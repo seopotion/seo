@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-24 (core auth + frontend Google login + Biome linter + CI)_
+_Last updated: 2026-06-24 (… + mock scanner + local dev: API server, ElasticMQ SQS, db:init)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -20,18 +20,18 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 ## Shared packages
 
 - ✅ `@shared/types` — `SETUP_STATUSES` / `SetupStatus`
-- ✅ `@shared/schemas` — `OrgSchema` (now with `user_id`) / `CreateOrgInput`, `ScanTask`, `UserSchema` / `CreateUserInput`
-- ✅ `@shared/db` — `getDb`/`closeDb`, `OrgRepo` (create/findById/findByUserId/updateStatus), `UserRepo` (findByGoogleSub/upsertByGoogleSub), `ensureIndexes`
+- ✅ `@shared/schemas` — `OrgSchema` (with `user_id` + optional `presets`) / `CreateOrgInput`, `ScanTask`, `SetupPresetsSchema`, `UserSchema` / `CreateUserInput`
+- ✅ `@shared/db` — `getDb`/`closeDb`, `OrgRepo` (create/findById/findByUserId/updateStatus/completeScan), `UserRepo` (findByGoogleSub/upsertByGoogleSub), `ensureIndexes`
 - ✅ `@shared/clients` — `getApiClient` (typed)
 
 ## Setup / onboarding flow
 
 - ✅ `POST /setup/start_scan` — creates org, enqueues SQS scan task
 - ✅ `GET /setup/status` — returns org setup status
-- ✅ Scanner worker — consumes SQS, validates `ScanTask`, advances to `setup_scan_completed`
-- 🟡 `scanWebsite()` — **stub**; needs real scrape + AI calls to generate presets
-- ⬜ Persist generated presets (business details, audience, blog, article prefs) — collection/fields + repo
-- ⬜ `GET /setup/details` — return generated presets (queryable)
+- ✅ Scanner worker — consumes SQS, validates `ScanTask`, generates presets, persists them, advances to `setup_scan_completed`
+- ✅ `scanWebsite()` — **mock** implementation (deterministic presets derived from the URL); swap for real scrape + AI later
+- ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
+- ⬜ `GET /setup/details` — return generated presets (queryable; data is now stored, endpoint not yet exposed)
 - ⬜ Editable preset endpoints per category (business / audience / blog / article prefs)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
 - ⬜ `POST /setup/finalize` — persist + flip status to `setup_complete`
@@ -75,13 +75,21 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
 - ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
 
+## Local development
+
+- ✅ Local API server (`apps/api/src/dev.ts`, `@hono/node-server` via tsx) — `npm run dev -w api`; **verified** (boots, `/health` + OpenAPI respond)
+- ✅ Local SQS via ElasticMQ in `docker-compose.yml` + worker poller (`apps/worker/src/dev.ts`); SQS client honors `SQS_ENDPOINT`
+- ✅ DB index init script — `npm run db:init`
+- ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
+- 🟡 Worker poller / `db:init` / ElasticMQ are typecheck-verified only here (Docker unavailable in this environment) — run locally to confirm the live round-trip
+
 ## Verification gaps (environment-limited)
 
 - ⬜ Integration test not executed here — Docker unavailable. Run: `docker compose up -d mongo && npm run test:integration`
-- ⬜ Full SQS round-trip not executed — needs deployed stack or LocalStack
+- ⬜ Full SQS round-trip not executed — run locally: `docker compose up -d` then `npm run dev`
 
 ## Always-green gates
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 11 passing)
+- `npm test` — unit tests (currently 14 passing)

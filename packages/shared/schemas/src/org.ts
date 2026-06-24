@@ -1,5 +1,6 @@
 import { SETUP_STATUSES } from '@shared/types';
 import { z } from 'zod';
+import { SetupPresetsSchema } from './presets';
 
 /**
  * Organization entity — the shape app code and the API work with.
@@ -12,10 +13,12 @@ export const OrgSchema = z.object({
   website_url: z.string().url(),
   setup_status: z.enum(SETUP_STATUSES),
   name: z.string().optional(),
+  // Populated by the scanner worker once scanning completes.
+  presets: SetupPresetsSchema.optional(),
   created_at: z.date(),
 });
 export type Org = z.infer<typeof OrgSchema>;
 
 /** Input for creating an org — the server assigns `id` and `created_at`. */
-export const CreateOrgInput = OrgSchema.omit({ id: true, created_at: true });
+export const CreateOrgInput = OrgSchema.omit({ id: true, created_at: true, presets: true });
 export type CreateOrgInput = z.infer<typeof CreateOrgInput>;

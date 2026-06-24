@@ -11,6 +11,7 @@
       "apps/**",
       "packages/**",
       "infra/**",
+      "scripts/**",
       "*.json",
       "*.ts",
       "*.md",

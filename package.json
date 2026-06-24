@@ -8,6 +8,8 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w api\" \"npm run dev -w worker\" \"npm run dev -w web\"",
+    "db:init": "node --env-file-if-exists=.env --import tsx scripts/init-db.ts",
     "check": "tsc -p tsconfig.json",
     "check:web": "npm run typecheck -w web",
     "check:all": "npm run check && npm run check:web",
@@ -21,7 +23,9 @@
     "@biomejs/biome": "^2.5.1",
     "@types/aws-lambda": "^8.10.162",
     "@types/node": "^26.0.0",
+    "concurrently": "^10.0.3",
     "esbuild": "^0.28.1",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }

@@ -30,23 +30,45 @@ CDK `NodejsFunction` (esbuild) at synth time.
 ```bash
 npm install                 # install all workspaces
 
-npm run check               # typecheck backend + shared packages
-npm run check:web           # typecheck the Next.js app
-npm run check:all           # both
+npm run lint                # Biome (lint + format + import-sort)
+npm run check:all           # typecheck (root + web)
 npm test                    # unit tests (Vitest) — no infra needed
 ```
+
+### Local full-stack dev
+
+Run the whole stack against local MongoDB + a local SQS-compatible queue (ElasticMQ).
+
+```bash
+# 1. Infra (MongoDB :27017, SQS :9324, SQS web UI :9325)
+docker compose up -d
+
+# 2. Env files (copy and fill in — Google client id is needed for real login)
+cp apps/api/.env.example apps/api/.env
+cp apps/worker/.env.example apps/worker/.env
+cp apps/web/.env.example apps/web/.env
+
+# 3. Create MongoDB indexes (one-off)
+npm run db:init
+
+# 4. Start everything (api :8787, worker poller, web :3000)
+npm run dev
+#   or individually:
+npm run dev -w api          # local Hono HTTP server (Node) — serves the Lambda app
+npm run dev -w worker       # long-polls the local SQS queue and runs the handler
+npm run dev -w web          # Next.js
+```
+
+The API local server (`apps/api/src/dev.ts`) serves the same Hono `app` as the Lambda
+handler — only the outer adapter differs. The worker (`apps/worker/src/dev.ts`) polls the
+local queue instead of being SQS-triggered. Google sign-in needs a real
+`GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID` authorized for `http://localhost`.
 
 ### Integration tests (real MongoDB)
 
 ```bash
 docker compose up -d mongo  # MongoDB on :27017
 npm run test:integration    # repository round-trips against live Mongo
-```
-
-### Frontend
-
-```bash
-npm run dev -w web          # Next.js dev server (set NEXT_PUBLIC_API_URL)
 ```
 
 ### Infrastructure

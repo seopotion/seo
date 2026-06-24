@@ -3,10 +3,12 @@ import { describe, expect, test, vi } from 'vitest';
 
 // vi.hoisted runs with the hoisted vi.mock factory, so the spy is initialized
 // before the factory references it.
-const { updateStatus } = vi.hoisted(() => ({ updateStatus: vi.fn(async () => {}) }));
+const { completeScan } = vi.hoisted(() => ({
+  completeScan: vi.fn(async (_id: string, _presets: { business: { name: string } }) => {}),
+}));
 
 vi.mock('@shared/db', () => ({
-  OrgRepo: { updateStatus },
+  OrgRepo: { completeScan },
 }));
 
 import { handler } from '../src/index';
@@ -30,13 +32,16 @@ function sqsEvent(body: unknown): SQSEvent {
 }
 
 describe('scanner worker', () => {
-  test('advances the org to setup_scan_completed', async () => {
+  test('generates presets and completes the scan for the org', async () => {
     await handler(
-      sqsEvent({ org_id: '6650f1a2b3c4d5e6f7a8b9c0', website_url: 'https://example.com' }),
+      sqsEvent({ org_id: '6650f1a2b3c4d5e6f7a8b9c0', website_url: 'https://clewas.com' }),
       {} as never,
       () => {},
     );
 
-    expect(updateStatus).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', 'setup_scan_completed');
+    expect(completeScan).toHaveBeenCalledTimes(1);
+    const [orgId, presets] = completeScan.mock.calls[0] ?? [];
+    expect(orgId).toBe('6650f1a2b3c4d5e6f7a8b9c0');
+    expect(presets?.business.name).toBe('Clewas');
   });
 });

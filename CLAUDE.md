@@ -19,8 +19,14 @@ npm run check:all        # both
 npm test                 # unit tests (Vitest); no infra needed
 npm test -- setup        # run a single test file by name filter
 npm run test:integration # repository tests vs real Mongo (needs `docker compose up -d mongo`)
+npm run dev              # full local stack (api + worker + web) via concurrently
+npm run dev -w api       # local Hono HTTP server (Node adapter; serves the Lambda app on :8787)
+npm run dev -w worker    # local SQS poller that runs the worker handler
 npm run dev -w web       # Next.js dev server
+npm run db:init          # create MongoDB indexes (one-off; needs Mongo running)
 ```
+
+Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + ElasticMQ SQS :9324) and `.env` files copied from each app's `.env.example`. The API/worker dev entrypoints (`src/dev.ts`, run via `tsx`) serve the same `app`/`handler` as the Lambda build — only the outer adapter differs. The SQS client honors `SQS_ENDPOINT` to target ElasticMQ locally.
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
 

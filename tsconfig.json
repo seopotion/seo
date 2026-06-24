@@ -4,7 +4,8 @@
     "apps/*/src/**/*",
     "apps/*/tests/**/*",
     "packages/shared/*/src/**/*",
-    "packages/shared/*/tests/**/*"
+    "packages/shared/*/tests/**/*",
+    "scripts/**/*.ts"
   ],
   "exclude": ["node_modules", "**/node_modules", "dist", "**/dist", "infra", "cdk.out"]
 }

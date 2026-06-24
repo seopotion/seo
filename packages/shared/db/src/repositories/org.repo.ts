@@ -3,6 +3,8 @@ import {
   CreateOrgInput as CreateOrgInputSchema,
   type Org,
   OrgSchema,
+  type SetupPresets,
+  SetupPresetsSchema,
 } from '@shared/schemas';
 import type { SetupStatus } from '@shared/types';
 import { type Document, ObjectId, type WithId } from 'mongodb';
@@ -38,5 +40,15 @@ export const OrgRepo = {
   async updateStatus(id: string, setup_status: SetupStatus): Promise<void> {
     if (!ObjectId.isValid(id)) return;
     await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { setup_status } });
+  },
+
+  /** Store the scan presets and mark scanning complete (single update). */
+  async completeScan(id: string, presets: SetupPresets): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    const data = SetupPresetsSchema.parse(presets); // validate on write
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { presets: data, setup_status: 'setup_scan_completed' } },
+    );
   },
 };
