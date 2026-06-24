@@ -1,0 +1,14 @@
+import { getDb } from './client';
+
+/**
+ * Idempotent index setup — run at deploy time (CDK-invoked one-off Lambda or a
+ * script), never lazily per request. `createIndex` is safe to re-run.
+ * See design/data-layer.md ("Indexes").
+ */
+export async function ensureIndexes(): Promise<void> {
+  const db = await getDb();
+  await db.collection('users').createIndex({ google_sub: 1 }, { unique: true });
+  await db.collection('orgs').createIndex({ user_id: 1 });
+  await db.collection('orgs').createIndex({ website_url: 1 });
+  // await db.collection('articles').createIndex({ org_id: 1, created_at: -1 });
+}

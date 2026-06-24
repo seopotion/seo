@@ -1,0 +1,20 @@
+{
+  "name": "infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "comment": "Standalone CDK package — NOT part of the npm workspaces. Run `cd infra && npm install` separately. Excluded from the root tsconfig.",
+  "scripts": {
+    "synth": "cdk synth",
+    "deploy": "cdk deploy"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.150.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.150.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.0"
+  }
+}

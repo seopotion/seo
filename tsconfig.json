@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "apps/*/src/**/*",
+    "apps/*/tests/**/*",
+    "packages/shared/*/src/**/*",
+    "packages/shared/*/tests/**/*"
+  ],
+  "exclude": ["node_modules", "**/node_modules", "dist", "**/dist", "infra", "cdk.out"]
+}
