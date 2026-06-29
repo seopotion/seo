@@ -7,6 +7,7 @@
  *   npm run cli -- --help
  */
 import { defineCommand, runMain } from 'citty';
+import { infraCommand } from './commands/infra';
 
 const main = defineCommand({
   meta: {
@@ -14,7 +15,9 @@ const main = defineCommand({
     version: '0.1.0',
     description: 'seo-dev CLI — infra checks and database management',
   },
-  subCommands: {},
+  subCommands: {
+    infra: infraCommand,
+  },
 });
 
 runMain(main);
