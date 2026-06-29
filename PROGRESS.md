@@ -74,6 +74,9 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Linter/formatter: **Biome** (`biome.json`) — `npm run lint` / `lint:fix`
 - ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
 - ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
+- ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above
+- ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings)
+- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL`
 
 ## Local development
 
