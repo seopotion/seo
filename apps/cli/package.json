@@ -1,0 +1,14 @@
+{
+  "name": "@seo/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1075.0",
+    "@shared/db": "*",
+    "@shared/types": "*",
+    "citty": "^0.1.6"
+  }
+}
