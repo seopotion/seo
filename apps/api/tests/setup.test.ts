@@ -35,6 +35,9 @@ vi.mock('@shared/db', () => ({
       setup_status: 'setup_scan_in_progress',
       created_at: new Date(),
     })),
+    // Default: no in-progress org for this user+url, so start_scan creates one.
+    findActiveByUserAndUrl: vi.fn(async () => null),
+    updateStatus: vi.fn(async () => {}),
     findById: vi.fn(async (id: string) => {
       // Completed org with presets ready.
       if (id === '6650f1a2b3c4d5e6f7a8b9c0') {
@@ -60,6 +63,7 @@ vi.mock('@shared/db', () => ({
   },
 }));
 
+import { OrgRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import { signToken } from '../src/auth/jwt';
 import app, { type AppType } from '../src/routes';
@@ -93,6 +97,35 @@ describe('setup routes', () => {
     // The scan task is enqueued for the worker with the new org id.
     expect(enqueueScanTask).toHaveBeenCalledWith({
       org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+      website_url: 'https://example.com',
+    });
+  });
+
+  test('POST /start_scan reuses an in-progress org instead of duplicating', async () => {
+    vi.mocked(OrgRepo.create).mockClear();
+    vi.mocked(OrgRepo.findActiveByUserAndUrl).mockResolvedValueOnce({
+      id: 'existing_org_id',
+      user_id: 'user_1',
+      website_url: 'https://example.com',
+      setup_status: 'setup_scan_in_progress',
+      created_at: new Date(),
+    });
+
+    const res = await client.api.v0.setup.start_scan.$post(
+      { json: { website_url: 'https://example.com' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json.org_id).toBe('existing_org_id');
+    expect(json.setup_status).toBe('setup_scan_in_progress');
+
+    // No new org created; the existing one is re-armed and re-enqueued.
+    expect(OrgRepo.create).not.toHaveBeenCalled();
+    expect(OrgRepo.updateStatus).toHaveBeenCalledWith('existing_org_id', 'setup_scan_in_progress');
+    expect(enqueueScanTask).toHaveBeenCalledWith({
+      org_id: 'existing_org_id',
       website_url: 'https://example.com',
     });
   });
