@@ -2,48 +2,42 @@
 
 import Script from 'next/script';
 import { useRef } from 'react';
-import { api } from '../lib/api';
-import { setToken } from '../lib/auth';
+import { GOOGLE_IDENTITY_SCRIPT_SRC, useGoogleLogin } from './auth/useGoogleLogin';
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
+type LoginButtonProps = {
+  onLoggedIn: () => void;
+  buttonOptions?: GoogleButtonOptions;
+  className?: string;
+};
 
 /**
  * "Sign in with Google" via Google Identity Services. On success we receive a
  * Google ID token, exchange it at POST /core/login for our session JWT, store
  * it, and notify the parent.
  */
-export function LoginButton({ onLoggedIn }: { onLoggedIn: () => void }) {
+export function LoginButton({ onLoggedIn, buttonOptions, className }: LoginButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { initialize } = useGoogleLogin({ onLoggedIn });
 
-  function initialize() {
-    if (!window.google || !containerRef.current) return;
+  function renderGoogleButton() {
+    if (!initialize() || !window.google || !containerRef.current) return;
 
-    window.google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      callback: async (response) => {
-        const res = await api.api.v0.core.login.$post({ json: { id_token: response.credential } });
-        if (res.ok) {
-          const { token } = await res.json();
-          setToken(token);
-          onLoggedIn();
-        }
-      },
-    });
-
+    containerRef.current.replaceChildren();
     window.google.accounts.id.renderButton(containerRef.current, {
       theme: 'outline',
       size: 'large',
+      ...buttonOptions,
     });
   }
 
   return (
     <>
       <Script
-        src="https://accounts.google.com/gsi/client"
+        src={GOOGLE_IDENTITY_SCRIPT_SRC}
         strategy="afterInteractive"
-        onLoad={initialize}
+        onReady={renderGoogleButton}
       />
-      <div ref={containerRef} />
+      <div className={className} ref={containerRef} />
     </>
   );
 }

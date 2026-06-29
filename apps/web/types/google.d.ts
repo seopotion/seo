@@ -15,6 +15,9 @@ interface GoogleButtonOptions {
   theme?: 'outline' | 'filled_blue' | 'filled_black';
   size?: 'small' | 'medium' | 'large';
   type?: 'standard' | 'icon';
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin';
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square';
+  width?: string | number;
 }
 
 interface Window {
