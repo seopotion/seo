@@ -2,12 +2,14 @@ import { swaggerUI } from '@hono/swagger-ui';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
+import { requestLogger } from '../middlewares/logger';
 import core from './core';
 import setup from './setup';
 
 const app = new OpenAPIHono();
 
 app.use('*', cors());
+app.use('*', requestLogger);
 
 app.get('/health', (c) => c.text('OK'));
 

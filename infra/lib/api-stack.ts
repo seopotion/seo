@@ -26,6 +26,8 @@ export class ApiStack extends Stack {
     const mongoEnv = {
       MONGO_URI: process.env.MONGO_URI ?? '',
       MONGO_DB: process.env.MONGO_DB ?? 'seo',
+      // Powertools Logger level (per-function service name is set in code).
+      POWERTOOLS_LOG_LEVEL: process.env.POWERTOOLS_LOG_LEVEL ?? 'INFO',
     };
 
     const bundling = { format: OutputFormat.ESM, minify: true, sourceMap: true };

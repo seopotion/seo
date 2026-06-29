@@ -9,6 +9,7 @@
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1075.0",
     "@shared/db": "*",
+    "@shared/logger": "*",
     "@shared/schemas": "*",
     "@shared/types": "*"
   }
