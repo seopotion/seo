@@ -39,27 +39,53 @@ vi.mock('@shared/db', () => ({
     findActiveByUserAndUrl: vi.fn(async () => null),
     updateStatus: vi.fn(async () => {}),
     findById: vi.fn(async (id: string) => {
-      // Completed org with presets ready.
+      // Completed org with presets ready, owned by the test user.
       if (id === '6650f1a2b3c4d5e6f7a8b9c0') {
         return {
           id,
+          user_id: 'user_1',
           website_url: 'https://example.com',
           setup_status: 'setup_scan_completed',
           presets: presetsFixture,
           created_at: new Date(),
         };
       }
-      // Completed org whose scan hasn't produced presets yet.
+      // Completed org whose scan hasn't produced presets yet (owned by test user).
       if (id === 'no_presets') {
         return {
           id,
+          user_id: 'user_1',
           website_url: 'https://example.com',
           setup_status: 'setup_scan_in_progress',
           created_at: new Date(),
         };
       }
+      // An already-finalized org owned by the test user (for 409 cases).
+      if (id === 'already_complete') {
+        return {
+          id,
+          user_id: 'user_1',
+          website_url: 'https://example.com',
+          setup_status: 'setup_complete',
+          presets: presetsFixture,
+          created_at: new Date(),
+        };
+      }
+      // An org owned by a DIFFERENT user (for ownership 404 cases).
+      if (id === 'other_users_org') {
+        return {
+          id,
+          user_id: 'someone_else',
+          website_url: 'https://example.com',
+          setup_status: 'setup_scan_completed',
+          presets: presetsFixture,
+          created_at: new Date(),
+        };
+      }
       return null;
     }),
+    updatePresets: vi.fn(async () => {}),
+    finalize: vi.fn(async () => {}),
   },
 }));
 
@@ -182,6 +208,122 @@ describe('setup routes', () => {
       { headers: await authHeader() },
     );
     expect(res.status).toBe(404);
+  });
+
+  test('GET /details returns 404 for an org owned by another user', async () => {
+    const res = await client.api.v0.setup.details.$get(
+      { query: { org_id: 'other_users_org' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /presets requires auth', async () => {
+    const res = await client.api.v0.setup.presets.$patch({
+      json: { org_id: '6650f1a2b3c4d5e6f7a8b9c0', presets: { business: { name: 'New' } } },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('PATCH /presets merges a partial edit and returns full presets', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { business: { name: 'Renamed Co' } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.business.name).toBe('Renamed Co');
+    expect(json.presets.business.language).toBe('English'); // sibling preserved
+    expect(OrgRepo.updatePresets).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({
+        business: expect.objectContaining({ name: 'Renamed Co', language: 'English' }),
+      }),
+    );
+  });
+
+  test('PATCH /presets returns 404 for an org owned by another user', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      { json: { org_id: 'other_users_org', presets: { business: { name: 'Hijack' } } } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /presets returns 409 when scan is not yet completed', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      { json: { org_id: 'no_presets', presets: { business: { name: 'Early' } } } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(409);
+  });
+
+  test('POST /finalize requires auth', async () => {
+    const res = await client.api.v0.setup.finalize.$post({
+      json: { org_id: '6650f1a2b3c4d5e6f7a8b9c0' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('POST /finalize flips status to setup_complete without edits', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      { json: { org_id: '6650f1a2b3c4d5e6f7a8b9c0' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.setup_status).toBe('setup_complete');
+    expect(json.presets.business.name).toBe('Example Co');
+    expect(OrgRepo.finalize).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({ business: expect.objectContaining({ name: 'Example Co' }) }),
+    );
+  });
+
+  test('POST /finalize applies a final edit then flips status', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { business: { name: 'Final Co' } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.business.name).toBe('Final Co');
+    expect(OrgRepo.finalize).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({ business: expect.objectContaining({ name: 'Final Co' }) }),
+    );
+  });
+
+  test('POST /finalize returns 404 for an org owned by another user', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      { json: { org_id: 'other_users_org' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('POST /finalize returns 409 when already complete', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      { json: { org_id: 'already_complete' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(409);
   });
 
   test('GET /health returns OK', async () => {

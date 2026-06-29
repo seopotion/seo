@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-29 (+ org_id/_id tension resolved: server-owned id + idempotent start_scan)_
+_Last updated: 2026-06-29 (+ setup finalize + editable presets)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -32,9 +32,9 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ `scanWebsite()` — **mock** implementation (deterministic presets derived from the URL); swap for real scrape + AI later
 - ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
 - ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
-- ⬜ Editable preset endpoints per category (business / audience / blog / article prefs)
+- ✅ `PATCH /setup/presets` — partial edit of generated presets (deep-merge, ownership-checked)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
-- ⬜ `POST /setup/finalize` — persist + flip status to `setup_complete`
+- ✅ `POST /setup/finalize` — optional final edit + flip status to `setup_complete`
 - ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
 
 ## Core / auth
@@ -93,4 +93,4 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 31 passing)
+- `npm test` — unit tests (currently 47 passing)
