@@ -6,6 +6,7 @@ import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
+import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 
 /**
@@ -30,6 +31,26 @@ export class ApiStack extends Stack {
       POWERTOOLS_LOG_LEVEL: process.env.POWERTOOLS_LOG_LEVEL ?? 'INFO',
     };
 
+    // JWT signing secret lives in an SSM SecureString created out-of-band (so
+    // the secret never enters this template). We reference it by NAME and grant
+    // the API Lambda read; the API fetches + caches it at runtime via Powertools
+    // Parameters. See apps/api/src/auth/secret.ts.
+    //   aws ssm put-parameter --name /seo/jwt-secret --type SecureString --value <secret>
+    const jwtSecretParamName = process.env.JWT_SECRET_PARAM ?? '/seo/jwt-secret';
+    const jwtSecretParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'JwtSecretParam',
+      { parameterName: jwtSecretParamName },
+    );
+
+    // Auth config — read by the API Lambda ONLY. JWT_SECRET_PARAM is just the
+    // parameter NAME (not the secret); GOOGLE_CLIENT_ID is a public OAuth id.
+    // Deliberately kept out of mongoEnv so the worker never receives them.
+    const authEnv = {
+      JWT_SECRET_PARAM: jwtSecretParamName,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+    };
+
     const bundling = { format: OutputFormat.ESM, minify: true, sourceMap: true };
 
     // Scan task queue. Visibility timeout >= worker timeout so an in-flight
@@ -45,10 +66,11 @@ export class ApiStack extends Stack {
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(30),
       memorySize: 512,
-      environment: { ...mongoEnv, SCAN_QUEUE_URL: scanQueue.queueUrl },
+      environment: { ...mongoEnv, ...authEnv, SCAN_QUEUE_URL: scanQueue.queueUrl },
       bundling,
     });
     scanQueue.grantSendMessages(apiFn);
+    jwtSecretParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {

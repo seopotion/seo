@@ -44,8 +44,9 @@ Run the whole stack against local MongoDB + a local SQS-compatible queue (Elasti
 docker compose up -d
 
 # 2. Env files (copy and fill in — Google client id is needed for real login)
-cp apps/api/.env.example apps/api/.env
-cp apps/worker/.env.example apps/worker/.env
+#    Root .env holds shared backend config + secrets (api/worker/cli cascade
+#    from it; create per-app apps/<app>/.env only to override). Web reads its own.
+cp .env.example .env
 cp apps/web/.env.example apps/web/.env
 
 # 3. Create MongoDB indexes (one-off)
@@ -76,6 +77,20 @@ npm run test:integration    # repository round-trips against live Mongo
 ```bash
 cd infra && npm install && npm run synth   # standalone CDK package
 ```
+
+The API Lambda reads its JWT signing secret from an SSM SecureString at runtime
+(cached via Powertools Parameters), so the secret never lands in the CDK
+template. Create it once per environment before deploying — CDK only references
+it by name (`JWT_SECRET_PARAM`, default `/seo/jwt-secret`) and grants the API
+Lambda read access:
+
+```bash
+aws ssm put-parameter --name /seo/jwt-secret --type SecureString \
+  --value "<strong-random-secret>"
+```
+
+Uses the AWS-managed `alias/aws/ssm` key, so no extra KMS grant is needed. Local
+dev doesn't touch SSM — it falls back to the `JWT_SECRET` value in the root `.env`.
 
 ## CLI
 
