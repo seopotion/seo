@@ -27,9 +27,18 @@ If no orgs are returned this is an indicator of a new/fresh user and he should b
 
 ## 1. Start
 
-whenever user comes to the setup page FE should generate a random `org_id` for him.
+Identity is **server-owned**: the org id is the org's Mongo `_id` (exposed as a
+string), per [data-layer.md](data-layer.md). The frontend does **not** mint an
+`org_id` — it has none until `start_scan` creates the org and returns one, which
+the FE then persists (e.g. localStorage) to poll `/status` and `/details`.
 
-endpoint `/api/v0/setup/status` returns `setup_not_started` with payload org_id.
+> _Resolved design tension:_ an earlier draft had the FE generate a random
+> `org_id` up front. We keep server-generated ids (one identity, no client-chosen
+> keys) and instead make `start_scan` **idempotent**: a retry for the same user +
+> URL reuses the in-progress org rather than duplicating it (see §1 start_scan).
+
+endpoint `/api/v0/setup/status` returns `setup_not_started` for any unknown
+`org_id` (e.g. before the first scan).
 
 Then we load the start scanning page.
 
@@ -39,7 +48,9 @@ Enter your website URL
 
 endpoint `/api/v0/setup/start_scan`
 
-payload: website url string, org_id.
+payload: website url string. (No `org_id` — the server creates the org and
+returns its id.) Idempotent: if the user already has a non-`setup_complete` org
+for this URL, that org is reused and re-armed instead of creating a new one.
 
 this will trigger the website _scanner_worker_
 

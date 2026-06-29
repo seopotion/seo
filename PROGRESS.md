@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-29 (+ @seo/cli: infra check, db init)_
+_Last updated: 2026-06-29 (+ org_id/_id tension resolved: server-owned id + idempotent start_scan)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -35,7 +35,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ⬜ Editable preset endpoints per category (business / audience / blog / article prefs)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
 - ⬜ `POST /setup/finalize` — persist + flip status to `setup_complete`
-- ⬜ Reconcile FE-generated `org_id` vs Mongo `_id` (open design tension — see design/product-flow.md §1)
+- ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
 
 ## Core / auth
 
@@ -93,4 +93,4 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 30 passing)
+- `npm test` — unit tests (currently 31 passing)

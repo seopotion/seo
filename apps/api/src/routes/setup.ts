@@ -33,13 +33,23 @@ const setup = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { website_url } = c.req.valid('json');
       const { userId } = c.get('auth');
-      const org = await OrgRepo.create({
-        user_id: userId,
-        website_url,
-        setup_status: 'setup_scan_in_progress',
-      });
-      await enqueueScanTask({ org_id: org.id, website_url });
-      return c.json({ org_id: org.id, setup_status: org.setup_status });
+      // Idempotent: a retry (double-click / refresh-and-resubmit) for the same
+      // user + URL reuses the in-progress org instead of creating a duplicate.
+      const existing = await OrgRepo.findActiveByUserAndUrl(userId, website_url);
+      let org_id: string;
+      if (existing) {
+        await OrgRepo.updateStatus(existing.id, 'setup_scan_in_progress');
+        org_id = existing.id;
+      } else {
+        const org = await OrgRepo.create({
+          user_id: userId,
+          website_url,
+          setup_status: 'setup_scan_in_progress',
+        });
+        org_id = org.id;
+      }
+      await enqueueScanTask({ org_id, website_url });
+      return c.json({ org_id, setup_status: 'setup_scan_in_progress' as const });
     },
   )
   .openapi(
