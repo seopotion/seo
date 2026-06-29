@@ -1,5 +1,5 @@
-import { Button } from '../../../components/ui';
-import { textEntryInputClass } from '../constants';
+import { XIcon } from 'lucide-react';
+import { Badge, Button, Input, Label } from '../../../components/ui';
 import type { TextEntry } from '../types';
 import { ErrorMessage } from './ErrorMessage';
 
@@ -30,11 +30,9 @@ export function TextEntryList({
 }) {
   return (
     <div>
-      <label className="block font-medium text-gray-900 text-sm" htmlFor={inputId}>
-        {label}
-      </label>
+      <Label htmlFor={inputId}>{label}</Label>
       <div className="mt-2 flex gap-2">
-        <input
+        <Input
           id={inputId}
           type={inputType}
           value={draft}
@@ -46,7 +44,6 @@ export function TextEntryList({
             }
           }}
           placeholder={placeholder}
-          className={textEntryInputClass}
           aria-invalid={ariaInvalid}
         />
         <Button variant="outline" onClick={onAdd}>
@@ -59,20 +56,18 @@ export function TextEntryList({
 
       <div className="mt-3 flex flex-wrap gap-2">
         {entries.map((entry) => (
-          <span
-            key={entry.id}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-gray-50 px-3 py-1 text-gray-700 text-sm"
-          >
-            {entry.value}
-            <button
-              type="button"
+          <Badge key={entry.id} variant="secondary" className="max-w-full gap-1.5 py-1 pr-1 pl-3">
+            <span className="truncate">{entry.value}</span>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => onRemove(entry.id)}
-              className="font-bold text-gray-500 hover:text-gray-900"
+              className="size-5 rounded-full text-muted-foreground hover:text-foreground"
               aria-label={`Remove ${entry.value}`}
             >
-              ×
-            </button>
-          </span>
+              <XIcon className="size-3" />
+            </Button>
+          </Badge>
         ))}
       </div>
     </div>

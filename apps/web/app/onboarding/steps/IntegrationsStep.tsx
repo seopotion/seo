@@ -1,4 +1,14 @@
-import { inputClass, labelClass, referralSources } from '../constants';
+import {
+  Button,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui';
+import { cn } from '../../../lib/utils';
+import { referralSources } from '../constants';
 import type { OnboardingForm, UpdateOnboardingField } from '../types';
 
 const integrations = [
@@ -49,50 +59,51 @@ export function IntegrationsStep({
       <h2 className="font-bold text-2xl text-gray-900">Integrations And Referral Source</h2>
 
       <div className="mt-6">
-        <p className={labelClass}>Available integrations</p>
+        <p className="font-medium text-sm leading-none">Available integrations</p>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {integrations.map((integration) => {
             const selected = form.integrations.includes(integration.id);
 
             return (
-              <button
+              <Button
                 key={integration.id}
-                type="button"
+                variant="outline"
                 onClick={() => toggleIntegration(integration.id)}
                 aria-pressed={selected}
-                className={`flex items-center gap-3 rounded-md border px-3 py-3 text-left text-sm transition ${
+                className={cn(
+                  'h-auto justify-start gap-3 px-3 py-3 text-left',
                   selected
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                }`}
+                    ? 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary'
+                    : 'text-foreground',
+                )}
               >
                 <span className="flex size-9 items-center justify-center rounded-md border border-current">
                   {integration.icon}
                 </span>
                 <span className="font-semibold">{integration.name}</span>
-              </button>
+              </Button>
             );
           })}
         </div>
       </div>
 
       <div className="mt-6">
-        <label className={labelClass} htmlFor="referralSource">
-          How did you hear about us?
-        </label>
-        <select
-          id="referralSource"
-          value={form.referralSource}
-          onChange={(event) => updateField('referralSource', event.target.value)}
-          className={inputClass}
+        <Label htmlFor="referralSource">How did you hear about us?</Label>
+        <Select
+          value={form.referralSource || undefined}
+          onValueChange={(value) => updateField('referralSource', value)}
         >
-          <option value="">Select an option</option>
-          {referralSources.map((source) => (
-            <option key={source} value={source}>
-              {source}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="referralSource" className="mt-2">
+            <SelectValue placeholder="Select an option" />
+          </SelectTrigger>
+          <SelectContent>
+            {referralSources.map((source) => (
+              <SelectItem key={source} value={source}>
+                {source}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
-import { Button } from '../../../components/ui';
+import { Alert, AlertDescription, Button, Input, Label } from '../../../components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
-import { inputClass, labelClass } from '../constants';
 import type { Errors, OnboardingForm, ScanState } from '../types';
 
 export function WebsiteScanStep({
@@ -22,16 +21,14 @@ export function WebsiteScanStep({
       <p className="mt-2 text-gray-600 text-sm">Start with the site Rankpace should learn from.</p>
 
       <div className="mt-6">
-        <label className={labelClass} htmlFor="websiteUrl">
-          Website URL
-        </label>
-        <input
+        <Label htmlFor="websiteUrl">Website URL</Label>
+        <Input
+          className="mt-2"
           id="websiteUrl"
           type="url"
           value={form.websiteUrl}
           onChange={(event) => onWebsiteUrlChange(event.target.value)}
           placeholder="https://example.com"
-          className={inputClass}
           aria-invalid={Boolean(errors.websiteUrl)}
         />
         <ErrorMessage>{errors.websiteUrl}</ErrorMessage>
@@ -42,12 +39,16 @@ export function WebsiteScanStep({
           {scanState === 'scanning' ? 'Scanning...' : 'Scan website'}
         </Button>
         {scanState === 'complete' && (
-          <p className="font-medium text-green-700 text-sm">
-            Scan complete. A draft business description is ready.
-          </p>
+          <Alert className="border-emerald-200 bg-emerald-50 py-2 text-emerald-900 sm:flex-1">
+            <AlertDescription className="text-emerald-800">
+              Scan complete. A draft business description is ready.
+            </AlertDescription>
+          </Alert>
         )}
         {scanState === 'scanning' && (
-          <p className="text-gray-600 text-sm">Scanning website content...</p>
+          <Alert className="py-2 sm:flex-1">
+            <AlertDescription>Scanning website content...</AlertDescription>
+          </Alert>
         )}
       </div>
       <ErrorMessage>{errors.scan}</ErrorMessage>

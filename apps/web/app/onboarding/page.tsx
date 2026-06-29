@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Card, CardContent } from '../../components/ui';
 import { FinishedState } from './components/FinishedState';
 import { ProgressSteps } from './components/ProgressSteps';
 import { StepNavigation } from './components/StepNavigation';
@@ -328,17 +329,19 @@ export default function OnboardingPage() {
 
         <ProgressSteps currentStep={currentStep} onStepClick={goToStep} steps={steps} />
 
-        <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-xs sm:p-6">
-          {renderCurrentStep()}
-          <StepNavigation
-            currentStep={currentStep}
-            isFinalStep={currentStep === steps.length - 1}
-            isNextDisabled={scanState === 'scanning'}
-            onBack={handleBack}
-            onFinish={handleFinish}
-            onNext={handleNext}
-          />
-        </section>
+        <Card>
+          <CardContent>
+            {renderCurrentStep()}
+            <StepNavigation
+              currentStep={currentStep}
+              isFinalStep={currentStep === steps.length - 1}
+              isNextDisabled={scanState === 'scanning'}
+              onBack={handleBack}
+              onFinish={handleFinish}
+              onNext={handleNext}
+            />
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

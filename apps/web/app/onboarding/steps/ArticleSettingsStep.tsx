@@ -1,6 +1,14 @@
+import {
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ToggleSwitch } from '../components/ToggleSwitch';
-import { articleStyles, inputClass, internalLinkCounts, labelClass } from '../constants';
+import { articleStyles, internalLinkCounts } from '../constants';
 import type { Errors, OnboardingForm, UpdateOnboardingField } from '../types';
 
 export function ArticleSettingsStep({
@@ -18,42 +26,46 @@ export function ArticleSettingsStep({
 
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <div>
-          <label className={labelClass} htmlFor="articleStyle">
-            Article style
-          </label>
-          <select
-            id="articleStyle"
-            value={form.articleStyle}
-            onChange={(event) => updateField('articleStyle', event.target.value)}
-            className={inputClass}
-            aria-invalid={Boolean(errors.articleStyle)}
+          <Label htmlFor="articleStyle">Article style</Label>
+          <Select
+            value={form.articleStyle || undefined}
+            onValueChange={(value) => updateField('articleStyle', value)}
           >
-            <option value="">Select style</option>
-            {articleStyles.map((style) => (
-              <option key={style} value={style}>
-                {style}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              id="articleStyle"
+              className="mt-2"
+              aria-invalid={Boolean(errors.articleStyle)}
+            >
+              <SelectValue placeholder="Select style" />
+            </SelectTrigger>
+            <SelectContent>
+              {articleStyles.map((style) => (
+                <SelectItem key={style} value={style}>
+                  {style}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <ErrorMessage>{errors.articleStyle}</ErrorMessage>
         </div>
 
         <div>
-          <label className={labelClass} htmlFor="internalLinksCount">
-            Internal links count
-          </label>
-          <select
-            id="internalLinksCount"
+          <Label htmlFor="internalLinksCount">Internal links count</Label>
+          <Select
             value={form.internalLinksCount}
-            onChange={(event) => updateField('internalLinksCount', event.target.value)}
-            className={inputClass}
+            onValueChange={(value) => updateField('internalLinksCount', value)}
           >
-            {internalLinkCounts.map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="internalLinksCount" className="mt-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {internalLinkCounts.map((count) => (
+                <SelectItem key={count} value={count}>
+                  {count}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <ToggleSwitch
