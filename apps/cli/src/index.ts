@@ -7,6 +7,7 @@
  *   npm run cli -- --help
  */
 import { defineCommand, runMain } from 'citty';
+import { dbCommand } from './commands/db';
 import { infraCommand } from './commands/infra';
 
 const main = defineCommand({
@@ -17,6 +18,7 @@ const main = defineCommand({
   },
   subCommands: {
     infra: infraCommand,
+    db: dbCommand,
   },
 });
 
