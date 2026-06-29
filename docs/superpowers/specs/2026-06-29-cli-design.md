@@ -53,23 +53,30 @@ command groups (E2E scan harness, data/admin management) without rework.
 ### Layout
 
 ```
-apps/cli/src/
-  index.ts              # citty main + subCommands (infra, db)
-  types.ts              # Result<T>, ok/fail, EXIT, Emitter, OutputMode, data types
-  utils/
-    emitter.ts          # createEmitter(mode): text vs json
-  commands/
-    shared.ts           # outputOption, verboseOption spreads
-    infra.ts            # `infra check`
-    db.ts               # `db init`
-  lib/
-    infra.ts            # checkInfra(services?) -> Result<InfraCheckResult>
+apps/cli/
+  package.json          # @seo/cli, type:module, deps + (no bin)
+  src/
+    index.ts            # citty main + subCommands (infra, db)
+    types.ts            # Result<T>, ok/fail, EXIT, Emitter, OutputMode, data types
+    utils/
+      emitter.ts        # createEmitter(mode): text vs json
+    commands/
+      shared.ts         # outputOption, verboseOption spreads
+      infra.ts          # `infra check`
+      db.ts             # `db init`
+    lib/
+      infra.ts          # checkInfra(services?) -> Result<InfraCheckResult>
+      db.ts             # initDb() -> Result<DbInitData>
+  tests/                # vitest only discovers apps/**/tests/**/*.test.ts
+    emitter.test.ts
     infra.test.ts
-    db.ts               # initDb() -> Result<DbInitData>
     db.test.ts
-  __tests__/
-    cli-smoke.test.ts   # --help and unknown-command behavior
+    cli-smoke.test.ts   # spawns the CLI; --help lists both command groups
 ```
+
+No per-app `tsconfig.json`: the root `tsconfig.json` already includes
+`apps/*/src/**` and `apps/*/tests/**`, so `npm run check` covers the CLI (same
+as `apps/worker`).
 
 **Layering rule:** `commands/` are thin citty definitions that parse args,
 create an emitter, lazy-`import()` the matching `lib/` function, render the
@@ -150,16 +157,18 @@ the set of collections/indexes ensured. Exit `OP_FAILED` on error, else
 
 ## Testing
 
-- **Vitest**, colocated in `lib/`:
-  - `infra.test.ts` — `checkInfra` with `@shared/db` and the SQS client mocked
-    (mirror existing `vi.mock` / `vi.hoisted` patterns); cover all-up,
-    one-down, and `--services` filtering.
+- **Vitest**, in `apps/cli/tests/` (the only place `npm test` discovers):
+  - `emitter.test.ts` — json `result()` writes a single JSON object to stdout;
+    text `result()` of a failure writes the `[CODE]` line to stderr.
+  - `infra.test.ts` — `checkInfra` with `@shared/db`, the SQS client, and
+    `fetch` mocked (mirror existing `vi.mock` / `vi.hoisted` patterns); cover
+    all-up, one-down, and `--services` filtering.
   - `db.test.ts` — `initDb` calls `ensureIndexes` (mocked) and maps a thrown
     error to a `fail(...)` Result.
-- **Smoke**: `__tests__/cli-smoke.test.ts` — `--help` exits 0; unknown command
-  exits non-zero without throwing.
-- Confirm `apps/cli` is covered by the root `npm run check` (tsconfig include)
-  and by `npm test`.
+- **Smoke**: `cli-smoke.test.ts` — spawns the CLI with `--help` via the local
+  `tsx` binary; asserts exit 0 and that output lists both `infra` and `db`.
+- `apps/cli` is covered by the root `npm run check` (root tsconfig include) and
+  by `npm test` (vitest `apps/**/tests/**` glob).
 - Always-green gates unchanged: `npm run lint`, `npm run check`, `npm test`.
 
 ## Future slots (documented, not built)
