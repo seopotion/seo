@@ -65,4 +65,21 @@ export const OrgRepo = {
       { $set: { presets: data, setup_status: 'setup_scan_completed' } },
     );
   },
+
+  /** Persist edited presets without changing status (used by PATCH /setup/presets). */
+  async updatePresets(id: string, presets: SetupPresets): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    const data = SetupPresetsSchema.parse(presets); // validate on write
+    await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { presets: data } });
+  },
+
+  /** Persist final presets and flip the org to `setup_complete` (single update). */
+  async finalize(id: string, presets: SetupPresets): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    const data = SetupPresetsSchema.parse(presets); // validate on write
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { presets: data, setup_status: 'setup_complete' } },
+    );
+  },
 };
