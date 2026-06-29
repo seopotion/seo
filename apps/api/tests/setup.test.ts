@@ -4,6 +4,27 @@ import { describe, expect, test, vi } from 'vitest';
 const { enqueueScanTask } = vi.hoisted(() => ({ enqueueScanTask: vi.fn(async () => {}) }));
 vi.mock('../src/clients/sqs', () => ({ enqueueScanTask }));
 
+// A fully-populated presets object (matches SetupPresetsSchema) for the
+// completed org, so `/details` has something to return.
+const presetsFixture = {
+  business: {
+    name: 'Example Co',
+    language: 'English',
+    country: 'Global (English)',
+    description: 'An example business.',
+  },
+  audience: { target: 'Developers', competitors: ['acme.com'] },
+  blog: {
+    sitemap_url: 'https://example.com/sitemap.xml',
+    main_blog_url: 'https://example.com/blog',
+    best_articles: ['https://example.com/blog/post-1'],
+  },
+  article_preferences: {
+    content_seo: { article_style: 'Conversational', internal_links: true, llm_instructions: '' },
+    engagement: { image_style: 'Minimal' },
+  },
+};
+
 // Mock the DB package BEFORE importing the app. Vitest hoists vi.mock above the
 // imports, so the route's `import { OrgRepo } from '@shared/db'` gets the mock.
 vi.mock('@shared/db', () => ({
@@ -14,16 +35,28 @@ vi.mock('@shared/db', () => ({
       setup_status: 'setup_scan_in_progress',
       created_at: new Date(),
     })),
-    findById: vi.fn(async (id: string) =>
-      id === '6650f1a2b3c4d5e6f7a8b9c0'
-        ? {
-            id,
-            website_url: 'https://example.com',
-            setup_status: 'setup_scan_completed',
-            created_at: new Date(),
-          }
-        : null,
-    ),
+    findById: vi.fn(async (id: string) => {
+      // Completed org with presets ready.
+      if (id === '6650f1a2b3c4d5e6f7a8b9c0') {
+        return {
+          id,
+          website_url: 'https://example.com',
+          setup_status: 'setup_scan_completed',
+          presets: presetsFixture,
+          created_at: new Date(),
+        };
+      }
+      // Completed org whose scan hasn't produced presets yet.
+      if (id === 'no_presets') {
+        return {
+          id,
+          website_url: 'https://example.com',
+          setup_status: 'setup_scan_in_progress',
+          created_at: new Date(),
+        };
+      }
+      return null;
+    }),
   },
 }));
 
@@ -80,6 +113,42 @@ describe('setup routes', () => {
 
     const json = await res.json();
     expect(json.setup_status).toBe('setup_not_started');
+  });
+
+  test('GET /details requires auth', async () => {
+    const res = await client.api.v0.setup.details.$get({
+      query: { org_id: '6650f1a2b3c4d5e6f7a8b9c0' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('GET /details returns generated presets for a completed org', async () => {
+    const res = await client.api.v0.setup.details.$get(
+      { query: { org_id: '6650f1a2b3c4d5e6f7a8b9c0' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.business.name).toBe('Example Co');
+    expect(json.presets.audience.competitors).toEqual(['acme.com']);
+  });
+
+  test('GET /details returns 404 when presets are not generated yet', async () => {
+    const res = await client.api.v0.setup.details.$get(
+      { query: { org_id: 'no_presets' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('GET /details returns 404 for an unknown org', async () => {
+    const res = await client.api.v0.setup.details.$get(
+      { query: { org_id: 'nope' } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(404);
   });
 
   test('GET /health returns OK', async () => {
