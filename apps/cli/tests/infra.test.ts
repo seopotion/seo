@@ -71,4 +71,16 @@ describe('checkInfra', () => {
     expect(res.data.services.map((s) => s.service)).toEqual(['api']);
     expect(ping).not.toHaveBeenCalled();
   });
+
+  test('marks sqs down with SCAN_QUEUE_URL not set message when env var is missing', async () => {
+    delete process.env.SCAN_QUEUE_URL;
+    const res = await checkInfra(['sqs']);
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.services[0]).toMatchObject({
+      service: 'sqs',
+      available: false,
+      error: 'SCAN_QUEUE_URL not set',
+    });
+  });
 });

@@ -93,4 +93,4 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 14 passing)
+- `npm test` — unit tests (currently 30 passing)
