@@ -1,12 +1,14 @@
 import { join } from 'node:path';
-import { Duration, Stack, type StackProps } from 'aws-cdk-lib';
+import { CustomResource, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
+import { Provider } from 'aws-cdk-lib/custom-resources';
 import type { Construct } from 'constructs';
 
 /**
@@ -53,15 +55,31 @@ export class ApiStack extends Stack {
 
     const bundling = { format: OutputFormat.ESM, minify: true, sourceMap: true };
 
+    // Lambda entries live in apps/* and import @shared/* — both outside this
+    // standalone infra package. Point esbuild at the monorepo root so it can
+    // resolve workspace source and the root lockfile during bundling.
+    const projectRoot = join(__dirname, '../..');
+    const depsLockFilePath = join(projectRoot, 'package-lock.json');
+
+    // Dead-letter queue: scan tasks that fail repeatedly land here instead of
+    // retrying/expiring silently. 14-day retention gives time to inspect.
+    const scanDlq = new Queue(this, 'ScanDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
     // Scan task queue. Visibility timeout >= worker timeout so an in-flight
     // message isn't redelivered while the worker is still processing it.
+    // After maxReceiveCount failed deliveries the message moves to the DLQ.
     const scanQueue = new Queue(this, 'ScanQueue', {
       visibilityTimeout: Duration.seconds(180),
+      deadLetterQueue: { queue: scanDlq, maxReceiveCount: 3 },
     });
 
     // API Lambda — produces scan tasks.
     const apiFn = new NodejsFunction(this, 'ApiFn', {
-      entry: join(__dirname, '../../apps/api/src/index.ts'),
+      entry: join(projectRoot, 'apps/api/src/index.ts'),
+      projectRoot,
+      depsLockFilePath,
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(30),
@@ -74,7 +92,9 @@ export class ApiStack extends Stack {
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {
-      entry: join(__dirname, '../../apps/worker/src/index.ts'),
+      entry: join(projectRoot, 'apps/worker/src/index.ts'),
+      projectRoot,
+      depsLockFilePath,
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(120),
@@ -83,6 +103,33 @@ export class ApiStack extends Stack {
       bundling,
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
+
+    // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
+    // custom resource below (Create/Update), so indexes exist before traffic.
+    const dbInitFn = new NodejsFunction(this, 'DbInitFn', {
+      entry: join(projectRoot, 'scripts/lambda-db-init.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.seconds(60),
+      memorySize: 256,
+      environment: mongoEnv,
+      bundling,
+    });
+
+    const dbInitProvider = new Provider(this, 'DbInitProvider', {
+      onEventHandler: dbInitFn,
+      logRetention: RetentionDays.ONE_WEEK,
+    });
+
+    // Re-run index creation on every deploy by varying a property so CFN sees a
+    // resource update (indexes are idempotent, so re-running is safe/cheap).
+    new CustomResource(this, 'DbInitResource', {
+      serviceToken: dbInitProvider.serviceToken,
+      removalPolicy: RemovalPolicy.DESTROY,
+      properties: { deployedAt: Date.now().toString() },
+    });
 
     // Public HTTP API -> API Lambda.
     const httpApi = new HttpApi(this, 'HttpApi');

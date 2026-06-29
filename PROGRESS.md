@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-29 (+ setup finalize + editable presets)_
+_Last updated: 2026-06-30 (+ infra synth verified: bin entrypoint, DLQ, DB-init custom resource)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -67,10 +67,10 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 ## Infrastructure / ops
 
-- 🟡 `infra/lib/api-stack.ts` — API fn, worker fn, SQS queue, HTTP API written but **not synthed/verified** (standalone CDK pkg, not installed here)
-- ⬜ `infra/bin` entrypoint so the stack actually `synth`s; verify NodejsFunction bundling end-to-end
-- ⬜ Dead-letter queue on `ScanQueue` (failed scans currently just retry/expire)
-- ⬜ Run `ensureIndexes()` at deploy (one-off Lambda / custom resource)
+- ✅ `infra/lib/api-stack.ts` — API fn, worker fn, SQS queue + DLQ, DB-init custom resource, HTTP API; **`cdk synth` verified green** (standalone CDK pkg)
+- ✅ `infra/bin/app.ts` entrypoint + `cdk.json` + `tsconfig.json`; **NodejsFunction bundling verified end-to-end** — both Lambdas bundle (api 1.1M, worker 1.5M, db-init 804K), `@shared/*` inlined, `mongodb`/powertools bundled, `handler` exported. `NodejsFunction` needs `projectRoot`/`depsLockFilePath` at the monorepo root (entries live in `apps/*`)
+- ✅ Dead-letter queue on `ScanQueue` (`maxReceiveCount: 3` → `ScanDlq`, 14-day retention)
+- ✅ Run `ensureIndexes()` at deploy — `scripts/lambda-db-init.ts` Lambda behind a `Provider`-backed `CustomResource` (re-runs each deploy; indexes idempotent)
 - ✅ Linter/formatter: **Biome** (`biome.json`) — `npm run lint` / `lint:fix`
 - ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
 - ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
