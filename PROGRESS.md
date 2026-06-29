@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-29 (+ `GET /setup/details` endpoint exposing generated presets)_
+_Last updated: 2026-06-29 (+ @seo/cli: infra check, db init)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -81,6 +81,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Local SQS via ElasticMQ in `docker-compose.yml` + worker poller (`apps/worker/src/dev.ts`); SQS client honors `SQS_ENDPOINT`
 - ✅ DB index init script — `npm run db:init`
 - ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
+- ✅ Management CLI (`apps/cli`, `@seo/cli`, citty + tsx) — `npm run cli -- <cmd>`; commands: `infra check`, `db init`; `--output json` for agents
 - 🟡 Worker poller / `db:init` / ElasticMQ are typecheck-verified only here (Docker unavailable in this environment) — run locally to confirm the live round-trip
 
 ## Verification gaps (environment-limited)
