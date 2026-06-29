@@ -8,6 +8,7 @@
     "apps/*"
   ],
   "scripts": {
+    "cli": "node --env-file-if-exists=.env --import tsx apps/cli/src/index.ts",
     "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w api\" \"npm run dev -w worker\" \"npm run dev -w web\"",
     "db:init": "node --env-file-if-exists=.env --import tsx scripts/init-db.ts",
     "check": "tsc -p tsconfig.json",

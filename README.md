@@ -76,3 +76,18 @@ npm run test:integration    # repository round-trips against live Mongo
 ```bash
 cd infra && npm install && npm run synth   # standalone CDK package
 ```
+
+## CLI
+
+A management CLI for humans and AI agents (`apps/cli`, run via `tsx`):
+
+```bash
+cp .env.example .env   # copy root env (and run `docker compose up -d`) so infra check can reach local Mongo/SQS
+npm run cli -- --help                 # list commands
+npm run cli -- infra check            # health-check mongo + sqs + api
+npm run cli -- infra check --services mongo,api
+npm run cli -- db init                # create MongoDB indexes
+```
+
+Add `--output json` to any command for machine-readable output + meaningful exit
+codes (0 ok, 1 user error, 2 infra down, 3 op failed, 4 internal).

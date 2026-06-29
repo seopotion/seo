@@ -61,6 +61,35 @@ const setup = new OpenAPIHono<AuthEnv>()
       const org = await OrgRepo.findById(org_id);
       return c.json({ setup_status: org?.setup_status ?? 'setup_not_started' });
     },
+  )
+  .openapi(
+    createRoute({
+      tags: ['setup'],
+      method: 'get',
+      path: '/details',
+      summary: 'Get generated setup presets',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { query: schemas.DetailsQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.DetailsResponse } },
+          description: 'Generated onboarding presets for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.NotFoundResponse } },
+          description: 'Org not found, or presets not generated yet',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const org = await OrgRepo.findById(org_id);
+      if (!org?.presets) {
+        return c.json({ error: 'Setup details not available' }, 404);
+      }
+      return c.json({ presets: org.presets }, 200);
+    },
   );
 
 export default setup;

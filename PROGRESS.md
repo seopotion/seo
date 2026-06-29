@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-24 (… + mock scanner + local dev: API server, ElasticMQ SQS, db:init)_
+_Last updated: 2026-06-29 (+ @seo/cli: infra check, db init)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -31,7 +31,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Scanner worker — consumes SQS, validates `ScanTask`, generates presets, persists them, advances to `setup_scan_completed`
 - ✅ `scanWebsite()` — **mock** implementation (deterministic presets derived from the URL); swap for real scrape + AI later
 - ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
-- ⬜ `GET /setup/details` — return generated presets (queryable; data is now stored, endpoint not yet exposed)
+- ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
 - ⬜ Editable preset endpoints per category (business / audience / blog / article prefs)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
 - ⬜ `POST /setup/finalize` — persist + flip status to `setup_complete`
@@ -81,6 +81,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Local SQS via ElasticMQ in `docker-compose.yml` + worker poller (`apps/worker/src/dev.ts`); SQS client honors `SQS_ENDPOINT`
 - ✅ DB index init script — `npm run db:init`
 - ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
+- ✅ Management CLI (`apps/cli`, `@seo/cli`, citty + tsx) — `npm run cli -- <cmd>`; commands: `infra check`, `db init`; `--output json` for agents
 - 🟡 Worker poller / `db:init` / ElasticMQ are typecheck-verified only here (Docker unavailable in this environment) — run locally to confirm the live round-trip
 
 ## Verification gaps (environment-limited)
@@ -92,4 +93,4 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 14 passing)
+- `npm test` — unit tests (currently 30 passing)
