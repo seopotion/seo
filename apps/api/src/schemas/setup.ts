@@ -44,3 +44,57 @@ export const NotFoundResponse = z
     error: z.string().openapi({ example: 'Setup details not available' }),
   })
   .openapi('NotFoundResponse');
+
+// Deep-partial of the presets shape: each category is optional, and within a
+// category each field is optional. The nested objects under `article_preferences`
+// are partialed too, so a client can patch a single deep field.
+export const SetupPresetsPatchSchema = z
+  .object({
+    business: SetupPresetsSchema.shape.business.partial().optional(),
+    audience: SetupPresetsSchema.shape.audience.partial().optional(),
+    blog: SetupPresetsSchema.shape.blog.partial().optional(),
+    article_preferences: z
+      .object({
+        content_seo: SetupPresetsSchema.shape.article_preferences.shape.content_seo
+          .partial()
+          .optional(),
+        engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement
+          .partial()
+          .optional(),
+      })
+      .optional(),
+  })
+  .openapi('SetupPresetsPatch');
+
+export const UpdatePresetsBody = z
+  .object({
+    org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
+    presets: SetupPresetsPatchSchema,
+  })
+  .openapi('UpdatePresetsBody');
+
+export const FinalizeBody = z
+  .object({
+    org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
+    presets: SetupPresetsPatchSchema.optional(),
+  })
+  .openapi('FinalizeBody');
+
+export const PresetsResponse = z
+  .object({
+    presets: SetupPresetsSchema,
+  })
+  .openapi('PresetsResponse');
+
+export const FinalizeResponse = z
+  .object({
+    setup_status: z.literal('setup_complete').openapi({ example: 'setup_complete' }),
+    presets: SetupPresetsSchema,
+  })
+  .openapi('FinalizeResponse');
+
+export const ConflictResponse = z
+  .object({
+    error: z.string().openapi({ example: 'Setup is not ready to finalize' }),
+  })
+  .openapi('ConflictResponse');
