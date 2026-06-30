@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
 import core from './core';
+import dashboard from './dashboard';
 import setup from './setup';
 
 const app = new OpenAPIHono();
@@ -19,7 +20,8 @@ app.get('/health', (c) => c.text('OK'));
  */
 const routes = app
   .route(`/api/${API_VERSION}/core`, core)
-  .route(`/api/${API_VERSION}/setup`, setup);
+  .route(`/api/${API_VERSION}/setup`, setup)
+  .route(`/api/${API_VERSION}/dashboard`, dashboard);
 
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',

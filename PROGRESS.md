@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-30 (+ infra synth verified: bin entrypoint, DLQ, DB-init custom resource)_
+_Last updated: 2026-06-30 (+ minimal dashboard: mock Home endpoints + Home UI; local round-trips run green against live Docker)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -50,7 +50,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 ## Dashboard (mostly INC in design)
 
-- ⬜ Home stats: `/dashboard/v0/articles/{best,published,planned}`, `/dashboard/v0/integrations/connected`
+- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live.
+- ✅ Dashboard Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated; renders Articles (published/planned), Backlink Exchange (upgrade-gated), Recommended Actions, Best Articles (GSC-gated) cards from the typed client; org domain + Domain Rating badge header
 - ⬜ Domain rating + Google Search Console integration
 - ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start)
 - ⬜ Articles: content planner / history / settings / integrations
@@ -85,15 +86,15 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ DB index init script — `npm run db:init`
 - ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
 - ✅ Management CLI (`apps/cli`, `@seo/cli`, citty + tsx) — `npm run cli -- <cmd>`; commands: `infra check`, `db init`; `--output json` for agents
-- 🟡 Worker poller / `db:init` / ElasticMQ are typecheck-verified only here (Docker unavailable in this environment) — run locally to confirm the live round-trip
+- ✅ Worker poller / `db:init` / ElasticMQ verified live (Docker up): `db:init` ensured indexes, worker polled ElasticMQ and processed a real scan message end-to-end
 
 ## Verification gaps (environment-limited)
 
-- ⬜ Integration test not executed here — Docker unavailable. Run: `docker compose up -d mongo && npm run test:integration`
-- ⬜ Full SQS round-trip not executed — run locally: `docker compose up -d` then `npm run dev`
+- ✅ Integration tests executed against live Mongo (Docker up) — 3 passed; `npm run db:init` ensured indexes
+- ✅ Full SQS round-trip executed against live ElasticMQ + Mongo: `start_scan` → worker consumed → presets persisted → `setup_scan_completed`; `/setup/details` returned presets; dashboard Home endpoints verified live (401 unauth, mock data authed)
 
 ## Always-green gates
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 47 passing)
+- `npm test` — unit tests (currently 52 passing)
