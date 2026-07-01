@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 # Cancel superseded runs on the same ref.
@@ -20,6 +20,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Verify checkout
+        run: |
+          pwd
+          test -f package.json
+          test -f package-lock.json
 
       - name: Install
         run: npm ci
