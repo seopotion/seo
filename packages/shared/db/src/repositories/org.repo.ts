@@ -30,6 +30,20 @@ export const OrgRepo = {
     return docs.map(toEntity);
   },
 
+  /**
+   * Find an org still mid-onboarding (not `setup_complete`) for this user and
+   * URL. Lets `POST /setup/start_scan` be idempotent: a double-click or a
+   * refresh-and-resubmit reuses the in-progress org instead of duplicating it.
+   */
+  async findActiveByUserAndUrl(userId: string, website_url: string): Promise<Org | null> {
+    const doc = await (await collection()).findOne({
+      user_id: userId,
+      website_url,
+      setup_status: { $ne: 'setup_complete' },
+    });
+    return doc ? toEntity(doc) : null;
+  },
+
   async create(input: CreateOrgInput): Promise<Org> {
     const data = CreateOrgInputSchema.parse(input); // validate on write
     const created_at = new Date();
@@ -49,6 +63,23 @@ export const OrgRepo = {
     await (await collection()).updateOne(
       { _id: new ObjectId(id) },
       { $set: { presets: data, setup_status: 'setup_scan_completed' } },
+    );
+  },
+
+  /** Persist edited presets without changing status (used by PATCH /setup/presets). */
+  async updatePresets(id: string, presets: SetupPresets): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    const data = SetupPresetsSchema.parse(presets); // validate on write
+    await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { presets: data } });
+  },
+
+  /** Persist final presets and flip the org to `setup_complete` (single update). */
+  async finalize(id: string, presets: SetupPresets): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    const data = SetupPresetsSchema.parse(presets); // validate on write
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { presets: data, setup_status: 'setup_complete' } },
     );
   },
 };

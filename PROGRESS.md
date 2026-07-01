@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-24 (… + mock scanner + local dev: API server, ElasticMQ SQS, db:init)_
+_Last updated: 2026-06-30 (+ minimal dashboard: mock Home endpoints + Home UI; local round-trips run green against live Docker)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -31,11 +31,12 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Scanner worker — consumes SQS, validates `ScanTask`, generates presets, persists them, advances to `setup_scan_completed`
 - ✅ `scanWebsite()` — **mock** implementation (deterministic presets derived from the URL); swap for real scrape + AI later
 - ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
-- ⬜ `GET /setup/details` — return generated presets (queryable; data is now stored, endpoint not yet exposed)
-- ⬜ Editable preset endpoints per category (business / audience / blog / article prefs)
+- ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
+- ✅ `PATCH /setup/presets` — partial edit of generated presets (deep-merge, ownership-checked)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
-- ⬜ `POST /setup/finalize` — persist + flip status to `setup_complete`
-- ⬜ Reconcile FE-generated `org_id` vs Mongo `_id` (open design tension — see design/product-flow.md §1)
+- 🟡 Onboarding parity backlog — baseline is intentionally a subset of a mature flow; deferred gaps (integrations, richer article prefs, Improvements/Product-Catalog subsystems, multi-segment audience, competitor minimums, GSC) captured in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md)
+- ✅ `POST /setup/finalize` — optional final edit + flip status to `setup_complete`
+- ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
 
 ## Core / auth
 
@@ -50,7 +51,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 ## Dashboard (mostly INC in design)
 
-- ⬜ Home stats: `/dashboard/v0/articles/{best,published,planned}`, `/dashboard/v0/integrations/connected`
+- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live.
+- ✅ Dashboard Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated; renders Articles (published/planned), Backlink Exchange (upgrade-gated), Recommended Actions, Best Articles (GSC-gated) cards from the typed client; org domain + Domain Rating badge header
 - ⬜ Domain rating + Google Search Console integration
 - ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start)
 - ⬜ Articles: content planner / history / settings / integrations
@@ -67,13 +69,16 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
 ## Infrastructure / ops
 
-- 🟡 `infra/lib/api-stack.ts` — API fn, worker fn, SQS queue, HTTP API written but **not synthed/verified** (standalone CDK pkg, not installed here)
-- ⬜ `infra/bin` entrypoint so the stack actually `synth`s; verify NodejsFunction bundling end-to-end
-- ⬜ Dead-letter queue on `ScanQueue` (failed scans currently just retry/expire)
-- ⬜ Run `ensureIndexes()` at deploy (one-off Lambda / custom resource)
+- ✅ `infra/lib/api-stack.ts` — API fn, worker fn, SQS queue + DLQ, DB-init custom resource, HTTP API; **`cdk synth` verified green** (standalone CDK pkg)
+- ✅ `infra/bin/app.ts` entrypoint + `cdk.json` + `tsconfig.json`; **NodejsFunction bundling verified end-to-end** — both Lambdas bundle (api 1.1M, worker 1.5M, db-init 804K), `@shared/*` inlined, `mongodb`/powertools bundled, `handler` exported. `NodejsFunction` needs `projectRoot`/`depsLockFilePath` at the monorepo root (entries live in `apps/*`)
+- ✅ Dead-letter queue on `ScanQueue` (`maxReceiveCount: 3` → `ScanDlq`, 14-day retention)
+- ✅ Run `ensureIndexes()` at deploy — `scripts/lambda-db-init.ts` Lambda behind a `Provider`-backed `CustomResource` (re-runs each deploy; indexes idempotent)
 - ✅ Linter/formatter: **Biome** (`biome.json`) — `npm run lint` / `lint:fix`
 - ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
 - ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
+- ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above
+- ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings)
+- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL`
 
 ## Local development
 
@@ -81,15 +86,16 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Local SQS via ElasticMQ in `docker-compose.yml` + worker poller (`apps/worker/src/dev.ts`); SQS client honors `SQS_ENDPOINT`
 - ✅ DB index init script — `npm run db:init`
 - ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
-- 🟡 Worker poller / `db:init` / ElasticMQ are typecheck-verified only here (Docker unavailable in this environment) — run locally to confirm the live round-trip
+- ✅ Management CLI (`apps/cli`, `@seo/cli`, citty + tsx) — `npm run cli -- <cmd>`; commands: `infra check`, `db init`; `--output json` for agents
+- ✅ Worker poller / `db:init` / ElasticMQ verified live (Docker up): `db:init` ensured indexes, worker polled ElasticMQ and processed a real scan message end-to-end
 
 ## Verification gaps (environment-limited)
 
-- ⬜ Integration test not executed here — Docker unavailable. Run: `docker compose up -d mongo && npm run test:integration`
-- ⬜ Full SQS round-trip not executed — run locally: `docker compose up -d` then `npm run dev`
+- ✅ Integration tests executed against live Mongo (Docker up) — 3 passed; `npm run db:init` ensured indexes
+- ✅ Full SQS round-trip executed against live ElasticMQ + Mongo: `start_scan` → worker consumed → presets persisted → `setup_scan_completed`; `/setup/details` returned presets; dashboard Home endpoints verified live (401 unauth, mock data authed)
 
 ## Always-green gates
 
 - `npm run lint` — Biome (lint + format + import-sort)
 - `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 14 passing)
+- `npm test` — unit tests (currently 52 passing)

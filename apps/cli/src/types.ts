@@ -1,0 +1,57 @@
+/**
+ * Core types for the seo CLI.
+ *
+ * Every lib function returns Result<T>. Errors are structured and
+ * machine-readable. Commands translate Results into output + exit codes.
+ */
+
+export interface CliError {
+  code: string;
+  message: string;
+  suggestion?: string;
+}
+
+export type Result<T> = { ok: true; data: T } | { ok: false; error: CliError };
+
+export const ok = <T>(data: T): Result<T> => ({ ok: true, data });
+export const fail = (code: string, message: string, suggestion?: string): Result<never> => ({
+  ok: false,
+  error: { code, message, suggestion },
+});
+
+export const EXIT = {
+  SUCCESS: 0,
+  USER_ERROR: 1,
+  INFRA_DOWN: 2,
+  OP_FAILED: 3,
+  INTERNAL: 4,
+} as const;
+export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
+
+export type OutputMode = 'text' | 'json';
+
+export interface Emitter {
+  step(name: string, status: 'start' | 'done' | 'fail', detail?: string): void;
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+  result<T>(data: Result<T>): void;
+}
+
+export type InfraService = 'mongo' | 'sqs' | 'api';
+
+export interface ServiceCheck {
+  service: InfraService;
+  available: boolean;
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface InfraCheckResult {
+  allHealthy: boolean;
+  services: ServiceCheck[];
+}
+
+export interface DbInitData {
+  collections: string[];
+}

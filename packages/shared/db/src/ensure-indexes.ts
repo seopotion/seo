@@ -8,7 +8,9 @@ import { getDb } from './client';
 export async function ensureIndexes(): Promise<void> {
   const db = await getDb();
   await db.collection('users').createIndex({ google_sub: 1 }, { unique: true });
-  await db.collection('orgs').createIndex({ user_id: 1 });
+  // Compound index covers both findByUserId (user_id prefix) and the idempotent
+  // start_scan lookup (OrgRepo.findActiveByUserAndUrl, user_id + website_url).
+  await db.collection('orgs').createIndex({ user_id: 1, website_url: 1 });
   await db.collection('orgs').createIndex({ website_url: 1 });
   // await db.collection('articles').createIndex({ org_id: 1, created_at: -1 });
 }

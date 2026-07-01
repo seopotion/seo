@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file-if-exists=.env --import tsx src/dev.ts",
+    "dev": "node --watch --env-file-if-exists=../../.env --env-file-if-exists=.env --import tsx src/dev.ts",
     "test": "vitest run"
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1075.0",
     "@shared/db": "*",
+    "@shared/logger": "*",
     "@shared/schemas": "*",
     "@shared/types": "*"
   }
