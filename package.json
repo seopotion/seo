@@ -20,7 +20,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.1",
+    "@biomejs/biome": "2.5.2",
     "@types/aws-lambda": "^8.10.162",
     "@types/node": "^26.0.0",
     "concurrently": "^10.0.3",

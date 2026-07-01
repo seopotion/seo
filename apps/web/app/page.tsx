@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { WishlistForm } from '../components/WishlistForm';
-import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME, absoluteUrl } from '../lib/seo';
+import { absoluteUrl, DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME } from '../lib/seo';
 
 export const metadata: Metadata = {
   title: {
@@ -211,6 +211,7 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <script
         type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD is serialized from local static data.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
       <section className="relative isolate overflow-hidden px-6 pt-32 pb-20 sm:pt-48">

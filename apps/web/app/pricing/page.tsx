@@ -153,6 +153,7 @@ export default function PricingPage() {
     <main className="min-h-screen bg-white">
       <script
         type="application/ld+json"
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD is serialized from local static data.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
       />
       <div className="mx-auto max-w-6xl px-6 pt-20 pb-24">

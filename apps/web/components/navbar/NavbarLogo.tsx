@@ -8,12 +8,7 @@ export function NavbarLogo() {
       href="/"
       aria-label="Seopotion home"
     >
-      <Image
-        src="/android-chrome-192x192.png"
-        alt="Seopotion logo"
-        width={32}
-        height={32}
-      />
+      <Image src="/android-chrome-192x192.png" alt="Seopotion logo" width={32} height={32} />
       <span className="text-2xl font-bold text-gray-900">Seopotion</span>
     </Link>
   );

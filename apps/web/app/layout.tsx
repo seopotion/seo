@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Navbar } from '../components/navbar';
-import {
-  DEFAULT_DESCRIPTION,
-  DEFAULT_TITLE,
-  SITE_NAME,
-  SITE_URL,
-  SOCIAL_IMAGE,
-} from '../lib/seo';
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME, SITE_URL, SOCIAL_IMAGE } from '../lib/seo';
 import './globals.css';
 
 export const metadata: Metadata = {
