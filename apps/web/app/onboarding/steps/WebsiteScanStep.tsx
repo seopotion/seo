@@ -18,7 +18,7 @@ export function WebsiteScanStep({
   return (
     <div>
       <h2 className="font-bold text-2xl text-gray-900">Website Scan</h2>
-      <p className="mt-2 text-gray-600 text-sm">Start with the site Rankpace should learn from.</p>
+      <p className="mt-2 text-gray-600 text-sm">Start with the site Seopotion should learn from.</p>
 
       <div className="mt-6">
         <Label htmlFor="websiteUrl">Website URL</Label>

@@ -1,12 +1,42 @@
-'use client';
-
+import type { Metadata } from 'next';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import Script from 'next/script';
-import { useEffect, useState } from 'react';
-import { GOOGLE_IDENTITY_SCRIPT_SRC, useGoogleLogin } from '../components/auth/useGoogleLogin';
-import { getToken } from '../lib/auth';
-import { getPostLoginPath } from '../lib/session';
+import { WishlistForm } from '../components/WishlistForm';
+import { DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME, absoluteUrl } from '../lib/seo';
+
+export const metadata: Metadata = {
+  title: {
+    absolute: DEFAULT_TITLE,
+  },
+  description: DEFAULT_DESCRIPTION,
+  alternates: {
+    canonical: '/',
+  },
+};
+
+const homeJsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      name: SITE_NAME,
+      url: absoluteUrl('/'),
+      logo: absoluteUrl('/android-chrome-192x192.png'),
+    },
+    {
+      '@type': 'SoftwareApplication',
+      name: SITE_NAME,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      url: absoluteUrl('/'),
+      description: DEFAULT_DESCRIPTION,
+      offers: {
+        '@type': 'Offer',
+        price: '80',
+        priceCurrency: 'USD',
+      },
+    },
+  ],
+};
 
 const features = [
   {
@@ -90,7 +120,8 @@ const features = [
       </svg>
     ),
     title: 'AI Search Optimization',
-    description: 'We structure your content so that ChatGPT and other AI models recommend your brand to users.',
+    description:
+      'We structure your content so that ChatGPT and other AI models recommend your brand to users.',
   },
   {
     icon: (
@@ -111,7 +142,7 @@ const features = [
     ),
     title: 'Seamless CMS Publishing',
     description:
-      "We handle all internal linking and publish the finished articles directly to your blog for you.",
+      'We handle all internal linking and publish the finished articles directly to your blog for you.',
   },
   {
     icon: (
@@ -131,7 +162,8 @@ const features = [
       </svg>
     ),
     title: 'Continuous SEO Tuning',
-    description: 'We track your search rankings daily and tweak our strategy to keep your traffic growing.',
+    description:
+      'We track your search rankings daily and tweak our strategy to keep your traffic growing.',
   },
 ];
 
@@ -139,8 +171,7 @@ const useCases = [
   { name: 'Indie Developers & Solopreneurs' },
   { name: 'Startups' },
   { name: 'Small Business Owners' },
-    { name: 'Anyone wants to be visible on web' },
-
+  { name: 'Anyone wants to be visible on web' },
 ];
 
 const testimonials = [
@@ -161,7 +192,7 @@ const testimonials = [
       "Finally, an SEO solution that doesn't require me to spend hours doing keyword research or writing drafts. It scanned my site and took care of the rest perfectly.",
     author: 'Emily Rodriguez',
     role: 'SaaS Founder',
-  }
+  },
 ];
 
 const starKeys = ['star-1', 'star-2', 'star-3', 'star-4', 'star-5'];
@@ -169,66 +200,19 @@ const starKeys = ['star-1', 'star-2', 'star-3', 'star-4', 'star-5'];
 function LogoMark() {
   return (
     <div className="flex items-center gap-2">
-      <Image
-        src="/android-chrome-192x192.png"
-        alt="Rankpace logo"
-        width={32}
-        height={32}
-      />
-      <span className="text-2xl font-bold text-gray-900">Rankpace</span>
+      <Image src="/android-chrome-192x192.png" alt="Seopotion logo" width={32} height={32} />
+      <span className="text-2xl font-bold text-gray-900">Seopotion</span>
     </div>
   );
 }
 
 export default function LandingPage() {
-  const router = useRouter();
-  const [authed, setAuthed] = useState(false);
-  const [scriptReady, setScriptReady] = useState(false);
-
-  async function routeByStatus() {
-    const path = await getPostLoginPath();
-    if (path) router.push(path);
-  }
-
-  function onLoggedIn() {
-    setAuthed(true);
-    void routeByStatus();
-  }
-
-  const { initialize, isConfigured, prompt } = useGoogleLogin({ onLoggedIn });
-
-  useEffect(() => {
-    setAuthed(Boolean(getToken()));
-  }, []);
-
-  function onScriptReady() {
-    setScriptReady(initialize());
-  }
-
-  function handleAuthAction() {
-    if (authed) {
-      void routeByStatus();
-      return;
-    }
-
-    prompt();
-  }
-
-  const authTitle = !isConfigured
-    ? 'Google sign-in is not configured'
-    : !scriptReady
-      ? 'Google sign-in is loading'
-      : undefined;
-  const heroLabel = authed ? 'Continue' : 'Get Started';
-
   return (
     <div className="min-h-screen">
-      <Script
-        src={GOOGLE_IDENTITY_SCRIPT_SRC}
-        strategy="afterInteractive"
-        onReady={onScriptReady}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
-
       <section className="relative isolate overflow-hidden px-6 pt-32 pb-20 sm:pt-48">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96 rotate-180 text-gray-500/30 opacity-60 mask-[linear-gradient(to_bottom,transparent,white)]">
           <svg
@@ -259,17 +243,7 @@ export default function LandingPage() {
           <h2 className="mx-auto mb-10 max-w-2xl text-gray-600 text-lg">
             We make your brand show up on both Google and Chatgpt, on autopilot.
           </h2>
-          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <button
-              type="button"
-              onClick={handleAuthAction}
-              title={authTitle}
-              className="rounded-lg bg-orange-400 px-4 py-2 font-medium text-white transition-colors hover:bg-orange-500"
-            >
-              {heroLabel}
-            </button>
-          </div>
-          <p className="mt-1 text-gray-500 text-sm">No credit card required</p>
+          <WishlistForm source="landing_hero" />
         </div>
       </section>
 
@@ -283,6 +257,8 @@ export default function LandingPage() {
                   alt="google search console befores"
                   width={1754}
                   height={1256}
+                  loading="eager"
+                  sizes="(min-width: 768px) 448px, calc(100vw - 80px)"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -327,7 +303,7 @@ export default function LandingPage() {
             {useCases.map((useCase) => (
               <div
                 key={useCase.name}
-                className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm"
+                className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm border border-gray-200"
               >
                 <span className="font-medium text-gray-700">{useCase.name}</span>
               </div>
@@ -343,7 +319,9 @@ export default function LandingPage() {
               Everything you need for SEO
             </h2>
             <p className="mx-auto max-w-5xl text-gray-600 text-lg">
-We handle all steps you need to rank higher in Google searchs and be mentioned by Chatgpt and other llms            </p>
+              We handle all steps you need to rank higher in Google searchs and be mentioned by
+              Chatgpt and other llms{' '}
+            </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
@@ -515,9 +493,7 @@ We handle all steps you need to rank higher in Google searchs and be mentioned b
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">Loved by users</h2>
-            <p className="text-gray-600 text-lg">
-              Join others who&apos;ve simplified their SEO.
-            </p>
+            <p className="text-gray-600 text-lg">Join others who&apos;ve simplified their SEO.</p>
           </div>
           <div className="grid gap-8 md:grid-cols-3">
             {testimonials.map((testimonial) => (
@@ -554,16 +530,10 @@ We handle all steps you need to rank higher in Google searchs and be mentioned b
           <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-gray-700 md:p-12">
             <h2 className="mb-4 font-bold text-3xl md:text-4xl">Ready to Boost your SEO?</h2>
             <p className="mx-auto mb-8 max-w-2xl text-xl">
-Join startups, agencies and teams who use Rankpace to scale their SEO without hiring a marketing team.
+              Join startups, agencies and teams who use Seopotion to scale their SEO without hiring
+              a marketing team.
             </p>
-            <button
-              type="button"
-              onClick={handleAuthAction}
-              title={authTitle}
-              className="rounded-lg bg-orange-400 px-4 py-2 font-medium text-white transition-colors hover:bg-orange-500"
-            >
-              {heroLabel}
-            </button>
+            <WishlistForm source="landing_final_cta" />
           </div>
         </div>
       </section>
@@ -586,7 +556,7 @@ Join startups, agencies and teams who use Rankpace to scale their SEO without hi
                 Support
               </a>
             </div>
-            <p className="text-gray-500 text-sm">&copy; 2026 Rankpace. All rights reserved.</p>
+            <p className="text-gray-500 text-sm">&copy; 2026 Seopotion. All rights reserved.</p>
           </div>
         </div>
       </footer>

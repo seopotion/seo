@@ -6,15 +6,15 @@ export function NavbarLogo() {
     <Link
       className="inline-flex items-center gap-2 justify-self-start no-underline"
       href="/"
-      aria-label="Rankpace home"
+      aria-label="Seopotion home"
     >
       <Image
         src="/android-chrome-192x192.png"
-        alt="Rankpace logo"
+        alt="Seopotion logo"
         width={32}
         height={32}
       />
-      <span className="text-2xl font-bold text-gray-900">Rankpace</span>
+      <span className="text-2xl font-bold text-gray-900">Seopotion</span>
     </Link>
   );
 }

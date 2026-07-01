@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { absoluteUrl } from '../../lib/seo';
 
 const TIERS = [
   {
@@ -53,8 +54,8 @@ const FAQ = [
     a: 'Growth gives you the AI SEO content engine: keyword research, content generation, CMS publishing, images, relevant YouTube videos, and rewrites. Expert-Led Growth adds a dedicated human SEO expert for strategy, planning, review, optimization recommendations, distribution, backlink opportunity review, and reporting.',
   },
   {
-    q: 'Can Rankpace publish to my CMS?',
-    a: 'Yes. Growth includes connections to WordPress, Webflow, and more, so Rankpace can help publish finished SEO content directly to your site.',
+    q: 'Can Seopotion publish to my CMS?',
+    a: 'Yes. Growth includes connections to WordPress, Webflow, and more, so Seopotion can help publish finished SEO content directly to your site.',
   },
   {
     q: 'Do I need to do keyword research myself?',
@@ -62,7 +63,7 @@ const FAQ = [
   },
   {
     q: 'Are images and videos included?',
-    a: 'Yes. Both plans include AI images and relevant YouTube video suggestions for the content Rankpace creates.',
+    a: 'Yes. Both plans include AI images and relevant YouTube video suggestions for the content Seopotion creates.',
   },
   {
     q: 'Can I rewrite generated content?',
@@ -93,6 +94,20 @@ const COMPARISON_ROWS = [
   { label: 'Backlink opportunity review', growth: false, expert: true },
   { label: 'Monthly SEO reporting', growth: false, expert: true },
 ];
+
+const pricingJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map((item) => ({
+    '@type': 'Question',
+    name: item.q,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.a,
+    },
+  })),
+  url: absoluteUrl('/pricing'),
+};
 
 function CellValue({ value }: { value: string | boolean }) {
   if (value === true) {
@@ -136,6 +151,10 @@ export default function PricingPage() {
 
   return (
     <main className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(pricingJsonLd) }}
+      />
       <div className="mx-auto max-w-6xl px-6 pt-20 pb-24">
         <div className="mb-12 text-center">
           <h1 className="mb-4 font-bold text-4xl text-gray-900 md:text-5xl">
