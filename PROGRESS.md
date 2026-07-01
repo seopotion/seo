@@ -34,6 +34,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
 - ✅ `PATCH /setup/presets` — partial edit of generated presets (deep-merge, ownership-checked)
 - ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
+- 🟡 Onboarding parity backlog — baseline is intentionally a subset of a mature flow; deferred gaps (integrations, richer article prefs, Improvements/Product-Catalog subsystems, multi-segment audience, competitor minimums, GSC) captured in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md)
 - ✅ `POST /setup/finalize` — optional final edit + flip status to `setup_complete`
 - ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
 
