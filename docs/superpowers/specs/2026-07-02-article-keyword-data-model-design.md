@@ -103,6 +103,7 @@ Same pattern as `OrgRepo`: a module-scoped collection accessor, a `toEntity` map
 - `listByOrg(orgId): Promise<Keyword[]>` — ordered by `scheduled_date asc`.
 - `countScheduled(orgId): Promise<number>` — `status: 'scheduled'` count (Home "planned").
 - `create(input: CreateKeywordInput): Promise<Keyword>` — used by seed.
+- `setArticleId(id, articleId): Promise<void>` — link a generated article back to its keyword (used by seed; foreshadows the generation worker).
 
 ### `ArticleRepo`
 
