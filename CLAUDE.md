@@ -1,6 +1,16 @@
-# Coding Principles
+# CLAUDE.md
 
-## 1. Think Before Coding
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+TypeScript monorepo (npm workspaces). Hono backend on AWS Lambda behind API Gateway, an SQS-triggered scanner worker, a Next.js frontend, and MongoDB. The headline pattern: the frontend consumes a **typed Hono RPC client inferred from the backend's route types** — zero codegen.
+
+Full design rationale lives in [`design/`](design/) — read it before non-trivial work. Design *plans* go in `design/`, never in this file. Current status and remaining work are tracked in [`PROGRESS.md`](PROGRESS.md) — check it to see what's built vs. stubbed, and update it as you complete work.
+
+## Coding Principles
+
+### 1. Think Before Coding
 Don't assume. Don't hide confusion. Surface tradeoffs.
 
 Before implementing:
@@ -10,7 +20,7 @@ Before implementing:
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-## 2. Simplicity First
+### 2. Simplicity First
 Minimum code that solves the problem. Nothing speculative.
 
 - No features beyond what was asked.
@@ -20,7 +30,7 @@ Minimum code that solves the problem. Nothing speculative.
 - If you write 200 lines and it could be 50, rewrite it.
 - Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## 3. Surgical Changes
+### 3. Surgical Changes
 Touch only what you must. Clean up only your own mess.
 
 When editing existing code:
@@ -36,7 +46,7 @@ When your changes create orphans:
 - Don't remove pre-existing dead code unless asked.
 - The test: Every changed line should trace directly to the user's request.
 
-## 4. Goal-Driven Execution
+### 4. Goal-Driven Execution
 Define success criteria. Loop until verified.
 
 Transform tasks into verifiable goals:
@@ -45,16 +55,6 @@ Transform tasks into verifiable goals:
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 
 For multi-step tasks, state a brief plan with clear verification steps.
-
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What this is
-
-TypeScript monorepo (npm workspaces). Hono backend on AWS Lambda behind API Gateway, an SQS-triggered scanner worker, a Next.js frontend, and MongoDB. The headline pattern: the frontend consumes a **typed Hono RPC client inferred from the backend's route types** — zero codegen.
-
-Full design rationale lives in [`design/`](design/) — read it before non-trivial work. Design *plans* go in `design/`, never in this file. Current status and remaining work are tracked in [`PROGRESS.md`](PROGRESS.md) — check it to see what's built vs. stubbed, and update it as you complete work.
 
 ## Commands
 
@@ -86,8 +86,8 @@ prelude naming `master`, **PRs target `dev`, not `master`.**
 
 - Never commit or merge directly to `dev` or `master` — always go through a PR.
 - Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),
-  and open the PR into `dev`. Run `npm run lint`, `npm run check:all`, and `npm test`
-  before pushing — CI runs the same checks and must pass.
+  and open the PR into `dev`. Run the checks above before pushing — CI runs the same
+  checks and must pass.
 - Only maintainers merge `dev` → `master` (also via PR).
 - Branch protection making this mandatory is documented in [README.md](README.md#branch-protection-to-enable-on-github) — enable it there when ready.
 
