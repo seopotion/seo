@@ -72,6 +72,35 @@ gh api -X PUT "repos/ozykhan/seo-dev/branches/$BRANCH/protection" \
 JSON
 ```
 
+## Issue tracking
+
+Remaining work lives as GitHub issues on the [seo Project board](https://github.com/orgs/seopotion/projects/1); [`PROGRESS.md`](PROGRESS.md) is the running status doc and links each open item to its issue. Two conventions keep the board searchable.
+
+### Title prefix — `[area]`
+
+Every issue title starts with a lowercase `[area]` tag naming the surface it touches, so `gh issue list --search "in:title dashboard"` (or a glance down the board) finds everything in an area. Current vocabulary:
+
+| Prefix | Surface |
+| --- | --- |
+| `[onboarding]` | `/setup/*` flow, presets, scanner worker |
+| `[dashboard]` | dashboard data + Articles surfaces |
+| `[auth]` | login / JWT / token handling |
+| `[billing]` | subscriptions, Stripe, promo codes |
+| `[web]` | `apps/web` frontend (UI, env, tests) |
+| `[infra]` | deploy / CDK / ops |
+| `[repo]` | repo governance (branch protection, CI) |
+
+Add a new prefix when a genuinely new surface appears; otherwise reuse one.
+
+### Labels
+
+- **`backend`** — code work in `apps/api` / `apps/worker` / shared packages.
+- **`frontend`** — `apps/web` work.
+- **`infra`** — infrastructure / deploy / ops (non-code backend). **Mutually exclusive with `backend`:** a backend issue is either code (`backend`) or ops (`infra`), never both — so `label:backend` is the pure-code queue and `label:infra` is the deploy/ops queue.
+- **`epic`** — large multi-part tracker; sub-tasks are checkboxes linking child issues.
+
+Routing: `backend`/`infra` → @ozykhan, `frontend` → @Alperadoss.
+
 ## Develop
 
 Requires Node 22+. Uses npm workspaces (no Turborepo yet); Lambdas are bundled by
