@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-TypeScript monorepo (npm workspaces). Hono backend on AWS Lambda behind API Gateway, an SQS-triggered scanner worker, a Next.js frontend, and MongoDB. The headline pattern: the frontend consumes a **typed Hono RPC client inferred from the backend's route types** — zero codegen.
+TypeScript monorepo (npm workspaces). Four apps: Hono backend on AWS Lambda behind API Gateway (`apps/api`), an SQS-triggered scanner worker (`apps/worker`), a Next.js frontend (`apps/web`), and a management CLI (`apps/cli`); plus MongoDB. The headline pattern: the frontend consumes a **typed Hono RPC client inferred from the backend's route types** — zero codegen.
 
 Full design rationale lives in [`design/`](design/) — read it before non-trivial work. Design *plans* go in `design/`, never in this file. Current status and remaining work are tracked in [`PROGRESS.md`](PROGRESS.md) — check it to see what's built vs. stubbed, and update it as you complete work.
 
@@ -65,6 +65,7 @@ Command names live in `package.json` (root + per-app). What isn't obvious from t
 - `npm run test:integration` — repository tests vs real Mongo; needs `docker compose up -d mongo`.
 - `npm run dev` — full stack via `concurrently`; `-w api` serves the Lambda app over HTTP on :8787 (Node adapter), `-w worker` is the SQS poller, `-w web` is Next.js.
 - `npm run db:init` — one-off MongoDB index creation; needs Mongo running.
+- `npm run cli -- <infra|db> …` — `seo-dev` management CLI (`apps/cli`, citty), built for humans **and agents**: `infra` runs local-infra checks, `db` handles database management. `npm run cli -- --help` lists commands.
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
 
