@@ -82,7 +82,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths — [#14](https://github.com/seopotion/seo/issues/14)
 - ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above — [#15](https://github.com/seopotion/seo/issues/15)
 - ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings) — [#16](https://github.com/seopotion/seo/issues/16)
-- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL` — [#17](https://github.com/seopotion/seo/issues/17)
+- ✅ CloudFormation `Output` `HttpApiUrl` (the HTTP API base URL) — deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL`; verified via `cdk synth` — [#17](https://github.com/seopotion/seo/issues/17)
 
 ## Local development
 
