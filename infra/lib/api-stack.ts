@@ -1,5 +1,12 @@
 import { join } from 'node:path';
-import { CustomResource, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import {
+  CfnOutput,
+  CustomResource,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  type StackProps,
+} from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
@@ -137,6 +144,13 @@ export class ApiStack extends Stack {
       path: '/{proxy+}',
       methods: [HttpMethod.ANY],
       integration: new HttpLambdaIntegration('ApiIntegration', apiFn),
+    });
+
+    // Discoverable endpoint: the deployed API base URL. Feed this to the web
+    // app as NEXT_PUBLIC_API_URL (the typed client appends /api/v0/...).
+    new CfnOutput(this, 'HttpApiUrl', {
+      value: httpApi.apiEndpoint,
+      description: 'Base URL of the HTTP API — set as NEXT_PUBLIC_API_URL for the web app',
     });
   }
 }
