@@ -453,6 +453,48 @@ which confirms the full spine end-to-end:
 - Article **generation** (keyword → article) and **publish** (article → CMS) are later
   workers; baseline can surface an empty/placeholder history until generation lands.
 
+#### 2.2.1 Article editor (detail page)
+
+The generated-article surface at `/dashboard/articles/{id}` (observed live 2026-07-02 on the
+July-2 "landing page design best practices" article). This is a **full AI editor**, not a
+read-only view — worth capturing so we know how large the deferred piece is.
+
+**Record shape (visible in the header).** Title + `slug: /landing-page-design-best-practices`
++ `keyword: landing page design best practices` — the article carries its **SEO title, a
+url-slug, and a back-reference to the source keyword**, all distinct fields. Header actions:
+**Export as MD** / "Choose export format" (menu), **Connect To Publish** →
+`/dashboard/integrations/new` (publishing is gated on a connected CMS — with no integration
+you can only export), **Save** (disabled until an edit).
+
+**Structured SEO/content fields**, each with inline AI actions
+(Improve · Shorten · Expand · Simplify · Fix grammar · Ask AI):
+- **TITLE** — the SEO title (≠ the body H1; body H1 was "Build Landing Pages in Notion?
+  Master These 10 Practices").
+- **FEATURED IMAGE** — Upload / Download / **Regenerate** / Ask AI.
+- **META DESCRIPTION** — with a live **char counter (148 / 160)** enforcing the SEO limit.
+- **CONTENT** — the rich article body.
+
+**Body is richly structured, not flat markdown.** Auto-generated **Table of Contents**
+(anchor links to every H2/H3); H2/H3 sections with slug anchors; **AI-generated inline
+images** (hosted on `cdnimg.co`, descriptive alt text); **embedded YouTube videos**
+(auto-sourced, relevant); **external citations** (e.g. nngroup.com — "Research referenced
+by …"); a **multi-column comparison table** (emoji column headers: Implementation Complexity
+/ Resource Requirements / Expected Outcomes / Ideal Use Cases / Key Advantages); bullet lists
+and callouts. Every block has hover controls: **Remove / Upload / Download / Regenerate /
+Ask AI** (block-level regen), plus selection-based quick actions.
+
+**AI rewrite panel** (resizable, left side): conversational "Rewrite this article — I keep
+your links and images intact", canned prompts ("Make the intro punchier", "more
+professional/expert tone", "Expand each section", "Tighten and cut fluff"), file attach +
+free-text instruction. Two view modes: **Review** | **Editor**.
+
+**Baseline implication.** Our `articles` record needs at least
+`{ id, keyword_id, title, slug, meta_description, featured_image_url, content, status,
+created_at, published_at }`. Baseline can **generate + store + display + export** an article
+(title/meta/slug/body as markdown) — the whole **AI editing layer** (chat rewrite,
+per-block regen, inline image/video generation, comparison-table synthesis, selection quick
+actions) is a large **deferred** subsystem, not baseline.
+
 ### 2.3 Articles Settings
 
 A settings section with three sub-tabs: **Preferences · Blog · Improvements**
@@ -483,6 +525,23 @@ row (`name: "Default"`, so multiple presets per site are supported), with ~28 fi
 Ours today: `content_seo.{article_style, internal_links(bool), llm_instructions}` +
 `engagement.{image_style}` — ~4 of these ~24 controls. The gap is real but **intentional**
 (baseline generates one reasonable article; the rest are polish toggles).
+
+**UI confirmation of the Preferences tab (live 2026-07-02).** The settings screen
+(heading "Configure your article preferences") matches the API-derived shape above and pins
+down two enums the field list left open:
+- **`image_style` is a 5-value enum:** Sketch · Watercolor · Realistic · Illustration ·
+  Brand & Text (each with example thumbnails). **Featured** images have their own
+  Sketch/Watercolor/Illustration variants, toggled by **Title-Based Featured Image** ("include
+  article title and your brand color") — the UI form of `use_different_featured_style`.
+- **The engagement section is a fixed set of boolean toggles** (all default-on): Table of
+  Contents, YouTube Video, Call-to-Action, Include Infographics, Include Emojis, Mention
+  Similar Products & Tools, First-Person Writing — 1:1 with the `is_*`/`table_of_contents`/
+  `mention_similar_products` fields.
+- Two behaviour toggles surface here too: **Auto-publish** (`auto_publish`) and **Automatic
+  Keyword Generation** ("maintains 25–30 keywords in your planner") — the planner auto-top-up
+  exposed as a user preference. **Internal Links** is explicitly gated: "Add a sitemap URL in
+  blog settings to enable internal linking" (confirms the sitemap dependency, parity-gap G5).
+- Custom **Style Prompt** / "Create Own Style Preset" (custom AI image presets) is paid-gated.
 
 **Improvements subsystem shape** (`GET /api/products/improvement-settings`): three blocks —
 `settings{enabled, setupCompleted, publishingDays[], autoPush}`, `readiness{status, ...,
