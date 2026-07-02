@@ -84,6 +84,8 @@ prelude naming `master`, **PRs target `dev`, not `master`.**
 - Only maintainers merge `dev` → `master` (also via PR).
 - Branch protection making this mandatory is documented in [README.md](README.md#branch-protection-to-enable-on-github) — enable it there when ready.
 
+When filing or triaging issues, follow the tag conventions in [README.md § Issue tracking](README.md#issue-tracking): every title gets an `[area]` prefix, and `backend`/`infra`/`frontend`/`epic` are the labels (`backend` and `infra` are mutually exclusive — code vs. ops).
+
 ## Architecture
 
 ### The typed-client chain (most important to understand)
