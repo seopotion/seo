@@ -7,7 +7,7 @@ _Last updated: 2026-07-02 (remaining work now tracked as GitHub issues #7–#22 
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
-**Remaining work is tracked as GitHub issues.** Each 🟡/⬜ item below links to its issue (`[#N]`); the [seo Project board](https://github.com/orgs/seopotion/projects/1) is the live kanban. Backend issues are assigned to @ozykhan, frontend to @Alperadoss. Update issues as work lands, then reflect status here.
+**Remaining work is tracked as GitHub issues.** Each 🟡/⬜ item below links to its issue (`[#N]`); the [seo Project board](https://github.com/orgs/seopotion/projects/1) is the live kanban. Backend issues are assigned to @ozykhan, frontend to @Alperadoss. Update issues as work lands, then reflect status here. Issue tag + title conventions (the `[area]` prefix and label set) are documented in [README § Issue tracking](README.md#issue-tracking).
 
 ## Foundation (architecture decisions — all locked & proven)
 
