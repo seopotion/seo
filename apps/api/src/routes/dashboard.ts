@@ -1,12 +1,9 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { OrgRepo } from '@shared/db';
+import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
-import {
-  MOCK_ARTICLE_DETAILS,
-  MOCK_ARTICLES,
-  MOCK_PLANNER,
-  MOCK_PRESETS,
-} from '../mocks/dashboard';
+import { MOCK_ARTICLE_DETAILS, MOCK_ARTICLES, MOCK_PLANNER } from '../mocks/dashboard';
 import * as schemas from '../schemas/dashboard';
 
 /**
@@ -164,14 +161,27 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       summary: 'Current article preferences (content/SEO + engagement)',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.SettingsQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticlesSettingsResponse } },
-          description: 'Article preferences (mock sample data)',
+          description: 'Article preferences for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ article_preferences: MOCK_PRESETS.article_preferences }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org?.presets) {
+        return c.json({ error: 'Settings not available' }, 404);
+      }
+      return c.json({ article_preferences: org.presets.article_preferences }, 200);
+    },
   )
   .openapi(
     createRoute({
@@ -190,14 +200,24 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticlesSettingsResponse } },
-          description: 'Updated article preferences (mock — not persisted)',
+          description: 'Updated article preferences (persisted)',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => {
-      const patch = c.req.valid('json');
-      const merged = mergePresets(MOCK_PRESETS, { article_preferences: patch });
-      return c.json({ article_preferences: merged.article_preferences });
+    async (c) => {
+      const { org_id, ...patch } = c.req.valid('json');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org?.presets) {
+        return c.json({ error: 'Settings not available' }, 404);
+      }
+      const merged = mergePresets(org.presets, { article_preferences: patch });
+      await OrgRepo.updatePresets(org_id, merged);
+      return c.json({ article_preferences: merged.article_preferences }, 200);
     },
   )
   // --- General Settings (§2.6) ---
@@ -209,14 +229,27 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       summary: 'Current business + audience/competitors settings',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.SettingsQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.GeneralSettingsResponse } },
-          description: 'Business + audience settings (mock sample data)',
+          description: 'Business + audience settings for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ business: MOCK_PRESETS.business, audience: MOCK_PRESETS.audience }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org?.presets) {
+        return c.json({ error: 'Settings not available' }, 404);
+      }
+      return c.json({ business: org.presets.business, audience: org.presets.audience }, 200);
+    },
   )
   .openapi(
     createRoute({
@@ -235,14 +268,24 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.GeneralSettingsResponse } },
-          description: 'Updated business + audience settings (mock — not persisted)',
+          description: 'Updated business + audience settings (persisted)',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => {
-      const patch = c.req.valid('json');
-      const merged = mergePresets(MOCK_PRESETS, patch);
-      return c.json({ business: merged.business, audience: merged.audience });
+    async (c) => {
+      const { org_id, ...patch } = c.req.valid('json');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org?.presets) {
+        return c.json({ error: 'Settings not available' }, 404);
+      }
+      const merged = mergePresets(org.presets, patch);
+      await OrgRepo.updatePresets(org_id, merged);
+      return c.json({ business: merged.business, audience: merged.audience }, 200);
     },
   );
 

@@ -5,17 +5,58 @@ vi.mock('../src/clients/google', () => ({
   verifyGoogleIdToken: vi.fn(async () => ({ sub: 'g-sub-123', email: 'u@example.com', name: 'U' })),
 }));
 
-vi.mock('@shared/db', () => ({
-  UserRepo: {
-    upsertByGoogleSub: vi.fn(async (input: { google_sub: string; email: string }) => ({
-      id: 'user_1',
-      google_sub: input.google_sub,
-      email: input.email,
-      created_at: new Date(),
-    })),
-  },
-  OrgRepo: {},
-}));
+vi.mock('@shared/db', () => {
+  // A single setup-complete org owned by the logged-in user (user_1), seeded
+  // with presets. `updatePresets` mutates the store so persistence is testable.
+  const SEED_PRESETS = {
+    business: {
+      name: 'Clewas',
+      language: 'English',
+      country: 'Global (English)',
+      description: 'Turn Notion pages into SEO-friendly sites.',
+    },
+    audience: { target: 'Notion creators', competitors: ['super.so', 'potion.so'] },
+    blog: {
+      sitemap_url: 'https://www.clewas.com/sitemap.xml',
+      main_blog_url: 'https://www.clewas.com/blog',
+      best_articles: [],
+    },
+    article_preferences: {
+      content_seo: { article_style: 'Informative', internal_links: true, llm_instructions: 'x' },
+      engagement: { image_style: 'Sketch' },
+    },
+  };
+  const store = new Map<string, Record<string, unknown>>([
+    [
+      'org_1',
+      {
+        id: 'org_1',
+        user_id: 'user_1',
+        website_url: 'https://clewas.com',
+        setup_status: 'setup_complete',
+        presets: structuredClone(SEED_PRESETS),
+        created_at: new Date(),
+      },
+    ],
+  ]);
+  return {
+    UserRepo: {
+      upsertByGoogleSub: vi.fn(async (input: { google_sub: string; email: string }) => ({
+        id: 'user_1',
+        google_sub: input.google_sub,
+        email: input.email,
+        created_at: new Date(),
+      })),
+    },
+    OrgRepo: {
+      findById: vi.fn(async (id: string) => store.get(id) ?? null),
+      updatePresets: vi.fn(async (id: string, presets: unknown) => {
+        const org = store.get(id);
+        if (org) org.presets = presets;
+      }),
+    },
+  };
+});
 
 import { testClient } from 'hono/testing';
 import app, { type AppType } from '../src/routes';
@@ -138,39 +179,70 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     expect(json.articles).toHaveLength(0);
     expect(json.gated).toBe(true);
   });
+});
 
-  test('GET + PATCH /settings/articles deep-merges a partial', async () => {
+describe('dashboard settings persistence', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  test('PATCH /settings/articles deep-merges and persists across reads', async () => {
     const opts = await auth();
-    const get = await client.api.v0.dashboard.settings.articles.$get(undefined, opts);
-    expect(get.status).toBe(200);
-    expect((await get.json()).article_preferences.engagement.image_style).toBeTruthy();
-
     const patched = await client.api.v0.dashboard.settings.articles.$patch(
-      { json: { engagement: { image_style: 'Watercolor' } } },
+      { json: { org_id: 'org_1', engagement: { image_style: 'Watercolor' } } },
       opts,
     );
     expect(patched.status).toBe(200);
-    const body = await patched.json();
-    expect(body.article_preferences.engagement.image_style).toBe('Watercolor');
-    // Sibling content_seo left untouched by the merge.
-    expect(body.article_preferences.content_seo.article_style).toBeTruthy();
+    if (patched.status === 200) {
+      expect((await patched.json()).article_preferences.engagement.image_style).toBe('Watercolor');
+    }
+
+    // Persistence: a fresh GET reflects the saved change.
+    const get = await client.api.v0.dashboard.settings.articles.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(get.status).toBe(200);
+    if (get.status === 200) {
+      const body = await get.json();
+      expect(body.article_preferences.engagement.image_style).toBe('Watercolor');
+      // Sibling content_seo left untouched by the merge.
+      expect(body.article_preferences.content_seo.article_style).toBeTruthy();
+    }
   });
 
-  test('GET + PATCH /settings/general deep-merges a partial', async () => {
+  test('PATCH /settings/general deep-merges and persists across reads', async () => {
     const opts = await auth();
-    const get = await client.api.v0.dashboard.settings.general.$get(undefined, opts);
-    expect(get.status).toBe(200);
-    expect((await get.json()).business.name).toBeTruthy();
-
     const patched = await client.api.v0.dashboard.settings.general.$patch(
-      { json: { business: { name: 'Renamed Co' } } },
+      { json: { org_id: 'org_1', business: { name: 'Renamed Co' } } },
       opts,
     );
     expect(patched.status).toBe(200);
-    const body = await patched.json();
-    expect(body.business.name).toBe('Renamed Co');
-    // Audience untouched; language sibling preserved.
-    expect(body.business.language).toBeTruthy();
-    expect(body.audience.competitors.length).toBeGreaterThan(0);
+    if (patched.status === 200) {
+      expect((await patched.json()).business.name).toBe('Renamed Co');
+    }
+
+    const get = await client.api.v0.dashboard.settings.general.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(get.status).toBe(200);
+    if (get.status === 200) {
+      const body = await get.json();
+      expect(body.business.name).toBe('Renamed Co');
+      // Audience untouched; language sibling preserved.
+      expect(body.business.language).toBeTruthy();
+      expect(body.audience.competitors.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('settings 404 for an org the caller does not own', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.settings.articles.$get(
+      { query: { org_id: 'unknown' } },
+      opts,
+    );
+    expect(res.status).toBe(404);
   });
 });

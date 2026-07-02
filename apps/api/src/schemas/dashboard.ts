@@ -155,6 +155,20 @@ export const ArticleNotFoundResponse = z
  * sub-shapes so entity shapes stay single-sourced. GET returns the current
  * values; PATCH deep-merges a partial (same pattern as PATCH /setup/presets).
  */
+// Settings are org-scoped: GET carries `org_id` as a query param, PATCH in the
+// body (same convention as the setup routes). Ownership is checked server-side.
+export const SettingsQuery = z.object({
+  org_id: z
+    .string()
+    .openapi({ param: { name: 'org_id', in: 'query' }, example: '6650f1a2b3c4d5e6f7a8b9c0' }),
+});
+
+export const SettingsNotFoundResponse = z
+  .object({
+    error: z.string().openapi({ example: 'Settings not available' }),
+  })
+  .openapi('SettingsNotFoundResponse');
+
 export const ArticlesSettingsResponse = z
   .object({
     article_preferences: SetupPresetsSchema.shape.article_preferences,
@@ -163,6 +177,7 @@ export const ArticlesSettingsResponse = z
 
 export const ArticlesSettingsPatchBody = z
   .object({
+    org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
     content_seo: SetupPresetsSchema.shape.article_preferences.shape.content_seo
       .partial()
       .optional(),
@@ -179,6 +194,7 @@ export const GeneralSettingsResponse = z
 
 export const GeneralSettingsPatchBody = z
   .object({
+    org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
     business: SetupPresetsSchema.shape.business.partial().optional(),
     audience: SetupPresetsSchema.shape.audience.partial().optional(),
   })
