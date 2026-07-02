@@ -361,6 +361,19 @@ keyword to help you rank."
   keep 25–30 (1/day) · 50–60 (2/day) · 75–90 (3/day) so content never runs dry.
 - Trial gates: "Research Keywords" / "Schedule Improvements" disabled until paid.
 
+**Per-card affordances (calendar cell, observed live 2026-07-02).** A scheduled day cell
+renders: format label (`List: Round-up` / `Resources` / `Guide` / `How-to`), the keyword,
+`Vol:` and `Diff:` badges, plus a remove control (two-step: "Confirm Removal" → "Delete
+scheduled keyword?", the latter offering "delete only this" vs "delete all inactive"). The
+action affordance depends on whether the article exists yet:
+- **Not generated** → `Pre-Create` button (desc "Pre-create article for scheduled
+  publishing"; gated — "Pre-create option is available for paid users only"), plus
+  **Add Instructions** (per-keyword custom brief) and **Quality Questions** with a count
+  badge (e.g. `4`) — the E-E-A-T interview surfaced inline on the card.
+- **Generated** → the Pre-Create/instructions controls are replaced by a **`Visit Article`**
+  link to `/dashboard/articles/{uuid}`. This is the visible signal that `article_id` flipped
+  from null → set. (Confirmed on the July-2 "landing page design best practices" card.)
+
 **Reference endpoints (theirs), captured live 2026-07-01:**
 - `GET scheduled_keywords?product_id=…&created_by_super_admin=neq.true&order=utc_scheduled_date.asc,search_volume.desc,difficulty.desc,id.asc` — the calendar.
 - `GET keywords_storage?product_id=…&order=created_at.desc` — the candidate **pool** (bank of researched-but-not-yet-scheduled keywords).
@@ -413,6 +426,20 @@ subscription here, not a free tier.
 The library of generated/published articles (`/dashboard/articles`). Each article moves
 through a status lifecycle: `generated → published` (plus `deleted`, and a `publish_error`
 flag when a CMS push fails). Counts on Home come from `HEAD` queries against this table.
+
+**Table shape (observed live 2026-07-02).** A searchable table — "Search articles by
+title..." box + a **Status** filter — with columns:
+`[bulk-select checkbox] · Image · Title · Keyword · Difficulty · Volume · Status · Date`.
+Header checkbox = select-all for bulk actions. **First real generated article observed**,
+which confirms the full spine end-to-end:
+- Title **"10 Landing Page Design Best Practices for Notion Sites"** · Keyword
+  "landing page design best practices" · Diff 36 · Vol 170 · Status **"Generated"** ·
+  Date 02 Jul 2026.
+- Same keyword/Vol/Diff as the July-2 planner card (format Round-up) → so the pipeline is
+  **planner keyword → generated article → history row**, and the planner card swapped to
+  "Visit Article" at the same moment. Note the article gets its **own SEO title distinct
+  from the raw keyword** (and niche-qualified, "…for Notion Sites") — so `article.title`
+  ≠ `keyword`; our schema must store the generated title separately, not reuse the keyword.
 
 **Reference endpoints (theirs):** `HEAD articles?status=not.eq.deleted` (total),
 `articles?select=title,slug&status=eq.published` (list). Article rows carry
