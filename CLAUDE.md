@@ -58,25 +58,17 @@ For multi-step tasks, state a brief plan with clear verification steps.
 
 ## Commands
 
-```bash
-npm run lint             # Biome: lint + format check + import-sort (whole repo)
-npm run lint:fix         # Biome: apply safe fixes (format, organize imports, safe lint)
-npm run check            # typecheck backend + shared packages (tsc, root config)
-npm run check:web        # typecheck the Next.js app (its own tsconfig)
-npm run check:all        # both
-npm test                 # unit tests (Vitest); no infra needed
-npm test -- setup        # run a single test file by name filter
-npm run test:integration # repository tests vs real Mongo (needs `docker compose up -d mongo`)
-npm run dev              # full local stack (api + worker + web) via concurrently
-npm run dev -w api       # local Hono HTTP server (Node adapter; serves the Lambda app on :8787)
-npm run dev -w worker    # local SQS poller that runs the worker handler
-npm run dev -w web       # Next.js dev server
-npm run db:init          # create MongoDB indexes (one-off; needs Mongo running)
-```
+Command names live in `package.json` (root + per-app). What isn't obvious from there:
 
-Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + ElasticMQ SQS :9324) and `.env` files. Shared backend config + secrets live in the **root `.env`** (copy from `.env.example`); the api/worker dev scripts load it first via `--env-file-if-exists=../../.env` then an optional per-app `.env` that overrides it. The web app reads its own `apps/web/.env` (Next.js loader; `NEXT_PUBLIC_*` only — secrets never go here). The API/worker dev entrypoints (`src/dev.ts`, run via `tsx`) serve the same `app`/`handler` as the Lambda build — only the outer adapter differs. The SQS client honors `SQS_ENDPOINT` to target ElasticMQ locally.
+- `npm run check:all` — typecheck backend + shared (root `tsc`) **and** the web app (its own tsconfig); `check` / `check:web` run each half.
+- `npm test -- setup` — run a single test file by name filter (`test` needs no infra).
+- `npm run test:integration` — repository tests vs real Mongo; needs `docker compose up -d mongo`.
+- `npm run dev` — full stack via `concurrently`; `-w api` serves the Lambda app over HTTP on :8787 (Node adapter), `-w worker` is the SQS poller, `-w web` is Next.js.
+- `npm run db:init` — one-off MongoDB index creation; needs Mongo running.
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
+
+Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + ElasticMQ SQS :9324) and `.env` files. Shared backend config + secrets live in the **root `.env`** (copy from `.env.example`); the api/worker dev scripts load it first via `--env-file-if-exists=../../.env` then an optional per-app `.env` that overrides it. The web app reads its own `apps/web/.env` (Next.js loader; `NEXT_PUBLIC_*` only — secrets never go here). The API/worker dev entrypoints (`src/dev.ts`, run via `tsx`) serve the same `app`/`handler` as the Lambda build — only the outer adapter differs. The SQS client honors `SQS_ENDPOINT` to target ElasticMQ locally.
 
 ## Branch workflow
 
@@ -104,7 +96,9 @@ prelude naming `master`, **PRs target `dev`, not `master`.**
 
 ### Auth (Google login + JWT)
 
-Google-only login. The frontend obtains a Google ID token and `POST /core/login` exchanges it for our session JWT: `verifyGoogleIdToken` (`apps/api/src/clients/google.ts`) → `UserRepo.upsertByGoogleSub` → `signToken` (`apps/api/src/auth/jwt.ts`, HS256 via `hono/jwt`). Protected routes declare `security: [{ Bearer: [] }]` + `middleware: [authMiddleware]`; the middleware (`apps/api/src/middlewares/auth.ts`) validates `Authorization: Bearer <jwt>` and sets `c.var.auth = { userId, email }`. Routers that use it are typed `OpenAPIHono<AuthEnv>`. `/core/organizations` (empty array ⇒ send to setup) and `/core/status` (the `setup_complete` gate) are protected, as is `/setup/start_scan` (stamps the new org with `user_id`). Config: `GOOGLE_CLIENT_ID` (public OAuth id) lives in `apps/api/src/config.ts`. The HS256 signing secret is resolved by `getJwtSecret()` (`apps/api/src/auth/secret.ts`): deployed envs set `JWT_SECRET_PARAM` to an SSM SecureString name and the API fetches + caches it via Powertools Parameters (`@aws-lambda-powertools/parameters/ssm`, `maxAge` 1h — at most one SSM call per hour per warm Lambda, never inlined into the CloudFormation template); locally `JWT_SECRET_PARAM` is unset so it falls back to the plain `JWT_SECRET` env var (no AWS needed). CDK references the param by name and grants the API Lambda read only — the worker never gets it.
+Google-only login. `POST /core/login` exchanges a Google ID token for our session JWT: `verifyGoogleIdToken` (`clients/google.ts`) → `UserRepo.upsertByGoogleSub` → `signToken` (`auth/jwt.ts`, HS256 via `hono/jwt`). Protected routes declare `security: [{ Bearer: [] }]` + `middleware: [authMiddleware]` and are typed `OpenAPIHono<AuthEnv>`; the middleware (`middlewares/auth.ts`) validates `Authorization: Bearer <jwt>` and sets `c.var.auth = { userId, email }`. Protected today: `/core/organizations` (empty ⇒ send to setup), `/core/status` (the `setup_complete` gate), `/setup/start_scan` (stamps the org with `user_id`).
+
+The HS256 signing secret is resolved by `getJwtSecret()` (`auth/secret.ts`): deployed envs read an SSM SecureString named by `JWT_SECRET_PARAM` (fetched + cached ~1h via Powertools); locally it falls back to the plain `JWT_SECRET` env var (no AWS needed). **Only the API Lambda is granted the secret — never the worker.** `GOOGLE_CLIENT_ID` (public OAuth id) lives in `config.ts`.
 
 ### Async scan flow (SQS)
 
