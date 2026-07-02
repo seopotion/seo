@@ -3,7 +3,7 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-06-30 (+ minimal dashboard: mock Home endpoints + Home UI; local round-trips run green against live Docker)_
+_Last updated: 2026-07-02 (dashboard design fully mapped from live Outrank cross-reference — all surfaces in `design/product-flow.md`; build still the frontier)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 
@@ -49,13 +49,14 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Logout (clears stored token) — frontend
 - ⬜ Token refresh / expiry handling on the client
 
-## Dashboard (mostly INC in design)
+## Dashboard (design fully mapped; build is the frontier)
 
-- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live.
+- ✅ **Dashboard design fully mapped** against live Outrank (2026-07-02) — every surface captured in [`design/product-flow.md`](design/product-flow.md): Home (populated state: published/planned/**awaiting-publish** counts, scored Recommended Actions, GSC-gated Best Articles + Search Performance), Content Planner (per-card affordances: Pre-Create / Add Instructions / Quality Questions ↔ Visit Article), the generated **Article editor** (§2.2.1: `{title, slug, keyword, meta_description, featured_image, content}` + deferred AI-edit layer), Content History table, Articles Settings (Preferences enums + Blog form), General Settings (§2.6: Business + Audience/Competitors), Linking Configuration, Integrations. Improvements Beta / Backlink Exchange / Tools Builder intentionally out of scope.
+- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live. **Design note:** live Home splits articles into three states (published / planned / generated-awaiting-publish) — baseline may want a third count.
 - ✅ Dashboard Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated; renders Articles (published/planned), Backlink Exchange (upgrade-gated), Recommended Actions, Best Articles (GSC-gated) cards from the typed client; org domain + Domain Rating badge header
 - ⬜ Domain rating + Google Search Console integration
 - ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start)
-- ⬜ Articles: content planner / history / settings / integrations
+- ⬜ Articles build (design mapped, code not started): content planner / article generation + editor / history / settings / integrations
 
 ## Frontend (`apps/web`)
 
