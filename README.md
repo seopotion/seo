@@ -22,6 +22,56 @@ packages/shared/
 infra/                AWS CDK (standalone, not a workspace)
 ```
 
+## Branch workflow
+
+We use a two-tier flow. `dev` is the integration branch (and the GitHub default);
+`master` is the release branch that `dev` is merged into periodically.
+
+- **Never commit or merge directly to `dev` or `master`.** All work goes through a
+  pull request.
+- Branch off `dev`, named `<your-gh-name>/<short-description>` (e.g.
+  `ozykhan/backend-stuff`).
+- Open the PR **into `dev`**. CI (lint + typecheck + unit tests) must pass, and the
+  PR needs an approving review before merge.
+- Maintainers periodically merge `dev` → `master` (also via PR) to cut a release.
+
+```bash
+git checkout dev && git pull            # start from latest dev
+git checkout -b <gh-name>/<description> # your feature branch
+# ...commit work...
+git push -u origin <gh-name>/<description>
+gh pr create --base dev                 # PR targets dev (the default base)
+```
+
+### Branch protection (to enable on GitHub)
+
+These rules aren't enforced yet — enable them in **Settings → Branches** (or via the
+`gh` commands below) to make the workflow above mandatory. Apply the same ruleset to
+both `dev` and `master`:
+
+- Require a pull request before merging (block direct pushes). **Review approvals are
+  off for now** — bump `required_approving_review_count` to `1` once there's a second
+  reviewer.
+- Require the `verify` status check (CI) to pass, and require branches to be up to
+  date before merging.
+- Include administrators, and block force-pushes and branch deletion.
+
+```bash
+# Requires admin on the repo. Repeat for BRANCH=master.
+BRANCH=dev
+gh api -X PUT "repos/ozykhan/seo-dev/branches/$BRANCH/protection" \
+  --input - <<'JSON'
+{
+  "required_status_checks": { "strict": true, "contexts": ["verify"] },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+JSON
+```
+
 ## Develop
 
 Requires Node 22+. Uses npm workspaces (no Turborepo yet); Lambdas are bundled by
