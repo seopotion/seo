@@ -8,27 +8,67 @@ TypeScript monorepo (npm workspaces). Hono backend on AWS Lambda behind API Gate
 
 Full design rationale lives in [`design/`](design/) — read it before non-trivial work. Design *plans* go in `design/`, never in this file. Current status and remaining work are tracked in [`PROGRESS.md`](PROGRESS.md) — check it to see what's built vs. stubbed, and update it as you complete work.
 
+## Coding Principles
+
+### 1. Think Before Coding
+Don't assume. Don't hide confusion. Surface tradeoffs.
+
+Before implementing:
+
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+- Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+Touch only what you must. Clean up only your own mess.
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+- The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+Define success criteria. Loop until verified.
+
+Transform tasks into verifiable goals:
+
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+
+For multi-step tasks, state a brief plan with clear verification steps.
+
 ## Commands
 
-```bash
-npm run lint             # Biome: lint + format check + import-sort (whole repo)
-npm run lint:fix         # Biome: apply safe fixes (format, organize imports, safe lint)
-npm run check            # typecheck backend + shared packages (tsc, root config)
-npm run check:web        # typecheck the Next.js app (its own tsconfig)
-npm run check:all        # both
-npm test                 # unit tests (Vitest); no infra needed
-npm test -- setup        # run a single test file by name filter
-npm run test:integration # repository tests vs real Mongo (needs `docker compose up -d mongo`)
-npm run dev              # full local stack (api + worker + web) via concurrently
-npm run dev -w api       # local Hono HTTP server (Node adapter; serves the Lambda app on :8787)
-npm run dev -w worker    # local SQS poller that runs the worker handler
-npm run dev -w web       # Next.js dev server
-npm run db:init          # create MongoDB indexes (one-off; needs Mongo running)
-```
+Command names live in `package.json` (root + per-app). What isn't obvious from there:
 
-Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + ElasticMQ SQS :9324) and `.env` files. Shared backend config + secrets live in the **root `.env`** (copy from `.env.example`); the api/worker dev scripts load it first via `--env-file-if-exists=../../.env` then an optional per-app `.env` that overrides it. The web app reads its own `apps/web/.env` (Next.js loader; `NEXT_PUBLIC_*` only — secrets never go here). The API/worker dev entrypoints (`src/dev.ts`, run via `tsx`) serve the same `app`/`handler` as the Lambda build — only the outer adapter differs. The SQS client honors `SQS_ENDPOINT` to target ElasticMQ locally.
+- `npm run check:all` — typecheck backend + shared (root `tsc`) **and** the web app (its own tsconfig); `check` / `check:web` run each half.
+- `npm test -- setup` — run a single test file by name filter (`test` needs no infra).
+- `npm run test:integration` — repository tests vs real Mongo; needs `docker compose up -d mongo`.
+- `npm run dev` — full stack via `concurrently`; `-w api` serves the Lambda app over HTTP on :8787 (Node adapter), `-w worker` is the SQS poller, `-w web` is Next.js.
+- `npm run db:init` — one-off MongoDB index creation; needs Mongo running.
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
+
+Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + ElasticMQ SQS :9324) and `.env` files. Shared backend config + secrets live in the **root `.env`** (copy from `.env.example`); the api/worker dev scripts load it first via `--env-file-if-exists=../../.env` then an optional per-app `.env` that overrides it. The web app reads its own `apps/web/.env` (Next.js loader; `NEXT_PUBLIC_*` only — secrets never go here). The API/worker dev entrypoints (`src/dev.ts`, run via `tsx`) serve the same `app`/`handler` as the Lambda build — only the outer adapter differs. The SQS client honors `SQS_ENDPOINT` to target ElasticMQ locally.
 
 ## Branch workflow
 
@@ -38,8 +78,8 @@ prelude naming `master`, **PRs target `dev`, not `master`.**
 
 - Never commit or merge directly to `dev` or `master` — always go through a PR.
 - Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),
-  and open the PR into `dev`. Run `npm run lint`, `npm run check:all`, and `npm test`
-  before pushing — CI runs the same checks and must pass.
+  and open the PR into `dev`. Run the checks above before pushing — CI runs the same
+  checks and must pass.
 - Only maintainers merge `dev` → `master` (also via PR).
 - Branch protection making this mandatory is documented in [README.md](README.md#branch-protection-to-enable-on-github) — enable it there when ready.
 
@@ -56,7 +96,9 @@ prelude naming `master`, **PRs target `dev`, not `master`.**
 
 ### Auth (Google login + JWT)
 
-Google-only login. The frontend obtains a Google ID token and `POST /core/login` exchanges it for our session JWT: `verifyGoogleIdToken` (`apps/api/src/clients/google.ts`) → `UserRepo.upsertByGoogleSub` → `signToken` (`apps/api/src/auth/jwt.ts`, HS256 via `hono/jwt`). Protected routes declare `security: [{ Bearer: [] }]` + `middleware: [authMiddleware]`; the middleware (`apps/api/src/middlewares/auth.ts`) validates `Authorization: Bearer <jwt>` and sets `c.var.auth = { userId, email }`. Routers that use it are typed `OpenAPIHono<AuthEnv>`. `/core/organizations` (empty array ⇒ send to setup) and `/core/status` (the `setup_complete` gate) are protected, as is `/setup/start_scan` (stamps the new org with `user_id`). Config: `GOOGLE_CLIENT_ID` (public OAuth id) lives in `apps/api/src/config.ts`. The HS256 signing secret is resolved by `getJwtSecret()` (`apps/api/src/auth/secret.ts`): deployed envs set `JWT_SECRET_PARAM` to an SSM SecureString name and the API fetches + caches it via Powertools Parameters (`@aws-lambda-powertools/parameters/ssm`, `maxAge` 1h — at most one SSM call per hour per warm Lambda, never inlined into the CloudFormation template); locally `JWT_SECRET_PARAM` is unset so it falls back to the plain `JWT_SECRET` env var (no AWS needed). CDK references the param by name and grants the API Lambda read only — the worker never gets it.
+Google-only login. `POST /core/login` exchanges a Google ID token for our session JWT: `verifyGoogleIdToken` (`clients/google.ts`) → `UserRepo.upsertByGoogleSub` → `signToken` (`auth/jwt.ts`, HS256 via `hono/jwt`). Protected routes declare `security: [{ Bearer: [] }]` + `middleware: [authMiddleware]` and are typed `OpenAPIHono<AuthEnv>`; the middleware (`middlewares/auth.ts`) validates `Authorization: Bearer <jwt>` and sets `c.var.auth = { userId, email }`. Protected today: `/core/organizations` (empty ⇒ send to setup), `/core/status` (the `setup_complete` gate), `/setup/start_scan` (stamps the org with `user_id`).
+
+The HS256 signing secret is resolved by `getJwtSecret()` (`auth/secret.ts`): deployed envs read an SSM SecureString named by `JWT_SECRET_PARAM` (fetched + cached ~1h via Powertools); locally it falls back to the plain `JWT_SECRET` env var (no AWS needed). **Only the API Lambda is granted the secret — never the worker.** `GOOGLE_CLIENT_ID` (public OAuth id) lives in `config.ts`.
 
 ### Async scan flow (SQS)
 
