@@ -3,9 +3,11 @@
 Living tracker of what's built vs. what's left. Update as work lands.
 Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-07-02 (dashboard design fully mapped from live Outrank cross-reference — all surfaces in `design/product-flow.md`; build still the frontier)_
+_Last updated: 2026-07-02 (remaining work now tracked as GitHub issues #7–#22 on the [seo Project board](https://github.com/orgs/seopotion/projects/1); backend → @ozykhan, frontend → @Alperadoss)_
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
+
+**Remaining work is tracked as GitHub issues.** Each 🟡/⬜ item below links to its issue (`[#N]`); the [seo Project board](https://github.com/orgs/seopotion/projects/1) is the live kanban. Backend issues are assigned to @ozykhan, frontend to @Alperadoss. Update issues as work lands, then reflect status here.
 
 ## Foundation (architecture decisions — all locked & proven)
 
@@ -33,8 +35,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
 - ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
 - ✅ `PATCH /setup/presets` — partial edit of generated presets (deep-merge, ownership-checked)
-- ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
-- 🟡 Onboarding parity backlog — baseline is intentionally a subset of a mature flow; deferred gaps (integrations, richer article prefs, Improvements/Product-Catalog subsystems, multi-segment audience, competitor minimums, GSC) captured in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md)
+- ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer) — [#7](https://github.com/seopotion/seo/issues/7)
+- 🟡 Onboarding parity backlog — baseline is intentionally a subset of a mature flow; deferred gaps (integrations, richer article prefs, Improvements/Product-Catalog subsystems, multi-segment audience, competitor minimums, GSC) captured in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md) — epic [#8](https://github.com/seopotion/seo/issues/8)
 - ✅ `POST /setup/finalize` — optional final edit + flip status to `setup_complete`
 - ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
 
@@ -45,29 +47,29 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ `GET /core/status` (auth-protected; the `setup_complete` dashboard gate)
 - ✅ Auth middleware (Bearer JWT → `c.var.auth`) + OpenAPI `Bearer` security scheme
 - ✅ `/setup/start_scan` now auth-protected and stamps org `user_id`
-- 🟡 `JWT_SECRET` / `GOOGLE_CLIENT_ID` are env-driven with dev defaults — set real values per env
+- 🟡 `JWT_SECRET` / `GOOGLE_CLIENT_ID` are env-driven with dev defaults — set real values per env — [#9](https://github.com/seopotion/seo/issues/9)
 - ✅ Logout (clears stored token) — frontend
-- ⬜ Token refresh / expiry handling on the client
+- ⬜ Token refresh / expiry handling on the client — [#18](https://github.com/seopotion/seo/issues/18)
 
 ## Dashboard (design fully mapped; build is the frontier)
 
 - ✅ **Dashboard design fully mapped** against live Outrank (2026-07-02) — every surface captured in [`design/product-flow.md`](design/product-flow.md): Home (populated state: published/planned/**awaiting-publish** counts, scored Recommended Actions, GSC-gated Best Articles + Search Performance), Content Planner (per-card affordances: Pre-Create / Add Instructions / Quality Questions ↔ Visit Article), the generated **Article editor** (§2.2.1: `{title, slug, keyword, meta_description, featured_image, content}` + deferred AI-edit layer), Content History table, Articles Settings (Preferences enums + Blog form), General Settings (§2.6: Business + Audience/Competitors), Linking Configuration, Integrations. Improvements Beta / Backlink Exchange / Tools Builder intentionally out of scope.
-- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live. **Design note:** live Home splits articles into three states (published / planned / generated-awaiting-publish) — baseline may want a third count.
-- 🟡 Dashboard API skeletons (populated mock data, so FE can build populated states) — auth-protected, wired into `AppType`, tested: `GET /dashboard/planner` (§2.1 scheduled keywords), `GET /dashboard/articles` (§2.2 list, status-filter + limit/offset) + `GET /dashboard/articles/:id` (§2.2.1 full record, 404 on miss), `GET`+`PATCH /dashboard/settings/articles` (§2.3 `article_preferences`) and `GET`+`PATCH /dashboard/settings/general` (§2.6 business + audience/competitors). Settings PATCH deep-merges via `mergePresets` but is **non-persisting** (no DB). Fixtures in `apps/api/src/mocks/dashboard.ts` — the swap-out seam. Settings schemas reuse `SetupPresetsSchema` sub-shapes (single source of truth). Spec: [`docs/superpowers/specs/2026-07-02-dashboard-api-skeletons-design.md`](docs/superpowers/specs/2026-07-02-dashboard-api-skeletons-design.md). **Deferred (not in this batch):** subscription status + `requirePaid` gate, integrations CRUD, keyword mutations (`POST /keywords/research`, `PATCH /keywords/:id`).
+- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later ([#10](https://github.com/seopotion/seo/issues/10)). Tested (`apps/api/tests/dashboard.test.ts`) + verified live. **Design note:** live Home splits articles into three states (published / planned / generated-awaiting-publish) — baseline may want a third count.
+- 🟡 Dashboard API skeletons (populated mock data, so FE can build populated states) — auth-protected, wired into `AppType`, tested: `GET /dashboard/planner` (§2.1 scheduled keywords), `GET /dashboard/articles` (§2.2 list, status-filter + limit/offset) + `GET /dashboard/articles/:id` (§2.2.1 full record, 404 on miss), `GET`+`PATCH /dashboard/settings/articles` (§2.3 `article_preferences`) and `GET`+`PATCH /dashboard/settings/general` (§2.6 business + audience/competitors). Settings PATCH deep-merges via `mergePresets` but is **non-persisting** (no DB). Fixtures in `apps/api/src/mocks/dashboard.ts` — the swap-out seam. Settings schemas reuse `SetupPresetsSchema` sub-shapes (single source of truth). Spec: [`docs/superpowers/specs/2026-07-02-dashboard-api-skeletons-design.md`](docs/superpowers/specs/2026-07-02-dashboard-api-skeletons-design.md). **Deferred (not in this batch):** subscription status + `requirePaid` gate, integrations CRUD, keyword mutations (`POST /keywords/research`, `PATCH /keywords/:id`). Real reads + persisting PATCH tracked in [#11](https://github.com/seopotion/seo/issues/11).
 - ✅ Dashboard Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated; renders Articles (published/planned), Backlink Exchange (upgrade-gated), Recommended Actions, Best Articles (GSC-gated) cards from the typed client; org domain + Domain Rating badge header
-- ⬜ Domain rating + Google Search Console integration
-- ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start)
-- ⬜ Articles build (design mapped, code not started): content planner / article generation + editor / history / settings / integrations
+- ⬜ Domain rating + Google Search Console integration — [#12](https://github.com/seopotion/seo/issues/12)
+- ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start) — [#13](https://github.com/seopotion/seo/issues/13)
+- ⬜ Articles build (design mapped, code not started): content planner / article generation + editor / history / settings / integrations — epic [#19](https://github.com/seopotion/seo/issues/19)
 
 ## Frontend (`apps/web`)
 
 - ✅ Next.js app wired to the typed client; verified via `next build` (all routes compile/prerender)
 - ✅ Google sign-in (Google Identity Services) → `/core/login` → JWT stored (localStorage) → auto-attached on every client call (`getApiClient(url, getToken)`)
 - ✅ Auth-gated routing: home shows sign-in; post-login routes by `/core/status` (setup vs dashboard); `/setup` redirects to login without a token; `/dashboard` placeholder
-- 🟡 UI is placeholder — needs real onboarding + dashboard screens (mockups in design/product-flow.md)
-- 🟡 JWT in localStorage (XSS tradeoff noted in `lib/auth.ts`); no refresh/expiry handling yet
-- ⬜ Env: set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per env (`.env.example` added)
-- ⬜ No component/DOM tests yet (no jsdom env configured); only `tsc` + `next build` cover the UI
+- 🟡 UI is placeholder — needs real onboarding + dashboard screens (mockups in design/product-flow.md) — [#20](https://github.com/seopotion/seo/issues/20)
+- 🟡 JWT in localStorage (XSS tradeoff noted in `lib/auth.ts`); no refresh/expiry handling yet — [#18](https://github.com/seopotion/seo/issues/18)
+- ⬜ Env: set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per env (`.env.example` added) — [#21](https://github.com/seopotion/seo/issues/21)
+- ⬜ No component/DOM tests yet (no jsdom env configured); only `tsc` + `next build` cover the UI — [#22](https://github.com/seopotion/seo/issues/22)
 
 ## Infrastructure / ops
 
@@ -77,10 +79,10 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
 - ✅ Run `ensureIndexes()` at deploy — `scripts/lambda-db-init.ts` Lambda behind a `Provider`-backed `CustomResource` (re-runs each deploy; indexes idempotent)
 - ✅ Linter/formatter: **Biome** (`biome.json`) — `npm run lint` / `lint:fix`
 - ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
-- ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
-- ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above
-- ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings)
-- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL`
+- ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths — [#14](https://github.com/seopotion/seo/issues/14)
+- ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above — [#15](https://github.com/seopotion/seo/issues/15)
+- ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings) — [#16](https://github.com/seopotion/seo/issues/16)
+- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL` — [#17](https://github.com/seopotion/seo/issues/17)
 
 ## Local development
 
