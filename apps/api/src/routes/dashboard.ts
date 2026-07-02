@@ -1,9 +1,9 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { OrgRepo } from '@shared/db';
+import { KeywordRepo, OrgRepo } from '@shared/db';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
-import { MOCK_ARTICLE_DETAILS, MOCK_ARTICLES, MOCK_PLANNER } from '../mocks/dashboard';
+import { MOCK_ARTICLE_DETAILS, MOCK_ARTICLES } from '../mocks/dashboard';
 import * as schemas from '../schemas/dashboard';
 
 /**
@@ -91,14 +91,39 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       summary: 'Scheduled keywords for the content planner calendar',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.PlannerResponse } },
-          description: 'Scheduled keywords (mock sample data)',
+          description: 'Scheduled keywords for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ keywords: MOCK_PLANNER }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      const keywords = await KeywordRepo.listByOrg(org_id);
+      return c.json(
+        {
+          keywords: keywords.map((k) => ({
+            id: k.id,
+            keyword: k.keyword,
+            status: k.status,
+            scheduled_date: k.scheduled_date,
+            search_volume: k.search_volume,
+            difficulty: k.difficulty,
+            article_id: k.article_id,
+          })),
+        },
+        200,
+      );
+    },
   )
   // --- Content History (§2.2, read-only) ---
   .openapi(

@@ -1,6 +1,17 @@
 import { z } from '@hono/zod-openapi';
 import { SetupPresetsSchema } from '@shared/schemas';
 
+// Org-scoped read: the caller passes org_id; the handler checks ownership.
+export const OrgQuery = z.object({
+  org_id: z
+    .string()
+    .openapi({ param: { name: 'org_id', in: 'query' }, example: '6650f1a2b3c4d5e6f7a8b9c0' }),
+});
+
+export const OrgNotFoundResponse = z
+  .object({ error: z.string().openapi({ example: 'Not found' }) })
+  .openapi('DashboardOrgNotFoundResponse');
+
 /**
  * Dashboard Home schemas. These back the four Home-page endpoints in
  * design/product-flow.md (Dashboard §1). The data is mocked/empty for now —
