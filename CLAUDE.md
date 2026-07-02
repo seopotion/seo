@@ -30,6 +30,19 @@ Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + El
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
 
+## Branch workflow
+
+Two-tier flow: `dev` is the integration branch and the **GitHub default base for PRs**;
+`master` is the release branch that `dev` is merged into periodically. Despite the git
+prelude naming `master`, **PRs target `dev`, not `master`.**
+
+- Never commit or merge directly to `dev` or `master` — always go through a PR.
+- Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),
+  and open the PR into `dev`. Run `npm run lint`, `npm run check:all`, and `npm test`
+  before pushing — CI runs the same checks and must pass.
+- Only maintainers merge `dev` → `master` (also via PR).
+- Branch protection making this mandatory is documented in [README.md](README.md#branch-protection-to-enable-on-github) — enable it there when ready.
+
 ## Architecture
 
 ### The typed-client chain (most important to understand)
