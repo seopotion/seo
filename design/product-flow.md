@@ -336,6 +336,22 @@ Our four endpoints above cover the baseline; **defer** domain-rating/backlinks/G
 - `premium_image_subscriptions` — premium AI-image add-on state.
 All of these back **deferred** cards for us; baseline Home stays the four counts/lists above.
 
+**Populated-state Home (live 2026-07-02, after the first article generated).** Earlier capture
+was an empty org (0/0); with real data the cards reveal detail the empty state hid:
+- **ARTICLES card exposes three states, not two:** Published **0**, Planned **29**, and a
+  distinct **"1 awaiting publish"** — i.e. *generated-but-not-yet-published*. So the 30-keyword
+  plan splits into `published + planned + generated_awaiting_publish`; the "awaiting publish"
+  bucket is gated by "Connect integration to start publishing". Baseline Home may want a **third
+  count** (generated-not-published) beyond published/planned. Also surfaces **"Next article on
+  Jul 3"** (next scheduled generation date).
+- **Recommended Actions is a dynamic, scored engine** — a **count badge ("5")** and "highest-
+  leverage next steps", not a static list. Cards reflect live state, e.g. "**1 article ready —
+  no integration connected**" → Connect, and "**Connect Google Search Console**" → Connect GSC
+  (`/dashboard/settings/general/google-search-console`). Deferred beyond baseline's simple list.
+- **A third GSC-gated block: "Search Performance"** (alongside Best Articles) — both show
+  "Connect Google Search Console" until a GSC connection exists. Confirms the GSC gate fans out
+  to multiple cards, all deferred (parity-gap G7).
+
 ## 2. Articles
 
 **Mockup — Articles sidebar submenu:** The expanded "Articles" navigation group lists: Content Planner, Improvements (Beta), Content History, Articles Settings, Integrations, Linking Configuration.
@@ -504,7 +520,10 @@ setup wizard collected — i.e. the presets become **editable settings** after `
 - **Preferences** ← `output_settings_presets` (GET/PATCH) = our `article_preferences`
   (`content_seo` + `engagement`). Baseline reuses `PATCH /setup/presets` shape or a
   dashboard-scoped `PATCH /dashboard/v0/settings/articles`.
-- **Blog** ← the `blog` presets (sitemap, main blog, best articles).
+- **Blog** ← the `blog` presets (sitemap, main blog, best articles). UI ("Content details",
+  live 2026-07-02) is exactly four fields: **Sitemap URL** (drives internal linking — the
+  dependency §2.3's Internal-Links gate points at), **Main blog address**, and **up to 3
+  "best article example" URLs** (seed the style reference + the Home "Best Articles" card).
 - **Improvements** ← `/api/products/improvement-settings` + `custom_image_presets` +
   `/api/catalog/profile`. These are the **deferred** subsystems (parity-gaps G2): article
   Improvement Schedule, custom AI image presets, Product Catalog. **Out of baseline.**
