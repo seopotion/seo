@@ -1,5 +1,4 @@
 import type { z } from '@hono/zod-openapi';
-import type { SetupPresets } from '@shared/schemas';
 import type {
   ArticleDetailResponse,
   ArticlesResponse,
@@ -142,36 +141,5 @@ export const MOCK_ARTICLE_DETAILS: Record<string, ArticleDetail> = {
     status: 'published',
     created_at: '2026-07-01T08:05:00.000Z',
     published_at: '2026-07-01T09:00:00.000Z',
-  },
-};
-
-// Settings baseline (§2.3 + §2.6) — the scan presets, now editable. GET returns
-// these; PATCH deep-merges the caller's partial against them (non-persisting).
-export const MOCK_PRESETS: SetupPresets = {
-  business: {
-    name: 'Clewas',
-    language: 'English',
-    country: 'Global (English)',
-    description:
-      'Clewas helps Notion users turn their pages into fast, SEO-friendly public websites without code.',
-  },
-  audience: {
-    target: 'Content creators and bloggers using Notion for writing',
-    competitors: ['super.so', 'potion.so', 'simple.ink'],
-  },
-  blog: {
-    sitemap_url: 'https://www.clewas.com/sitemap.xml',
-    main_blog_url: 'https://www.clewas.com/blog',
-    best_articles: ['https://www.clewas.com/blog/notion-seo-guide'],
-  },
-  article_preferences: {
-    content_seo: {
-      article_style: 'Informative',
-      internal_links: true,
-      llm_instructions: 'Write in a practical, example-driven tone.',
-    },
-    engagement: {
-      image_style: 'Sketch',
-    },
   },
 };
