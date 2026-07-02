@@ -618,6 +618,44 @@ Baseline: fold into Articles Settings; a dedicated surface is **deferred**.
   paywalled — another paid-gated surface. Baseline can ship read-only source config; targeting
   is deferred.
 
+### 2.6 General Settings
+
+The post-onboarding home of the **`business` + `audience`/`competitors` presets** — the
+counterpart to Articles Settings (§2.3), which owns `article_preferences`. Route
+`/dashboard/settings/general/*`, three sub-tabs: **Business · Audience and Competitors ·
+Google Search Console** (mined live 2026-07-02).
+
+**Business** (`/general/business`, "About your business"):
+- **Website to business** — read-only/disabled, prefilled with the scanned URL (server-owned,
+  matches our "identity is server-owned" stance — the site URL isn't user-editable here).
+- **Business name** — editable.
+- **Language** (select, "English") + **Country** (select, "Global (English)" — note: "Uses US
+  English search data as the broadest international signal") → maps to `keyword_region`.
+- **Description** — the AI business summary from the scan, but **richly structured**, not a
+  paragraph: an overview + bulleted **Features**, **Distinct advantages**, and **Customer
+  problems solved** sections. Editable. (Our `business.description` is a plain string — the
+  structured breakdown is a deferred enrichment.)
+
+**Audience and Competitors** (`/general/audience-competitors` — note the slug, no "and";
+"Define your Target Audience and Competitors"):
+- **Target Audiences** — a **chip list of free-text strings** (add via textbox + Add, e.g.
+  "Content creators and bloggers using Notion for writing"). Plain strings, **not** multi-field
+  segments — confirms baseline audience shape is adequate (parity-gap G8 "multi-segment
+  audience" is about richer per-segment metadata, not this list).
+- **Competitors** — a **chip list of URLs/company names** (super.so, potion.so, simple.ink).
+  These drive the competitor-sourced keyword generation (`generation_filters.competitors`,
+  `generation_source: "competitors"` from §2.1's keyword model).
+- Save.
+
+**Google Search Console** (`/general/google-search-console`) — the GSC connect surface that
+gates Home's Best Articles / Search Performance cards (§1). **Deferred** (parity-gap G7).
+
+**Baseline implication.** Business + Audience/Competitors settings reuse the same preset data
+we already generate at scan time (`SetupPresetsSchema.business` + audience/competitors) — a
+dashboard-scoped `GET`/`PATCH` over those fields, same pattern as `PATCH /setup/presets`.
+Audiences and competitors are simple string/URL lists; only the structured Description and the
+GSC tab are deferred enrichments.
+
 ## 3. Other dashboard surfaces (all deferred — inventory for completeness)
 
 These top-level sidebar items sit outside the Articles group. **None are in our baseline**;
