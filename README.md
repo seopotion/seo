@@ -49,7 +49,9 @@ These rules aren't enforced yet — enable them in **Settings → Branches** (or
 `gh` commands below) to make the workflow above mandatory. Apply the same ruleset to
 both `dev` and `master`:
 
-- Require a pull request before merging (block direct pushes), with ≥1 approval.
+- Require a pull request before merging (block direct pushes). **Review approvals are
+  off for now** — bump `required_approving_review_count` to `1` once there's a second
+  reviewer.
 - Require the `verify` status check (CI) to pass, and require branches to be up to
   date before merging.
 - Include administrators, and block force-pushes and branch deletion.
@@ -62,7 +64,7 @@ gh api -X PUT "repos/ozykhan/seo-dev/branches/$BRANCH/protection" \
 {
   "required_status_checks": { "strict": true, "contexts": ["verify"] },
   "enforce_admins": true,
-  "required_pull_request_reviews": { "required_approving_review_count": 1 },
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
   "restrictions": null,
   "allow_force_pushes": false,
   "allow_deletions": false
