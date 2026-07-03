@@ -67,8 +67,7 @@ export class ApiStack extends Stack {
       format: OutputFormat.ESM,
       minify: true,
       sourceMap: true,
-      banner:
-        "import{createRequire as __cr}from'module';const require=__cr(import.meta.url);",
+      banner: "import{createRequire as __cr}from'module';const require=__cr(import.meta.url);",
     };
 
     // Lambda entries live in apps/* and import @shared/* — both outside this
