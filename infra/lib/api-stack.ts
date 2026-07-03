@@ -60,7 +60,16 @@ export class ApiStack extends Stack {
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
     };
 
-    const bundling = { format: OutputFormat.ESM, minify: true, sourceMap: true };
+    // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
+    // anything not bundled. The mongodb driver `require`s Node built-ins (e.g.
+    // `timers/promises`) at runtime, so define a real `require` via createRequire.
+    const bundling = {
+      format: OutputFormat.ESM,
+      minify: true,
+      sourceMap: true,
+      banner:
+        "import{createRequire as __cr}from'module';const require=__cr(import.meta.url);",
+    };
 
     // Lambda entries live in apps/* and import @shared/* — both outside this
     // standalone infra package. Point esbuild at the monorepo root so it can
