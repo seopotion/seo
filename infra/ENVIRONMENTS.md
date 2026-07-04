@@ -11,13 +11,14 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
 ## One-time prerequisites (per account)
 
 1. **Two Atlas clusters** (staging, prod) → two connection strings.
-2. **SSM SecureStrings** (values never enter CloudFormation):
+2. **SSM SecureStrings** (values never enter CloudFormation). Generate each
+   JWT secret with `openssl rand -base64 32`:
 
    ```sh
    aws ssm put-parameter --name /seo/staging/mongo-uri  --type SecureString --value '<staging-conn-str>'
-   aws ssm put-parameter --name /seo/staging/jwt-secret --type SecureString --value '<staging-secret>'
+   aws ssm put-parameter --name /seo/staging/jwt-secret --type SecureString --value "$(openssl rand -base64 32)"
    aws ssm put-parameter --name /seo/prod/mongo-uri     --type SecureString --value '<prod-conn-str>'
-   aws ssm put-parameter --name /seo/prod/jwt-secret    --type SecureString --value '<prod-secret>'
+   aws ssm put-parameter --name /seo/prod/jwt-secret    --type SecureString --value "$(openssl rand -base64 32)"
    ```
 
 3. **Two Google OAuth client IDs** (staging vs prod). Set them as GitHub Actions
@@ -29,7 +30,28 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    secret. The role's trust policy must allow this repo's `dev` and `master`
    refs; its permissions must allow `cdk deploy` for the two stacks.
 
+## Verify prerequisites (preflight)
+
+Before deploying, confirm the four out-of-band items for a stage are actually in
+place. The preflight checks that both SSM SecureStrings resolve to a non-empty
+value and that `GOOGLE_CLIENT_ID_<STAGE>` is set — the same values the stack
+reads at synth/runtime — so a typo'd or missing secret is caught before it ships
+as broken Lambda config.
+
+Run it with AWS credentials for the target account and the client id in the env
+(this is the same check the deploy CI runs before `cdk deploy`):
+
+```sh
+GOOGLE_CLIENT_ID_STAGING=<staging-oauth-client-id> \
+  npm run cli -- infra preflight --stage staging
+```
+
+Exit code 0 = ready; 2 = a prerequisite is missing (it lists which). Add
+`--output json` for machine-readable output.
+
 ## First deploy
+
+Run the preflight above first, then:
 
 ```sh
 cd infra && npm ci

@@ -1,0 +1,99 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+// Mock the SSM client the same way infra.test.ts mocks SQS: a constructor
+// returning an object whose `send` we control per test.
+const { ssmSend } = vi.hoisted(() => ({
+  ssmSend: vi.fn(),
+}));
+
+vi.mock('@aws-sdk/client-ssm', () => ({
+  // biome-ignore lint/complexity/useArrowFunction: regular function required — arrow fns are not constructors
+  SSMClient: vi.fn(function () {
+    return { send: ssmSend, destroy: vi.fn() };
+  }),
+  // biome-ignore lint/complexity/useArrowFunction: regular function required — arrow fns are not constructors
+  GetParameterCommand: vi.fn(function (input: unknown) {
+    return input;
+  }),
+}));
+
+import { preflight } from '../src/lib/preflight';
+
+// A GetParameter response that resolves the SecureString to a non-empty value.
+const paramValue = (value: string) => ({ Parameter: { Value: value } });
+
+beforeEach(() => {
+  process.env.GOOGLE_CLIENT_ID_STAGING = 'staging-client.apps.googleusercontent.com';
+  process.env.GOOGLE_CLIENT_ID_PROD = 'prod-client.apps.googleusercontent.com';
+});
+
+afterEach(() => {
+  vi.clearAllMocks();
+  delete process.env.GOOGLE_CLIENT_ID_STAGING;
+  delete process.env.GOOGLE_CLIENT_ID_PROD;
+});
+
+describe('preflight', () => {
+  test('ready when both SSM params resolve non-empty and the google client id is set', async () => {
+    ssmSend.mockResolvedValue(paramValue('present'));
+
+    const res = await preflight('staging');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(true);
+    expect(res.data.checks.every((c) => c.present)).toBe(true);
+    // jwt-secret, mongo-uri, and the google client id env var.
+    expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/staging/jwt-secret',
+      '/seo/staging/mongo-uri',
+      'GOOGLE_CLIENT_ID_STAGING',
+    ]);
+  });
+
+  test('checks the prod-scoped names when stage is prod', async () => {
+    ssmSend.mockResolvedValue(paramValue('present'));
+
+    const res = await preflight('prod');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/prod/jwt-secret',
+      '/seo/prod/mongo-uri',
+      'GOOGLE_CLIENT_ID_PROD',
+    ]);
+  });
+
+  test('not ready when an SSM parameter is missing (ParameterNotFound)', async () => {
+    ssmSend.mockRejectedValue(Object.assign(new Error('not found'), { name: 'ParameterNotFound' }));
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    const jwt = res.data.checks.find((c) => c.name === '/seo/staging/jwt-secret');
+    expect(jwt).toMatchObject({ present: false });
+    expect(jwt?.error).toBeDefined();
+  });
+
+  test('not ready when an SSM parameter resolves to an empty string', async () => {
+    ssmSend.mockResolvedValue(paramValue(''));
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === '/seo/staging/mongo-uri')).toMatchObject({
+      present: false,
+    });
+  });
+
+  test('not ready when the google client id env var is unset', async () => {
+    delete process.env.GOOGLE_CLIENT_ID_STAGING;
+    ssmSend.mockResolvedValue(paramValue('present'));
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === 'GOOGLE_CLIENT_ID_STAGING')).toMatchObject({
+      present: false,
+      kind: 'env',
+    });
+  });
+});
