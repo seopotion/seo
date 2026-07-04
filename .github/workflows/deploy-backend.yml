@@ -48,6 +48,16 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: us-east-1
 
+      - name: Install root deps (for preflight CLI)
+        run: npm ci
+
+      - name: Preflight — verify deploy prerequisites
+        env:
+          AWS_REGION: us-east-1
+          GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+          GOOGLE_CLIENT_ID_PROD: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+        run: npm run cli -- infra preflight --stage ${{ steps.stage.outputs.name }} --output json
+
       - name: Install infra deps
         run: cd infra && npm ci
 
