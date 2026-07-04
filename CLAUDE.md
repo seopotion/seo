@@ -93,7 +93,7 @@ Agent sessions start cold, so the durable trail (git, PR bodies, issue comments,
 - **Start:** find the linked issue and read it for scope. Don't hand-flip board columns — the [Project board](https://github.com/orgs/seopotion/projects/1) auto-moves cards on PR open/merge. Only move a card manually when concurrent workers actually need the signal.
 - **During:** reference the issue in commits / PR body (`Part of #N`).
 - **Finish:** the **PR body** holds the detail and carries `Closes #N` for anything *fully* done, so the merge closes it. Comment on an issue only when its status *meaningfully* changed, and keep it a concise pointer to the PR — not a play-by-play. **Don't close issues by hand mid-session**; let merge do it, and leave issues open when a real remainder survives (e.g. a human-gated deploy).
-- **Source of truth:** issues/board = live task state; `PROGRESS.md` = the built-vs-stubbed narrative; PR body = one change's record. Update `PROGRESS.md` when work lands so they don't drift.
+- **Source of truth (one fact, one owner):** issues (+ the board as their live view) hold task state, acceptance criteria, and discussion. `PROGRESS.md` is a coarse built-vs-stubbed **map that links to issues, never restates them** — one line + `[#N]` per gap, so there's nothing to drift. PR body is one change's record. Agent memory is machine-local and **must not duplicate the repo** (pointers to issues/PRs only, pruned when stale). Update `PROGRESS.md` when work lands, but keep entries terse — detail belongs in the issue, not here.
 
 ## Architecture
 
