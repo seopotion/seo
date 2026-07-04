@@ -54,7 +54,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Infrastructure / ops
 
 - ✅ CDK `ApiStack` — API + worker + db-init Lambdas, SQS queue + DLQ, HTTP API, deploy-time index init; NodejsFunction bundling (ESM `createRequire` banner) verified
-- ✅ Parameterized by stage → `SeoApiStack-staging` + `SeoApiStack-prod`; Mongo-URI + JWT resolve at runtime from per-env SSM; backend deploy CI (OIDC, `dev`→staging / `master`→prod) + `infra/ENVIRONMENTS.md`. Sub-project A [#33](https://github.com/seopotion/seo/issues/33) — **staging deployed** (`CREATE_COMPLETE`, `/health` 200); prod not yet (needs `GOOGLE_CLIENT_ID_PROD` + `/seo/prod/*`); SQS scan round-trip e2e still to verify
+- ✅ Parameterized by stage → `SeoApiStack-staging` + `SeoApiStack-prod`; Mongo-URI + JWT resolve at runtime from per-env SSM; backend deploy CI (OIDC — merge `dev`→`master` ships staging; prod via GitHub Release, deferred [#43](https://github.com/seopotion/seo/issues/43)) + `infra/ENVIRONMENTS.md`. Sub-project A [#33](https://github.com/seopotion/seo/issues/33) — **staging deployed** (`CREATE_COMPLETE`, `/health` 200); SQS scan round-trip e2e still to verify
 - ✅ First real `cdk deploy` (2026-07-03, single `SeoApiStack`) — now superseded by the two stage stacks; delete manually once staging is healthy — [#15](https://github.com/seopotion/seo/issues/15)
 - ✅ `HttpApiUrl` CfnOutput — [#17](https://github.com/seopotion/seo/issues/17); API Gateway `{proxy+}` → Hono `/api/v0/...` live — [#14](https://github.com/seopotion/seo/issues/14)
 - ✅ Biome lint/format; CI (`ci.yml`) runs lint + typecheck + tests on PRs

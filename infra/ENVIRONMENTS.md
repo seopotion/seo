@@ -2,8 +2,8 @@
 
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
-- `SeoApiStack-staging` — deployed on merge to `dev`.
-- `SeoApiStack-prod` — deployed on merge to `master`.
+- `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
+- `SeoApiStack-prod` — deployed by publishing a GitHub Release / tag. Deferred, not yet wired — see [#43](https://github.com/seopotion/seo/issues/43).
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
 Secret values are provisioned out-of-band and resolved at Lambda runtime.
