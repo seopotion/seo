@@ -2,7 +2,7 @@
 
 Coarse **map** of what's built vs. what's left — by design. Detail for any 🟡/⬜ gap lives in its linked issue (`[#N]`), not here; entries stay to one line so they can't drift from the issue. Design lives in [`design/`](design/); how-to-work in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-07-04 — three-tier env effort: backend-envs sub-project A ([#33](https://github.com/seopotion/seo/issues/33)) implemented (PR #37, pending first staging deploy); frontend-hosting sub-project C ([#35](https://github.com/seopotion/seo/issues/35)) blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
+_Last updated: 2026-07-04 — three-tier env effort: backend-envs sub-project A ([#33](https://github.com/seopotion/seo/issues/33)) **staging live** (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend-hosting sub-project C ([#35](https://github.com/seopotion/seo/issues/35)) blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title conventions: [README § Issue tracking](README.md#issue-tracking).
 
@@ -54,7 +54,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Infrastructure / ops
 
 - ✅ CDK `ApiStack` — API + worker + db-init Lambdas, SQS queue + DLQ, HTTP API, deploy-time index init; NodejsFunction bundling (ESM `createRequire` banner) verified
-- ✅ Parameterized by stage → `SeoApiStack-staging` + `SeoApiStack-prod`; Mongo-URI + JWT resolve at runtime from per-env SSM; backend deploy CI (OIDC, `dev`→staging / `master`→prod) + `infra/ENVIRONMENTS.md`. Sub-project A [#33](https://github.com/seopotion/seo/issues/33) (PR #37) — **first staging deploy pending** (human prereqs)
+- ✅ Parameterized by stage → `SeoApiStack-staging` + `SeoApiStack-prod`; Mongo-URI + JWT resolve at runtime from per-env SSM; backend deploy CI (OIDC, `dev`→staging / `master`→prod) + `infra/ENVIRONMENTS.md`. Sub-project A [#33](https://github.com/seopotion/seo/issues/33) — **staging deployed** (`CREATE_COMPLETE`, `/health` 200); prod not yet (needs `GOOGLE_CLIENT_ID_PROD` + `/seo/prod/*`); SQS scan round-trip e2e still to verify
 - ✅ First real `cdk deploy` (2026-07-03, single `SeoApiStack`) — now superseded by the two stage stacks; delete manually once staging is healthy — [#15](https://github.com/seopotion/seo/issues/15)
 - ✅ `HttpApiUrl` CfnOutput — [#17](https://github.com/seopotion/seo/issues/17); API Gateway `{proxy+}` → Hono `/api/v0/...` live — [#14](https://github.com/seopotion/seo/issues/14)
 - ✅ Biome lint/format; CI (`ci.yml`) runs lint + typecheck + tests on PRs
