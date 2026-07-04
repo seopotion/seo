@@ -17,6 +17,7 @@ import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { Provider } from 'aws-cdk-lib/custom-resources';
 import type { Construct } from 'constructs';
+import { STAGE_CONFIG, type Stage } from './config';
 
 /**
  * API stack — Style A bundling: `NodejsFunction` runs esbuild at `cdk synth`
@@ -29,35 +30,50 @@ import type { Construct } from 'constructs';
  * `cd infra && npm install` before `cdk synth`. esbuild must be resolvable from
  * the repo root for monorepo NodejsFunction bundling.
  */
+export interface ApiStackProps extends StackProps {
+  stage: Stage;
+}
+
 export class ApiStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
+    const cfg = STAGE_CONFIG[props.stage];
+
+    // Mongo connection string is a SecureString resolved at runtime by
+    // @shared/db (see packages/shared/db/src/mongo-uri.ts). Only its NAME is an
+    // env var; the value never enters this template.
     const mongoEnv = {
-      MONGO_URI: process.env.MONGO_URI ?? '',
-      MONGO_DB: process.env.MONGO_DB ?? 'seo',
-      // Powertools Logger level (per-function service name is set in code).
-      POWERTOOLS_LOG_LEVEL: process.env.POWERTOOLS_LOG_LEVEL ?? 'INFO',
+      MONGO_URI_PARAM: cfg.mongoUriParam,
+      MONGO_DB: cfg.mongoDb,
+      POWERTOOLS_LOG_LEVEL: cfg.logLevel,
     };
 
     // JWT signing secret lives in an SSM SecureString created out-of-band (so
     // the secret never enters this template). We reference it by NAME and grant
     // the API Lambda read; the API fetches + caches it at runtime via Powertools
     // Parameters. See apps/api/src/auth/secret.ts.
-    //   aws ssm put-parameter --name /seo/jwt-secret --type SecureString --value <secret>
-    const jwtSecretParamName = process.env.JWT_SECRET_PARAM ?? '/seo/jwt-secret';
+    //   aws ssm put-parameter --name /seo/<stage>/jwt-secret --type SecureString --value <secret>
     const jwtSecretParam = StringParameter.fromSecureStringParameterAttributes(
       this,
       'JwtSecretParam',
-      { parameterName: jwtSecretParamName },
+      { parameterName: cfg.jwtSecretParam },
+    );
+
+    // Mongo connection string SecureString — read by every Lambda that talks to
+    // Mongo (API + worker + db-init). Resolved at runtime, cached ~1h.
+    const mongoUriParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'MongoUriParam',
+      { parameterName: cfg.mongoUriParam },
     );
 
     // Auth config — read by the API Lambda ONLY. JWT_SECRET_PARAM is just the
     // parameter NAME (not the secret); GOOGLE_CLIENT_ID is a public OAuth id.
     // Deliberately kept out of mongoEnv so the worker never receives them.
     const authEnv = {
-      JWT_SECRET_PARAM: jwtSecretParamName,
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+      JWT_SECRET_PARAM: cfg.jwtSecretParam,
+      GOOGLE_CLIENT_ID: cfg.googleClientId,
     };
 
     // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
@@ -104,6 +120,7 @@ export class ApiStack extends Stack {
     });
     scanQueue.grantSendMessages(apiFn);
     jwtSecretParam.grantRead(apiFn);
+    mongoUriParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {
@@ -118,6 +135,7 @@ export class ApiStack extends Stack {
       bundling,
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(workerFn);
 
     // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
     // custom resource below (Create/Update), so indexes exist before traffic.
@@ -132,6 +150,7 @@ export class ApiStack extends Stack {
       environment: mongoEnv,
       bundling,
     });
+    mongoUriParam.grantRead(dbInitFn);
 
     const dbInitProvider = new Provider(this, 'DbInitProvider', {
       onEventHandler: dbInitFn,
