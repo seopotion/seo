@@ -24,16 +24,24 @@ infra/                AWS CDK (standalone, not a workspace)
 
 ## Branch workflow
 
-We use a two-tier flow. `dev` is the integration branch (and the GitHub default);
-`master` is the release branch that `dev` is merged into periodically.
+We use a three-tier flow mapped to environments. `dev` is the integration branch
+(and the GitHub default) — merging to it **deploys nothing**. `master` is the
+**staging** branch: merging `dev`→`master` deploys the staging backend. **Production**
+deploys from a **GitHub Release / tag** (deferred until the prod env exists — see #43).
+
+| Branch / event         | Deploys       |
+| ---------------------- | ------------- |
+| push to `dev`          | nothing       |
+| merge `dev` → `master` | **staging**   |
+| GitHub Release / tag   | **prod** (deferred, #43) |
 
 - **Never commit or merge directly to `dev` or `master`.** All work goes through a
   pull request.
 - Branch off `dev`, named `<your-gh-name>/<short-description>` (e.g.
   `ozykhan/backend-stuff`).
-- Open the PR **into `dev`**. CI (lint + typecheck + unit tests) must pass, and the
-  PR needs an approving review before merge.
-- Maintainers periodically merge `dev` → `master` (also via PR) to cut a release.
+- Open the PR **into `dev`**. CI (lint + typecheck + unit tests) must pass.
+- Maintainers periodically merge `dev` → `master` (also via PR) to ship **staging**;
+  cut a GitHub Release / tag to ship **prod**.
 
 ```bash
 git checkout dev && git pull            # start from latest dev

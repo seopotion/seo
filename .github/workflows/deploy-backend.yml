@@ -1,8 +1,11 @@
 name: Deploy backend
 
+# Branch → environment: merging `dev` → `master` deploys staging. Pushes to `dev`
+# deploy nothing (integration only). Production deploys from a GitHub Release / tag
+# and is not wired here yet — deferred (see issue #43).
 on:
   push:
-    branches: [dev, master]
+    branches: [master]
     paths:
       - 'apps/api/**'
       - 'apps/worker/**'
@@ -11,9 +14,9 @@ on:
       - 'infra/**'
       - '.github/workflows/deploy-backend.yml'
 
-# One backend deploy per environment at a time.
+# One staging deploy at a time.
 concurrency:
-  group: deploy-backend-${{ github.ref }}
+  group: deploy-backend-staging
   cancel-in-progress: false
 
 permissions:
@@ -32,17 +35,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Resolve stage
-        id: stage
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            echo "name=prod" >> "$GITHUB_OUTPUT"
-            echo "stack=SeoApiStack-prod" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=staging" >> "$GITHUB_OUTPUT"
-            echo "stack=SeoApiStack-staging" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
@@ -55,8 +47,7 @@ jobs:
         env:
           AWS_REGION: us-east-1
           GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
-          GOOGLE_CLIENT_ID_PROD: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
-        run: npm run cli -- infra preflight --stage ${{ steps.stage.outputs.name }} --output json
+        run: npm run cli -- infra preflight --stage staging --output json
 
       - name: Install infra deps
         run: cd infra && npm ci
@@ -66,5 +57,4 @@ jobs:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           CDK_DEFAULT_REGION: us-east-1
           GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
-          GOOGLE_CLIENT_ID_PROD: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
-        run: cd infra && npx cdk deploy ${{ steps.stage.outputs.stack }} --require-approval never
+        run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never
