@@ -42,6 +42,8 @@ describe('preflight', () => {
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.ready).toBe(true);
     expect(res.data.checks.every((c) => c.present)).toBe(true);
+    // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
+    expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
     // jwt-secret, mongo-uri, and the google client id env var.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
       '/seo/staging/jwt-secret',

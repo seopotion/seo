@@ -28,7 +28,11 @@ function googleClientIdVar(stage: Stage): string {
 
 async function checkSsmParam(client: SSMClient, name: string): Promise<PrereqCheck> {
   try {
-    const res = await client.send(new GetParameterCommand({ Name: name, WithDecryption: true }));
+    // Presence-only: don't decrypt. A SecureString returns its (non-empty)
+    // ciphertext without decryption, which is all we need to confirm it exists —
+    // so the caller (the deploy role in CI) needs `ssm:GetParameter` but never
+    // `kms:Decrypt`, and the secret value is never materialized just to count it.
+    const res = await client.send(new GetParameterCommand({ Name: name, WithDecryption: false }));
     const value = res.Parameter?.Value;
     if (!value) {
       return { name, kind: 'ssm', present: false, error: 'resolved to an empty value' };

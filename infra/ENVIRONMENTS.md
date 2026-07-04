@@ -98,33 +98,45 @@ JSON
 cat > /tmp/perms.json <<'JSON'
 {
   "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": "sts:AssumeRole",
-    "Resource": "arn:aws:iam::859998284061:role/cdk-hnb659fds-*"
-  }]
+  "Statement": [
+    {
+      "Sid": "AssumeCdkBootstrapRoles",
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": "arn:aws:iam::859998284061:role/cdk-hnb659fds-*"
+    },
+    {
+      "Sid": "PreflightReadSsm",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:us-east-1:859998284061:parameter/seo/*"
+    }
+  ]
 }
 JSON
 
 aws iam create-role --role-name github-actions-seo-deploy \
   --assume-role-policy-document file:///tmp/trust.json
 aws iam put-role-policy --role-name github-actions-seo-deploy \
-  --policy-name cdk-assume-bootstrap-roles --policy-document file:///tmp/perms.json
+  --policy-name cdk-deploy --policy-document file:///tmp/perms.json
 ```
 
-The role only needs to **assume the CDK bootstrap roles** (`cdk-hnb659fds-*`); the
-CDK CLI does the rest through them. `hnb659fds` is CDK's default bootstrap
-qualifier — change it only if you bootstrapped with a custom `--qualifier`. AWS
-validates GitHub's cert against its own trust store, so the thumbprint value is a
-formality the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
+Two grants: the role **assumes the CDK bootstrap roles** (`cdk-hnb659fds-*`) — the
+CDK CLI does the actual deploy through them — and reads `/seo/*` SSM parameters so
+the preflight step can verify they exist. It deliberately has **no `kms:Decrypt`**:
+the preflight checks presence without decrypting, and only the Lambda execution
+roles decrypt secrets at runtime. `hnb659fds` is CDK's default bootstrap qualifier
+— change it only if you bootstrapped with a custom `--qualifier`. AWS validates
+GitHub's cert against its own trust store, so the thumbprint value is a formality
+the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the four out-of-band items for a stage are actually in
-place. The preflight checks that both SSM SecureStrings resolve to a non-empty
-value and that `GOOGLE_CLIENT_ID_<STAGE>` is set — the same values the stack
-reads at synth/runtime — so a typo'd or missing secret is caught before it ships
-as broken Lambda config.
+place. The preflight checks that both SSM SecureStrings exist (presence only — it
+does not decrypt them) and that `GOOGLE_CLIENT_ID_<STAGE>` is set — the same names
+the stack reads at synth/runtime — so a missing or mis-pathed secret is caught
+before it ships as broken Lambda config.
 
 Run it with AWS credentials for the target account and the client id in the env
 (this is the same check the deploy CI runs before `cdk deploy`):
