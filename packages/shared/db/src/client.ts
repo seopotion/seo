@@ -1,4 +1,5 @@
 import { type Db, MongoClient } from 'mongodb';
+import { resolveMongoUri } from './mongo-uri';
 
 /**
  * Lambda connection reuse: create the client once at module scope and reuse it
@@ -10,10 +11,10 @@ let db: Db | null = null;
 
 export async function getDb(): Promise<Db> {
   if (db) return db;
-  client ??= new MongoClient(process.env.MONGO_URI ?? 'mongodb://localhost:27017', {
-    maxPoolSize: 5,
-    minPoolSize: 0,
-  });
+  if (!client) {
+    const uri = await resolveMongoUri();
+    client = new MongoClient(uri, { maxPoolSize: 5, minPoolSize: 0 });
+  }
   await client.connect(); // no-op if already connected
   db = client.db(process.env.MONGO_DB ?? 'seo');
   return db;

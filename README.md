@@ -22,6 +22,93 @@ packages/shared/
 infra/                AWS CDK (standalone, not a workspace)
 ```
 
+## Branch workflow
+
+We use a three-tier flow mapped to environments. `dev` is the integration branch
+(and the GitHub default) — merging to it **deploys nothing**. `master` is the
+**staging** branch: merging `dev`→`master` deploys the staging backend. **Production**
+deploys from a **GitHub Release / tag** (deferred until the prod env exists — see #43).
+
+| Branch / event         | Deploys       |
+| ---------------------- | ------------- |
+| push to `dev`          | nothing       |
+| merge `dev` → `master` | **staging**   |
+| GitHub Release / tag   | **prod** (deferred, #43) |
+
+- **Never commit or merge directly to `dev` or `master`.** All work goes through a
+  pull request.
+- Branch off `dev`, named `<your-gh-name>/<short-description>` (e.g.
+  `ozykhan/backend-stuff`).
+- Open the PR **into `dev`**. CI (lint + typecheck + unit tests) must pass.
+- Maintainers periodically merge `dev` → `master` (also via PR) to ship **staging**;
+  cut a GitHub Release / tag to ship **prod**.
+
+```bash
+git checkout dev && git pull            # start from latest dev
+git checkout -b <gh-name>/<description> # your feature branch
+# ...commit work...
+git push -u origin <gh-name>/<description>
+gh pr create --base dev                 # PR targets dev (the default base)
+```
+
+### Branch protection (to enable on GitHub)
+
+These rules aren't enforced yet — enable them in **Settings → Branches** (or via the
+`gh` commands below) to make the workflow above mandatory. Apply the same ruleset to
+both `dev` and `master`:
+
+- Require a pull request before merging (block direct pushes). **Review approvals are
+  off for now** — bump `required_approving_review_count` to `1` once there's a second
+  reviewer.
+- Require the `verify` status check (CI) to pass, and require branches to be up to
+  date before merging.
+- Include administrators, and block force-pushes and branch deletion.
+
+```bash
+# Requires admin on the repo. Repeat for BRANCH=master.
+BRANCH=dev
+gh api -X PUT "repos/ozykhan/seo-dev/branches/$BRANCH/protection" \
+  --input - <<'JSON'
+{
+  "required_status_checks": { "strict": true, "contexts": ["verify"] },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": 0 },
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+JSON
+```
+
+## Issue tracking
+
+Remaining work lives as GitHub issues on the [seo Project board](https://github.com/orgs/seopotion/projects/1); [`PROGRESS.md`](PROGRESS.md) is the running status doc and links each open item to its issue. Two conventions keep the board searchable.
+
+### Title prefix — `[area]`
+
+Every issue title starts with a lowercase `[area]` tag naming the surface it touches, so `gh issue list --search "in:title dashboard"` (or a glance down the board) finds everything in an area. Current vocabulary:
+
+| Prefix | Surface |
+| --- | --- |
+| `[onboarding]` | `/setup/*` flow, presets, scanner worker |
+| `[dashboard]` | dashboard data + Articles surfaces |
+| `[auth]` | login / JWT / token handling |
+| `[billing]` | subscriptions, Stripe, promo codes |
+| `[web]` | `apps/web` frontend (UI, env, tests) |
+| `[infra]` | deploy / CDK / ops |
+| `[repo]` | repo governance (branch protection, CI) |
+
+Add a new prefix when a genuinely new surface appears; otherwise reuse one.
+
+### Labels
+
+- **`backend`** — code work in `apps/api` / `apps/worker` / shared packages.
+- **`frontend`** — `apps/web` work.
+- **`infra`** — infrastructure / deploy / ops (non-code backend). **Mutually exclusive with `backend`:** a backend issue is either code (`backend`) or ops (`infra`), never both — so `label:backend` is the pure-code queue and `label:infra` is the deploy/ops queue.
+- **`epic`** — large multi-part tracker; sub-tasks are checkboxes linking child issues.
+
+Routing: `backend`/`infra` → @ozykhan, `frontend` → @Alperadoss.
+
 ## Develop
 
 Requires Node 22+. Uses npm workspaces (no Turborepo yet); Lambdas are bundled by

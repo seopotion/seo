@@ -1,102 +1,72 @@
 # Progress
 
-Living tracker of what's built vs. what's left. Update as work lands.
-Design lives in [`design/`](design/); how-to-work lives in [`CLAUDE.md`](CLAUDE.md).
+Coarse **map** of what's built vs. what's left — by design. Detail for any 🟡/⬜ gap lives in its linked issue (`[#N]`), not here; entries stay to one line so they can't drift from the issue. Design lives in [`design/`](design/); how-to-work in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-07-02 (dashboard design fully mapped from live Outrank cross-reference — all surfaces in `design/product-flow.md`; build still the frontier)_
+_Last updated: 2026-07-04 — three-tier env effort: backend-envs sub-project A ([#33](https://github.com/seopotion/seo/issues/33)) **staging live** (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend-hosting sub-project C ([#35](https://github.com/seopotion/seo/issues/35)) blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
 
-Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started
+Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title conventions: [README § Issue tracking](README.md#issue-tracking).
 
-## Foundation (architecture decisions — all locked & proven)
+## Foundation (locked & proven)
 
-- ✅ Monorepo: npm workspaces, no orchestrator yet (Turborepo deferred), esbuild at root
-- ✅ TypeScript strict base config (bundler resolution, `verbatimModuleSyntax`)
-- ✅ Vitest (unit) + separate integration config
-- ✅ Typed Hono RPC client chain (`AppType` → `hc<AppType>`), consumed by `apps/web` — verified by typecheck
-- ✅ Data layer: Zod + official `mongodb` driver, repository pattern, module-scoped client
-- ✅ Lambda bundling Style A (CDK `NodejsFunction` / esbuild) — wiring written
-- ✅ Design docs, `CLAUDE.md`, `README.md`
+- ✅ Monorepo (npm workspaces, esbuild at root; Turborepo deferred)
+- ✅ TypeScript strict base (bundler resolution, `verbatimModuleSyntax`); Vitest unit + separate integration config
+- ✅ Typed Hono RPC client chain (`AppType` → `hc<AppType>`), consumed by `apps/web`
+- ✅ Data layer: Zod + `mongodb` driver, repository pattern, module-scoped client
+- ✅ Lambda bundling Style A (CDK `NodejsFunction` / esbuild)
 
 ## Shared packages
 
-- ✅ `@shared/types` — `SETUP_STATUSES` / `SetupStatus`
-- ✅ `@shared/schemas` — `OrgSchema` (with `user_id` + optional `presets`) / `CreateOrgInput`, `ScanTask`, `SetupPresetsSchema`, `UserSchema` / `CreateUserInput`
-- ✅ `@shared/db` — `getDb`/`closeDb`, `OrgRepo` (create/findById/findByUserId/updateStatus/completeScan), `UserRepo` (findByGoogleSub/upsertByGoogleSub), `ensureIndexes`
-- ✅ `@shared/clients` — `getApiClient` (typed)
+- ✅ `@shared/types`, `@shared/schemas` (Zod entity shapes), `@shared/db` (repos + `ensureIndexes`), `@shared/clients` (typed `getApiClient`)
 
-## Setup / onboarding flow
+## Setup / onboarding
 
-- ✅ `POST /setup/start_scan` — creates org, enqueues SQS scan task
-- ✅ `GET /setup/status` — returns org setup status
-- ✅ Scanner worker — consumes SQS, validates `ScanTask`, generates presets, persists them, advances to `setup_scan_completed`
-- ✅ `scanWebsite()` — **mock** implementation (deterministic presets derived from the URL); swap for real scrape + AI later
-- ✅ Persist generated presets — `SetupPresetsSchema` (business / audience / blog / article prefs) stored on the org via `OrgRepo.completeScan`
-- ✅ `GET /setup/details` — returns generated presets (auth-protected, queryable by `org_id`; 404 if org missing or presets not yet generated)
-- ✅ `PATCH /setup/presets` — partial edit of generated presets (deep-merge, ownership-checked)
-- ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (design says: hard, defer)
-- 🟡 Onboarding parity backlog — baseline is intentionally a subset of a mature flow; deferred gaps (integrations, richer article prefs, Improvements/Product-Catalog subsystems, multi-segment audience, competitor minimums, GSC) captured in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md)
-- ✅ `POST /setup/finalize` — optional final edit + flip status to `setup_complete`
-- ✅ Resolved `org_id` vs Mongo `_id` tension: identity is server-owned (`org_id` = stringified `_id`); `start_scan` is idempotent per (user_id, website_url) for non-complete orgs (`OrgRepo.findActiveByUserAndUrl`). Design doc §1 updated.
+- ✅ `start_scan` → SQS → worker → `setup_scan_completed`; presets generated (mock `scanWebsite()`) + persisted
+- ✅ `GET /setup/status`, `GET /setup/details`, `PATCH /setup/presets`, `POST /setup/finalize`
+- ✅ Identity server-owned (`org_id` = stringified `_id`); `start_scan` idempotent per (user, url)
+- 🟡 Onboarding parity backlog — baseline is a deliberate subset; deferred gaps in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md) — epic [#8](https://github.com/seopotion/seo/issues/8)
+- ⬜ `GET`/`POST /setup/integrations` — publishing-platform connections (deferred) — [#7](https://github.com/seopotion/seo/issues/7)
 
 ## Core / auth
 
-- ✅ Google login → `POST /core/login` (verify Google ID token → upsert user → JWT)
-- ✅ `GET /core/organizations` (auth-protected; empty array ⇒ send to setup)
-- ✅ `GET /core/status` (auth-protected; the `setup_complete` dashboard gate)
-- ✅ Auth middleware (Bearer JWT → `c.var.auth`) + OpenAPI `Bearer` security scheme
-- ✅ `/setup/start_scan` now auth-protected and stamps org `user_id`
-- 🟡 `JWT_SECRET` / `GOOGLE_CLIENT_ID` are env-driven with dev defaults — set real values per env
-- ✅ Logout (clears stored token) — frontend
-- ⬜ Token refresh / expiry handling on the client
+- ✅ Google login → `POST /core/login` (verify → upsert → JWT); auth middleware + `Bearer` scheme
+- ✅ `GET /core/organizations`, `GET /core/status` (dashboard gate); `start_scan` stamps `user_id`; logout (FE)
+- 🟡 Real `JWT_SECRET` / `GOOGLE_CLIENT_ID` per env not yet set — [#9](https://github.com/seopotion/seo/issues/9)
+- ⬜ Client token refresh / expiry handling — [#18](https://github.com/seopotion/seo/issues/18)
 
-## Dashboard (design fully mapped; build is the frontier)
+## Dashboard (design mapped; build is the frontier)
 
-- ✅ **Dashboard design fully mapped** against live Outrank (2026-07-02) — every surface captured in [`design/product-flow.md`](design/product-flow.md): Home (populated state: published/planned/**awaiting-publish** counts, scored Recommended Actions, GSC-gated Best Articles + Search Performance), Content Planner (per-card affordances: Pre-Create / Add Instructions / Quality Questions ↔ Visit Article), the generated **Article editor** (§2.2.1: `{title, slug, keyword, meta_description, featured_image, content}` + deferred AI-edit layer), Content History table, Articles Settings (Preferences enums + Blog form), General Settings (§2.6: Business + Audience/Competitors), Linking Configuration, Integrations. Improvements Beta / Backlink Exchange / Tools Builder intentionally out of scope.
-- 🟡 Home stats: `/api/v0/dashboard/articles/{best,published,planned}`, `/api/v0/dashboard/integrations/connected` — auth-protected routes wired into `AppType`, returning **mock/empty** data (published/planned `0`, best `[]` + `gated:true`, integrations `[]`). Swap handler bodies for real reads later. Tested (`apps/api/tests/dashboard.test.ts`) + verified live. **Design note:** live Home splits articles into three states (published / planned / generated-awaiting-publish) — baseline may want a third count.
-- ✅ Dashboard Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated; renders Articles (published/planned), Backlink Exchange (upgrade-gated), Recommended Actions, Best Articles (GSC-gated) cards from the typed client; org domain + Domain Rating badge header
-- ⬜ Domain rating + Google Search Console integration
-- ⬜ Subscription model (Free/Paid) + Stripe billing + promo codes (design billing with promo codes from the start)
-- ⬜ Articles build (design mapped, code not started): content planner / article generation + editor / history / settings / integrations
+- ✅ Design fully mapped vs live Outrank — every surface in [`design/product-flow.md`](design/product-flow.md)
+- ✅ Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated, renders cards from the typed client
+- 🟡 Home stats endpoints wired into `AppType`, returning mock/empty data — [#10](https://github.com/seopotion/seo/issues/10)
+- 🟡 Dashboard API skeletons (planner/articles/settings) — mock reads except settings GET/PATCH (real org presets); swap seam in `apps/api/src/mocks/dashboard.ts` — [#11](https://github.com/seopotion/seo/issues/11)
+- ⬜ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12)
+- ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
+- ⬜ Articles build (planner / generation + editor / history / settings / integrations) — epic [#19](https://github.com/seopotion/seo/issues/19)
 
 ## Frontend (`apps/web`)
 
-- ✅ Next.js app wired to the typed client; verified via `next build` (all routes compile/prerender)
-- ✅ Google sign-in (Google Identity Services) → `/core/login` → JWT stored (localStorage) → auto-attached on every client call (`getApiClient(url, getToken)`)
-- ✅ Auth-gated routing: home shows sign-in; post-login routes by `/core/status` (setup vs dashboard); `/setup` redirects to login without a token; `/dashboard` placeholder
-- 🟡 UI is placeholder — needs real onboarding + dashboard screens (mockups in design/product-flow.md)
-- 🟡 JWT in localStorage (XSS tradeoff noted in `lib/auth.ts`); no refresh/expiry handling yet
-- ⬜ Env: set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per env (`.env.example` added)
-- ⬜ No component/DOM tests yet (no jsdom env configured); only `tsc` + `next build` cover the UI
+- ✅ Next.js on the typed client (verified via `next build`); Google sign-in → JWT (localStorage) → auto-attached; auth-gated routing by `/core/status`
+- 🟡 UI is placeholder — needs real onboarding + dashboard screens — [#20](https://github.com/seopotion/seo/issues/20)
+- 🟡 JWT in localStorage; no refresh/expiry — [#18](https://github.com/seopotion/seo/issues/18)
+- ⬜ Set `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per env — [#21](https://github.com/seopotion/seo/issues/21)
+- ⬜ No component/DOM tests (no jsdom) — [#22](https://github.com/seopotion/seo/issues/22)
 
 ## Infrastructure / ops
 
-- ✅ `infra/lib/api-stack.ts` — API fn, worker fn, SQS queue + DLQ, DB-init custom resource, HTTP API; **`cdk synth` verified green** (standalone CDK pkg)
-- ✅ `infra/bin/app.ts` entrypoint + `cdk.json` + `tsconfig.json`; **NodejsFunction bundling verified end-to-end** — both Lambdas bundle (api 1.1M, worker 1.5M, db-init 804K), `@shared/*` inlined, `mongodb`/powertools bundled, `handler` exported. `NodejsFunction` needs `projectRoot`/`depsLockFilePath` at the monorepo root (entries live in `apps/*`)
-- ✅ Dead-letter queue on `ScanQueue` (`maxReceiveCount: 3` → `ScanDlq`, 14-day retention)
-- ✅ Run `ensureIndexes()` at deploy — `scripts/lambda-db-init.ts` Lambda behind a `Provider`-backed `CustomResource` (re-runs each deploy; indexes idempotent)
-- ✅ Linter/formatter: **Biome** (`biome.json`) — `npm run lint` / `lint:fix`
-- ✅ CI: `.github/workflows/ci.yml` runs lint + typecheck + tests on push to `main` and all PRs (verified via clean `npm ci`)
-- ⬜ Confirm API Gateway stage/base-path stripping vs. Hono mounted paths
-- ⬜ **Real `cdk deploy` never run** — only `synth` + bundling verified here (no AWS creds in this env). Needs `cdk bootstrap` then `cdk deploy`; only a live deploy exercises the DB-init custom resource, SQS→worker event source, and the base-path question above
-- ⬜ Pre-deploy prerequisites not yet automated/checked: SSM SecureString `/seo/jwt-secret` must be created out-of-band; `MONGO_URI` / `GOOGLE_CLIENT_ID` are read from `process.env` at **synth** time (CI/deploy must set them, or the Lambdas ship with empty strings)
-- ⬜ No CloudFormation `Outputs` (e.g. HTTP API URL) — add so the deployed endpoint is discoverable for `NEXT_PUBLIC_API_URL`
+- ✅ CDK `ApiStack` — API + worker + db-init Lambdas, SQS queue + DLQ, HTTP API, deploy-time index init; NodejsFunction bundling (ESM `createRequire` banner) verified
+- ✅ Parameterized by stage → `SeoApiStack-staging` + `SeoApiStack-prod`; Mongo-URI + JWT resolve at runtime from per-env SSM; backend deploy CI (OIDC — merge `dev`→`master` ships staging; prod via GitHub Release, deferred [#43](https://github.com/seopotion/seo/issues/43)) + `infra/ENVIRONMENTS.md`. Sub-project A [#33](https://github.com/seopotion/seo/issues/33) — **staging deployed** (`CREATE_COMPLETE`, `/health` 200); SQS scan round-trip e2e still to verify
+- ✅ First real `cdk deploy` (2026-07-03, single `SeoApiStack`) — now superseded by the two stage stacks; delete manually once staging is healthy — [#15](https://github.com/seopotion/seo/issues/15)
+- ✅ `HttpApiUrl` CfnOutput — [#17](https://github.com/seopotion/seo/issues/17); API Gateway `{proxy+}` → Hono `/api/v0/...` live — [#14](https://github.com/seopotion/seo/issues/14)
+- ✅ Biome lint/format; CI (`ci.yml`) runs lint + typecheck + tests on PRs
+- ✅ Pre-deploy prereq preflight — `infra preflight --stage` CLI verifies SSM secrets + `GOOGLE_CLIENT_ID`; gates the deploy CI — [#16](https://github.com/seopotion/seo/issues/16). Provisioning of the real values is still by hand — [#9](https://github.com/seopotion/seo/issues/9)
+- ⬜ `cdk synth` PR-gate for `infra/**` (CI runs root gates only) — [#30](https://github.com/seopotion/seo/issues/30)
+- ⬜ Sub-project C — Frontend hosting + previews (OpenNext + CDK); design stub, blocked on SSR answers — [#35](https://github.com/seopotion/seo/issues/35)
 
 ## Local development
 
-- ✅ Local API server (`apps/api/src/dev.ts`, `@hono/node-server` via tsx) — `npm run dev -w api`; **verified** (boots, `/health` + OpenAPI respond)
-- ✅ Local SQS via ElasticMQ in `docker-compose.yml` + worker poller (`apps/worker/src/dev.ts`); SQS client honors `SQS_ENDPOINT`
-- ✅ DB index init script — `npm run db:init`
-- ✅ `npm run dev` runs api + worker + web together (concurrently); `.env.example` per app; README "Local full-stack dev" section
-- ✅ Management CLI (`apps/cli`, `@seo/cli`, citty + tsx) — `npm run cli -- <cmd>`; commands: `infra check`, `db init`; `--output json` for agents
-- ✅ Worker poller / `db:init` / ElasticMQ verified live (Docker up): `db:init` ensured indexes, worker polled ElasticMQ and processed a real scan message end-to-end
-
-## Verification gaps (environment-limited)
-
-- ✅ Integration tests executed against live Mongo (Docker up) — 3 passed; `npm run db:init` ensured indexes
-- ✅ Full SQS round-trip executed against live ElasticMQ + Mongo: `start_scan` → worker consumed → presets persisted → `setup_scan_completed`; `/setup/details` returned presets; dashboard Home endpoints verified live (401 unauth, mock data authed)
+- ✅ `npm run dev` runs api + worker + web (concurrently); local API server, ElasticMQ SQS, `db:init` — all verified live
+- ✅ Management CLI (`apps/cli`, citty) — `npm run cli -- <infra check | db init>`, `--output json` for agents
 
 ## Always-green gates
 
-- `npm run lint` — Biome (lint + format + import-sort)
-- `npm run check:all` — typecheck (root + web)
-- `npm test` — unit tests (currently 52 passing)
+- `npm run lint` (Biome) · `npm run check:all` (typecheck root + web) · `npm test` (unit) · `npm run test:integration` (needs Mongo)

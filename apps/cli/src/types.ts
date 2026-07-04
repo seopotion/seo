@@ -55,3 +55,18 @@ export interface InfraCheckResult {
 export interface DbInitData {
   collections: string[];
 }
+
+export type Stage = 'staging' | 'prod';
+
+export interface PrereqCheck {
+  name: string; // SSM parameter name or env var name
+  kind: 'ssm' | 'env';
+  present: boolean;
+  error?: string;
+}
+
+export interface PreflightResult {
+  stage: Stage;
+  ready: boolean;
+  checks: PrereqCheck[];
+}
