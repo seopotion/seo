@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import { WishlistForm } from '../components/WishlistForm';
-import { absoluteUrl, DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME } from '../lib/seo';
+import { WishlistForm } from '../../components/WishlistForm';
+import { absoluteUrl, DEFAULT_DESCRIPTION, DEFAULT_TITLE, SITE_NAME } from '../../lib/seo';
 
 export const metadata: Metadata = {
   title: {
@@ -313,7 +313,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="features" className="px-6 py-20">
+      <section id="features" className="scroll-mt-24 px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">

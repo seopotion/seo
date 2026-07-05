@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
-  title: 'Setup',
+  title: 'Home',
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export default function SetupLayout({ children }: { children: ReactNode }) {
+export default function HomeLayout({ children }: { children: ReactNode }) {
   return children;
 }

@@ -5,7 +5,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../components/ui';
+} from '../../../../components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ToggleSwitch } from '../components/ToggleSwitch';
 import { articleStyles, internalLinkCounts } from '../constants';

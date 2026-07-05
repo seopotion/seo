@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-} from '../../../components/ui';
+} from '../../../../components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { countries, languages } from '../constants';
 import type { Errors, OnboardingForm, UpdateOnboardingField } from '../types';

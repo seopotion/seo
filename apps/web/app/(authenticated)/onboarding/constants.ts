@@ -11,6 +11,7 @@ export const steps = [
 
 export const languages = ['English', 'Turkish', 'Spanish', 'German', 'French'];
 export const countries = [
+  'Global (English)',
   'United States',
   'Turkey',
   'United Kingdom',
@@ -18,7 +19,14 @@ export const countries = [
   'Germany',
   'France',
 ];
-export const articleStyles = ['Informative', 'Casual', 'Professional', 'Technical', 'Friendly'];
+export const articleStyles = [
+  'Informative',
+  'Informative, practical, SEO-optimized',
+  'Casual',
+  'Professional',
+  'Technical',
+  'Friendly',
+];
 export const internalLinkCounts = ['0', '1', '2', '3'];
 export const referralSources = ['LinkedIn', 'Friend', 'Twitter/X', 'Search', 'Community', 'Other'];
 

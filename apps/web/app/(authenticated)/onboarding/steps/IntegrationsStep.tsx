@@ -6,8 +6,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../components/ui';
-import { cn } from '../../../lib/utils';
+} from '../../../../components/ui';
+import { cn } from '../../../../lib/utils';
 import { referralSources } from '../constants';
 import type { OnboardingForm, UpdateOnboardingField } from '../types';
 

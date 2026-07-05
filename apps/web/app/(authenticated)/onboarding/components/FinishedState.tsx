@@ -1,4 +1,4 @@
-import { Button, Card, CardContent } from '../../../components/ui';
+import { Button, Card, CardContent } from '../../../../components/ui';
 
 export function FinishedState({
   onReviewAnswers,
@@ -14,8 +14,7 @@ export function FinishedState({
           <p className="font-semibold text-primary text-sm">Onboarding complete</p>
           <h1 className="mt-2 font-bold text-3xl text-gray-900">You&apos;re ready to start.</h1>
           <p className="mt-3 text-gray-600">
-            Your mock onboarding flow is complete. The next implementation pass can wire these
-            answers into setup status, scanning, and persistence.
+            Your onboarding flow is complete and your SEO workspace is ready.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button onClick={onReviewAnswers}>Review answers</Button>

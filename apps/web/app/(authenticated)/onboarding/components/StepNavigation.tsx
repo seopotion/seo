@@ -1,7 +1,9 @@
-import { Button, Separator } from '../../../components/ui';
+import { Button, Separator } from '../../../../components/ui';
 
 export function StepNavigation({
   currentStep,
+  finishLabel = 'Get Started',
+  isFinishDisabled = false,
   isNextDisabled,
   isFinalStep,
   onBack,
@@ -9,6 +11,8 @@ export function StepNavigation({
   onNext,
 }: {
   currentStep: number;
+  finishLabel?: string;
+  isFinishDisabled?: boolean;
   isNextDisabled: boolean;
   isFinalStep: boolean;
   onBack: () => void;
@@ -23,7 +27,9 @@ export function StepNavigation({
           Back
         </Button>
         {isFinalStep ? (
-          <Button onClick={onFinish}>Get Started</Button>
+          <Button onClick={onFinish} disabled={isFinishDisabled}>
+            {finishLabel}
+          </Button>
         ) : (
           <Button onClick={onNext} disabled={isNextDisabled}>
             Next

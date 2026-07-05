@@ -1,5 +1,5 @@
 import { XIcon } from 'lucide-react';
-import { Badge, Button, Input, Label } from '../../../components/ui';
+import { Badge, Button, Input, Label } from '../../../../components/ui';
 import type { TextEntry } from '../types';
 import { ErrorMessage } from './ErrorMessage';
 

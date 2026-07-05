@@ -1,9 +1,28 @@
+import type { SetupStatus } from '@shared/schemas';
 import { api } from './api';
 
-export async function getPostLoginPath(): Promise<'/dashboard' | '/setup' | null> {
-  const res = await api.api.v0.core.status.$get();
-  if (!res.ok) return null;
+type SetupOrganization = {
+  id: string;
+  website_url: string;
+  setup_status: SetupStatus;
+  name?: string;
+};
 
-  const { setup_complete } = await res.json();
-  return setup_complete ? '/dashboard' : '/setup';
+export async function getPostLoginPath(): Promise<'/home' | '/onboarding' | null> {
+  const orgsRes = await api.api.v0.core.organizations.$get();
+
+  if (orgsRes.ok) {
+    const { organizations } = await orgsRes.json();
+    return (organizations as SetupOrganization[]).some(
+      (organization) => organization.setup_status === 'setup_complete',
+    )
+      ? '/home'
+      : '/onboarding';
+  }
+
+  const statusRes = await api.api.v0.core.status.$get();
+  if (!statusRes.ok) return null;
+
+  const { setup_complete } = await statusRes.json();
+  return setup_complete ? '/home' : '/onboarding';
 }

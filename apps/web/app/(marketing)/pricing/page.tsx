@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { absoluteUrl } from '../../lib/seo';
+import { absoluteUrl } from '../../../lib/seo';
 
 const TIERS = [
   {

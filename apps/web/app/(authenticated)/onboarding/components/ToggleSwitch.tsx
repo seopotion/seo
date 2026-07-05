@@ -1,4 +1,4 @@
-import { Label, Switch } from '../../../components/ui';
+import { Label, Switch } from '../../../../components/ui';
 
 export function ToggleSwitch({
   checked,

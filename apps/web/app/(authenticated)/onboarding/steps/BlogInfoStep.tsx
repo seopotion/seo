@@ -1,4 +1,4 @@
-import { Input, Label } from '../../../components/ui';
+import { Input, Label } from '../../../../components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { blogPostFields } from '../constants';
 import type { Errors, OnboardingForm, UpdateOnboardingField } from '../types';

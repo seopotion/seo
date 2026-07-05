@@ -1,5 +1,5 @@
-import { Button, Progress } from '../../../components/ui';
-import { cn } from '../../../lib/utils';
+import { Button, Progress } from '../../../../components/ui';
+import { cn } from '../../../../lib/utils';
 
 export function ProgressSteps({
   currentStep,
