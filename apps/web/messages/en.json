@@ -1,0 +1,445 @@
+{
+  "AuthGuard": {
+    "checkingSession": "Checking your session..."
+  },
+  "GoogleJoinButton": {
+    "label": "Join with Google",
+    "loading": "Google sign-in is loading",
+    "notConfigured": "Google sign-in is not configured"
+  },
+  "HomePage": {
+    "articles": {
+      "cta": "Visit content planner / Add keywords",
+      "planned": "Planned",
+      "published": "Published",
+      "title": "Articles"
+    },
+    "backlinks": {
+      "description": "Disabled during free trial.",
+      "title": "Backlink Exchange",
+      "upgrade": "Upgrade to unlock"
+    },
+    "bestArticles": {
+      "empty": "No article performance data yet.",
+      "gated": "Connect Google Search Console to unlock this block.",
+      "title": "Best Articles"
+    },
+    "loadError": "Dashboard API is unavailable, so empty development data is shown.",
+    "loading": "Loading home...",
+    "recommended": {
+      "done": "done",
+      "integration": "Connect a publishing integration",
+      "keywords": "Add keywords to start generating",
+      "searchConsole": "Connect Google Search Console",
+      "title": "Recommended Actions"
+    }
+  },
+  "LandingPage": {
+    "features": [
+      {
+        "description": "We find the best search terms to bring real buyers to your website, not just empty traffic.",
+        "title": "Smart Keyword Research"
+      },
+      {
+        "description": "We write engaging blog posts that perfectly match your brand's unique voice and style.",
+        "title": "On-Brand Content"
+      },
+      {
+        "description": "We secure trusted links from other websites to push your domain higher in search results.",
+        "title": "Quality Backlink Building"
+      },
+      {
+        "description": "We structure your content so that ChatGPT and other AI models recommend your brand to users.",
+        "title": "AI Search Optimization"
+      },
+      {
+        "description": "We handle all internal linking and publish the finished articles directly to your blog for you.",
+        "title": "Seamless CMS Publishing"
+      },
+      {
+        "description": "We track your search rankings daily and tweak our strategy to keep your traffic growing.",
+        "title": "Continuous SEO Tuning"
+      }
+    ],
+    "featuresDescription": "We handle all steps you need to rank higher in Google searches and get mentioned by ChatGPT and other LLMs.",
+    "featuresTitle": "Everything you need for SEO",
+    "finalCta": {
+      "description": "Join startups, agencies, and teams who use Seopotion to scale their SEO without hiring a marketing team.",
+      "title": "Ready to Boost your SEO?"
+    },
+    "footer": {
+      "blog": "Blog",
+      "copyright": "© 2026 Seopotion. All rights reserved.",
+      "features": "Features",
+      "pricing": "Pricing",
+      "support": "Support"
+    },
+    "hero": {
+      "subtitle": "We make your brand show up on both Google and ChatGPT, on autopilot.",
+      "titleLine1": "Stand Out on",
+      "titleLine2": "Google and ChatGPT"
+    },
+    "images": {
+      "afterAlt": "Google Search Console after Seopotion growth",
+      "beforeAlt": "Google Search Console before Seopotion growth"
+    },
+    "testimonials": [
+      {
+        "author": "Melisa Ozturk",
+        "quote": "This tool transformed how I handle SEO. I just connected my WordPress, approved a few topics, and it automated my entire content calendar. It's magical.",
+        "role": "Indie Developer"
+      },
+      {
+        "author": "Marcus Johnson",
+        "quote": "We put our entire content pipeline on autopilot. The team loves how it instantly learns the brand voice, and we love the steady growth in organic traffic.",
+        "role": "Agency Owner"
+      },
+      {
+        "author": "Emily Rodriguez",
+        "quote": "Finally, an SEO solution that doesn't require me to spend hours doing keyword research or writing drafts. It scanned my site and took care of the rest perfectly.",
+        "role": "SaaS Founder"
+      }
+    ],
+    "testimonialsDescription": "Join others who've simplified their SEO.",
+    "testimonialsTitle": "Loved by users",
+    "useCases": [
+      { "name": "Indie Developers & Solopreneurs" },
+      { "name": "Startups" },
+      { "name": "Small Business Owners" },
+      { "name": "Anyone who wants to be visible on the web" }
+    ],
+    "useCasesTitle": "Perfect for"
+  },
+  "LocaleSwitcher": {
+    "label": "Language"
+  },
+  "Metadata": {
+    "defaultDescription": "Seopotion helps teams rank on Google and get mentioned by AI search with keyword research, on-brand SEO content, CMS publishing, and continuous tuning.",
+    "defaultTitle": "Seopotion | AI SEO Content for Google and ChatGPT",
+    "keywords": [
+      "AI SEO",
+      "SEO automation",
+      "SEO content",
+      "keyword research",
+      "ChatGPT SEO",
+      "AI search optimization"
+    ],
+    "openGraphLocale": "en_US",
+    "socialImageAlt": "Seopotion SEO growth dashboard preview"
+  },
+  "Navbar": {
+    "homeLabel": "Seopotion home",
+    "links": {
+      "features": "Features",
+      "pricing": "Pricing"
+    },
+    "logoAlt": "Seopotion logo",
+    "primaryNavigation": "Primary navigation"
+  },
+  "Onboarding": {
+    "actions": {
+      "add": "Add",
+      "back": "Back",
+      "finalizing": "Finalizing...",
+      "getStarted": "Get Started",
+      "next": "Next",
+      "remove": "Remove {value}"
+    },
+    "articleSettings": {
+      "articleStyle": "Article style",
+      "internalLinksCount": "Internal links count",
+      "selectStyle": "Select style",
+      "tableOfContents": "Table of contents",
+      "title": "Article Settings",
+      "youtubeVideos": "YouTube videos"
+    },
+    "audience": {
+      "competitorUrls": "Competitor website URLs",
+      "targetAudience": "Target audience",
+      "targetAudiencePlaceholder": "SaaS founders",
+      "title": "Target Audience And Competitors"
+    },
+    "blog": {
+      "bestPosts": "Best 3 blog posts",
+      "blogPageUrl": "Blog page URL",
+      "blogPostFields": {
+        "post1": "Blog post 1 URL",
+        "post2": "Blog post 2 URL",
+        "post3": "Blog post 3 URL"
+      },
+      "sitemapUrl": "Sitemap URL",
+      "title": "Blog Info"
+    },
+    "business": {
+      "businessDescription": "Business description",
+      "businessName": "Business name",
+      "country": "Country",
+      "language": "Language",
+      "selectCountry": "Select country",
+      "selectLanguage": "Select language",
+      "title": "About Your Business"
+    },
+    "errors": {
+      "checkScanStatus": "Could not check scan status. Try scanning again.",
+      "completeScanBeforeFinalize": "Complete the website scan before finalizing setup.",
+      "finalize": "Could not finalize setup. Review the fields and try again.",
+      "generatedDetailsPending": "Scan completed, but the generated setup details are not available yet.",
+      "loadGeneratedDetails": "Could not load generated setup details. Try again when the API is available.",
+      "reachSetupApi": "Could not reach the setup API. Try again when the API is available.",
+      "startScan": "Could not start the website scan. Check the URL and try again."
+    },
+    "eyebrow": "Setup",
+    "finished": {
+      "description": "Your onboarding flow is complete and your SEO workspace is ready.",
+      "eyebrow": "Onboarding complete",
+      "reviewAnswers": "Review answers",
+      "startOver": "Start over",
+      "title": "You're ready to start."
+    },
+    "integrations": {
+      "availableIntegrations": "Available integrations",
+      "referralSource": "How did you hear about us?",
+      "selectOption": "Select an option",
+      "title": "Integrations And Referral Source"
+    },
+    "options": {
+      "articleStyles": {
+        "casual": "Casual",
+        "friendly": "Friendly",
+        "informative": "Informative",
+        "informativePracticalSeo": "Informative, practical, SEO-optimized",
+        "professional": "Professional",
+        "technical": "Technical"
+      },
+      "countries": {
+        "canada": "Canada",
+        "france": "France",
+        "germany": "Germany",
+        "globalEnglish": "Global (English)",
+        "turkey": "Turkey",
+        "unitedKingdom": "United Kingdom",
+        "unitedStates": "United States"
+      },
+      "languages": {
+        "english": "English",
+        "french": "French",
+        "german": "German",
+        "spanish": "Spanish",
+        "turkish": "Turkish"
+      },
+      "referralSources": {
+        "community": "Community",
+        "friend": "Friend",
+        "linkedin": "LinkedIn",
+        "other": "Other",
+        "search": "Search",
+        "twitterX": "Twitter/X"
+      }
+    },
+    "progressLabel": "Onboarding progress",
+    "stepNumber": "Step {number}",
+    "steps": {
+      "articleSettings": "Article Settings",
+      "audienceCompetitors": "Audience & Competitors",
+      "blogInfo": "Blog Info",
+      "businessInfo": "About Your Business",
+      "integrations": "Integrations",
+      "websiteScan": "Website Scan"
+    },
+    "stepsLabel": "Onboarding steps",
+    "title": "Create your SEO workspace",
+    "validation": {
+      "articleStyleRequired": "Article style is required.",
+      "businessNameRequired": "Business name is required.",
+      "competitorUrl": "Enter a valid competitor URL.",
+      "competitorsValidUrls": "Each competitor must be a valid URL.",
+      "countryRequired": "Country is required.",
+      "labels": {
+        "blogPageUrl": "Blog page URL",
+        "blogPostUrl": "blog post {index} URL",
+        "sitemapUrl": "Sitemap URL"
+      },
+      "languageRequired": "Language is required.",
+      "required": "{label} is required.",
+      "scanBeforeContinuing": "Scan the website before continuing.",
+      "targetAudienceRequired": "Add at least one target audience.",
+      "urlWithProtocol": "Enter a valid URL starting with http or https.",
+      "validUrl": "Enter a valid {label}.",
+      "websiteRequired": "Website URL is required."
+    },
+    "websiteScan": {
+      "completeMessage": "Scan complete. Generated setup details have been added to the next steps.",
+      "description": "Start with the site Seopotion should learn from.",
+      "orgStatus": "Org {orgId}",
+      "scanButton": "Scan website",
+      "scanningButton": "Scanning...",
+      "scanningMessage": "Scanning website content. This can take a moment.",
+      "setupStatus": "Setup",
+      "title": "Website Scan",
+      "websiteUrl": "Website URL"
+    }
+  },
+  "PricingMetadata": {
+    "description": "Compare Seopotion plans for automated AI SEO content, CMS publishing, keyword research, and expert-led SEO growth.",
+    "openGraphTitle": "Pricing | Seopotion",
+    "title": "Pricing"
+  },
+  "PricingPage": {
+    "annual": "Annual",
+    "banner": {
+      "description": "Start with automated content production, then bring in expert strategy when you want a hands-on growth partner.",
+      "title": "Scale SEO without hiring a full team"
+    },
+    "comparison": {
+      "expand": "Tap to expand comparison table",
+      "expertLedGrowth": "Expert-Led Growth",
+      "feature": "Feature",
+      "title": "Compare plans"
+    },
+    "comparisonRows": [
+      { "expert": "30", "growth": "30", "label": "Articles / month" },
+      { "expert": "Unlimited", "growth": "Unlimited", "label": "Users" },
+      { "expert": true, "growth": true, "label": "Automatic keyword research" },
+      { "expert": true, "growth": true, "label": "CMS publishing integrations" },
+      { "expert": true, "growth": true, "label": "AI images" },
+      { "expert": true, "growth": true, "label": "Relevant YouTube videos" },
+      { "expert": true, "growth": true, "label": "Unlimited AI rewrites" },
+      { "expert": true, "growth": false, "label": "Dedicated SEO expert" },
+      { "expert": true, "growth": false, "label": "SEO strategy and roadmap" },
+      { "expert": true, "growth": false, "label": "Manual content review" },
+      { "expert": true, "growth": false, "label": "On-page SEO recommendations" },
+      { "expert": true, "growth": false, "label": "Backlink opportunity review" },
+      { "expert": true, "growth": false, "label": "Monthly SEO reporting" }
+    ],
+    "description": "Choose automated SEO content on autopilot, or add an expert to guide strategy, execution, and reporting.",
+    "faq": [
+      {
+        "a": "Growth gives you the AI SEO content engine: keyword research, content generation, CMS publishing, images, relevant YouTube videos, and rewrites. Expert-Led Growth adds a dedicated human SEO expert for strategy, planning, review, optimization recommendations, distribution, backlink opportunity review, and reporting.",
+        "q": "What is the difference between Growth and Expert-Led Growth?"
+      },
+      {
+        "a": "Yes. Growth includes connections to WordPress, Webflow, and more, so Seopotion can help publish finished SEO content directly to your site.",
+        "q": "Can Seopotion publish to my CMS?"
+      },
+      {
+        "a": "No. Growth includes automatic keyword research. On Expert-Led Growth, an SEO expert also helps shape the strategy, roadmap, and content priorities.",
+        "q": "Do I need to do keyword research myself?"
+      },
+      {
+        "a": "Yes. Both plans include AI images and relevant YouTube video suggestions for the content Seopotion creates.",
+        "q": "Are images and videos included?"
+      },
+      {
+        "a": "Yes. Both plans include unlimited AI rewrites, so you can keep refining content until it matches your brand and SEO goals.",
+        "q": "Can I rewrite generated content?"
+      },
+      {
+        "a": "You can pay monthly or annually. Annual billing gives you the same plan at a lower effective monthly rate.",
+        "q": "How does billing work?"
+      },
+      {
+        "a": "Yes. You can move from Growth to Expert-Led Growth when you want a dedicated SEO expert involved in strategy, execution, and reporting.",
+        "q": "Can I switch plans later?"
+      }
+    ],
+    "faqTitle": "Frequently asked questions",
+    "footerNote": "Questions? Choose the plan that matches how hands-on you want your SEO growth to be.",
+    "free": "Free",
+    "included": "Included",
+    "monthShort": "mo",
+    "monthly": "Monthly",
+    "mostPopular": "Most popular",
+    "notIncluded": "Not included",
+    "save": "Save 25%",
+    "tiers": {
+      "expertledgrowth": {
+        "cta": "Talk to an SEO expert",
+        "description": "A dedicated SEO expert handles your SEO strategy, execution, and reporting.",
+        "features": [
+          "Everything in Growth",
+          "Dedicated SEO expert",
+          "SEO strategy and roadmap",
+          "Content planning and prioritization",
+          "Manual content review and optimization",
+          "On-page SEO recommendations",
+          "Community and Reddit distribution when relevant",
+          "Manual backlink opportunity review",
+          "Monthly SEO reporting"
+        ],
+        "name": "Expert-Led Growth"
+      },
+      "growth": {
+        "cta": "Rank higher on auto-pilot",
+        "description": "AI SEO content engine for growth on auto-pilot.",
+        "features": [
+          "30 Articles a month",
+          "Unlimited Users",
+          "Auto Keyword Research",
+          "Connect to Wordpress, Webflow and more",
+          "AI Images",
+          "Relevant YouTube videos",
+          "Unlimited AI rewrites"
+        ],
+        "name": "Growth"
+      }
+    },
+    "title": "Pricing for SEO growth",
+    "toggleAnnualBilling": "Toggle annual billing",
+    "year": "year"
+  },
+  "PrivateMetadata": {
+    "home": "Home",
+    "onboarding": "Onboarding"
+  },
+  "ProductPlaceholderPage": {
+    "description": "This workspace area is ready for the product flow, data fetching, and actions that belong here.",
+    "title": "Coming soon"
+  },
+  "ProductShell": {
+    "logoAlt": "Seopotion logo",
+    "logout": "Log out",
+    "nav": {
+      "ads": {
+        "description": "Coordinate paid content experiments and promotional campaigns.",
+        "label": "Ads"
+      },
+      "analytics": {
+        "description": "Monitor performance trends, content impact, and search visibility.",
+        "label": "Analytics"
+      },
+      "articleImprovements": {
+        "description": "Review improvement opportunities and prioritize updates for existing content.",
+        "label": "Article Improvements"
+      },
+      "articleSettings": {
+        "description": "Control article style, SEO structure, media preferences, and generation defaults.",
+        "label": "Article Settings"
+      },
+      "backlinks": {
+        "description": "Track backlink opportunities, exchange status, and outreach progress.",
+        "label": "Backlinks"
+      },
+      "contentPlanner": {
+        "description": "Plan topics, keywords, publishing cadence, and content priorities.",
+        "label": "Content Planner"
+      },
+      "home": {
+        "description": "Manage your SEO engine",
+        "label": "Home"
+      },
+      "settings": {
+        "description": "Manage workspace preferences, organization details, and account settings.",
+        "label": "Settings"
+      }
+    },
+    "organizationFallback": "Your organization"
+  },
+  "WishlistForm": {
+    "emailPlaceholder": "Enter your email",
+    "error": "Something went wrong. Please try again.",
+    "honeypotLabel": "Website",
+    "joining": "Joining...",
+    "submit": "Join the wishlist",
+    "success": "You're on the SEO Potion wishlist. We'll let you know when early access opens."
+  }
+}

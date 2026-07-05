@@ -1,14 +1,17 @@
 import Image from 'next/image';
-import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 
 export function NavbarLogo() {
+  const t = useTranslations('Navbar');
+
   return (
     <Link
       className="inline-flex items-center gap-2 justify-self-start no-underline"
       href="/"
-      aria-label="Seopotion home"
+      aria-label={t('homeLabel')}
     >
-      <Image src="/android-chrome-192x192.png" alt="Seopotion logo" width={32} height={32} />
+      <Image src="/android-chrome-192x192.png" alt={t('logoAlt')} width={32} height={32} />
       <span className="text-2xl font-bold text-gray-900">Seopotion</span>
     </Link>
   );

@@ -1,0 +1,445 @@
+{
+  "AuthGuard": {
+    "checkingSession": "Oturumunuz kontrol ediliyor..."
+  },
+  "GoogleJoinButton": {
+    "label": "Google ile katıl",
+    "loading": "Google ile oturum açma yükleniyor",
+    "notConfigured": "Google ile oturum açma yapılandırılmamış"
+  },
+  "HomePage": {
+    "articles": {
+      "cta": "İçerik planlayıcıya git / Anahtar kelime ekle",
+      "planned": "Planlanan",
+      "published": "Yayınlanan",
+      "title": "Makaleler"
+    },
+    "backlinks": {
+      "description": "Ücretsiz deneme sırasında devre dışı.",
+      "title": "Backlink Değişimi",
+      "upgrade": "Kilidi açmak için yükselt"
+    },
+    "bestArticles": {
+      "empty": "Henüz makale performans verisi yok.",
+      "gated": "Bu alanı açmak için Google Search Console'u bağlayın.",
+      "title": "En İyi Makaleler"
+    },
+    "loadError": "Dashboard API kullanılamıyor, bu yüzden boş geliştirme verisi gösteriliyor.",
+    "loading": "Ana sayfa yükleniyor...",
+    "recommended": {
+      "done": "tamamlandı",
+      "integration": "Bir yayınlama entegrasyonu bağla",
+      "keywords": "Üretimi başlatmak için anahtar kelime ekle",
+      "searchConsole": "Google Search Console'u bağla",
+      "title": "Önerilen Aksiyonlar"
+    }
+  },
+  "LandingPage": {
+    "features": [
+      {
+        "description": "Sitenize boş trafik değil, gerçek alıcılar getirecek en iyi arama terimlerini buluruz.",
+        "title": "Akıllı Anahtar Kelime Araştırması"
+      },
+      {
+        "description": "Markanızın benzersiz sesi ve tarzıyla uyumlu, etkileyici blog yazıları üretiriz.",
+        "title": "Markaya Uygun İçerik"
+      },
+      {
+        "description": "Alan adınızı arama sonuçlarında yukarı taşımak için güvenilir sitelerden bağlantılar kazanırız.",
+        "title": "Kaliteli Backlink Çalışması"
+      },
+      {
+        "description": "İçeriğinizi ChatGPT ve diğer AI modellerinin markanızı önerebileceği şekilde yapılandırırız.",
+        "title": "AI Arama Optimizasyonu"
+      },
+      {
+        "description": "İç bağlantıları yönetir, tamamlanan makaleleri doğrudan blogunuza yayınlarız.",
+        "title": "Sorunsuz CMS Yayını"
+      },
+      {
+        "description": "Arama sıralamalarınızı günlük takip eder, trafiğinizin büyümesi için stratejiyi sürekli iyileştiririz.",
+        "title": "Sürekli SEO İyileştirme"
+      }
+    ],
+    "featuresDescription": "Google aramalarında yükselmeniz ve ChatGPT ile diğer LLM'lerde anılmanız için gereken tüm adımları yönetiriz.",
+    "featuresTitle": "SEO için ihtiyacınız olan her şey",
+    "finalCta": {
+      "description": "Pazarlama ekibi işe almadan SEO'sunu büyütmek için Seopotion kullanan startup'lara, ajanslara ve ekiplere katılın.",
+      "title": "SEO'nuzu büyütmeye hazır mısınız?"
+    },
+    "footer": {
+      "blog": "Blog",
+      "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
+      "features": "Özellikler",
+      "pricing": "Fiyatlandırma",
+      "support": "Destek"
+    },
+    "hero": {
+      "subtitle": "Markanızın hem Google'da hem ChatGPT'de otomatik olarak görünmesini sağlarız.",
+      "titleLine1": "Google ve ChatGPT'de",
+      "titleLine2": "Öne Çıkın"
+    },
+    "images": {
+      "afterAlt": "Seopotion büyümesinden sonra Google Search Console",
+      "beforeAlt": "Seopotion büyümesinden önce Google Search Console"
+    },
+    "testimonials": [
+      {
+        "author": "Melisa Ozturk",
+        "quote": "Bu araç SEO yönetimimi tamamen değiştirdi. WordPress'i bağladım, birkaç konuyu onayladım ve tüm içerik takvimim otomatikleşti. Harika.",
+        "role": "Bağımsız Geliştirici"
+      },
+      {
+        "author": "Marcus Johnson",
+        "quote": "Tüm içerik hattımızı otomatik pilota aldık. Ekip marka dilini hemen öğrenmesini seviyor, biz de organik trafikteki düzenli büyümeyi seviyoruz.",
+        "role": "Ajans Sahibi"
+      },
+      {
+        "author": "Emily Rodriguez",
+        "quote": "Sonunda saatlerce anahtar kelime araştırması veya taslak yazımı gerektirmeyen bir SEO çözümü. Sitemi taradı ve geri kalanını kusursuzca halletti.",
+        "role": "SaaS Kurucusu"
+      }
+    ],
+    "testimonialsDescription": "SEO'sunu sadeleştiren diğer ekiplere katılın.",
+    "testimonialsTitle": "Kullanıcılar seviyor",
+    "useCases": [
+      { "name": "Bağımsız geliştiriciler ve tek kişilik girişimler" },
+      { "name": "Startup'lar" },
+      { "name": "Küçük işletme sahipleri" },
+      { "name": "Web'de görünür olmak isteyen herkes" }
+    ],
+    "useCasesTitle": "Kimler için ideal?"
+  },
+  "LocaleSwitcher": {
+    "label": "Dil"
+  },
+  "Metadata": {
+    "defaultDescription": "Seopotion; anahtar kelime araştırması, markaya uygun SEO içeriği, CMS yayını ve sürekli iyileştirmeyle ekiplerin Google'da yükselmesine ve AI aramalarında anılmasına yardımcı olur.",
+    "defaultTitle": "Seopotion | Google ve ChatGPT için AI SEO İçeriği",
+    "keywords": [
+      "AI SEO",
+      "SEO otomasyonu",
+      "SEO içeriği",
+      "anahtar kelime araştırması",
+      "ChatGPT SEO",
+      "AI arama optimizasyonu"
+    ],
+    "openGraphLocale": "tr_TR",
+    "socialImageAlt": "Seopotion SEO büyüme paneli önizlemesi"
+  },
+  "Navbar": {
+    "homeLabel": "Seopotion ana sayfa",
+    "links": {
+      "features": "Özellikler",
+      "pricing": "Fiyatlandırma"
+    },
+    "logoAlt": "Seopotion logosu",
+    "primaryNavigation": "Ana gezinme"
+  },
+  "Onboarding": {
+    "actions": {
+      "add": "Ekle",
+      "back": "Geri",
+      "finalizing": "Tamamlanıyor...",
+      "getStarted": "Başla",
+      "next": "İleri",
+      "remove": "{value} değerini kaldır"
+    },
+    "articleSettings": {
+      "articleStyle": "Makale stili",
+      "internalLinksCount": "İç bağlantı sayısı",
+      "selectStyle": "Stil seç",
+      "tableOfContents": "İçindekiler",
+      "title": "Makale Ayarları",
+      "youtubeVideos": "YouTube videoları"
+    },
+    "audience": {
+      "competitorUrls": "Rakip web sitesi URL'leri",
+      "targetAudience": "Hedef kitle",
+      "targetAudiencePlaceholder": "SaaS kurucuları",
+      "title": "Hedef Kitle ve Rakipler"
+    },
+    "blog": {
+      "bestPosts": "En iyi 3 blog yazısı",
+      "blogPageUrl": "Blog sayfası URL'si",
+      "blogPostFields": {
+        "post1": "Blog yazısı 1 URL'si",
+        "post2": "Blog yazısı 2 URL'si",
+        "post3": "Blog yazısı 3 URL'si"
+      },
+      "sitemapUrl": "Site haritası URL'si",
+      "title": "Blog Bilgileri"
+    },
+    "business": {
+      "businessDescription": "İşletme açıklaması",
+      "businessName": "İşletme adı",
+      "country": "Ülke",
+      "language": "Dil",
+      "selectCountry": "Ülke seç",
+      "selectLanguage": "Dil seç",
+      "title": "İşletmeniz Hakkında"
+    },
+    "errors": {
+      "checkScanStatus": "Tarama durumu kontrol edilemedi. Tekrar taramayı deneyin.",
+      "completeScanBeforeFinalize": "Kurulumu tamamlamadan önce web sitesi taramasını bitirin.",
+      "finalize": "Kurulum tamamlanamadı. Alanları gözden geçirip tekrar deneyin.",
+      "generatedDetailsPending": "Tarama tamamlandı, ancak oluşturulan kurulum detayları henüz hazır değil.",
+      "loadGeneratedDetails": "Oluşturulan kurulum detayları yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "reachSetupApi": "Kurulum API'sine ulaşılamadı. API kullanılabilir olduğunda tekrar deneyin.",
+      "startScan": "Web sitesi taraması başlatılamadı. URL'yi kontrol edip tekrar deneyin."
+    },
+    "eyebrow": "Kurulum",
+    "finished": {
+      "description": "Onboarding akışınız tamamlandı ve SEO çalışma alanınız hazır.",
+      "eyebrow": "Onboarding tamamlandı",
+      "reviewAnswers": "Yanıtları gözden geçir",
+      "startOver": "Baştan başla",
+      "title": "Başlamaya hazırsınız."
+    },
+    "integrations": {
+      "availableIntegrations": "Mevcut entegrasyonlar",
+      "referralSource": "Bizi nereden duydunuz?",
+      "selectOption": "Bir seçenek seç",
+      "title": "Entegrasyonlar ve Referans Kaynağı"
+    },
+    "options": {
+      "articleStyles": {
+        "casual": "Samimi",
+        "friendly": "Dostane",
+        "informative": "Bilgilendirici",
+        "informativePracticalSeo": "Bilgilendirici, pratik, SEO odaklı",
+        "professional": "Profesyonel",
+        "technical": "Teknik"
+      },
+      "countries": {
+        "canada": "Kanada",
+        "france": "Fransa",
+        "germany": "Almanya",
+        "globalEnglish": "Global (İngilizce)",
+        "turkey": "Türkiye",
+        "unitedKingdom": "Birleşik Krallık",
+        "unitedStates": "Amerika Birleşik Devletleri"
+      },
+      "languages": {
+        "english": "İngilizce",
+        "french": "Fransızca",
+        "german": "Almanca",
+        "spanish": "İspanyolca",
+        "turkish": "Türkçe"
+      },
+      "referralSources": {
+        "community": "Topluluk",
+        "friend": "Arkadaş",
+        "linkedin": "LinkedIn",
+        "other": "Diğer",
+        "search": "Arama",
+        "twitterX": "Twitter/X"
+      }
+    },
+    "progressLabel": "Onboarding ilerlemesi",
+    "stepNumber": "Adım {number}",
+    "steps": {
+      "articleSettings": "Makale Ayarları",
+      "audienceCompetitors": "Hedef Kitle ve Rakipler",
+      "blogInfo": "Blog Bilgileri",
+      "businessInfo": "İşletmeniz Hakkında",
+      "integrations": "Entegrasyonlar",
+      "websiteScan": "Web Sitesi Taraması"
+    },
+    "stepsLabel": "Onboarding adımları",
+    "title": "SEO çalışma alanınızı oluşturun",
+    "validation": {
+      "articleStyleRequired": "Makale stili zorunludur.",
+      "businessNameRequired": "İşletme adı zorunludur.",
+      "competitorUrl": "Geçerli bir rakip URL'si girin.",
+      "competitorsValidUrls": "Her rakip geçerli bir URL olmalıdır.",
+      "countryRequired": "Ülke zorunludur.",
+      "labels": {
+        "blogPageUrl": "Blog sayfası URL'si",
+        "blogPostUrl": "blog yazısı {index} URL'si",
+        "sitemapUrl": "Site haritası URL'si"
+      },
+      "languageRequired": "Dil zorunludur.",
+      "required": "{label} zorunludur.",
+      "scanBeforeContinuing": "Devam etmeden önce web sitesini tarayın.",
+      "targetAudienceRequired": "En az bir hedef kitle ekleyin.",
+      "urlWithProtocol": "http veya https ile başlayan geçerli bir URL girin.",
+      "validUrl": "Geçerli bir {label} girin.",
+      "websiteRequired": "Web sitesi URL'si zorunludur."
+    },
+    "websiteScan": {
+      "completeMessage": "Tarama tamamlandı. Oluşturulan kurulum detayları sonraki adımlara eklendi.",
+      "description": "Seopotion'ın öğrenmesini istediğiniz siteyle başlayın.",
+      "orgStatus": "Org {orgId}",
+      "scanButton": "Web sitesini tara",
+      "scanningButton": "Taranıyor...",
+      "scanningMessage": "Web sitesi içeriği taranıyor. Bu biraz zaman alabilir.",
+      "setupStatus": "Kurulum",
+      "title": "Web Sitesi Taraması",
+      "websiteUrl": "Web sitesi URL'si"
+    }
+  },
+  "PricingMetadata": {
+    "description": "Otomatik AI SEO içeriği, CMS yayını, anahtar kelime araştırması ve uzman destekli SEO büyümesi için Seopotion planlarını karşılaştırın.",
+    "openGraphTitle": "Fiyatlandırma | Seopotion",
+    "title": "Fiyatlandırma"
+  },
+  "PricingPage": {
+    "annual": "Yıllık",
+    "banner": {
+      "description": "Otomatik içerik üretimiyle başlayın, uygulamalı bir büyüme ortağı istediğinizde uzman stratejiyi ekleyin.",
+      "title": "Tam ekip kurmadan SEO'yu büyütün"
+    },
+    "comparison": {
+      "expand": "Karşılaştırma tablosunu açmak için dokunun",
+      "expertLedGrowth": "Uzman Destekli Büyüme",
+      "feature": "Özellik",
+      "title": "Planları karşılaştır"
+    },
+    "comparisonRows": [
+      { "expert": "30", "growth": "30", "label": "Makale / ay" },
+      { "expert": "Sınırsız", "growth": "Sınırsız", "label": "Kullanıcılar" },
+      { "expert": true, "growth": true, "label": "Otomatik anahtar kelime araştırması" },
+      { "expert": true, "growth": true, "label": "CMS yayın entegrasyonları" },
+      { "expert": true, "growth": true, "label": "AI görselleri" },
+      { "expert": true, "growth": true, "label": "İlgili YouTube videoları" },
+      { "expert": true, "growth": true, "label": "Sınırsız AI yeniden yazım" },
+      { "expert": true, "growth": false, "label": "Özel SEO uzmanı" },
+      { "expert": true, "growth": false, "label": "SEO stratejisi ve yol haritası" },
+      { "expert": true, "growth": false, "label": "Manuel içerik incelemesi" },
+      { "expert": true, "growth": false, "label": "Sayfa içi SEO önerileri" },
+      { "expert": true, "growth": false, "label": "Backlink fırsatı incelemesi" },
+      { "expert": true, "growth": false, "label": "Aylık SEO raporu" }
+    ],
+    "description": "Otomatik SEO içeriğini seçin ya da strateji, uygulama ve raporlama için bir uzman ekleyin.",
+    "faq": [
+      {
+        "a": "Growth size AI SEO içerik motorunu sunar: anahtar kelime araştırması, içerik üretimi, CMS yayını, görseller, ilgili YouTube videoları ve yeniden yazımlar. Expert-Led Growth ise strateji, planlama, inceleme, optimizasyon önerileri, dağıtım, backlink fırsatı incelemesi ve raporlama için özel bir insan SEO uzmanı ekler.",
+        "q": "Growth ile Expert-Led Growth arasındaki fark nedir?"
+      },
+      {
+        "a": "Evet. Growth; WordPress, Webflow ve daha fazlasına bağlantılar içerir, böylece Seopotion tamamlanan SEO içeriklerini doğrudan sitenize yayınlamanıza yardımcı olur.",
+        "q": "Seopotion CMS'ime yayın yapabilir mi?"
+      },
+      {
+        "a": "Hayır. Growth otomatik anahtar kelime araştırması içerir. Expert-Led Growth'ta bir SEO uzmanı stratejiyi, yol haritasını ve içerik önceliklerini şekillendirmeye de yardımcı olur.",
+        "q": "Anahtar kelime araştırmasını kendim yapmam gerekir mi?"
+      },
+      {
+        "a": "Evet. İki planda da Seopotion'ın ürettiği içerikler için AI görselleri ve ilgili YouTube video önerileri bulunur.",
+        "q": "Görseller ve videolar dahil mi?"
+      },
+      {
+        "a": "Evet. İki planda da sınırsız AI yeniden yazım bulunur, böylece içerikleri markanıza ve SEO hedeflerinize uyana kadar iyileştirebilirsiniz.",
+        "q": "Üretilen içeriği yeniden yazabilir miyim?"
+      },
+      {
+        "a": "Aylık veya yıllık ödeme yapabilirsiniz. Yıllık ödeme aynı planı daha düşük efektif aylık ücretle sunar.",
+        "q": "Faturalandırma nasıl işler?"
+      },
+      {
+        "a": "Evet. Strateji, uygulama ve raporlamada özel bir SEO uzmanı istediğinizde Growth'tan Expert-Led Growth'a geçebilirsiniz.",
+        "q": "Daha sonra plan değiştirebilir miyim?"
+      }
+    ],
+    "faqTitle": "Sık sorulan sorular",
+    "footerNote": "Sorularınız mı var? SEO büyümenizde ne kadar uygulamalı destek istediğinize uygun planı seçin.",
+    "free": "Ücretsiz",
+    "included": "Dahil",
+    "monthShort": "ay",
+    "monthly": "Aylık",
+    "mostPopular": "En popüler",
+    "notIncluded": "Dahil değil",
+    "save": "%25 tasarruf",
+    "tiers": {
+      "expertledgrowth": {
+        "cta": "Bir SEO uzmanıyla görüş",
+        "description": "Özel bir SEO uzmanı SEO stratejinizi, uygulamayı ve raporlamayı yönetir.",
+        "features": [
+          "Growth'taki her şey",
+          "Özel SEO uzmanı",
+          "SEO stratejisi ve yol haritası",
+          "İçerik planlama ve önceliklendirme",
+          "Manuel içerik inceleme ve optimizasyon",
+          "Sayfa içi SEO önerileri",
+          "Uygun olduğunda topluluk ve Reddit dağıtımı",
+          "Manuel backlink fırsatı incelemesi",
+          "Aylık SEO raporu"
+        ],
+        "name": "Expert-Led Growth"
+      },
+      "growth": {
+        "cta": "Otomatik pilotta daha üst sıralara çık",
+        "description": "Otomatik pilotta büyüme için AI SEO içerik motoru.",
+        "features": [
+          "Ayda 30 makale",
+          "Sınırsız kullanıcı",
+          "Otomatik anahtar kelime araştırması",
+          "Wordpress, Webflow ve daha fazlasına bağlanma",
+          "AI görselleri",
+          "İlgili YouTube videoları",
+          "Sınırsız AI yeniden yazım"
+        ],
+        "name": "Growth"
+      }
+    },
+    "title": "SEO büyümesi için fiyatlandırma",
+    "toggleAnnualBilling": "Yıllık ödemeyi aç/kapat",
+    "year": "yıl"
+  },
+  "PrivateMetadata": {
+    "home": "Ana Sayfa",
+    "onboarding": "Onboarding"
+  },
+  "ProductPlaceholderPage": {
+    "description": "Bu çalışma alanı, ilgili ürün akışı, veri çekme ve aksiyonlar için hazır.",
+    "title": "Yakında"
+  },
+  "ProductShell": {
+    "logoAlt": "Seopotion logosu",
+    "logout": "Çıkış yap",
+    "nav": {
+      "ads": {
+        "description": "Ücretli içerik denemelerini ve promosyon kampanyalarını koordine edin.",
+        "label": "Reklamlar"
+      },
+      "analytics": {
+        "description": "Performans trendlerini, içerik etkisini ve arama görünürlüğünü izleyin.",
+        "label": "Analitik"
+      },
+      "articleImprovements": {
+        "description": "İyileştirme fırsatlarını gözden geçirin ve mevcut içerik güncellemelerini önceliklendirin.",
+        "label": "Makale İyileştirmeleri"
+      },
+      "articleSettings": {
+        "description": "Makale stilini, SEO yapısını, medya tercihlerini ve üretim varsayılanlarını yönetin.",
+        "label": "Makale Ayarları"
+      },
+      "backlinks": {
+        "description": "Backlink fırsatlarını, değişim durumunu ve iletişim ilerlemesini takip edin.",
+        "label": "Backlinkler"
+      },
+      "contentPlanner": {
+        "description": "Konuları, anahtar kelimeleri, yayın temposunu ve içerik önceliklerini planlayın.",
+        "label": "İçerik Planlayıcı"
+      },
+      "home": {
+        "description": "SEO motorunuzu yönetin",
+        "label": "Ana Sayfa"
+      },
+      "settings": {
+        "description": "Çalışma alanı tercihlerini, organizasyon detaylarını ve hesap ayarlarını yönetin.",
+        "label": "Ayarlar"
+      }
+    },
+    "organizationFallback": "Organizasyonunuz"
+  },
+  "WishlistForm": {
+    "emailPlaceholder": "E-posta adresinizi girin",
+    "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+    "honeypotLabel": "Web sitesi",
+    "joining": "Katılınıyor...",
+    "submit": "Bekleme listesine katıl",
+    "success": "SEO Potion bekleme listesine eklendiniz. Erken erişim açıldığında size haber vereceğiz."
+  }
+}

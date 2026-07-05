@@ -1,8 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import Script from 'next/script';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { useRouter } from '@/i18n/navigation';
 import { getPostLoginPath } from '../../lib/session';
 import { GOOGLE_IDENTITY_SCRIPT_SRC, useGoogleLogin } from '../auth/useGoogleLogin';
 import { Button } from '../ui';
@@ -34,6 +35,7 @@ function GoogleIcon() {
 
 export function GoogleJoinButton() {
   const router = useRouter();
+  const t = useTranslations('GoogleJoinButton');
   const [scriptReady, setScriptReady] = useState(false);
 
   async function onLoggedIn() {
@@ -49,11 +51,7 @@ export function GoogleJoinButton() {
     setScriptReady(initialize());
   }
 
-  const title = !isConfigured
-    ? 'Google sign-in is not configured'
-    : !scriptReady
-      ? 'Google sign-in is loading'
-      : undefined;
+  const title = !isConfigured ? t('notConfigured') : !scriptReady ? t('loading') : undefined;
 
   return (
     <>
@@ -68,7 +66,7 @@ export function GoogleJoinButton() {
         title={title}
       >
         <GoogleIcon />
-        Join with Google
+        {t('label')}
       </Button>
     </>
   );
