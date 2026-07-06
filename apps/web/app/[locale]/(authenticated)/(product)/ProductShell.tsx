@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Archive,
   BarChart3,
   FileSliders,
   Home,
@@ -34,6 +35,11 @@ const navItems = [
     href: '/content-planner',
     key: 'contentPlanner',
     icon: LayoutList,
+  },
+  {
+    href: '/content-history',
+    key: 'contentHistory',
+    icon: Archive,
   },
   {
     href: '/article-settings',

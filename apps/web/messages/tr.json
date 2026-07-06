@@ -34,6 +34,114 @@
       "title": "Önerilen Aksiyonlar"
     }
   },
+  "ContentPlannerPage": {
+    "actions": {
+      "closeDetails": "Detayları kapat",
+      "openArticle": "{title} detaylarını aç",
+      "researchKeyword": "AI ile anahtar kelime araştır"
+    },
+    "activeRange": "Aktif dönem",
+    "agendaLabel": "İçerik ajanda listesi",
+    "articleTypes": {
+      "alternatives": "Alternatifler",
+      "case_study": "Vaka çalışması",
+      "comparison": "Karşılaştırma",
+      "definition": "Tanım",
+      "how_to_guide": "Nasıl yapılır rehberi",
+      "listicle": "Liste yazısı",
+      "product_guide": "Ürün rehberi"
+    },
+    "calendarLabel": "İçerik takvimi ızgarası",
+    "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
+    "modal": {
+      "scheduledDate": "Planlanan tarih",
+      "status": "Durum",
+      "title": "Makale detayları",
+      "type": "Makale tipi"
+    },
+    "oneArticlePerDay": "Günde 1 makale",
+    "rangeDays": "{count} gün",
+    "rangeLabel": "Aralık",
+    "scheduledCount": "{count} planlandı",
+    "statuses": {
+      "generated": "Oluşturuldu",
+      "planned": "Planlandı"
+    },
+    "title": "İçerik takvimi"
+  },
+  "ContentHistoryPage": {
+    "actions": {
+      "openArticle": "{title} makalesini aç"
+    },
+    "articlesCount": "{count} makale",
+    "columns": {
+      "articleName": "Makale adı",
+      "keyword": "Anahtar kelime",
+      "publishDate": "Yayın tarihi"
+    },
+    "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
+    "empty": {
+      "description": "İçerik yayınlandığında yayınlanan makaleler burada görünecek.",
+      "title": "Henüz yayınlanan makale yok"
+    },
+    "listLabel": "Yayınlanan makaleler listesi",
+    "pagination": {
+      "emptyPage": "Sayfa yok",
+      "emptyRange": "Henüz yayınlanan makale yok",
+      "label": "İçerik geçmişi sayfalaması",
+      "next": "Sonraki",
+      "page": "Sayfa {page} / {totalPages}",
+      "perPage": "Sayfa başına {count}",
+      "previous": "Önceki",
+      "range": "{start}-{end} / {total}"
+    },
+    "tableLabel": "Yayınlanan makaleler tablosu",
+    "title": "İçerik geçmişi"
+  },
+  "ArticleSettingsPage": {
+    "actions": {
+      "save": "Kaydet"
+    },
+    "fields": {
+      "articleStyle": {
+        "description": "Oluşturulan makaleler için varsayılan yazım stilini seçin.",
+        "label": "Makale stili",
+        "placeholder": "Stil seç"
+      },
+      "autoPublish": {
+        "description": "Üretim tamamlandığında bitmiş makaleleri otomatik yayınlayın.",
+        "label": "Otomatik yayınlama"
+      },
+      "internalLinks": {
+        "description": "Her makaleye kaç iç bağlantı ekleneceğini seçin.",
+        "label": "İç bağlantılar"
+      },
+      "tableOfContents": {
+        "description": "Oluşturulan makalelere içindekiler bölümü ekleyin.",
+        "label": "İçindekiler"
+      }
+    }
+  },
+  "SettingsPage": {
+    "actions": {
+      "save": "Kaydet"
+    },
+    "googleSearchConsole": {
+      "comingSoon": "Yakında",
+      "connect": "Bağlan",
+      "description": "Google Search Console bağlantı ayarları burada görünecek."
+    },
+    "placeholders": {
+      "competitorUrl": "https://rakip.com"
+    },
+    "tabs": {
+      "audienceCompetitors": "Hedef Kitle ve Rakipler",
+      "business": "İşletme",
+      "googleSearchConsole": "Google Search Console",
+      "integrations": "Entegrasyonlar",
+      "label": "Ayar bölümleri"
+    }
+  },
   "LandingPage": {
     "features": [
       {
@@ -412,7 +520,7 @@
         "label": "Makale İyileştirmeleri"
       },
       "articleSettings": {
-        "description": "Makale stilini, SEO yapısını, medya tercihlerini ve üretim varsayılanlarını yönetin.",
+        "description": "Gelecekteki tüm makaleler için tercihlerinizi belirleyin.",
         "label": "Makale Ayarları"
       },
       "backlinks": {
@@ -422,6 +530,10 @@
       "contentPlanner": {
         "description": "Konuları, anahtar kelimeleri, yayın temposunu ve içerik önceliklerini planlayın.",
         "label": "İçerik Planlayıcı"
+      },
+      "contentHistory": {
+        "description": "Yayınlanan makaleleri, anahtar kelimeleri ve yayın geçmişini inceleyin.",
+        "label": "İçerik Geçmişi"
       },
       "home": {
         "description": "SEO motorunuzu yönetin",

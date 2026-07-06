@@ -510,9 +510,7 @@ export default function OnboardingPage() {
 
       return {
         ...currentForm,
-        integrations: selected
-          ? currentForm.integrations.filter((id) => id !== integrationId)
-          : [...currentForm.integrations, integrationId],
+        integrations: selected ? [] : [integrationId],
       };
     });
   }

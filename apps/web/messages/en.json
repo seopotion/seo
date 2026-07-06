@@ -34,6 +34,114 @@
       "title": "Recommended Actions"
     }
   },
+  "ContentPlannerPage": {
+    "actions": {
+      "closeDetails": "Close details",
+      "openArticle": "Open {title} details",
+      "researchKeyword": "Research keyword with AI"
+    },
+    "activeRange": "Active window",
+    "agendaLabel": "Content agenda list",
+    "articleTypes": {
+      "alternatives": "Alternatives",
+      "case_study": "Case study",
+      "comparison": "Comparison",
+      "definition": "Definition",
+      "how_to_guide": "How-to guide",
+      "listicle": "Listicle",
+      "product_guide": "Product guide"
+    },
+    "calendarLabel": "Content calendar grid",
+    "description": "Plan one article per day across the next 45 days.",
+    "modal": {
+      "scheduledDate": "Scheduled date",
+      "status": "Status",
+      "title": "Article details",
+      "type": "Article type"
+    },
+    "oneArticlePerDay": "1 article per day",
+    "rangeDays": "{count} days",
+    "rangeLabel": "Range",
+    "scheduledCount": "{count} scheduled",
+    "statuses": {
+      "generated": "Generated",
+      "planned": "Planned"
+    },
+    "title": "Content calendar"
+  },
+  "ContentHistoryPage": {
+    "actions": {
+      "openArticle": "Open {title}"
+    },
+    "articlesCount": "{count, plural, one {# article} other {# articles}}",
+    "columns": {
+      "articleName": "Article name",
+      "keyword": "Keyword",
+      "publishDate": "Publish date"
+    },
+    "description": "Review published articles, their target keywords, and publication dates.",
+    "empty": {
+      "description": "Published articles will appear here once content is published.",
+      "title": "No published articles yet"
+    },
+    "listLabel": "Published articles list",
+    "pagination": {
+      "emptyPage": "No pages",
+      "emptyRange": "No published articles yet",
+      "label": "Content history pagination",
+      "next": "Next",
+      "page": "Page {page} of {totalPages}",
+      "perPage": "{count} per page",
+      "previous": "Previous",
+      "range": "{start}-{end} of {total}"
+    },
+    "tableLabel": "Published articles table",
+    "title": "Content history"
+  },
+  "ArticleSettingsPage": {
+    "actions": {
+      "save": "Save"
+    },
+    "fields": {
+      "articleStyle": {
+        "description": "Choose the default writing style for generated articles.",
+        "label": "Article style",
+        "placeholder": "Select style"
+      },
+      "autoPublish": {
+        "description": "Publish finished articles automatically when generation is complete.",
+        "label": "Auto-publish"
+      },
+      "internalLinks": {
+        "description": "Choose how many internal links to include in each article.",
+        "label": "Internal links"
+      },
+      "tableOfContents": {
+        "description": "Include a table of contents in generated articles.",
+        "label": "Table of contents"
+      }
+    }
+  },
+  "SettingsPage": {
+    "actions": {
+      "save": "Save"
+    },
+    "googleSearchConsole": {
+      "comingSoon": "Coming soon",
+      "connect": "Connect",
+      "description": "Google Search Console connection settings will appear here."
+    },
+    "placeholders": {
+      "competitorUrl": "https://competitor.com"
+    },
+    "tabs": {
+      "audienceCompetitors": "Audience & Competitors",
+      "business": "Business",
+      "googleSearchConsole": "Google Search Console",
+      "integrations": "Integrations",
+      "label": "Settings sections"
+    }
+  },
   "LandingPage": {
     "features": [
       {
@@ -412,7 +520,7 @@
         "label": "Article Improvements"
       },
       "articleSettings": {
-        "description": "Control article style, SEO structure, media preferences, and generation defaults.",
+        "description": "Set your preferences for all future articles.",
         "label": "Article Settings"
       },
       "backlinks": {
@@ -422,6 +530,10 @@
       "contentPlanner": {
         "description": "Plan topics, keywords, publishing cadence, and content priorities.",
         "label": "Content Planner"
+      },
+      "contentHistory": {
+        "description": "Review published articles, keywords, and publication history.",
+        "label": "Content History"
       },
       "home": {
         "description": "Manage your SEO engine",
