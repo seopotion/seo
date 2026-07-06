@@ -11,6 +11,8 @@ type PublishedArticle = {
   title: string;
   keyword: string;
   publishedAt: string; // ISO date string
+  volume: number;
+  difficulty: number;
   contentUrl?: string;
 };
 
@@ -22,7 +24,10 @@ export default function ContentHistoryPage() {
   const locale = useLocale();
   const [page, setPage] = useState(1);
 
-  const dateFormatter = useMemo(() => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }), [locale]);
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
+    [locale],
+  );
   const sortedArticles = useMemo(() => sortArticlesByPublishDate(publishedArticles), []);
   const totalArticles = sortedArticles.length;
   const totalPages = Math.max(1, Math.ceil(totalArticles / ARTICLES_PER_PAGE));
@@ -55,9 +60,11 @@ export default function ContentHistoryPage() {
         aria-label={t('tableLabel')}
         className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
       >
-        <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(10rem,0.8fr)_11rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_10rem_7rem_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
           <span>{t('columns.articleName')}</span>
           <span>{t('columns.keyword')}</span>
+          <span>{t('columns.volume')}</span>
+          <span>{t('columns.difficulty')}</span>
           <span>{t('columns.publishDate')}</span>
         </div>
 
@@ -68,6 +75,7 @@ export default function ContentHistoryPage() {
                 key={article.id}
                 article={article}
                 dateFormatter={dateFormatter}
+                locale={locale}
                 t={t}
               />
             ))}
@@ -84,6 +92,7 @@ export default function ContentHistoryPage() {
               key={article.id}
               article={article}
               dateFormatter={dateFormatter}
+              locale={locale}
               t={t}
             />
           ))
@@ -108,15 +117,17 @@ export default function ContentHistoryPage() {
 function DesktopArticleRow({
   article,
   dateFormatter,
+  locale,
   t,
 }: {
   article: PublishedArticle;
   dateFormatter: Intl.DateTimeFormat;
+  locale: string;
   t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
 }) {
   const publishedDate = formatPublishedDate(article.publishedAt, dateFormatter);
   const rowClassName =
-    'grid min-h-14 grid-cols-[minmax(0,1.5fr)_minmax(10rem,0.8fr)_11rem] items-center gap-0 px-4 py-3 text-sm';
+    'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_10rem_7rem_7rem] items-center gap-0 px-4 py-3 text-sm';
 
   if (article.contentUrl) {
     return (
@@ -130,6 +141,12 @@ function DesktopArticleRow({
       >
         <ArticleName title={article.title} linked />
         <span className="min-w-0 truncate px-3 text-slate-600">{article.keyword}</span>
+        <span className="min-w-0 truncate text-slate-600">
+          {formatNumber(article.volume, locale)}
+        </span>
+        <span className="min-w-0 truncate text-slate-600">
+          {formatNumber(article.difficulty, locale)}
+        </span>
         <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
           {publishedDate}
         </time>
@@ -141,6 +158,12 @@ function DesktopArticleRow({
     <div className={cn(rowClassName, 'text-slate-700')}>
       <ArticleName title={article.title} />
       <span className="min-w-0 truncate px-3 text-slate-600">{article.keyword}</span>
+      <span className="min-w-0 truncate text-slate-600">
+        {formatNumber(article.volume, locale)}
+      </span>
+      <span className="min-w-0 truncate text-slate-600">
+        {formatNumber(article.difficulty, locale)}
+      </span>
       <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
         {publishedDate}
       </time>
@@ -151,10 +174,12 @@ function DesktopArticleRow({
 function MobileArticleCard({
   article,
   dateFormatter,
+  locale,
   t,
 }: {
   article: PublishedArticle;
   dateFormatter: Intl.DateTimeFormat;
+  locale: string;
   t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
 }) {
   const publishedDate = formatPublishedDate(article.publishedAt, dateFormatter);
@@ -167,6 +192,18 @@ function MobileArticleCard({
           <div className="min-w-0">
             <dt className="text-slate-500 text-xs">{t('columns.keyword')}</dt>
             <dd className="mt-1 truncate font-medium text-slate-700">{article.keyword}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-slate-500 text-xs">{t('columns.volume')}</dt>
+            <dd className="mt-1 truncate font-medium text-slate-700">
+              {formatNumber(article.volume, locale)}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-slate-500 text-xs">{t('columns.difficulty')}</dt>
+            <dd className="mt-1 truncate font-medium text-slate-700">
+              {formatNumber(article.difficulty, locale)}
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-slate-500 text-xs">{t('columns.publishDate')}</dt>
@@ -198,7 +235,9 @@ function ArticleName({ linked = false, title }: { linked?: boolean; title: strin
   return (
     <span className="flex min-w-0 items-center gap-2 pr-3">
       <span className="min-w-0 truncate font-medium text-slate-950">{title}</span>
-      {linked ? <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
+      {linked ? (
+        <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+      ) : null}
     </span>
   );
 }
@@ -304,4 +343,8 @@ function formatPublishedDate(publishedAt: string, formatter: Intl.DateTimeFormat
   const date = new Date(publishedAt);
 
   return Number.isNaN(date.getTime()) ? publishedAt : formatter.format(date);
+}
+
+function formatNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(locale).format(value);
 }

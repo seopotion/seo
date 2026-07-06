@@ -22,6 +22,9 @@ type PlannerArticle = {
   id: string;
   scheduledDate: string;
   title: string;
+  keyword: string;
+  volume: number;
+  difficulty: number;
   type: PlannerArticleType;
   status: PlannerArticleStatus;
 };
@@ -44,7 +47,10 @@ export default function ContentPlannerPage() {
   const today = useMemo(() => startOfToday(), []);
   const rangeEnd = useMemo(() => addDays(today, DAYS_IN_RANGE - 1), [today]);
   const calendarWeeks = useMemo(() => buildCalendarWeeks(today, plannerArticles), [today]);
-  const activeDays = useMemo(() => calendarWeeks.flat().filter((day) => day.inRange), [calendarWeeks]);
+  const activeDays = useMemo(
+    () => calendarWeeks.flat().filter((day) => day.inRange),
+    [calendarWeeks],
+  );
   const weekdayLabels = useMemo(
     () => calendarWeeks[0]?.map((day) => formatWeekday(day.date, locale, 'short')) ?? [],
     [calendarWeeks, locale],
@@ -62,7 +68,11 @@ export default function ContentPlannerPage() {
           <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
-          <SummaryPill icon={<CalendarDays className="size-4" />} label={t('rangeLabel')} value={dateRangeText} />
+          <SummaryPill
+            icon={<CalendarDays className="size-4" />}
+            label={t('rangeLabel')}
+            value={dateRangeText}
+          />
           <SummaryPill label={t('rangeDays', { count: DAYS_IN_RANGE })} value={t('activeRange')} />
           <SummaryPill
             label={t('scheduledCount', { count: plannerArticles.length })}
@@ -137,10 +147,17 @@ function PlannerDayCell({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className={cn('truncate font-medium text-slate-600 text-xs', !day.inRange && 'text-slate-400')}>
+          <p
+            className={cn(
+              'truncate font-medium text-slate-600 text-xs',
+              !day.inRange && 'text-slate-400',
+            )}
+          >
             {formatWeekday(day.date, locale, 'short')}
           </p>
-          <p className={cn('font-semibold text-slate-950 text-sm', !day.inRange && 'text-slate-400')}>
+          <p
+            className={cn('font-semibold text-slate-950 text-sm', !day.inRange && 'text-slate-400')}
+          >
             {formatDayNumber(day.date, locale)}
           </p>
         </div>
@@ -151,7 +168,12 @@ function PlannerDayCell({
 
       <div className="mt-3 flex min-h-0 flex-1 items-end">
         {day.article ? (
-          <ArticleButton article={day.article} onSelectArticle={onSelectArticle} t={t} />
+          <ArticleButton
+            article={day.article}
+            locale={locale}
+            onSelectArticle={onSelectArticle}
+            t={t}
+          />
         ) : day.inRange ? (
           <Button
             type="button"
@@ -196,7 +218,12 @@ function PlannerAgendaRow({
       </div>
 
       {day.article ? (
-        <ArticleButton article={day.article} onSelectArticle={onSelectArticle} t={t} />
+        <ArticleButton
+          article={day.article}
+          locale={locale}
+          onSelectArticle={onSelectArticle}
+          t={t}
+        />
       ) : (
         <Button
           type="button"
@@ -214,10 +241,12 @@ function PlannerAgendaRow({
 
 function ArticleButton({
   article,
+  locale,
   onSelectArticle,
   t,
 }: {
   article: PlannerArticle;
+  locale: string;
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
@@ -228,9 +257,15 @@ function ArticleButton({
       aria-label={t('actions.openArticle', { title: article.title })}
       onClick={() => onSelectArticle(article)}
     >
-      <span className="truncate font-medium text-slate-500 text-xs">{t(`articleTypes.${article.type}`)}</span>
-      <span className="line-clamp-2 font-semibold text-slate-950 text-sm leading-snug">{article.title}</span>
-      <StatusBadge status={article.status} t={t} />
+      <span className="line-clamp-2 font-semibold text-slate-950 text-sm leading-snug">
+        {article.keyword}
+      </span>
+      <span className="truncate font-normal text-slate-600 text-xs">
+        {t('metrics.volume')}: {formatNumber(article.volume, locale)}
+      </span>
+      <span className="truncate font-normal text-slate-600 text-xs">
+        {t('metrics.difficulty')}: {formatNumber(article.difficulty, locale)}
+      </span>
     </button>
   );
 }
@@ -272,14 +307,18 @@ function ArticleDetailModal({
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
       role="presentation"
-      onMouseDown={onClose}
     >
+      <button
+        type="button"
+        aria-label={t('actions.closeDetails')}
+        className="absolute inset-0 cursor-default"
+        onMouseDown={onClose}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="planner-article-detail-title"
-        className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
-        onMouseDown={(event) => event.stopPropagation()}
+        className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -308,7 +347,10 @@ function ArticleDetailModal({
 
         <dl className="grid gap-3 text-sm">
           <DetailItem label={t('modal.type')} value={t(`articleTypes.${article.type}`)} />
-          <DetailItem label={t('modal.scheduledDate')} value={formatDateFromKey(article.scheduledDate, locale)} />
+          <DetailItem
+            label={t('modal.scheduledDate')}
+            value={formatDateFromKey(article.scheduledDate, locale)}
+          />
           <div className="grid gap-1">
             <dt className="text-slate-500">{t('modal.status')}</dt>
             <dd>
@@ -342,9 +384,7 @@ function StatusBadge({
       variant="secondary"
       className={cn(
         'w-fit border-transparent',
-        status === 'generated'
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-sky-100 text-sky-700',
+        status === 'generated' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700',
       )}
     >
       {t(`statuses.${status}`)}
@@ -352,15 +392,7 @@ function StatusBadge({
   );
 }
 
-function SummaryPill({
-  icon,
-  label,
-  value,
-}: {
-  icon?: ReactNode;
-  label: string;
-  value: string;
-}) {
+function SummaryPill({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
       {icon ? <span className="shrink-0 text-slate-500">{icon}</span> : null}
@@ -450,6 +482,10 @@ function formatDayNumber(date: Date, locale: string) {
 
 function formatMonth(date: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
+}
+
+function formatNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(locale).format(value);
 }
 
 function isFirstDayOfMonth(date: Date) {

@@ -59,6 +59,10 @@
       "title": "Article details",
       "type": "Article type"
     },
+    "metrics": {
+      "difficulty": "Difficulty",
+      "volume": "Volume"
+    },
     "oneArticlePerDay": "1 article per day",
     "rangeDays": "{count} days",
     "rangeLabel": "Range",
@@ -76,8 +80,10 @@
     "articlesCount": "{count, plural, one {# article} other {# articles}}",
     "columns": {
       "articleName": "Article name",
+      "difficulty": "Difficulty",
       "keyword": "Keyword",
-      "publishDate": "Publish date"
+      "publishDate": "Publish date",
+      "volume": "Volume"
     },
     "description": "Review published articles, their target keywords, and publication dates.",
     "empty": {

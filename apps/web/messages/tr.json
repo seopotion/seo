@@ -59,6 +59,10 @@
       "title": "Makale detayları",
       "type": "Makale tipi"
     },
+    "metrics": {
+      "difficulty": "Difficulty",
+      "volume": "Volume"
+    },
     "oneArticlePerDay": "Günde 1 makale",
     "rangeDays": "{count} gün",
     "rangeLabel": "Aralık",
@@ -76,8 +80,10 @@
     "articlesCount": "{count} makale",
     "columns": {
       "articleName": "Makale adı",
+      "difficulty": "Difficulty",
       "keyword": "Anahtar kelime",
-      "publishDate": "Yayın tarihi"
+      "publishDate": "Yayın tarihi",
+      "volume": "Volume"
     },
     "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
     "empty": {
