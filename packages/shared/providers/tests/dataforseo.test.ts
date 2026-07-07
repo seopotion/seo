@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createDataForSeoClient, DataForSeoError } from '../src';
+import { createDataForSeoClient } from '../src';
 
 function labsResponse(items: unknown[]) {
   return new Response(
