@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 
 ## Shared packages
 
-- ✅ `@shared/types`, `@shared/schemas` (Zod entity shapes), `@shared/db` (repos + `ensureIndexes`), `@shared/clients` (typed `getApiClient`)
+- ✅ `@shared/types`, `@shared/schemas` (Zod entity shapes), `@shared/db` (repos + `ensureIndexes`), `@shared/clients` (typed `getApiClient`), `@shared/providers` (DataForSEO client)
 
 ## Setup / onboarding
 
@@ -42,6 +42,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ⬜ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12)
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
 - ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
+- 🟡 Keyword-research foundation built: `@shared/providers` DataForSEO client (5 endpoints, credential-free errors) + org-scoped candidate pool (`CandidateRepo`, indexes) — not yet wired to a consumer — [#49](https://github.com/seopotion/seo/issues/49)
 - 🟡 Dashboard UI surfaces — planner/history/settings landed; article editor, integrations, and candidate-pool UI remain — frontend epic [#19](https://github.com/seopotion/seo/issues/19)
 
 ## Frontend (`apps/web`)
