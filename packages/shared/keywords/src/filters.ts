@@ -60,7 +60,7 @@ export function brandNavFilter(
   const rejected: WorkingCandidate[] = [];
   for (const c of candidates) {
     const tokens = c.normalized.split(' ');
-    const hitsBrand = tokens.some((t) => brand.has(t)) || (label && c.normalized.includes(label));
+    const hitsBrand = tokens.some((t) => brand.has(t));
     const hitsNav = NAV_PHRASES.some((p) => containsPhrase(c.normalized, p));
     if (hitsBrand || hitsNav) rejected.push(reject(c, 'brand_navigation'));
     else survivors.push(c);

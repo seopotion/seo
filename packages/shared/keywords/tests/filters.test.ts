@@ -43,4 +43,12 @@ describe('brandNavFilter', () => {
     const { survivors } = brandNavFilter([cand('how to clean floors')], opts);
     expect(survivors).toHaveLength(1);
   });
+
+  it('does not reject keywords that merely contain the domain label as a substring', () => {
+    const { survivors } = brandNavFilter([cand('good vacuum guide')], {
+      orgName: 'GoShop',
+      websiteUrl: 'https://go.com',
+    });
+    expect(survivors).toHaveLength(1);
+  });
 });
