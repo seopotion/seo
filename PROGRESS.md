@@ -2,7 +2,7 @@
 
 Coarse **map** of what's built vs. what's left — by design. Detail for any 🟡/⬜ gap lives in its linked issue (`[#N]`), not here; entries stay to one line so they can't drift from the issue. Design lives in [`design/`](design/); how-to-work in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-07-04 — three-tier env effort: backend-envs sub-project A ([#33](https://github.com/seopotion/seo/issues/33)) **staging live** (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend-hosting sub-project C ([#35](https://github.com/seopotion/seo/issues/35)) blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
+_Last updated: 2026-07-07 — automated content strategy + article pipeline roadmap opened as epic [#56](https://github.com/seopotion/seo/issues/56). Backend staging remains live (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend hosting [#35](https://github.com/seopotion/seo/issues/35) remains blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title conventions: [README § Issue tracking](README.md#issue-tracking).
 
@@ -30,18 +30,19 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 
 - ✅ Google login → `POST /core/login` (verify → upsert → JWT); auth middleware + `Bearer` scheme
 - ✅ `GET /core/organizations`, `GET /core/status` (dashboard gate); `start_scan` stamps `user_id`; logout (FE)
-- 🟡 Real `JWT_SECRET` / `GOOGLE_CLIENT_ID` per env not yet set — [#9](https://github.com/seopotion/seo/issues/9)
-- ⬜ Client token refresh / expiry handling — [#18](https://github.com/seopotion/seo/issues/18)
+- ✅ Real staging `JWT_SECRET` / `GOOGLE_CLIENT_ID` configured — [#9](https://github.com/seopotion/seo/issues/9); prod values deferred — [#43](https://github.com/seopotion/seo/issues/43)
+- 🟡 JWT remains in localStorage with no refresh / expiry handling; tracking issue is closed but the code gap remains — [#18](https://github.com/seopotion/seo/issues/18)
 
 ## Dashboard (design mapped; build is the frontier)
 
 - ✅ Design fully mapped vs live Outrank — every surface in [`design/product-flow.md`](design/product-flow.md)
 - ✅ Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated, renders cards from the typed client
-- 🟡 Home stats endpoints wired into `AppType`, returning mock/empty data — [#10](https://github.com/seopotion/seo/issues/10)
-- 🟡 Dashboard API skeletons (planner/articles/settings) — mock reads except settings GET/PATCH (real org presets); swap seam in `apps/api/src/mocks/dashboard.ts` — [#11](https://github.com/seopotion/seo/issues/11)
+- 🟡 Home stats endpoints remain mock/empty; [#10](https://github.com/seopotion/seo/issues/10) was closed as a duplicate of [#11](https://github.com/seopotion/seo/issues/11)
+- 🟡 Planner + settings use real repositories; article list/detail and Home reads still use mock/empty data even though [#11](https://github.com/seopotion/seo/issues/11) is closed
 - ⬜ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12)
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
-- ⬜ Articles build (planner / generation + editor / history / settings / integrations) — epic [#19](https://github.com/seopotion/seo/issues/19)
+- ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
+- 🟡 Dashboard UI surfaces — planner/history/settings landed; article editor, integrations, and candidate-pool UI remain — frontend epic [#19](https://github.com/seopotion/seo/issues/19)
 
 ## Frontend (`apps/web`)
 
