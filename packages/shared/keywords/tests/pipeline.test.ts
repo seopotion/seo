@@ -127,4 +127,15 @@ describe('runKeywordPipeline', () => {
     });
     expect(serpCalls).toBe(1);
   });
+
+  it('applies cannibalization penalty for a non-normalized existing keyword', async () => {
+    const clean = await runKeywordPipeline(input());
+    const penalized = await runKeywordPipeline({
+      ...input(),
+      existingKeywords: ['Cheap Dog Food'],
+    });
+    const scoreOf = (r: Awaited<ReturnType<typeof runKeywordPipeline>>) =>
+      r.candidates.find((c) => c.keyword === 'cheap dog food')!.opportunity_score;
+    expect(scoreOf(penalized)!).toBeLessThan(scoreOf(clean)!);
+  });
 });

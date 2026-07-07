@@ -1,4 +1,4 @@
-import type { RejectionReason } from '@shared/schemas';
+import { normalizeKeyword, type RejectionReason } from '@shared/schemas';
 import { classifyCandidates } from './classify';
 import { clusterCandidates } from './cluster';
 import { resolveConfig } from './config';
@@ -87,7 +87,9 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     llm: input.clients.llm,
     presets: input.presets,
   });
-  const cannibalSet = new Set([...input.existingKeywords, ...input.existingArticleKeywords]);
+  const cannibalSet = new Set(
+    [...input.existingKeywords, ...input.existingArticleKeywords].map(normalizeKeyword),
+  );
   const scored = scoreCandidates(withRelevance, { cannibalSet, config });
 
   // 9 rank + split top-N
