@@ -1,10 +1,42 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { KeywordRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, KeywordRepo, OrgRepo } from '@shared/db';
+import type { Article } from '@shared/schemas';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
-import { MOCK_ARTICLE_DETAILS, MOCK_ARTICLES } from '../mocks/dashboard';
 import * as schemas from '../schemas/dashboard';
+
+/** Map an Article entity to the Content History list row (Date -> ISO string). */
+function toArticleListItem(a: Article) {
+  return {
+    id: a.id,
+    title: a.title,
+    slug: a.slug,
+    keyword: a.keyword,
+    status: a.status,
+    difficulty: a.difficulty,
+    search_volume: a.search_volume,
+    featured_image_url: a.featured_image_url,
+    created_at: a.created_at.toISOString(),
+    published_at: a.published_at ? a.published_at.toISOString() : null,
+  };
+}
+
+/** Map an Article entity to the full article record (Date -> ISO string). */
+function toArticleDetail(a: Article) {
+  return {
+    id: a.id,
+    keyword_id: a.keyword_id,
+    title: a.title,
+    slug: a.slug,
+    meta_description: a.meta_description,
+    featured_image_url: a.featured_image_url,
+    content: a.content,
+    status: a.status,
+    created_at: a.created_at.toISOString(),
+    published_at: a.published_at ? a.published_at.toISOString() : null,
+  };
+}
 
 /**
  * Dashboard Home routes (design/product-flow.md, Dashboard §1). All require a
@@ -39,31 +71,55 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       summary: 'Count of published articles',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticleCountResponse } },
-          description: 'Published article count (0 for a fresh org)',
+          description: 'Published article count for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ count: 0 }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      const count = await ArticleRepo.countByStatus(org_id, 'published');
+      return c.json({ count }, 200);
+    },
   )
   .openapi(
     createRoute({
       tags: ['dashboard'],
       method: 'get',
       path: '/articles/planned',
-      summary: 'Count of planned articles',
+      summary: 'Count of planned articles (scheduled keywords awaiting generation)',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticleCountResponse } },
-          description: 'Planned article count (0 for a fresh org)',
+          description: 'Planned article count for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ count: 0 }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      const count = await KeywordRepo.countScheduled(org_id);
+      return c.json({ count }, 200);
+    },
   )
   .openapi(
     createRoute({
@@ -138,14 +194,21 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticlesResponse } },
-          description: 'Article history rows (mock sample data)',
+          description: 'Article history rows for the org',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => {
-      const { status, limit, offset } = c.req.valid('query');
-      const filtered = status ? MOCK_ARTICLES.filter((a) => a.status === status) : MOCK_ARTICLES;
-      return c.json({ articles: filtered.slice(offset, offset + limit), total: filtered.length });
+    async (c) => {
+      const { org_id, status, limit, offset } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      const { articles, total } = await ArticleRepo.listByOrg(org_id, { status, limit, offset });
+      return c.json({ articles: articles.map(toArticleListItem), total }, 200);
     },
   )
   .openapi(
@@ -168,13 +231,16 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
       },
     }),
-    (c) => {
+    async (c) => {
       const { id } = c.req.valid('param');
-      const article = MOCK_ARTICLE_DETAILS[id];
-      if (!article) {
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      // A missing article and one owned by another user both 404 — never leak
+      // existence across accounts (same rule as loadOwnedOrg).
+      if (!article || !(await loadOwnedOrg(article.org_id, userId))) {
         return c.json({ error: 'Article not found' }, 404);
       }
-      return c.json(article, 200);
+      return c.json(toArticleDetail(article), 200);
     },
   )
   // --- Articles Settings (§2.3) ---

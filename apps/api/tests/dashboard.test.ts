@@ -65,6 +65,23 @@ vi.mock('@shared/db', () => {
       created_at: now,
       published_at: now,
     },
+    // Owned by org_3 (user_2) — never visible to user_1 via detail reads.
+    {
+      id: 'art_3',
+      org_id: 'org_3',
+      keyword_id: 'kw_9',
+      title: 'Foreign Article',
+      slug: 'foreign-article',
+      keyword: 'foreign',
+      meta_description: 'm',
+      featured_image_url: 'https://x/3.png',
+      content: '# c',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      created_at: now,
+      published_at: null,
+    },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
     [
@@ -131,6 +148,11 @@ vi.mock('@shared/db', () => {
         created_at: now,
       },
     ],
+    // Owned by a different user — used to prove ownership 404s don't leak.
+    [
+      'org_3',
+      { id: 'org_3', user_id: 'user_2', website_url: 'https://other.com', created_at: now },
+    ],
   ]);
   return {
     UserRepo: {
@@ -192,26 +214,57 @@ async function login(): Promise<string> {
 
 describe('dashboard home routes', () => {
   test('reject requests without a token', async () => {
-    const res = await client.api.v0.dashboard.articles.published.$get();
+    const res = await client.api.v0.dashboard.articles.published.$get({
+      query: { org_id: 'org_1' },
+    });
     expect(res.status).toBe(401);
   });
 
-  test('GET /articles/published returns a count for a fresh org', async () => {
+  test('GET /articles/published counts published articles for the org', async () => {
     const token = await login();
-    const res = await client.api.v0.dashboard.articles.published.$get(undefined, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const headers = { Authorization: `Bearer ${token}` };
+    // org_1 has one published article (art_2); org_2 has none.
+    const res = await client.api.v0.dashboard.articles.published.$get(
+      { query: { org_id: 'org_1' } },
+      { headers },
+    );
     expect(res.status).toBe(200);
-    expect((await res.json()).count).toBe(0);
+    if (res.status === 200) expect((await res.json()).count).toBe(1);
+
+    const empty = await client.api.v0.dashboard.articles.published.$get(
+      { query: { org_id: 'org_2' } },
+      { headers },
+    );
+    expect(empty.status).toBe(200);
+    if (empty.status === 200) expect((await empty.json()).count).toBe(0);
   });
 
-  test('GET /articles/planned returns a count for a fresh org', async () => {
+  test('GET /articles/planned counts scheduled keywords for the org', async () => {
     const token = await login();
-    const res = await client.api.v0.dashboard.articles.planned.$get(undefined, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const headers = { Authorization: `Bearer ${token}` };
+    // org_1 has two scheduled keywords; org_2 has none.
+    const res = await client.api.v0.dashboard.articles.planned.$get(
+      { query: { org_id: 'org_1' } },
+      { headers },
+    );
     expect(res.status).toBe(200);
-    expect((await res.json()).count).toBe(0);
+    if (res.status === 200) expect((await res.json()).count).toBe(2);
+
+    const empty = await client.api.v0.dashboard.articles.planned.$get(
+      { query: { org_id: 'org_2' } },
+      { headers },
+    );
+    expect(empty.status).toBe(200);
+    if (empty.status === 200) expect((await empty.json()).count).toBe(0);
+  });
+
+  test('GET /articles/published 404s for an org the caller does not own', async () => {
+    const token = await login();
+    const res = await client.api.v0.dashboard.articles.published.$get(
+      { query: { org_id: 'org_3' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(res.status).toBe(404);
   });
 
   test('GET /articles/best is empty and gated until Google data is connected', async () => {
@@ -273,27 +326,39 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
 
   test('GET /articles returns rows + total, filterable by status', async () => {
     const opts = await auth();
-    const all = await client.api.v0.dashboard.articles.$get({ query: {} }, opts);
+    const all = await client.api.v0.dashboard.articles.$get({ query: { org_id: 'org_1' } }, opts);
     expect(all.status).toBe(200);
+    if (all.status !== 200) return;
     const allBody = await all.json();
     expect(allBody.total).toBe(allBody.articles.length);
     expect(allBody.articles.length).toBeGreaterThan(1);
 
     const published = await client.api.v0.dashboard.articles.$get(
-      { query: { status: 'published' } },
+      { query: { org_id: 'org_1', status: 'published' } },
       opts,
     );
+    expect(published.status).toBe(200);
+    if (published.status !== 200) return;
     const pubBody = await published.json();
     expect(pubBody.articles.every((a) => a.status === 'published')).toBe(true);
     expect(pubBody.total).toBeLessThan(allBody.total);
   });
 
-  test('GET /articles/:id returns the article, 404 for unknown id', async () => {
+  test('GET /articles 404s for an org the caller does not own', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.articles.$get({ query: { org_id: 'org_3' } }, opts);
+    expect(res.status).toBe(404);
+  });
+
+  test('GET /articles/:id returns the owned article, 404 otherwise', async () => {
     const opts = await auth();
     const ok = await client.api.v0.dashboard.articles[':id'].$get({ param: { id: 'art_1' } }, opts);
     expect(ok.status).toBe(200);
     if (ok.status === 200) {
-      expect((await ok.json()).id).toBe('art_1');
+      const body = await ok.json();
+      expect(body.id).toBe('art_1');
+      // Date entity fields are serialized to ISO strings in the response.
+      expect(typeof body.created_at).toBe('string');
     }
 
     const missing = await client.api.v0.dashboard.articles[':id'].$get(
@@ -301,6 +366,13 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       opts,
     );
     expect(missing.status).toBe(404);
+
+    // art_3 belongs to another user's org — must 404, not leak the record.
+    const foreign = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_3' } },
+      opts,
+    );
+    expect(foreign.status).toBe(404);
   });
 
   test('static /articles/best still resolves after adding /articles/:id', async () => {
