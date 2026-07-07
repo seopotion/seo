@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { CandidateSchema, CreateCandidateInput, normalizeKeyword } from '../src';
+import {
+  ARTICLE_TYPES,
+  CandidateSchema,
+  CreateCandidateInput,
+  normalizeKeyword,
+  REJECTION_REASONS,
+} from '../src';
 
 describe('normalizeKeyword', () => {
   test('lowercases, trims, and collapses whitespace', () => {
@@ -50,5 +56,43 @@ describe('CreateCandidateInput', () => {
     expect('normalized_keyword' in CreateCandidateInput.shape).toBe(false);
     expect('created_at' in CreateCandidateInput.shape).toBe(false);
     expect('updated_at' in CreateCandidateInput.shape).toBe(false);
+  });
+});
+
+describe('candidate #54 fields', () => {
+  const base = {
+    id: 'c1',
+    org_id: 'o1',
+    keyword: 'best dog food',
+    normalized_keyword: 'best dog food',
+    source: 'keyword_ideas' as const,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  test('defaults article_type and rejection_reason to null', () => {
+    const c = CandidateSchema.parse(base);
+    expect(c.article_type).toBeNull();
+    expect(c.rejection_reason).toBeNull();
+  });
+
+  test('accepts a valid article_type and rejection_reason', () => {
+    const c = CandidateSchema.parse({
+      ...base,
+      article_type: 'how_to_guide',
+      rejection_reason: 'serp_authority',
+    });
+    expect(c.article_type).toBe('how_to_guide');
+    expect(c.rejection_reason).toBe('serp_authority');
+  });
+
+  test('rejects an unknown article_type', () => {
+    expect(() => CandidateSchema.parse({ ...base, article_type: 'tweet' })).toThrow();
+  });
+
+  test('exposes the constrained enums', () => {
+    expect(ARTICLE_TYPES).toContain('case_study');
+    expect(ARTICLE_TYPES).toContain('other');
+    expect(REJECTION_REASONS).toContain('difficulty_ceiling');
   });
 });

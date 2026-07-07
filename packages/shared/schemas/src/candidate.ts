@@ -9,9 +9,11 @@ export const CANDIDATE_SOURCES = [
   'manual',
   'seed',
 ] as const;
+export type CandidateSource = (typeof CANDIDATE_SOURCES)[number];
 
 /** Candidate lifecycle. Scoring/rejection reasons are added in #54. */
 export const CANDIDATE_STATUSES = ['candidate', 'selected', 'rejected'] as const;
+export type CandidateStatus = (typeof CANDIDATE_STATUSES)[number];
 
 /** Search intent, shared with the DataForSEO client's normalization. */
 export const SEARCH_INTENTS = [
@@ -21,6 +23,30 @@ export const SEARCH_INTENTS = [
   'navigational',
 ] as const;
 export type SearchIntent = (typeof SEARCH_INTENTS)[number];
+
+/** Constrained article types a classified candidate can become (#54). */
+export const ARTICLE_TYPES = [
+  'how_to_guide',
+  'listicle',
+  'comparison',
+  'definition',
+  'product_guide',
+  'case_study',
+  'other',
+] as const;
+export type ArticleType = (typeof ARTICLE_TYPES)[number];
+
+/** Why a candidate was rejected by the pipeline (#54). */
+export const REJECTION_REASONS = [
+  'brand_navigation',
+  'clustered_duplicate',
+  'difficulty_ceiling',
+  'serp_intent',
+  'serp_authority',
+  'serp_locality',
+  'serp_duplicate',
+] as const;
+export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
 /** Canonical dedup key: lowercased, trimmed, whitespace-collapsed. */
 export function normalizeKeyword(raw: string): string {
@@ -49,6 +75,8 @@ export const CandidateSchema = z.object({
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
   relevance_score: z.number().nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
+  article_type: z.enum(ARTICLE_TYPES).nullable().default(null),
+  rejection_reason: z.enum(REJECTION_REASONS).nullable().default(null),
   status: z.enum(CANDIDATE_STATUSES).default('candidate'),
   created_at: z.date(),
   updated_at: z.date(),

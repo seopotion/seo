@@ -42,7 +42,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ⬜ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12)
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
 - ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
-- 🟡 Keyword-research foundation built: `@shared/providers` DataForSEO client (5 endpoints, credential-free errors) + org-scoped candidate pool (`CandidateRepo`, indexes) — not yet wired to a consumer — [#49](https://github.com/seopotion/seo/issues/49)
+- 🟡 Keyword pipeline built: `@shared/providers` DataForSEO client + org-scoped candidate pool (`CandidateRepo`) ([#49](https://github.com/seopotion/seo/issues/49)) and `@shared/keywords` scoring/SERP-validation/classification pipeline ([#54](https://github.com/seopotion/seo/issues/54)) — pure library, not yet wired to a consumer ([#47](https://github.com/seopotion/seo/issues/47)/[#50](https://github.com/seopotion/seo/issues/50))
 - ✅ LLM (OpenRouter/Claude Sonnet) + image (fal.ai/FLUX.1 dev) provider decision + neutral `LlmClient`/`ImageClient` clients — [#52](https://github.com/seopotion/seo/issues/52); worker wiring pending — [#55](https://github.com/seopotion/seo/issues/55), [#51](https://github.com/seopotion/seo/issues/51)
 - 🟡 Dashboard UI surfaces — planner/history/settings landed; article editor, integrations, and candidate-pool UI remain — frontend epic [#19](https://github.com/seopotion/seo/issues/19)
 
