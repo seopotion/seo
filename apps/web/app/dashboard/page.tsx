@@ -29,21 +29,26 @@ export default function DashboardPage() {
       return;
     }
     void (async () => {
-      const [orgsRes, publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
-        api.api.v0.core.organizations.$get(),
-        api.api.v0.dashboard.articles.published.$get(),
-        api.api.v0.dashboard.articles.planned.$get(),
+      // Article counts are org-scoped, so resolve the active org first, then
+      // fetch its Home stats. best/integrations aren't org-scoped yet (gated).
+      const orgsRes = await api.api.v0.core.organizations.$get();
+      const activeOrg = orgsRes.ok ? ((await orgsRes.json()).organizations[0] ?? null) : null;
+      setOrg(activeOrg);
+
+      const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
+        activeOrg
+          ? api.api.v0.dashboard.articles.published.$get({ query: { org_id: activeOrg.id } })
+          : null,
+        activeOrg
+          ? api.api.v0.dashboard.articles.planned.$get({ query: { org_id: activeOrg.id } })
+          : null,
         api.api.v0.dashboard.articles.best.$get(),
         api.api.v0.dashboard.integrations.connected.$get(),
       ]);
 
-      if (orgsRes.ok) {
-        const { organizations } = await orgsRes.json();
-        setOrg(organizations[0] ?? null);
-      }
       setData({
-        published: publishedRes.ok ? (await publishedRes.json()).count : 0,
-        planned: plannedRes.ok ? (await plannedRes.json()).count : 0,
+        published: publishedRes?.ok ? (await publishedRes.json()).count : 0,
+        planned: plannedRes?.ok ? (await plannedRes.json()).count : 0,
         bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
         integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
       });

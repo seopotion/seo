@@ -37,8 +37,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 
 - ✅ Design fully mapped vs live Outrank — every surface in [`design/product-flow.md`](design/product-flow.md)
 - ✅ Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated, renders cards from the typed client
-- 🟡 Home stats endpoints remain mock/empty; [#10](https://github.com/seopotion/seo/issues/10) was closed as a duplicate of [#11](https://github.com/seopotion/seo/issues/11)
-- 🟡 Planner + settings use real repositories; article list/detail and Home reads still use mock/empty data even though [#11](https://github.com/seopotion/seo/issues/11) is closed
+- ✅ Planner, settings, article history (list/detail) + Home counts (published/planned) are real org-scoped repo reads — [#58](https://github.com/seopotion/seo/issues/58); articles read empty until the generation pipeline ([#56](https://github.com/seopotion/seo/issues/56)) populates them
+- 🟡 Home `best`/`integrations` stay mock/empty — gated on GSC ([#12](https://github.com/seopotion/seo/issues/12)) and integrations ([#7](https://github.com/seopotion/seo/issues/7))
 - ⬜ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12)
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
 - ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
