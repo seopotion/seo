@@ -1,5 +1,6 @@
+import type { DataForSeoClient } from '@shared/providers';
 import type { RejectionReason } from '@shared/schemas';
-import type { WorkingCandidate } from './types';
+import type { ResolvedConfig, WorkingCandidate } from './types';
 
 export function reject(c: WorkingCandidate, reason: RejectionReason): WorkingCandidate {
   return { ...c, status: 'rejected', rejection_reason: reason };
@@ -63,6 +64,42 @@ export function brandNavFilter(
     const hitsBrand = tokens.some((t) => brand.has(t));
     const hitsNav = NAV_PHRASES.some((p) => containsPhrase(c.normalized, p));
     if (hitsBrand || hitsNav) rejected.push(reject(c, 'brand_navigation'));
+    else survivors.push(c);
+  }
+  return { survivors, rejected };
+}
+
+/** Fill null difficulty via one batched bulk lookup; present values are untouched. */
+export async function fillDifficulty(
+  candidates: WorkingCandidate[],
+  deps: { dataForSeo: DataForSeoClient; config: ResolvedConfig },
+): Promise<WorkingCandidate[]> {
+  const missing = candidates.filter((c) => c.difficulty === null);
+  if (missing.length === 0) return candidates;
+
+  const metrics = await deps.dataForSeo.bulkKeywordDifficulty({
+    keywords: missing.map((c) => c.keyword),
+    locationName: deps.config.locationName,
+    languageName: deps.config.languageName,
+  });
+  const byKeyword = new Map(metrics.map((m) => [m.keyword.toLowerCase(), m.difficulty]));
+
+  return candidates.map((c) =>
+    c.difficulty === null
+      ? { ...c, difficulty: byKeyword.get(c.keyword.toLowerCase()) ?? null }
+      : c,
+  );
+}
+
+export function applyDifficultyCeiling(
+  candidates: WorkingCandidate[],
+  ceiling: number,
+): { survivors: WorkingCandidate[]; rejected: WorkingCandidate[] } {
+  const survivors: WorkingCandidate[] = [];
+  const rejected: WorkingCandidate[] = [];
+  for (const c of candidates) {
+    if (c.difficulty !== null && c.difficulty > ceiling)
+      rejected.push(reject(c, 'difficulty_ceiling'));
     else survivors.push(c);
   }
   return { survivors, rejected };
