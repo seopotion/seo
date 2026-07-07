@@ -1,7 +1,14 @@
 import type { SearchIntent } from '@shared/schemas';
 import { SEARCH_INTENTS } from '@shared/schemas';
 import { categorizeApiStatus, categorizeHttpStatus, DataForSeoError, isRetryable } from './errors';
-import type { DataForSeoConfig, KeywordMetric, SiteKeywordsParams } from './types';
+import type {
+  DataForSeoConfig,
+  KeywordMetric,
+  SeedKeywordsParams,
+  SerpParams,
+  SerpResult,
+  SiteKeywordsParams,
+} from './types';
 
 const DEFAULT_BASE_URL = 'https://api.dataforseo.com/v3';
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -39,8 +46,22 @@ function toKeywordMetric(item: Record<string, unknown>): KeywordMetric {
   };
 }
 
+/** Normalize one SERP `items[]` organic entry. */
+function toSerpResult(item: Record<string, unknown>): SerpResult {
+  return {
+    rank: num(item.rank_absolute) ?? 0,
+    url: String(item.url ?? ''),
+    domain: String(item.domain ?? ''),
+    title: String(item.title ?? ''),
+  };
+}
+
 export type DataForSeoClient = {
   keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
+  rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
+  keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
+  bulkKeywordDifficulty(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
+  serpGoogleOrganic(params: SerpParams): Promise<SerpResult[]>;
 };
 
 export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClient {
@@ -126,6 +147,43 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       if (params.limit) task.limit = params.limit;
       const result = await request('/dataforseo_labs/google/keywords_for_site/live', task);
       return itemsOf(result).map(toKeywordMetric);
+    },
+
+    async rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
+      const task: Record<string, unknown> = { target: params.target };
+      if (params.locationName) task.location_name = params.locationName;
+      if (params.languageName) task.language_name = params.languageName;
+      if (params.limit) task.limit = params.limit;
+      const result = await request('/dataforseo_labs/google/ranked_keywords/live', task);
+      return itemsOf(result).map(toKeywordMetric);
+    },
+
+    async keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]> {
+      const task: Record<string, unknown> = { keywords: params.keywords };
+      if (params.locationName) task.location_name = params.locationName;
+      if (params.languageName) task.language_name = params.languageName;
+      if (params.limit) task.limit = params.limit;
+      const result = await request('/dataforseo_labs/google/keyword_ideas/live', task);
+      return itemsOf(result).map(toKeywordMetric);
+    },
+
+    async bulkKeywordDifficulty(params: SeedKeywordsParams): Promise<KeywordMetric[]> {
+      const task: Record<string, unknown> = { keywords: params.keywords };
+      if (params.locationName) task.location_name = params.locationName;
+      if (params.languageName) task.language_name = params.languageName;
+      const result = await request('/dataforseo_labs/google/bulk_keyword_difficulty/live', task);
+      return itemsOf(result).map(toKeywordMetric);
+    },
+
+    async serpGoogleOrganic(params: SerpParams): Promise<SerpResult[]> {
+      const task: Record<string, unknown> = { keyword: params.keyword };
+      if (params.locationName) task.location_name = params.locationName;
+      if (params.languageName) task.language_name = params.languageName;
+      if (params.depth) task.depth = params.depth;
+      const result = await request('/serp/google/organic/live/advanced', task);
+      return itemsOf(result)
+        .filter((item) => item.type === 'organic')
+        .map(toSerpResult);
     },
   };
 }

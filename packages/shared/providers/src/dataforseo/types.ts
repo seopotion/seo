@@ -38,3 +38,17 @@ export interface SiteKeywordsParams {
   languageName?: string;
   limit?: number;
 }
+
+export interface SeedKeywordsParams {
+  keywords: string[];
+  locationName?: string;
+  languageName?: string;
+  limit?: number;
+}
+
+export interface SerpParams {
+  keyword: string;
+  locationName?: string;
+  languageName?: string;
+  depth?: number;
+}

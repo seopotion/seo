@@ -123,3 +123,102 @@ describe('keywordsForSite', () => {
     });
   });
 });
+
+function serpResponse(items: unknown[]) {
+  return new Response(
+    JSON.stringify({ status_code: 20000, tasks: [{ status_code: 20000, result: [{ items }] }] }),
+    { status: 200 },
+  );
+}
+
+describe('rankedKeywords', () => {
+  test('normalizes and hits the ranked_keywords endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      // ranked_keywords nests metrics under keyword_data.
+      new Response(
+        JSON.stringify({
+          status_code: 20000,
+          tasks: [
+            {
+              status_code: 20000,
+              result: [
+                {
+                  items: [{ keyword: 'seo', keyword_info: { search_volume: 50 } }],
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await client().rankedKeywords({ target: 'x.com' });
+    expect(out[0]).toMatchObject({ keyword: 'seo', search_volume: 50 });
+    expect(fetchMock.mock.calls[0]![0]).toContain('/dataforseo_labs/google/ranked_keywords/live');
+  });
+});
+
+describe('keywordIdeas', () => {
+  test('sends keywords array to keyword_ideas endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(labsResponse([{ keyword: 'idea one' }]));
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await client().keywordIdeas({ keywords: ['seed'] });
+    expect(out[0]!.keyword).toBe('idea one');
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/dataforseo_labs/google/keyword_ideas/live');
+    expect(JSON.parse(init.body as string)).toEqual([{ keywords: ['seed'] }]);
+  });
+});
+
+describe('bulkKeywordDifficulty', () => {
+  test('reads difficulty off the item directly', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(labsResponse([{ keyword: 'seo tools', keyword_difficulty: 42 }])),
+    );
+    const out = await client().bulkKeywordDifficulty({ keywords: ['seo tools'] });
+    expect(out[0]).toMatchObject({ keyword: 'seo tools', difficulty: 42 });
+  });
+});
+
+describe('serpGoogleOrganic', () => {
+  test('normalizes organic results and skips non-organic items', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        serpResponse([
+          {
+            type: 'organic',
+            rank_absolute: 1,
+            url: 'https://a.com/x',
+            domain: 'a.com',
+            title: 'A',
+          },
+          { type: 'paid', rank_absolute: 2, url: 'https://ad.com', domain: 'ad.com', title: 'Ad' },
+          {
+            type: 'organic',
+            rank_absolute: 3,
+            url: 'https://b.com/y',
+            domain: 'b.com',
+            title: 'B',
+          },
+        ]),
+      ),
+    );
+    const out = await client().serpGoogleOrganic({ keyword: 'seo tools' });
+    expect(out).toEqual([
+      { rank: 1, url: 'https://a.com/x', domain: 'a.com', title: 'A' },
+      { rank: 3, url: 'https://b.com/y', domain: 'b.com', title: 'B' },
+    ]);
+  });
+
+  test('posts to the SERP live advanced endpoint with the keyword', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(serpResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().serpGoogleOrganic({ keyword: 'seo tools' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/serp/google/organic/live/advanced');
+    expect(JSON.parse(init.body as string)).toEqual([{ keyword: 'seo tools' }]);
+  });
+});
