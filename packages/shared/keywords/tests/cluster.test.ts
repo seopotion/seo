@@ -23,10 +23,17 @@ const cand = (keyword: string, search_volume: number | null): WorkingCandidate =
 describe('clusterCandidates', () => {
   it('keeps the highest-volume head and rejects near-duplicate members', () => {
     const { survivors, rejected } = clusterCandidates(
-      [cand('best running shoes', 100), cand('best running shoe', 500), cand('yoga mat guide', 50)],
-      0.5,
+      [
+        cand('best running shoes', 100),
+        cand('best running shoes for men', 500),
+        cand('yoga mat guide', 50),
+      ],
+      0.6,
     );
-    expect(survivors.map((c) => c.keyword).sort()).toEqual(['best running shoe', 'yoga mat guide']);
+    expect(survivors.map((c) => c.keyword).sort()).toEqual([
+      'best running shoes for men',
+      'yoga mat guide',
+    ]);
     expect(rejected[0]!.keyword).toBe('best running shoes');
     expect(rejected[0]!.rejection_reason).toBe('clustered_duplicate');
   });
