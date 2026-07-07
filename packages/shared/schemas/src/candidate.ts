@@ -1,0 +1,68 @@
+import { z } from 'zod';
+
+/** Provenance of a candidate keyword. */
+export const CANDIDATE_SOURCES = [
+  'keywords_for_site',
+  'ranked_keywords',
+  'keyword_ideas',
+  'serp',
+  'manual',
+  'seed',
+] as const;
+
+/** Candidate lifecycle. Scoring/rejection reasons are added in #54. */
+export const CANDIDATE_STATUSES = ['candidate', 'selected', 'rejected'] as const;
+
+/** Search intent, shared with the DataForSEO client's normalization. */
+export const SEARCH_INTENTS = [
+  'informational',
+  'commercial',
+  'transactional',
+  'navigational',
+] as const;
+export type SearchIntent = (typeof SEARCH_INTENTS)[number];
+
+/** Canonical dedup key: lowercased, trimmed, whitespace-collapsed. */
+export function normalizeKeyword(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Candidate keyword — an org-scoped opportunity in the candidate pool, distinct
+ * from the scheduled `keywords`/planner collection. Scoring fields
+ * (`relevance_score`, `opportunity_score`) are populated later by #54.
+ * See docs/superpowers/specs/2026-07-07-dataforseo-candidate-pool-design.md.
+ */
+export const CandidateSchema = z.object({
+  id: z.string(),
+  org_id: z.string(),
+  keyword: z.string(),
+  // Derived from `keyword` by the repository; unique per org.
+  normalized_keyword: z.string(),
+  source: z.enum(CANDIDATE_SOURCES),
+  source_context: z.string().nullable().default(null),
+  search_volume: z.number().int().nullable().default(null),
+  difficulty: z.number().int().nullable().default(null),
+  cpc: z.number().nullable().default(null),
+  competition: z.number().nullable().default(null),
+  trend: z.number().nullable().default(null),
+  intent: z.enum(SEARCH_INTENTS).nullable().default(null),
+  relevance_score: z.number().nullable().default(null),
+  opportunity_score: z.number().nullable().default(null),
+  status: z.enum(CANDIDATE_STATUSES).default('candidate'),
+  created_at: z.date(),
+  updated_at: z.date(),
+});
+export type Candidate = z.infer<typeof CandidateSchema>;
+
+/**
+ * Input for creating a candidate. `id`/`created_at`/`updated_at` are
+ * server-assigned; `normalized_keyword` is derived by the repository.
+ */
+export const CreateCandidateInput = CandidateSchema.omit({
+  id: true,
+  normalized_keyword: true,
+  created_at: true,
+  updated_at: true,
+});
+export type CreateCandidateInput = z.infer<typeof CreateCandidateInput>;
