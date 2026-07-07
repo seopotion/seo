@@ -25,7 +25,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
     'Content-Type': 'application/json',
   };
   if (config.appReferer) headers['HTTP-Referer'] = config.appReferer;
-  if (config.appTitle) headers['X-OpenRouter-Title'] = config.appTitle;
+  if (config.appTitle) headers['X-Title'] = config.appTitle;
 
   /** One POST to /chat/completions. Handles timeout + maps failures to ProviderError. */
   async function once(body: Record<string, unknown>): Promise<LlmResult> {

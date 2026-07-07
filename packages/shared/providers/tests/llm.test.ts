@@ -108,4 +108,20 @@ describe('complete', () => {
     ).rejects.toMatchObject({ category: 'network' });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  test('sends attribution headers when configured', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    const attributedClient = createOpenRouterClient({
+      apiKey: 'sk-test',
+      appReferer: 'https://example.com',
+      appTitle: 'SeoPotion',
+      maxRetries: 2,
+      retryDelayMs: 0,
+    });
+    await attributedClient.complete({ messages: [{ role: 'user', content: 'x' }] });
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>;
+    expect(headers['HTTP-Referer']).toBe('https://example.com');
+    expect(headers['X-Title']).toBe('SeoPotion');
+  });
 });
