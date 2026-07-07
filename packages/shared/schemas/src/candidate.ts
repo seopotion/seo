@@ -65,4 +65,7 @@ export const CreateCandidateInput = CandidateSchema.omit({
   created_at: true,
   updated_at: true,
 });
-export type CreateCandidateInput = z.infer<typeof CreateCandidateInput>;
+// `z.input` (not `z.infer`/`z.output`) so defaulted fields (status, scores, etc.)
+// are optional in the type, matching the runtime contract: callers pass only
+// org_id/keyword/source and the schema fills in the rest on `.parse()`.
+export type CreateCandidateInput = z.input<typeof CreateCandidateInput>;
