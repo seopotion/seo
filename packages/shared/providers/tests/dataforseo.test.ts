@@ -173,12 +173,15 @@ describe('keywordIdeas', () => {
 
 describe('bulkKeywordDifficulty', () => {
   test('reads difficulty off the item directly', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(labsResponse([{ keyword: 'seo tools', keyword_difficulty: 42 }])),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(labsResponse([{ keyword: 'seo tools', keyword_difficulty: 42 }]));
+    vi.stubGlobal('fetch', fetchMock);
     const out = await client().bulkKeywordDifficulty({ keywords: ['seo tools'] });
     expect(out[0]).toMatchObject({ keyword: 'seo tools', difficulty: 42 });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/dataforseo_labs/google/bulk_keyword_difficulty/live');
+    expect(JSON.parse(init.body as string)).toEqual([{ keywords: ['seo tools'] }]);
   });
 });
 
