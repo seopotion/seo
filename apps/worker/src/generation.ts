@@ -74,7 +74,13 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         published_at: null,
       });
       await KeywordRepo.linkArticle(keyword.id, article.id);
-      await enqueueImageTask({ org_id: org.id, article_id: article.id });
+      try {
+        await enqueueImageTask({ org_id: org.id, article_id: article.id });
+      } catch (err) {
+        // Article is generated and linked; images stay 'pending' and can be
+        // re-enqueued manually — never fail the generation over this (#51).
+        logger.error('image task enqueue failed; images stay pending', { error: err as Error });
+      }
       logger.info('article generated', { article_id: article.id });
     } catch (err) {
       // Record the failure, then rethrow so SQS redelivers (-> DLQ after N).

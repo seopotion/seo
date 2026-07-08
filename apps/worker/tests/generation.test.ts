@@ -107,6 +107,20 @@ describe('generation worker', () => {
     expect(enqueueImageTask).toHaveBeenCalledWith({ org_id: 'o1', article_id: 'art1' });
   });
 
+  test('image task enqueue failure does not fail generation', async () => {
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    enqueueImageTask.mockRejectedValueOnce(new Error('sqs down'));
+
+    await expect(
+      handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {}),
+    ).resolves.toBeUndefined();
+
+    expect(linkArticle).toHaveBeenCalledWith('k1', 'art1');
+    expect(failGeneration).not.toHaveBeenCalled();
+  });
+
   test('skips when claim fails (already done/in-flight)', async () => {
     // Once, not permanently: vi.clearAllMocks() clears calls but NOT implementations,
     // so a plain mockResolvedValue(false) would leak into the later tests.
