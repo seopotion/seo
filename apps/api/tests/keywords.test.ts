@@ -12,6 +12,9 @@ vi.mock('../src/clients/providers', () => ({
   getDataForSeoClient: () => ({ keywordIdeas, bulkKeywordDifficulty }),
 }));
 
+const { addCandidates } = vi.hoisted(() => ({ addCandidates: vi.fn() }));
+vi.mock('@shared/db', () => ({ addCandidates }));
+
 // authMiddleware sets c.var.auth from the JWT; stub it to a fixed user.
 vi.mock('../src/middlewares/auth', async (orig) => {
   const actual = await orig<typeof import('../src/middlewares/auth')>();
@@ -80,5 +83,69 @@ describe('POST /research', () => {
     const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
     expect(res.status).toBe(402);
     expect(keywordIdeas).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /candidates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('inserts selected keywords as manual candidates (pool only)', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce(paidOrg);
+    addCandidates.mockResolvedValueOnce([{ id: 'c1' }]); // 1 of 2 inserted
+
+    const res = await testClient(app).candidates.$post({
+      json: {
+        org_id: 'o1',
+        keywords: [
+          {
+            keyword: 'best crm',
+            search_volume: 300,
+            difficulty: 30,
+            cpc: 1,
+            competition: 0.3,
+            trend: 0,
+            intent: 'commercial',
+          },
+          {
+            keyword: 'crm pricing',
+            search_volume: 200,
+            difficulty: 20,
+            cpc: 1,
+            competition: 0.2,
+            trend: 0,
+            intent: 'commercial',
+          },
+        ],
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ added: 1, skipped: 1 });
+    const [orgId, items] = addCandidates.mock.calls[0]!;
+    expect(orgId).toBe('o1');
+    expect(items[0]).toMatchObject({ source: 'manual', status: 'candidate', keyword: 'best crm' });
+  });
+
+  test('402 for a free org, without touching the pool', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce({ ok: false, reason: 'not_paid' });
+    const res = await testClient(app).candidates.$post({
+      json: {
+        org_id: 'o1',
+        keywords: [
+          {
+            keyword: 'x',
+            search_volume: 1,
+            difficulty: 1,
+            cpc: null,
+            competition: null,
+            trend: null,
+            intent: null,
+          },
+        ],
+      },
+    });
+    expect(res.status).toBe(402);
+    expect(addCandidates).not.toHaveBeenCalled();
   });
 });
