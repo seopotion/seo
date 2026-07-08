@@ -14,7 +14,7 @@ const {
   failGeneration: vi.fn(async () => {}),
   linkArticle: vi.fn(async () => {}),
   findOrgById: vi.fn(),
-  createArticle: vi.fn(async () => ({ id: 'art1' })),
+  createArticle: vi.fn(async (_doc: unknown) => ({ id: 'art1' })),
 }));
 vi.mock('@shared/db', () => ({
   KeywordRepo: { claimGeneration, findById: findKeywordById, failGeneration, linkArticle },
@@ -96,7 +96,7 @@ describe('generation worker', () => {
 
     expect(claimGeneration).toHaveBeenCalledWith('k1');
     expect(createArticle).toHaveBeenCalledTimes(1);
-    expect((createArticle.mock.calls[0] as any)?.[0]).toMatchObject({
+    expect(createArticle.mock.calls[0]![0]).toMatchObject({
       status: 'generated',
       featured_image_url: '',
     });
