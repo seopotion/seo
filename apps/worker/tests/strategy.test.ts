@@ -109,6 +109,24 @@ describe('strategy worker', () => {
     expect(createKeyword).not.toHaveBeenCalled();
   });
 
+  test('budgets remaining schedule against already-scheduled strategy keywords (redelivery)', async () => {
+    findById.mockResolvedValue(org);
+    const preExisting = Array.from({ length: 28 }, (_, i) => ({
+      keyword: `existing-${i}`,
+      opportunity_score: 0.5,
+    }));
+    listByOrg.mockResolvedValue(preExisting as never);
+    runKeywordPipeline.mockResolvedValue({
+      candidates: Array.from({ length: 10 }, (_, i) => candidate(`fresh-${i}`, 0.9 - i * 0.01)),
+      stats: {},
+    });
+
+    await handler(event({ org_id: 'o1' }), {} as never, () => {});
+
+    expect(createKeyword.mock.calls.length).toBeLessThanOrEqual(2); // PLAN_DAYS(30) - 28
+    expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
+  });
+
   test('marks failed and rethrows on pipeline error', async () => {
     findById.mockResolvedValue(org);
     runKeywordPipeline.mockRejectedValue(new Error('provider down'));

@@ -54,6 +54,13 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       // Select schedulable candidates: accepted (no rejection), real metrics,
       // not already on the planner. Rank by opportunity_score desc, stable.
       const scheduledSet = new Set(scheduled.map((k) => normalizeKeyword(k.keyword)));
+      // Strategy entries this job wrote carry a non-null opportunity_score; manual #50
+      // selections go to the candidate pool (not KeywordRepo), so this proxy counts
+      // only prior strategy output. Budget the remaining 30-day plan against them and
+      // offset the start date so a redelivered partial run neither exceeds PLAN_DAYS
+      // nor collides calendar dates with already-created entries.
+      const alreadyScheduled = scheduled.filter((k) => k.opportunity_score !== null).length;
+      const budget = Math.max(0, PLAN_DAYS - alreadyScheduled);
       const selectable = result.candidates
         .filter(
           (c) =>
@@ -67,9 +74,11 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
             (b.opportunity_score ?? 0) - (a.opportunity_score ?? 0) ||
             normalizeKeyword(a.keyword).localeCompare(normalizeKeyword(b.keyword)),
         )
-        .slice(0, PLAN_DAYS);
+        .slice(0, budget);
 
-      const plan = clusterSpreadSchedule(selectable, new Date(), PLAN_DAYS);
+      const startDay = new Date();
+      startDay.setUTCDate(startDay.getUTCDate() + alreadyScheduled);
+      const plan = clusterSpreadSchedule(selectable, startDay, budget);
       for (const c of plan) {
         await KeywordRepo.create({
           org_id: orgId,
