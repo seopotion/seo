@@ -36,6 +36,7 @@ function toEnriched(c: WorkingCandidate, orgId: string): EnrichedCandidate {
     article_type: c.article_type,
     rejection_reason: c.rejection_reason,
     status: c.status,
+    serp_competitors: c.serp_competitors,
   };
 }
 

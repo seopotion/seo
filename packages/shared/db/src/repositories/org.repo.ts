@@ -6,7 +6,7 @@ import {
   type SetupPresets,
   SetupPresetsSchema,
 } from '@shared/schemas';
-import type { SetupStatus } from '@shared/types';
+import type { SetupStatus, StrategyStatus } from '@shared/types';
 import { type Document, ObjectId, type WithId } from 'mongodb';
 import { getDb } from '../client';
 
@@ -80,6 +80,29 @@ export const OrgRepo = {
     await (await collection()).updateOne(
       { _id: new ObjectId(id) },
       { $set: { presets: data, setup_status: 'setup_complete' } },
+    );
+  },
+
+  /**
+   * Atomically claim the automatic-strategy job for this org. Flips
+   * `strategy_status` none|failed -> pending and returns true only for the call
+   * that won the transition, so `/setup/finalize` enqueues exactly one job even
+   * under retries/re-finalize.
+   */
+  async claimStrategy(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id), strategy_status: { $in: ['none', 'failed'] } },
+      { $set: { strategy_status: 'pending' } },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async setStrategyStatus(id: string, status: StrategyStatus): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { strategy_status: status } },
     );
   },
 };

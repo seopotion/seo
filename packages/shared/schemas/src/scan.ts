@@ -10,3 +10,12 @@ export const ScanTask = z.object({
   website_url: z.string().url(),
 });
 export type ScanTask = z.infer<typeof ScanTask>;
+
+/**
+ * Strategy task message — the contract on the SQS strategy queue between the API
+ * (producer, POST /setup/finalize for paid orgs) and the strategy worker.
+ */
+export const StrategyTask = z.object({
+  org_id: z.string(),
+});
+export type StrategyTask = z.infer<typeof StrategyTask>;

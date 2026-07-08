@@ -106,6 +106,29 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: scanDlq, maxReceiveCount: 3 },
     });
 
+    // Dead-letter queue: strategy tasks that fail repeatedly land here instead
+    // of retrying/expiring silently. 14-day retention gives time to inspect.
+    const strategyDlq = new Queue(this, 'StrategyDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Strategy task queue. Visibility timeout >= worker timeout so an
+    // in-flight message isn't redelivered while the worker is still
+    // processing it. After maxReceiveCount failed deliveries the message
+    // moves to the DLQ.
+    const strategyQueue = new Queue(this, 'StrategyQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
+    });
+
+    // Provider secret env vars — read from process.env at synth/deploy host.
+    // Deployed-secret provisioning (SSM SecureString) is deferred; the `?? ''`
+    // fallback is intentional until that lands.
+    const providerEnv = {
+      DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN ?? '',
+      DATAFORSEO_PASSWORD: process.env.DATAFORSEO_PASSWORD ?? '',
+    };
+
     // API Lambda — produces scan tasks.
     const apiFn = new NodejsFunction(this, 'ApiFn', {
       entry: join(projectRoot, 'apps/api/src/index.ts'),
@@ -115,10 +138,17 @@ export class ApiStack extends Stack {
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(30),
       memorySize: 512,
-      environment: { ...mongoEnv, ...authEnv, SCAN_QUEUE_URL: scanQueue.queueUrl },
+      environment: {
+        ...mongoEnv,
+        ...authEnv,
+        ...providerEnv,
+        SCAN_QUEUE_URL: scanQueue.queueUrl,
+        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+      },
       bundling,
     });
     scanQueue.grantSendMessages(apiFn);
+    strategyQueue.grantSendMessages(apiFn);
     jwtSecretParam.grantRead(apiFn);
     mongoUriParam.grantRead(apiFn);
 
@@ -136,6 +166,25 @@ export class ApiStack extends Stack {
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(workerFn);
+
+    // Strategy worker Lambda — consumes strategy tasks from the queue.
+    const strategyWorkerFn = new NodejsFunction(this, 'StrategyWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/strategy.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        ...providerEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+      },
+      bundling,
+    });
+    strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(strategyWorkerFn);
 
     // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
     // custom resource below (Create/Update), so indexes exist before traffic.

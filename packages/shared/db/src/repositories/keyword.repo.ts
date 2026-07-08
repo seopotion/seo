@@ -3,6 +3,7 @@ import {
   CreateKeywordInput as CreateKeywordInputSchema,
   type Keyword,
   KeywordSchema,
+  normalizeKeyword,
 } from '@shared/schemas';
 import { type Document, ObjectId, type WithId } from 'mongodb';
 import { getDb } from '../client';
@@ -31,8 +32,9 @@ export const KeywordRepo = {
   async create(input: CreateKeywordInput): Promise<Keyword> {
     const data = CreateKeywordInputSchema.parse(input); // validate on write
     const created_at = new Date();
-    const res = await (await collection()).insertOne({ ...data, created_at });
-    return toEntity({ _id: res.insertedId, ...data, created_at });
+    const normalized_keyword = normalizeKeyword(data.keyword);
+    const res = await (await collection()).insertOne({ ...data, normalized_keyword, created_at });
+    return toEntity({ _id: res.insertedId, ...data, normalized_keyword, created_at });
   },
 
   /** Link a generated article back to its keyword (article_id null -> set). */
@@ -42,5 +44,13 @@ export const KeywordRepo = {
       { _id: new ObjectId(id) },
       { $set: { article_id: articleId } },
     );
+  },
+
+  /** Normalized set of every keyword already on this org's planner. */
+  async scheduledNormalizedSet(orgId: string): Promise<Set<string>> {
+    const docs = await (await collection())
+      .find({ org_id: orgId }, { projection: { keyword: 1 } })
+      .toArray();
+    return new Set(docs.map((d) => normalizeKeyword(d.keyword as string)));
   },
 };

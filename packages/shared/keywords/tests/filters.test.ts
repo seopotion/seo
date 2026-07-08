@@ -20,6 +20,7 @@ const cand = (keyword: string): WorkingCandidate => ({
   article_type: null,
   rejection_reason: null,
   status: 'candidate',
+  serp_competitors: null,
 });
 
 describe('brandNavFilter', () => {

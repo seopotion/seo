@@ -18,6 +18,7 @@ const cand = (keyword: string, search_volume: number | null): WorkingCandidate =
   article_type: null,
   rejection_reason: null,
   status: 'candidate',
+  serp_competitors: null,
 });
 
 describe('clusterCandidates', () => {

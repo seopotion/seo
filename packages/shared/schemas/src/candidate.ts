@@ -73,6 +73,8 @@ export const CandidateSchema = z.object({
   competition: z.number().nullable().default(null),
   trend: z.number().nullable().default(null),
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
+  // Top-K organic domains captured during SERP validation (#47); null otherwise.
+  serp_competitors: z.array(z.string()).nullable().default(null),
   relevance_score: z.number().nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
   article_type: z.enum(ARTICLE_TYPES).nullable().default(null),
