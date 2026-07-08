@@ -131,11 +131,12 @@ language, country, target audience, competitors, `article_style`, `internal_link
 - `meta_description` length 120–160,
 - exactly one H1 and ≥ 2 H2,
 - non-empty intro and conclusion,
-- no empty or duplicate section bodies,
-- output language matches `presets.business.language`.
+- no empty or duplicate section bodies.
 
 **LLM semantic (one JSON call):** unsupported company claims, competitor promotion, natural
-keyword usage → `{ pass: boolean, reasons: string[] }`.
+keyword usage, and **output language matches `presets.business.language`** → `{ pass: boolean,
+reasons: string[] }`. (Language is checked here, not deterministically, to avoid a language-detection
+dependency.)
 
 Any failure (deterministic or semantic) marks the run failed, is recorded on the keyword, and does
 not produce a published or persisted article.
