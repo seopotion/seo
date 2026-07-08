@@ -91,6 +91,7 @@ vi.mock('@shared/db', () => {
         user_id: 'user_1',
         website_url: 'https://clewas.com',
         setup_status: 'setup_complete',
+        strategy_status: 'completed',
         presets: {
           business: {
             name: 'Clewas',
@@ -304,10 +305,11 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     const res = await client.api.v0.dashboard.planner.$get({ query: { org_id: 'org_1' } }, opts);
     expect(res.status).toBe(200);
     if (res.status === 200) {
-      const { keywords } = await res.json();
+      const { keywords, strategy_status } = await res.json();
       expect(keywords.map((k) => k.keyword)).toEqual(['landing pages', 'notion builder']);
       expect(keywords[0]?.article_id).toBe('art_1');
       expect(keywords[1]?.article_id).toBeNull();
+      expect(strategy_status).toBe('completed');
     }
   });
 
@@ -315,7 +317,12 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     const opts = await auth();
     const res = await client.api.v0.dashboard.planner.$get({ query: { org_id: 'org_2' } }, opts);
     expect(res.status).toBe(200);
-    if (res.status === 200) expect((await res.json()).keywords).toHaveLength(0);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.keywords).toHaveLength(0);
+      // Org never ran a paid strategy job -> defaults to 'none'.
+      expect(body.strategy_status).toBe('none');
+    }
   });
 
   test('GET /planner 404s for an org the caller does not own', async () => {
