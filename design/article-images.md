@@ -136,7 +136,7 @@ Picks up the wiring [#52 deferred](llm-image-providers.md#configuration--secrets
 
 | Item | Local | Deployed |
 | --- | --- | --- |
-| fal.ai API key | `FAL_KEY` in root `.env` (+ `.env.example`) | per-stage SSM SecureString via `FAL_KEY_PARAM`, granted **only to the images worker Lambda** |
+| fal.ai API key | `FAL_KEY` in root `.env` (+ `.env.example`) | synth-time env (`FAL_KEY`), matching the existing provider-secret pattern; per-stage SSM SecureString provisioning is deferred with the rest (#9/#43) |
 
 CDK (`api-stack.ts`), per stage:
 

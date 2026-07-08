@@ -9,12 +9,15 @@ import {
 } from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import { CachePolicy, Distribution, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { Provider } from 'aws-cdk-lib/custom-resources';
@@ -201,6 +204,57 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: generationDlq, maxReceiveCount: 3 },
     });
 
+    // Article images (#51): private per-stage bucket + CloudFront (OAC) — durable,
+    // provider-independent image URLs. Objects are immutable at a given key
+    // (retries overwrite BEFORE the URL is stored), so long default TTLs are safe.
+    const imagesBucket = new Bucket(this, 'ImagesBucket', {
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+    });
+    const imagesCdn = new Distribution(this, 'ImagesCdn', {
+      defaultBehavior: {
+        origin: S3BucketOrigin.withOriginAccessControl(imagesBucket),
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+      },
+    });
+
+    // Dead-letter queue: image tasks that fail repeatedly land here.
+    const imagesDlq = new Queue(this, 'ImagesDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Image task queue. Visibility timeout >= worker timeout so an in-flight
+    // message isn't redelivered mid-generation (image generation is slow).
+    const imagesQueue = new Queue(this, 'ImagesQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: imagesDlq, maxReceiveCount: 3 },
+    });
+
+    // Images worker Lambda — consumes image tasks; plans, generates, and stores
+    // article images. FAL_KEY follows the existing synth-time provider-secret
+    // pattern (SSM provisioning deferred — #9/#43).
+    const imagesWorkerFn = new NodejsFunction(this, 'ImagesWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/images.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        FAL_KEY: process.env.FAL_KEY ?? '',
+        IMAGES_BUCKET: imagesBucket.bucketName,
+        IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
+      },
+      bundling,
+    });
+    imagesWorkerFn.addEventSource(new SqsEventSource(imagesQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(imagesWorkerFn);
+    imagesBucket.grantPut(imagesWorkerFn);
+
     // Generation worker Lambda — consumes generation tasks; produces articles.
     const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
       entry: join(projectRoot, 'apps/worker/src/generation.ts'),
@@ -213,11 +267,13 @@ export class ApiStack extends Stack {
       environment: {
         ...mongoEnv,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
       },
       bundling,
     });
     generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(generationWorkerFn);
+    imagesQueue.grantSendMessages(generationWorkerFn);
 
     // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
     // generation queue. No provider secret needed (it only reads Mongo + sends SQS).
@@ -286,5 +342,8 @@ export class ApiStack extends Stack {
       value: httpApi.apiEndpoint,
       description: 'Base URL of the HTTP API — set as NEXT_PUBLIC_API_URL for the web app',
     });
+
+    // Image CDN domain — the base of every stored article-image URL.
+    new CfnOutput(this, 'ImagesCdnDomain', { value: imagesCdn.distributionDomainName });
   }
 }
