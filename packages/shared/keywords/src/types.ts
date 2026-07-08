@@ -25,6 +25,7 @@ export interface WorkingCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
+  serp_competitors: string[] | null;
 }
 
 /** Pipeline output — assignable to `CreateCandidateInput` (repo derives normalized_keyword). */
@@ -44,6 +45,7 @@ export interface EnrichedCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
+  serp_competitors: string[] | null;
 }
 
 export interface ScoreWeights {

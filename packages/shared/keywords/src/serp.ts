@@ -74,7 +74,7 @@ export async function validateSerp(
     }
 
     acceptedSerps.push(urls);
-    accepted.push(c);
+    accepted.push({ ...c, serp_competitors: serp.slice(0, config.serpTopK).map((r) => r.domain) });
   }
 
   return { accepted, rejected };
