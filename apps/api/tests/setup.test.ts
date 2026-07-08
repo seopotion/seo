@@ -134,6 +134,8 @@ describe('setup routes', () => {
       user_id: 'user_1',
       website_url: 'https://example.com',
       setup_status: 'setup_scan_in_progress',
+      plan: 'free',
+      strategy_status: 'none',
       created_at: new Date(),
     });
 
