@@ -2,7 +2,7 @@
 
 Coarse **map** of what's built vs. what's left — by design. Detail for any 🟡/⬜ gap lives in its linked issue (`[#N]`), not here; entries stay to one line so they can't drift from the issue. Design lives in [`design/`](design/); how-to-work in [`CLAUDE.md`](CLAUDE.md).
 
-_Last updated: 2026-07-08 — Phase 3 article generation (#55) landed. Backend staging remains live (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend hosting [#35](https://github.com/seopotion/seo/issues/35) remains blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
+_Last updated: 2026-07-08 — Phase 3 article generation (#55) + cover/inline images (#51) landed. Backend staging remains live (`https://90ukvykb8i.execute-api.us-east-1.amazonaws.com`, `/health` 200); frontend hosting [#35](https://github.com/seopotion/seo/issues/35) remains blocked on SSR answers. Live board: [seo Project](https://github.com/orgs/seopotion/projects/1). Backend → @ozykhan, frontend → @Alperadoss._
 
 Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title conventions: [README § Issue tracking](README.md#issue-tracking).
 
@@ -43,7 +43,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
 - ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
 - 🟡 Keyword pipeline wired behind a paid-entitlement seam (`Org.plan`/`isPaid`): manual research API `POST /keywords/research` + `/keywords/candidates` ([#50](https://github.com/seopotion/seo/issues/50)) and an automatic 30-day content strategy — paid `/setup/finalize` → SQS strategy queue → strategy worker Lambda runs `@shared/keywords` and cluster-spreads a 30-day planner ([#47](https://github.com/seopotion/seo/issues/47)); library from [#49](https://github.com/seopotion/seo/issues/49)/[#54](https://github.com/seopotion/seo/issues/54). Deployed-env provider secret provisioning still manual/deferred ([#9](https://github.com/seopotion/seo/issues/9)/[#43](https://github.com/seopotion/seo/issues/43))
-- ✅ Article generation (#55) — daily EventBridge scheduler fans out due planner entries to an SQS generation worker (`@shared/generation`: outline → article → humanize → deterministic + LLM validation), persists a `generated` article, and atomically links `keyword.article_id`. Image generation pending — [#51](https://github.com/seopotion/seo/issues/51)
+- ✅ Article generation (#55) — daily EventBridge scheduler fans out due planner entries to an SQS generation worker (`@shared/generation`: outline → article → humanize → deterministic + LLM validation), persists a `generated` article, and atomically links `keyword.article_id`. Cover + inline images [#51](https://github.com/seopotion/seo/issues/51): image SQS task after generation → plan → fal.ai → per-stage S3+CloudFront, idempotent per-slot retries
 - 🟡 Dashboard UI surfaces — planner/history/settings landed; article editor, integrations, and candidate-pool UI remain — frontend epic [#19](https://github.com/seopotion/seo/issues/19)
 
 ## Frontend (`apps/web`)

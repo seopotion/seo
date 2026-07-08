@@ -1,5 +1,10 @@
-/** Neutral aspect/size enum, mapped to the provider's own size param. */
-export type ImageSize = 'square' | 'landscape_16_9' | 'landscape_4_3' | 'portrait_16_9';
+/** Neutral aspect/size enum (or exact pixels), mapped to the provider's own size param. */
+export type ImageSize =
+  | 'square'
+  | 'landscape_16_9'
+  | 'landscape_4_3'
+  | 'portrait_16_9'
+  | { width: number; height: number };
 
 export interface ImageGenerateParams {
   prompt: string;

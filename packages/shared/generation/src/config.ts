@@ -10,3 +10,6 @@ export const MAX_GENERATION_ATTEMPTS = 3;
 
 /** Whether to run the humanization/readability pass. */
 export const HUMANIZE = true;
+
+/** Inline images per article (#51); the cover is always additionally required. */
+export const INLINE_IMAGE_COUNT = 2;
