@@ -30,6 +30,9 @@ vi.mock('@shared/generation', async (orig) => ({
 
 vi.mock('../src/providers', () => ({ getGenerationClients: () => ({ llm: {} }) }));
 
+const { enqueueImageTask } = vi.hoisted(() => ({ enqueueImageTask: vi.fn(async () => {}) }));
+vi.mock('../src/queue', () => ({ enqueueImageTask }));
+
 import { handler } from '../src/generation';
 
 function event(body: unknown): SQSEvent {
@@ -101,6 +104,7 @@ describe('generation worker', () => {
       featured_image_url: '',
     });
     expect(linkArticle).toHaveBeenCalledWith('k1', 'art1');
+    expect(enqueueImageTask).toHaveBeenCalledWith({ org_id: 'o1', article_id: 'art1' });
   });
 
   test('skips when claim fails (already done/in-flight)', async () => {

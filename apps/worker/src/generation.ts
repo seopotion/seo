@@ -4,6 +4,7 @@ import { GenerateTask, isPaid } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
 import { getGenerationClients } from './providers';
+import { enqueueImageTask } from './queue';
 
 /**
  * Generation worker — triggered by SQS (enqueued by the daily generation
@@ -65,7 +66,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         slug: result.article.slug,
         keyword: keyword.keyword,
         meta_description: result.article.meta_description,
-        featured_image_url: '', // populated by #51
+        featured_image_url: '', // populated by the images worker (#51)
         content: result.article.content,
         difficulty: keyword.difficulty,
         search_volume: keyword.search_volume,
@@ -73,6 +74,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         published_at: null,
       });
       await KeywordRepo.linkArticle(keyword.id, article.id);
+      await enqueueImageTask({ org_id: org.id, article_id: article.id });
       logger.info('article generated', { article_id: article.id });
     } catch (err) {
       // Record the failure, then rethrow so SQS redelivers (-> DLQ after N).

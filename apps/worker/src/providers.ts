@@ -1,4 +1,4 @@
-import { createDataForSeoClient, createOpenRouterClient } from '@shared/providers';
+import { createDataForSeoClient, createFalClient, createOpenRouterClient } from '@shared/providers';
 
 /** Build the DataForSEO + LLM clients the strategy pipeline needs, from env. */
 export function getStrategyClients() {
@@ -15,5 +15,13 @@ export function getStrategyClients() {
 export function getGenerationClients() {
   return {
     llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+  };
+}
+
+/** Build the LLM (plan) + image (fal) clients the images worker needs, from env (#51). */
+export function getImageClients() {
+  return {
+    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    image: createFalClient({ apiKey: process.env.FAL_KEY ?? '' }),
   };
 }
