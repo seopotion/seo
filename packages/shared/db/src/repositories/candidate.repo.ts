@@ -22,7 +22,11 @@ export const CandidateRepo = {
    * both within the batch and against already-stored candidates. Returns only
    * the newly inserted candidates.
    */
-  async insertMany(orgId: string, items: CreateCandidateInput[]): Promise<Candidate[]> {
+  async insertMany(
+    orgId: string,
+    items: CreateCandidateInput[],
+    opts: { excludeNormalized?: Set<string> } = {},
+  ): Promise<Candidate[]> {
     if (items.length === 0) return [];
 
     // Validate + derive normalized key.
@@ -31,10 +35,14 @@ export const CandidateRepo = {
       return { ...data, normalized_keyword: normalizeKeyword(data.keyword) };
     });
 
-    // Dedupe within the batch (keep first occurrence).
+    // Dedupe within the batch (keep first occurrence) and against excluded keywords.
     const seen = new Set<string>();
+    const exclude = opts.excludeNormalized ?? new Set<string>();
     const batch = prepared.filter(
-      (p) => !seen.has(p.normalized_keyword) && seen.add(p.normalized_keyword),
+      (p) =>
+        !exclude.has(p.normalized_keyword) &&
+        !seen.has(p.normalized_keyword) &&
+        seen.add(p.normalized_keyword),
     );
 
     const col = await collection();
