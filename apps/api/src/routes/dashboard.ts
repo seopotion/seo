@@ -167,6 +167,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       const keywords = await KeywordRepo.listByOrg(org_id);
       return c.json(
         {
+          strategy_status: org.strategy_status ?? 'none',
           keywords: keywords.map((k) => ({
             id: k.id,
             keyword: k.keyword,
