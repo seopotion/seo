@@ -7,6 +7,7 @@ const base = (over: Partial<CreateArticleInput>): CreateArticleInput => ({
   org_id: 'org_art',
   keyword_id: 'k1',
   title: 'T',
+  meta_title: 'T meta',
   slug: 's',
   keyword: 'kw',
   meta_description: 'm',

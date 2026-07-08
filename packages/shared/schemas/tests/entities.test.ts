@@ -31,6 +31,7 @@ describe('ArticleSchema', () => {
       org_id: 'o1',
       keyword_id: 'k1',
       title: 'Best Practices',
+      meta_title: 'Best Practices 2026',
       slug: 'best-practices',
       keyword: 'notion seo',
       meta_description: 'meta',

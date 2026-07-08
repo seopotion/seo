@@ -13,6 +13,8 @@ export const ArticleSchema = z.object({
   org_id: z.string(),
   keyword_id: z.string(),
   title: z.string(),
+  // SERP <title>, distinct from `title` (the H1). Added by generation (#55).
+  meta_title: z.string(),
   slug: z.string(),
   keyword: z.string(),
   meta_description: z.string(),

@@ -19,3 +19,14 @@ export const StrategyTask = z.object({
   org_id: z.string(),
 });
 export type StrategyTask = z.infer<typeof StrategyTask>;
+
+/**
+ * Generate task message — the contract on the SQS generation queue between the
+ * scheduler (producer, apps/worker/src/generation-scheduler.ts) and the
+ * generation worker (consumer, apps/worker/src/generation.ts). See #55.
+ */
+export const GenerateTask = z.object({
+  org_id: z.string(),
+  keyword_id: z.string(),
+});
+export type GenerateTask = z.infer<typeof GenerateTask>;
