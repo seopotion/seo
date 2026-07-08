@@ -4,6 +4,9 @@ import { ARTICLE_TYPES, SEARCH_INTENTS } from './candidate';
 /** Keyword statuses. Only `scheduled` today; the enum leaves room to grow. */
 export const KEYWORD_STATUSES = ['scheduled'] as const;
 
+/** Generation lifecycle for a scheduled keyword (#55). */
+export const GENERATION_STATUSES = ['pending', 'generating', 'generated', 'failed'] as const;
+
 /**
  * Keyword entity — one org-scoped record per planner (calendar) opportunity.
  * `id` is the stringified Mongo `_id`. Rich classification / quality-questions
@@ -28,6 +31,11 @@ export const KeywordSchema = z.object({
   opportunity_score: z.number().nullable().default(null),
   serp_competitors: z.array(z.string()).nullable().default(null),
   created_at: z.date(),
+  // Generation lifecycle (#55). Defaulted so pre-#55 planner docs still parse.
+  generation_status: z.enum(GENERATION_STATUSES).default('pending'),
+  generation_attempts: z.number().int().default(0),
+  generation_error: z.string().nullable().default(null),
+  generation_started_at: z.date().nullable().default(null),
 });
 export type Keyword = z.infer<typeof KeywordSchema>;
 
