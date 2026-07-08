@@ -9,6 +9,8 @@ import {
 } from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -185,6 +187,62 @@ export class ApiStack extends Stack {
     });
     strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(strategyWorkerFn);
+
+    // Dead-letter queue: generation tasks that fail repeatedly land here.
+    const generationDlq = new Queue(this, 'GenerationDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Generation task queue. Visibility timeout >= worker timeout so an
+    // in-flight message isn't redelivered mid-generation. After maxReceiveCount
+    // failed deliveries the message moves to the DLQ.
+    const generationQueue = new Queue(this, 'GenerationQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: generationDlq, maxReceiveCount: 3 },
+    });
+
+    // Generation worker Lambda — consumes generation tasks; produces articles.
+    const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/generation.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+      },
+      bundling,
+    });
+    generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(generationWorkerFn);
+
+    // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
+    // generation queue. No provider secret needed (it only reads Mongo + sends SQS).
+    const generationSchedulerFn = new NodejsFunction(this, 'GenerationSchedulerFn', {
+      entry: join(projectRoot, 'apps/worker/src/generation-scheduler.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(2),
+      memorySize: 256,
+      environment: {
+        ...mongoEnv,
+        GENERATION_QUEUE_URL: generationQueue.queueUrl,
+      },
+      bundling,
+    });
+    generationQueue.grantSendMessages(generationSchedulerFn);
+    mongoUriParam.grantRead(generationSchedulerFn);
+
+    // Daily at 07:00 UTC — articles generate on/after their scheduled day.
+    new Rule(this, 'GenerationSchedule', {
+      schedule: Schedule.cron({ minute: '0', hour: '7' }),
+      targets: [new LambdaFunction(generationSchedulerFn)],
+    });
 
     // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
     // custom resource below (Create/Update), so indexes exist before traffic.
