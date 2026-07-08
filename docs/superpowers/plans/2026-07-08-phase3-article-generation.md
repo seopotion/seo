@@ -72,7 +72,7 @@
 - Modify: `packages/shared/schemas/src/keyword.ts`
 - Modify: `packages/shared/schemas/src/article.ts`
 - Modify: `packages/shared/schemas/src/scan.ts`
-- Test: `packages/shared/schemas/tests/keyword.test.ts` (extend)
+- Modify test: `packages/shared/schemas/tests/entities.test.ts` (add `meta_title` to the article fixture)
 - Create test: `packages/shared/schemas/tests/generation-schema.test.ts`
 
 **Interfaces:**
@@ -162,7 +162,7 @@ export const GenerateTask = z.object({
 export type GenerateTask = z.infer<typeof GenerateTask>;
 ```
 
-- [ ] **Step 4: Update the article repo integration test helper**
+- [ ] **Step 4: Update existing article test fixtures for the new required field**
 
 In `packages/shared/db/tests/article.repo.integration.test.ts`, add `meta_title` to the `base()` helper object (right after `title: 'T',`):
 
@@ -170,10 +170,18 @@ In `packages/shared/db/tests/article.repo.integration.test.ts`, add `meta_title`
   meta_title: 'T meta',
 ```
 
+In `packages/shared/schemas/tests/entities.test.ts`, the `ArticleSchema` fixture (in the "parses a full article with a nullable published_at" test) now fails without the new required field — add right after its `title: 'Best Practices',` line:
+
+```ts
+      meta_title: 'Best Practices 2026',
+```
+
+(`meta_title` is deliberately **required**, not defaulted, despite the "optional/defaulted" global constraint: no article documents exist in any environment yet — #55 is the first producer of articles — so there are no pre-existing docs to break.)
+
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `npm test -- generation-schema keyword`
-Expected: PASS. Then `npm run check` — Expected: no type errors.
+Run: `npm test -- generation-schema keyword entities`
+Expected: PASS (including the updated `entities.test.ts` article fixture). Then `npm run check` — Expected: no type errors.
 
 - [ ] **Step 6: Commit**
 
@@ -873,7 +881,8 @@ import { countWords, validateArticle } from '../src/validate';
 
 const ctx = { keyword: 'best widgets' } as GenerationContext;
 
-const goodBody = `# Best Widgets For Makers\n\n${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(30)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(30)}\n`;
+// Fixture must clear WORD_COUNT_FLOOR (800): 140 intro + 2 x 360 section words = ~868.
+const goodBody = `# Best Widgets For Makers\n\n${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(60)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(60)}\n`;
 
 const goodArticle = {
   title: 'Best Widgets For Makers',
@@ -1207,7 +1216,8 @@ const outlineJson = JSON.stringify({
   ],
 });
 
-const articleMd = `# Best Widgets For Makers\n\n${'Intro paragraph words here. '.repeat(20)}\n\n## One\n\n${'Body one content unique. '.repeat(30)}\n\n## Two\n\n${'Body two content unique. '.repeat(30)}\n`;
+// Fixture must clear WORD_COUNT_FLOOR (800): 80 intro + 2 x 400 section words = ~886.
+const articleMd = `# Best Widgets For Makers\n\n${'Intro paragraph words here. '.repeat(20)}\n\n## One\n\n${'Body one content unique. '.repeat(100)}\n\n## Two\n\n${'Body two content unique. '.repeat(100)}\n`;
 
 /** Returns an LlmClient whose complete() replies in call order. */
 function mockLlm(replies: string[]): LlmClient {
@@ -1586,7 +1596,9 @@ describe('generation worker', () => {
   });
 
   test('skips when claim fails (already done/in-flight)', async () => {
-    claimGeneration.mockResolvedValue(false);
+    // Once, not permanently: vi.clearAllMocks() clears calls but NOT implementations,
+    // so a plain mockResolvedValue(false) would leak into the later tests.
+    claimGeneration.mockResolvedValueOnce(false);
     await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
     expect(findOrgById).not.toHaveBeenCalled();
     expect(createArticle).not.toHaveBeenCalled();
