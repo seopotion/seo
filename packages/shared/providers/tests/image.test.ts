@@ -75,4 +75,14 @@ describe('generate', () => {
     expect(out.images[0]!.url).toBe('https://ok/1.png');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  test('passes a custom {width, height} size through as image_size', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().generate({ prompt: 'og cover', size: { width: 1200, height: 630 } });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({
+      prompt: 'og cover',
+      image_size: { width: 1200, height: 630 },
+    });
+  });
 });
