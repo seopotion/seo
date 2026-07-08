@@ -143,8 +143,9 @@ CDK (`api-stack.ts`), per stage:
 - `ImagesQueue` + `ImagesDlq` (`maxReceiveCount: 3`, visibility timeout ≥ worker
   timeout — image generation is slow, size generously).
 - `ImagesWorkerFn` (`NodejsFunction`, entry `apps/worker/src/images.ts`) + SQS event
-  source (`batchSize: 1`); granted Mongo URI param, `FAL_KEY` param, `OPENROUTER_API_KEY`
-  param (for the plan call), and `putObject` on the bucket.
+  source (`batchSize: 1`); granted the Mongo URI SSM param, `FAL_KEY` and
+  `OPENROUTER_API_KEY` as synth-time env vars (for the plan call), and `putObject` on
+  the bucket.
 - Private S3 `ImagesBucket` + CloudFront `Distribution` with
   `S3BucketOrigin.withOriginAccessControl`; long default TTL.
 - `GenerationWorkerFn` gains `IMAGES_QUEUE_URL` + send permission.

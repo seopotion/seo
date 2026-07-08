@@ -47,7 +47,7 @@ describe('buildImagePlanPrompt', () => {
 describe('parseImagePlan', () => {
   test('accepts a valid plan (with an optional code fence)', () => {
     expect(parseImagePlan(JSON.stringify(validPlan), headings)).toEqual(validPlan);
-    expect(parseImagePlan('```json\n' + JSON.stringify(validPlan) + '\n```', headings)).toEqual(
+    expect(parseImagePlan(`\`\`\`json\n${JSON.stringify(validPlan)}\n\`\`\``, headings)).toEqual(
       validPlan,
     );
   });
