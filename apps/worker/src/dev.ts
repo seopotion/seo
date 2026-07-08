@@ -1,5 +1,6 @@
 import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import type { SQSEvent, SQSHandler, SQSRecord } from 'aws-lambda';
+import { handler as generationHandler } from './generation';
 import { handler as scanHandler } from './index';
 import { handler as strategyHandler } from './strategy';
 
@@ -64,8 +65,10 @@ async function pollQueue(name: string, queueUrl: string, handler: SQSHandler): P
 
 const scanUrl = process.env.SCAN_QUEUE_URL;
 const strategyUrl = process.env.STRATEGY_QUEUE_URL;
+const generationUrl = process.env.GENERATION_QUEUE_URL;
 if (!scanUrl) throw new Error('SCAN_QUEUE_URL is required for the local worker poller');
 
 const pollers = [pollQueue('scan', scanUrl, scanHandler)];
 if (strategyUrl) pollers.push(pollQueue('strategy', strategyUrl, strategyHandler));
+if (generationUrl) pollers.push(pollQueue('generation', generationUrl, generationHandler));
 await Promise.all(pollers);
