@@ -1,8 +1,11 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Spy on the SQS enqueue (hoisted so the vi.mock factory can reference it).
 const { enqueueScanTask } = vi.hoisted(() => ({ enqueueScanTask: vi.fn(async () => {}) }));
-vi.mock('../src/clients/sqs', () => ({ enqueueScanTask }));
+const { enqueueStrategyTask } = vi.hoisted(() => ({
+  enqueueStrategyTask: vi.fn(async () => {}),
+}));
+vi.mock('../src/clients/sqs', () => ({ enqueueScanTask, enqueueStrategyTask }));
 
 // A fully-populated presets object (matches SetupPresetsSchema) for the
 // completed org, so `/details` has something to return.
@@ -46,6 +49,7 @@ vi.mock('@shared/db', () => ({
           user_id: 'user_1',
           website_url: 'https://example.com',
           setup_status: 'setup_scan_completed',
+          plan: 'free',
           presets: presetsFixture,
           created_at: new Date(),
         };
@@ -57,6 +61,7 @@ vi.mock('@shared/db', () => ({
           user_id: 'user_1',
           website_url: 'https://example.com',
           setup_status: 'setup_scan_in_progress',
+          plan: 'free',
           created_at: new Date(),
         };
       }
@@ -67,6 +72,7 @@ vi.mock('@shared/db', () => ({
           user_id: 'user_1',
           website_url: 'https://example.com',
           setup_status: 'setup_complete',
+          plan: 'free',
           presets: presetsFixture,
           created_at: new Date(),
         };
@@ -78,6 +84,19 @@ vi.mock('@shared/db', () => ({
           user_id: 'someone_else',
           website_url: 'https://example.com',
           setup_status: 'setup_scan_completed',
+          plan: 'free',
+          presets: presetsFixture,
+          created_at: new Date(),
+        };
+      }
+      // A paid org ready to finalize (for the strategy-trigger tests).
+      if (id === 'paid_ready') {
+        return {
+          id,
+          user_id: 'user_1',
+          website_url: 'https://example.com',
+          setup_status: 'setup_scan_completed',
+          plan: 'paid',
           presets: presetsFixture,
           created_at: new Date(),
         };
@@ -86,6 +105,7 @@ vi.mock('@shared/db', () => ({
     }),
     updatePresets: vi.fn(async () => {}),
     finalize: vi.fn(async () => {}),
+    claimStrategy: vi.fn(async () => true),
   },
 }));
 
@@ -99,6 +119,13 @@ const client = testClient<AppType>(app);
 async function authHeader() {
   const token = await signToken({ sub: 'user_1', email: 'u@example.com' });
   return { Authorization: `Bearer ${token}` };
+}
+
+async function finalize(orgId: string) {
+  return client.api.v0.setup.finalize.$post(
+    { json: { org_id: orgId } },
+    { headers: await authHeader() },
+  );
 }
 
 describe('setup routes', () => {
@@ -134,6 +161,8 @@ describe('setup routes', () => {
       user_id: 'user_1',
       website_url: 'https://example.com',
       setup_status: 'setup_scan_in_progress',
+      plan: 'free',
+      strategy_status: 'none',
       created_at: new Date(),
     });
 
@@ -330,5 +359,31 @@ describe('setup routes', () => {
     const res = await app.request('/health');
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('OK');
+  });
+});
+
+describe('POST /finalize strategy trigger', () => {
+  beforeEach(() => {
+    enqueueStrategyTask.mockClear();
+  });
+
+  test('paid org: claims and enqueues exactly one strategy job', async () => {
+    const res = await finalize('paid_ready');
+    expect(res.status).toBe(200);
+    expect(enqueueStrategyTask).toHaveBeenCalledTimes(1);
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'paid_ready' });
+  });
+
+  test('free org: does not enqueue', async () => {
+    const res = await finalize('6650f1a2b3c4d5e6f7a8b9c0');
+    expect(res.status).toBe(200);
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+  });
+
+  test('paid org, claim lost: does not enqueue', async () => {
+    vi.mocked(OrgRepo.claimStrategy).mockResolvedValueOnce(false);
+    const res = await finalize('paid_ready');
+    expect(res.status).toBe(200);
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
   });
 });

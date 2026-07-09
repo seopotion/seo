@@ -1,0 +1,60 @@
+name: Deploy backend
+
+# Branch → environment: merging `dev` → `master` deploys staging. Pushes to `dev`
+# deploy nothing (integration only). Production deploys from a GitHub Release / tag
+# and is not wired here yet — deferred (see issue #43).
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/api/**'
+      - 'apps/worker/**'
+      - 'packages/shared/**'
+      - 'scripts/lambda-db-init.ts'
+      - 'infra/**'
+      - '.github/workflows/deploy-backend.yml'
+
+# One staging deploy at a time.
+concurrency:
+  group: deploy-backend-staging
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install root deps (for preflight CLI)
+        run: npm ci
+
+      - name: Preflight — verify deploy prerequisites
+        env:
+          AWS_REGION: us-east-1
+          GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+        run: npm run cli -- infra preflight --stage staging --output json
+
+      - name: Install infra deps
+        run: cd infra && npm ci
+
+      - name: CDK deploy
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: us-east-1
+          GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+        run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never

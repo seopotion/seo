@@ -336,6 +336,22 @@ Our four endpoints above cover the baseline; **defer** domain-rating/backlinks/G
 - `premium_image_subscriptions` — premium AI-image add-on state.
 All of these back **deferred** cards for us; baseline Home stays the four counts/lists above.
 
+**Populated-state Home (live 2026-07-02, after the first article generated).** Earlier capture
+was an empty org (0/0); with real data the cards reveal detail the empty state hid:
+- **ARTICLES card exposes three states, not two:** Published **0**, Planned **29**, and a
+  distinct **"1 awaiting publish"** — i.e. *generated-but-not-yet-published*. So the 30-keyword
+  plan splits into `published + planned + generated_awaiting_publish`; the "awaiting publish"
+  bucket is gated by "Connect integration to start publishing". Baseline Home may want a **third
+  count** (generated-not-published) beyond published/planned. Also surfaces **"Next article on
+  Jul 3"** (next scheduled generation date).
+- **Recommended Actions is a dynamic, scored engine** — a **count badge ("5")** and "highest-
+  leverage next steps", not a static list. Cards reflect live state, e.g. "**1 article ready —
+  no integration connected**" → Connect, and "**Connect Google Search Console**" → Connect GSC
+  (`/dashboard/settings/general/google-search-console`). Deferred beyond baseline's simple list.
+- **A third GSC-gated block: "Search Performance"** (alongside Best Articles) — both show
+  "Connect Google Search Console" until a GSC connection exists. Confirms the GSC gate fans out
+  to multiple cards, all deferred (parity-gap G7).
+
 ## 2. Articles
 
 **Mockup — Articles sidebar submenu:** The expanded "Articles" navigation group lists: Content Planner, Improvements (Beta), Content History, Articles Settings, Integrations, Linking Configuration.
@@ -360,6 +376,19 @@ keyword to help you rank."
 - **Capacity / auto top-up:** max 60 keywords scheduled at once; the queue auto-refills to
   keep 25–30 (1/day) · 50–60 (2/day) · 75–90 (3/day) so content never runs dry.
 - Trial gates: "Research Keywords" / "Schedule Improvements" disabled until paid.
+
+**Per-card affordances (calendar cell, observed live 2026-07-02).** A scheduled day cell
+renders: format label (`List: Round-up` / `Resources` / `Guide` / `How-to`), the keyword,
+`Vol:` and `Diff:` badges, plus a remove control (two-step: "Confirm Removal" → "Delete
+scheduled keyword?", the latter offering "delete only this" vs "delete all inactive"). The
+action affordance depends on whether the article exists yet:
+- **Not generated** → `Pre-Create` button (desc "Pre-create article for scheduled
+  publishing"; gated — "Pre-create option is available for paid users only"), plus
+  **Add Instructions** (per-keyword custom brief) and **Quality Questions** with a count
+  badge (e.g. `4`) — the E-E-A-T interview surfaced inline on the card.
+- **Generated** → the Pre-Create/instructions controls are replaced by a **`Visit Article`**
+  link to `/dashboard/articles/{uuid}`. This is the visible signal that `article_id` flipped
+  from null → set. (Confirmed on the July-2 "landing page design best practices" card.)
 
 **Reference endpoints (theirs), captured live 2026-07-01:**
 - `GET scheduled_keywords?product_id=…&created_by_super_admin=neq.true&order=utc_scheduled_date.asc,search_volume.desc,difficulty.desc,id.asc` — the calendar.
@@ -414,6 +443,20 @@ The library of generated/published articles (`/dashboard/articles`). Each articl
 through a status lifecycle: `generated → published` (plus `deleted`, and a `publish_error`
 flag when a CMS push fails). Counts on Home come from `HEAD` queries against this table.
 
+**Table shape (observed live 2026-07-02).** A searchable table — "Search articles by
+title..." box + a **Status** filter — with columns:
+`[bulk-select checkbox] · Image · Title · Keyword · Difficulty · Volume · Status · Date`.
+Header checkbox = select-all for bulk actions. **First real generated article observed**,
+which confirms the full spine end-to-end:
+- Title **"10 Landing Page Design Best Practices for Notion Sites"** · Keyword
+  "landing page design best practices" · Diff 36 · Vol 170 · Status **"Generated"** ·
+  Date 02 Jul 2026.
+- Same keyword/Vol/Diff as the July-2 planner card (format Round-up) → so the pipeline is
+  **planner keyword → generated article → history row**, and the planner card swapped to
+  "Visit Article" at the same moment. Note the article gets its **own SEO title distinct
+  from the raw keyword** (and niche-qualified, "…for Notion Sites") — so `article.title`
+  ≠ `keyword`; our schema must store the generated title separately, not reuse the keyword.
+
 **Reference endpoints (theirs):** `HEAD articles?status=not.eq.deleted` (total),
 `articles?select=title,slug&status=eq.published` (list). Article rows carry
 `{ id, title, slug, status, published_at, created_at, publish_error }`.
@@ -426,6 +469,48 @@ flag when a CMS push fails). Counts on Home come from `HEAD` queries against thi
 - Article **generation** (keyword → article) and **publish** (article → CMS) are later
   workers; baseline can surface an empty/placeholder history until generation lands.
 
+#### 2.2.1 Article editor (detail page)
+
+The generated-article surface at `/dashboard/articles/{id}` (observed live 2026-07-02 on the
+July-2 "landing page design best practices" article). This is a **full AI editor**, not a
+read-only view — worth capturing so we know how large the deferred piece is.
+
+**Record shape (visible in the header).** Title + `slug: /landing-page-design-best-practices`
++ `keyword: landing page design best practices` — the article carries its **SEO title, a
+url-slug, and a back-reference to the source keyword**, all distinct fields. Header actions:
+**Export as MD** / "Choose export format" (menu), **Connect To Publish** →
+`/dashboard/integrations/new` (publishing is gated on a connected CMS — with no integration
+you can only export), **Save** (disabled until an edit).
+
+**Structured SEO/content fields**, each with inline AI actions
+(Improve · Shorten · Expand · Simplify · Fix grammar · Ask AI):
+- **TITLE** — the SEO title (≠ the body H1; body H1 was "Build Landing Pages in Notion?
+  Master These 10 Practices").
+- **FEATURED IMAGE** — Upload / Download / **Regenerate** / Ask AI.
+- **META DESCRIPTION** — with a live **char counter (148 / 160)** enforcing the SEO limit.
+- **CONTENT** — the rich article body.
+
+**Body is richly structured, not flat markdown.** Auto-generated **Table of Contents**
+(anchor links to every H2/H3); H2/H3 sections with slug anchors; **AI-generated inline
+images** (hosted on `cdnimg.co`, descriptive alt text); **embedded YouTube videos**
+(auto-sourced, relevant); **external citations** (e.g. nngroup.com — "Research referenced
+by …"); a **multi-column comparison table** (emoji column headers: Implementation Complexity
+/ Resource Requirements / Expected Outcomes / Ideal Use Cases / Key Advantages); bullet lists
+and callouts. Every block has hover controls: **Remove / Upload / Download / Regenerate /
+Ask AI** (block-level regen), plus selection-based quick actions.
+
+**AI rewrite panel** (resizable, left side): conversational "Rewrite this article — I keep
+your links and images intact", canned prompts ("Make the intro punchier", "more
+professional/expert tone", "Expand each section", "Tighten and cut fluff"), file attach +
+free-text instruction. Two view modes: **Review** | **Editor**.
+
+**Baseline implication.** Our `articles` record needs at least
+`{ id, keyword_id, title, slug, meta_description, featured_image_url, content, status,
+created_at, published_at }`. Baseline can **generate + store + display + export** an article
+(title/meta/slug/body as markdown) — the whole **AI editing layer** (chat rewrite,
+per-block regen, inline image/video generation, comparison-table synthesis, selection quick
+actions) is a large **deferred** subsystem, not baseline.
+
 ### 2.3 Articles Settings
 
 A settings section with three sub-tabs: **Preferences · Blog · Improvements**
@@ -435,7 +520,10 @@ setup wizard collected — i.e. the presets become **editable settings** after `
 - **Preferences** ← `output_settings_presets` (GET/PATCH) = our `article_preferences`
   (`content_seo` + `engagement`). Baseline reuses `PATCH /setup/presets` shape or a
   dashboard-scoped `PATCH /dashboard/v0/settings/articles`.
-- **Blog** ← the `blog` presets (sitemap, main blog, best articles).
+- **Blog** ← the `blog` presets (sitemap, main blog, best articles). UI ("Content details",
+  live 2026-07-02) is exactly four fields: **Sitemap URL** (drives internal linking — the
+  dependency §2.3's Internal-Links gate points at), **Main blog address**, and **up to 3
+  "best article example" URLs** (seed the style reference + the Home "Best Articles" card).
 - **Improvements** ← `/api/products/improvement-settings` + `custom_image_presets` +
   `/api/catalog/profile`. These are the **deferred** subsystems (parity-gaps G2): article
   Improvement Schedule, custom AI image presets, Product Catalog. **Out of baseline.**
@@ -456,6 +544,23 @@ row (`name: "Default"`, so multiple presets per site are supported), with ~28 fi
 Ours today: `content_seo.{article_style, internal_links(bool), llm_instructions}` +
 `engagement.{image_style}` — ~4 of these ~24 controls. The gap is real but **intentional**
 (baseline generates one reasonable article; the rest are polish toggles).
+
+**UI confirmation of the Preferences tab (live 2026-07-02).** The settings screen
+(heading "Configure your article preferences") matches the API-derived shape above and pins
+down two enums the field list left open:
+- **`image_style` is a 5-value enum:** Sketch · Watercolor · Realistic · Illustration ·
+  Brand & Text (each with example thumbnails). **Featured** images have their own
+  Sketch/Watercolor/Illustration variants, toggled by **Title-Based Featured Image** ("include
+  article title and your brand color") — the UI form of `use_different_featured_style`.
+- **The engagement section is a fixed set of boolean toggles** (all default-on): Table of
+  Contents, YouTube Video, Call-to-Action, Include Infographics, Include Emojis, Mention
+  Similar Products & Tools, First-Person Writing — 1:1 with the `is_*`/`table_of_contents`/
+  `mention_similar_products` fields.
+- Two behaviour toggles surface here too: **Auto-publish** (`auto_publish`) and **Automatic
+  Keyword Generation** ("maintains 25–30 keywords in your planner") — the planner auto-top-up
+  exposed as a user preference. **Internal Links** is explicitly gated: "Add a sitemap URL in
+  blog settings to enable internal linking" (confirms the sitemap dependency, parity-gap G5).
+- Custom **Style Prompt** / "Create Own Style Preset" (custom AI image presets) is paid-gated.
 
 **Improvements subsystem shape** (`GET /api/products/improvement-settings`): three blocks —
 `settings{enabled, setupCompleted, publishingDays[], autoPush}`, `readiness{status, ...,
@@ -512,6 +617,44 @@ Baseline: fold into Articles Settings; a dedicated surface is **deferred**.
   (`products.prioritize_backlinks`), **custom anchor texts**, and additional sources are all
   paywalled — another paid-gated surface. Baseline can ship read-only source config; targeting
   is deferred.
+
+### 2.6 General Settings
+
+The post-onboarding home of the **`business` + `audience`/`competitors` presets** — the
+counterpart to Articles Settings (§2.3), which owns `article_preferences`. Route
+`/dashboard/settings/general/*`, three sub-tabs: **Business · Audience and Competitors ·
+Google Search Console** (mined live 2026-07-02).
+
+**Business** (`/general/business`, "About your business"):
+- **Website to business** — read-only/disabled, prefilled with the scanned URL (server-owned,
+  matches our "identity is server-owned" stance — the site URL isn't user-editable here).
+- **Business name** — editable.
+- **Language** (select, "English") + **Country** (select, "Global (English)" — note: "Uses US
+  English search data as the broadest international signal") → maps to `keyword_region`.
+- **Description** — the AI business summary from the scan, but **richly structured**, not a
+  paragraph: an overview + bulleted **Features**, **Distinct advantages**, and **Customer
+  problems solved** sections. Editable. (Our `business.description` is a plain string — the
+  structured breakdown is a deferred enrichment.)
+
+**Audience and Competitors** (`/general/audience-competitors` — note the slug, no "and";
+"Define your Target Audience and Competitors"):
+- **Target Audiences** — a **chip list of free-text strings** (add via textbox + Add, e.g.
+  "Content creators and bloggers using Notion for writing"). Plain strings, **not** multi-field
+  segments — confirms baseline audience shape is adequate (parity-gap G8 "multi-segment
+  audience" is about richer per-segment metadata, not this list).
+- **Competitors** — a **chip list of URLs/company names** (super.so, potion.so, simple.ink).
+  These drive the competitor-sourced keyword generation (`generation_filters.competitors`,
+  `generation_source: "competitors"` from §2.1's keyword model).
+- Save.
+
+**Google Search Console** (`/general/google-search-console`) — the GSC connect surface that
+gates Home's Best Articles / Search Performance cards (§1). **Deferred** (parity-gap G7).
+
+**Baseline implication.** Business + Audience/Competitors settings reuse the same preset data
+we already generate at scan time (`SetupPresetsSchema.business` + audience/competitors) — a
+dashboard-scoped `GET`/`PATCH` over those fields, same pattern as `PATCH /setup/presets`.
+Audiences and competitors are simple string/URL lists; only the structured Description and the
+GSC tab are deferred enrichments.
 
 ## 3. Other dashboard surfaces (all deferred — inventory for completeness)
 

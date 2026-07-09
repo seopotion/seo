@@ -12,3 +12,11 @@ export const SETUP_STATUSES = [
 ] as const;
 
 export type SetupStatus = (typeof SETUP_STATUSES)[number];
+
+/** Billing entitlement plans. `paid` unlocks the automated pipeline (#56). */
+export const ENTITLEMENT_PLANS = ['free', 'trial', 'paid'] as const;
+export type EntitlementPlan = (typeof ENTITLEMENT_PLANS)[number];
+
+/** Lifecycle of an org's automatic 30-day strategy job (#47). */
+export const STRATEGY_STATUSES = ['none', 'pending', 'completed', 'failed'] as const;
+export type StrategyStatus = (typeof STRATEGY_STATUSES)[number];

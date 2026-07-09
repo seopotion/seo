@@ -33,5 +33,40 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'set-plan': defineCommand({
+      meta: {
+        name: 'set-plan',
+        description:
+          "Override an org's entitlement plan (dev/staging escape hatch for the paywall)",
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to update' },
+        user: { type: 'string', description: "Owner's email; resolves to their single org" },
+        plan: { type: 'string', description: 'free | trial | paid', default: 'paid' },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { setOrgPlan } = await import('../lib/db');
+
+          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.step('db:set-plan', 'start');
+
+          const result = await setOrgPlan({
+            org: args.org as string | undefined,
+            user: args.user as string | undefined,
+            plan: args.plan as string,
+          });
+          emitter.step('db:set-plan', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
   },
 });

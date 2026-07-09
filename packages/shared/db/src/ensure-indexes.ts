@@ -12,5 +12,14 @@ export async function ensureIndexes(): Promise<void> {
   // start_scan lookup (OrgRepo.findActiveByUserAndUrl, user_id + website_url).
   await db.collection('orgs').createIndex({ user_id: 1, website_url: 1 });
   await db.collection('orgs').createIndex({ website_url: 1 });
-  // await db.collection('articles').createIndex({ org_id: 1, created_at: -1 });
+  await db.collection('keywords').createIndex({ org_id: 1, scheduled_date: 1 });
+  // Scheduler due-query: scheduled_date range + unlinked filter (#55).
+  await db.collection('keywords').createIndex({ scheduled_date: 1, article_id: 1 });
+  await db.collection('articles').createIndex({ org_id: 1, created_at: -1 });
+  await db.collection('articles').createIndex({ org_id: 1, status: 1 });
+  await db
+    .collection('candidates')
+    .createIndex({ org_id: 1, normalized_keyword: 1 }, { unique: true });
+  await db.collection('candidates').createIndex({ org_id: 1, status: 1 });
+  await db.collection('candidates').createIndex({ org_id: 1, opportunity_score: -1 });
 }

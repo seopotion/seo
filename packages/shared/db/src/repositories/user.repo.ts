@@ -20,6 +20,11 @@ export const UserRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  async findByEmail(email: string): Promise<User | null> {
+    const doc = await (await collection()).findOne({ email });
+    return doc ? toEntity(doc) : null;
+  },
+
   /** Find-or-create by Google subject id. Used by the login flow. */
   async upsertByGoogleSub(input: CreateUserInput): Promise<User> {
     const data = CreateUserInputSchema.parse(input);
