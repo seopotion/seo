@@ -122,4 +122,10 @@ export const KeywordRepo = {
       .toArray();
     return new Set(docs.map((d) => normalizeKeyword(d.keyword as string)));
   },
+
+  /** Delete every keyword for an org (used by the `db reset-user` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };

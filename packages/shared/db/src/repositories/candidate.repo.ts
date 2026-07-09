@@ -91,4 +91,10 @@ export const CandidateRepo = {
       { $set: { status, updated_at: new Date() } },
     );
   },
+
+  /** Delete every candidate for an org (used by the `db reset-user` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };

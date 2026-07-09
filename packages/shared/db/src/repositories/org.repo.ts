@@ -116,4 +116,11 @@ export const OrgRepo = {
     const res = await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { plan } });
     return res.matchedCount === 1;
   },
+
+  /** Delete the org (used by the `db reset-user` CLI). Returns true when a doc matched. */
+  async deleteById(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).deleteOne({ _id: new ObjectId(id) });
+    return res.deletedCount === 1;
+  },
 };
