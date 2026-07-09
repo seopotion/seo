@@ -1,28 +1,101 @@
-import type { SetupStatus } from '@shared/schemas';
 import { api } from './api';
 
-type SetupOrganization = {
-  id: string;
-  website_url: string;
-  setup_status: SetupStatus;
-  name?: string;
+type AuthorizedWorkspaceStatus = {
+  ok: true;
+  path: '/home' | '/onboarding';
+  setupComplete: boolean;
 };
 
-export async function getPostLoginPath(): Promise<'/home' | '/onboarding' | null> {
-  const orgsRes = await api.api.v0.core.organizations.$get();
+export type WorkspaceStatus =
+  | AuthorizedWorkspaceStatus
+  | {
+      ok: false;
+      reason: 'unauthorized' | 'unavailable';
+    };
 
-  if (orgsRes.ok) {
-    const { organizations } = await orgsRes.json();
-    return (organizations as SetupOrganization[]).some(
-      (organization) => organization.setup_status === 'setup_complete',
-    )
-      ? '/home'
-      : '/onboarding';
+let cachedWorkspaceStatus: AuthorizedWorkspaceStatus | null = null;
+let pendingWorkspaceStatus: Promise<WorkspaceStatus> | null = null;
+let workspaceStatusCacheRevision = 0;
+
+function buildWorkspaceStatus(setupComplete: boolean): AuthorizedWorkspaceStatus {
+  return {
+    ok: true,
+    path: setupComplete ? '/home' : '/onboarding',
+    setupComplete,
+  };
+}
+
+export function getCachedWorkspaceStatus(): AuthorizedWorkspaceStatus | null {
+  return cachedWorkspaceStatus;
+}
+
+export function setWorkspaceStatusCache(setupComplete: boolean): AuthorizedWorkspaceStatus {
+  workspaceStatusCacheRevision += 1;
+  cachedWorkspaceStatus = buildWorkspaceStatus(setupComplete);
+  return cachedWorkspaceStatus;
+}
+
+export function clearWorkspaceStatusCache(): void {
+  workspaceStatusCacheRevision += 1;
+  cachedWorkspaceStatus = null;
+  pendingWorkspaceStatus = null;
+}
+
+async function requestWorkspaceStatus(): Promise<WorkspaceStatus> {
+  const requestRevision = workspaceStatusCacheRevision;
+
+  try {
+    const statusRes = await api.api.v0.core.status.$get();
+    const statusCode = statusRes.status as number;
+
+    if (statusCode === 401) {
+      clearWorkspaceStatusCache();
+      return { ok: false, reason: 'unauthorized' };
+    }
+
+    if (!statusRes.ok) {
+      return { ok: false, reason: 'unavailable' };
+    }
+
+    const { setup_complete } = await statusRes.json();
+    const status = buildWorkspaceStatus(setup_complete);
+
+    if (requestRevision === workspaceStatusCacheRevision) {
+      cachedWorkspaceStatus = status;
+    }
+
+    return status;
+  } catch {
+    return { ok: false, reason: 'unavailable' };
+  }
+}
+
+export async function getWorkspaceStatus(
+  options: { useCache?: boolean } = {},
+): Promise<WorkspaceStatus> {
+  const shouldUseCache = options.useCache !== false;
+
+  if (shouldUseCache) {
+    if (cachedWorkspaceStatus) return cachedWorkspaceStatus;
+    if (pendingWorkspaceStatus) return pendingWorkspaceStatus;
   }
 
-  const statusRes = await api.api.v0.core.status.$get();
-  if (!statusRes.ok) return null;
+  const request = requestWorkspaceStatus();
 
-  const { setup_complete } = await statusRes.json();
-  return setup_complete ? '/home' : '/onboarding';
+  if (!shouldUseCache) return request;
+
+  pendingWorkspaceStatus = request;
+
+  try {
+    return await request;
+  } finally {
+    if (pendingWorkspaceStatus === request) {
+      pendingWorkspaceStatus = null;
+    }
+  }
+}
+
+export async function getPostLoginPath(): Promise<'/home' | '/onboarding' | null> {
+  const status = await getWorkspaceStatus();
+  return status.ok ? status.path : null;
 }

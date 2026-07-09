@@ -1,11 +1,19 @@
 {
   "AuthGuard": {
-    "checkingSession": "Checking your session..."
+    "checkingSession": "Checking your session...",
+    "checkingWorkspace": "Checking your workspace...",
+    "retry": "Retry",
+    "workspaceError": "Could not check your workspace. Try again."
   },
   "GoogleJoinButton": {
+    "checkingWorkspace": "Checking workspace...",
     "label": "Join with Google",
     "loading": "Google sign-in is loading",
-    "notConfigured": "Google sign-in is not configured"
+    "notConfigured": "Google sign-in is not configured",
+    "retry": "Retry",
+    "signInError": "Google sign-in failed. Try again.",
+    "signingIn": "Signing in...",
+    "workspaceError": "Could not check your workspace."
   },
   "HomePage": {
     "articles": {
@@ -257,7 +265,8 @@
       "finalizing": "Finalizing...",
       "getStarted": "Get Started",
       "next": "Next",
-      "remove": "Remove {value}"
+      "remove": "Remove {value}",
+      "retry": "Retry"
     },
     "articleSettings": {
       "articleStyle": "Article style",
@@ -293,7 +302,9 @@
       "selectLanguage": "Select language",
       "title": "About Your Business"
     },
+    "checkingWorkspace": "Checking your workspace...",
     "errors": {
+      "checkWorkspace": "Could not check your workspace. Try again.",
       "checkScanStatus": "Could not check scan status. Try scanning again.",
       "completeScanBeforeFinalize": "Complete the website scan before finalizing setup.",
       "finalize": "Could not finalize setup. Review the fields and try again.",

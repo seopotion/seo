@@ -201,135 +201,138 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <>
       <script
         type="application/ld+json"
         // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD is serialized from local static data.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(homeJsonLd) }}
       />
-      <section className="relative isolate overflow-hidden px-6 pt-32 pb-20 sm:pt-48">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96 rotate-180 text-gray-500/30 opacity-60 mask-[linear-gradient(to_bottom,transparent,white)]">
-          <svg
-            aria-hidden="true"
-            className="absolute inset-0 h-full w-full"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <pattern
-                id="grid-pattern"
-                width="32"
-                height="32"
-                patternUnits="userSpaceOnUse"
-                x="50%"
-                y="100%"
-                patternTransform="translate(0 -1)"
-              >
-                <path d="M0 32V.5H32" fill="none" stroke="currentColor" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid-pattern)" />
-          </svg>
-        </div>
-        <div className="relative z-10 mx-auto max-w-4xl text-center">
-          <h1 className="mb-6 font-bold text-4xl text-gray-800 leading-tight tracking-tight md:text-5xl">
-            {t('hero.titleLine1')} <br /> {t('hero.titleLine2')}
-          </h1>
-          <h2 className="mx-auto mb-10 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
-          <WishlistForm source="landing_hero" />
-        </div>
-      </section>
+      <main className="min-h-screen">
+        <section className="relative isolate overflow-hidden px-6 pt-32 pb-20 sm:pt-48">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96 rotate-180 text-gray-500/30 opacity-60 mask-[linear-gradient(to_bottom,transparent,white)]">
+            <svg
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <defs>
+                <pattern
+                  id="grid-pattern"
+                  width="32"
+                  height="32"
+                  patternUnits="userSpaceOnUse"
+                  x="50%"
+                  y="100%"
+                  patternTransform="translate(0 -1)"
+                >
+                  <path d="M0 32V.5H32" fill="none" stroke="currentColor" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+            </svg>
+          </div>
+          <div className="relative z-10 mx-auto max-w-4xl text-center">
+            <h1 className="mb-6 font-bold text-4xl text-gray-800 leading-tight tracking-tight md:text-5xl">
+              {t('hero.titleLine1')} <br /> {t('hero.titleLine2')}
+            </h1>
+            <h2 className="mx-auto mb-10 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
+            <WishlistForm source="landing_hero" />
+          </div>
+        </section>
 
-      <section className="px-6 pb-20">
-        <div className="mx-auto max-w-5xl">
-          <div className="relative rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 md:p-12">
-            <div className="grid items-center gap-8 md:grid-cols-2">
-              <div className="overflow-hidden rounded-xl bg-white shadow-xl">
-                <Image
-                  src="/hero-image-1.png"
-                  alt={t('images.beforeAlt')}
-                  width={1754}
-                  height={1256}
-                  loading="eager"
-                  sizes="(min-width: 768px) 448px, calc(100vw - 80px)"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-
-              <div className="absolute top-1/2 left-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 md:flex">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-400 shadow-lg">
-                  <svg
-                    aria-hidden="true"
-                    className="h-10 w-10 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
-                    />
-                  </svg>
+        <section className="px-6 pb-20">
+          <div className="mx-auto max-w-5xl">
+            <div className="relative rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 md:p-12">
+              <div className="grid items-center gap-8 sm:grid-cols-2">
+                <div className="overflow-hidden rounded-xl bg-white shadow-xl">
+                  <Image
+                    src="/hero-image-1.png"
+                    alt={t('images.beforeAlt')}
+                    width={1105}
+                    height={800}
+                    loading="eager"
+                    sizes="(min-width: 768px) 448px, calc(100vw - 80px)"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-              </div>
 
-              <div className="overflow-hidden rounded-xl bg-white shadow-xl">
-                <Image
-                  src="/hero-image-2.png"
-                  alt={t('images.afterAlt')}
-                  width={1754}
-                  height={1255}
-                  className="h-full w-full object-cover"
-                />
+                <div className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 flex rotate-90 sm:rotate-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-400 shadow-lg">
+                    <svg
+                      aria-hidden="true"
+                      className="h-10 w-10 text-white"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 7l5 5m0 0l-5 5m5-5H6"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-xl bg-white shadow-xl">
+                  <Image
+                    src="/hero-image-2.png"
+                    alt={t('images.afterAlt')}
+                    width={1105}
+                    height={800}
+                    loading="eager"
+                    fetchPriority="high"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="border-gray-100 border-y bg-gray-50 px-6 py-12">
-        <div className="mx-auto max-w-7xl">
-          <p className="mb-6 text-center text-gray-500">{t('useCasesTitle')}</p>
-          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
-            {useCaseCards.map((useCase) => (
-              <div
-                key={useCase.name}
-                className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm border border-gray-200"
-              >
-                <span className="font-medium text-gray-700">{useCase.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section id="features" className="scroll-mt-24 px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-16 text-center">
-            <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
-              {t('featuresTitle')}
-            </h2>
-            <p className="mx-auto max-w-5xl text-gray-600 text-lg">{t('featuresDescription')}</p>
-          </div>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {featureCards.map((feature, index) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl bg-gray-50 p-6 transition-shadow hover:shadow-lg"
-              >
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                  {features[index]?.icon}
+        <section className="border-gray-100 border-y bg-gray-50 px-6 py-12">
+          <div className="mx-auto max-w-7xl">
+            <p className="mb-6 text-center text-gray-500">{t('useCasesTitle')}</p>
+            <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
+              {useCaseCards.map((useCase) => (
+                <div
+                  key={useCase.name}
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm border border-gray-200"
+                >
+                  <span className="font-medium text-gray-700">{useCase.name}</span>
                 </div>
-                <h3 className="mb-2 font-semibold text-gray-900 text-xl">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* <section className="bg-[#2D3748] px-6 py-20">
+        <section id="features" className="scroll-mt-24 px-6 py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-16 text-center">
+              <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
+                {t('featuresTitle')}
+              </h2>
+              <p className="mx-auto max-w-5xl text-gray-600 text-lg">{t('featuresDescription')}</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {featureCards.map((feature, index) => (
+                <div
+                  key={feature.title}
+                  className="rounded-2xl bg-gray-50 p-6 transition-shadow hover:shadow-lg"
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                    {features[index]?.icon}
+                  </div>
+                  <h3 className="mb-2 font-semibold text-gray-900 text-xl">{feature.title}</h3>
+                  <p className="text-gray-600">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* <section className="bg-[#2D3748] px-6 py-20">
         <div className="mx-auto max-w-6xl">
           <div className="mb-16 text-center">
             <h2 className="font-bold text-3xl text-gray-100 md:text-4xl">
@@ -378,7 +381,7 @@ export default function LandingPage() {
               <p className="mb-2 font-medium text-[#F6AD55] text-sm">Step 1</p>
               <h3 className="mb-3 font-bold text-white text-xl">Choose or create a Notion page</h3>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Choose an existing Notion page, create a new one or start with a template. Sparkie
+                Choose an existing Notion page, create a new one or start with a template. Seo Potion
                 works with any Notion page.
               </p>
             </div>
@@ -424,10 +427,10 @@ export default function LandingPage() {
               </div>
               <p className="mb-2 font-medium text-[#F6AD55] text-sm">Step 2</p>
               <h3 className="mb-3 font-bold text-white text-xl">
-                Paste the Notion page&apos;s web link in Sparkie
+                Paste the Notion page&apos;s web link in Seo Potion
               </h3>
               <p className="text-gray-400 text-sm leading-relaxed">
-                Publish your Notion page via the Share menu and paste the Notion web link in Sparkie
+                Publish your Notion page via the Share menu and paste the Notion web link in Seo Potion
                 when creating a site.
               </p>
             </div>
@@ -478,53 +481,54 @@ export default function LandingPage() {
         </div>
       </section> */}
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-16 text-center">
-            <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
-              {t('testimonialsTitle')}
-            </h2>
-            <p className="text-gray-600 text-lg">{t('testimonialsDescription')}</p>
-          </div>
-          <div className="grid gap-8 md:grid-cols-3">
-            {testimonialCards.map((testimonial) => (
-              <div
-                key={testimonial.author}
-                className="rounded-2xl border border-gray-100 bg-white p-6"
-              >
-                <div className="mb-4 flex gap-1 text-yellow-400">
-                  {starKeys.map((starKey) => (
-                    <svg
-                      key={starKey}
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
+        <section className="px-6 py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-16 text-center">
+              <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
+                {t('testimonialsTitle')}
+              </h2>
+              <p className="text-gray-600 text-lg">{t('testimonialsDescription')}</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-3">
+              {testimonialCards.map((testimonial) => (
+                <div
+                  key={testimonial.author}
+                  className="rounded-2xl border border-gray-100 bg-white p-6"
+                >
+                  <div className="mb-4 flex gap-1 text-yellow-400">
+                    {starKeys.map((starKey) => (
+                      <svg
+                        key={starKey}
+                        aria-hidden="true"
+                        className="h-5 w-5"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <p className="mb-6 text-gray-700">&ldquo;{testimonial.quote}&rdquo;</p>
+                  <div>
+                    <p className="font-semibold text-gray-900">{testimonial.author}</p>
+                    <p className="text-gray-500 text-sm">{testimonial.role}</p>
+                  </div>
                 </div>
-                <p className="mb-6 text-gray-700">&ldquo;{testimonial.quote}&rdquo;</p>
-                <div>
-                  <p className="font-semibold text-gray-900">{testimonial.author}</p>
-                  <p className="text-gray-500 text-sm">{testimonial.role}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-gray-700 md:p-12">
-            <h2 className="mb-4 font-bold text-3xl md:text-4xl">{t('finalCta.title')}</h2>
-            <p className="mx-auto mb-8 max-w-2xl text-xl">{t('finalCta.description')}</p>
-            <WishlistForm source="landing_final_cta" />
+        <section className="px-6 py-20">
+          <div className="mx-auto max-w-4xl">
+            <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-gray-700 md:p-12">
+              <h2 className="mb-4 font-bold text-3xl md:text-4xl">{t('finalCta.title')}</h2>
+              <p className="mx-auto mb-8 max-w-2xl text-xl">{t('finalCta.description')}</p>
+              <WishlistForm source="landing_final_cta" />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <footer className="border-gray-100 border-t px-6 py-12">
         <div className="mx-auto max-w-6xl">
@@ -548,6 +552,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-    </div>
+    </>
   );
 }

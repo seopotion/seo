@@ -21,6 +21,7 @@ import { Button } from '@/components/ui';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 type ProductOrganization = {
@@ -128,6 +129,7 @@ export function ProductShell({ children }: { children: ReactNode }) {
 
   function logout() {
     clearToken();
+    clearWorkspaceStatusCache();
     router.replace('/');
   }
 

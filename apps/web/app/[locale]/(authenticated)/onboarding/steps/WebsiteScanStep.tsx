@@ -1,4 +1,3 @@
-import type { SetupStatus } from '@shared/schemas';
 import { useTranslations } from 'next-intl';
 import { Alert, AlertDescription, Button, Input, Label } from '@/components/ui';
 import { ErrorMessage } from '../components/ErrorMessage';
@@ -9,17 +8,13 @@ export function WebsiteScanStep({
   form,
   onScanWebsite,
   onWebsiteUrlChange,
-  orgId,
   scanState,
-  setupStatus,
 }: {
   errors: Errors;
   form: OnboardingForm;
   onScanWebsite: () => void;
   onWebsiteUrlChange: (value: string) => void;
-  orgId: string | null;
   scanState: ScanState;
-  setupStatus: SetupStatus | null;
 }) {
   const t = useTranslations('Onboarding.websiteScan');
 
@@ -57,12 +52,6 @@ export function WebsiteScanStep({
           </Alert>
         )}
       </div>
-      {(orgId || setupStatus) && (
-        <p className="mt-3 text-gray-500 text-xs">
-          {orgId ? t('orgStatus', { orgId }) : t('setupStatus')}{' '}
-          {setupStatus ? `- ${setupStatus}` : ''}
-        </p>
-      )}
       <ErrorMessage>{errors.scan}</ErrorMessage>
     </div>
   );

@@ -171,7 +171,7 @@ billing/subscription. The active product is tracked in a `current_product_id` co
 discounts).
 
 **The `products` entity (theirs, ~50 columns — the real tenant record).** Confirms the
-scan/onboarding output lives here, not on the org: `name` ("Sparkie"), `url`, `description`
+scan/onboarding output lives here, not on the org: `name` ("Seo Potion"), `url`, `description`
 (rich markdown — features/advantages/problems-solved, confirms parity-gaps G6),
 `target_audiences[]` (**5 segments — an array**, confirms G3), `niche`, `sitemap_url`,
 `blog_root_url`, `example_article_urls`, `status`. Plus operational flags our baseline has no
@@ -397,7 +397,7 @@ keyword to help you rank."
 - Article generation itself (keyword → published article) is a **later** worker; baseline
   can stop at "keywords scheduled".
 
-**Corrected trial observation (2026-07-01, Sparkie).** An earlier note here claimed the
+**Corrected trial observation (2026-07-01, Seo Potion).** An earlier note here claimed the
 trial planner stays *empty because keyword generation is paywalled*. **That was wrong** — it
 was async lag, not a paywall. Re-inspected on the paid trial: the account is a Stripe
 `trialing` subscription (plan **"All in One"**, `isTrialSubscription: true`) and the planner

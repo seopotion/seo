@@ -14,7 +14,7 @@ export function NavbarLinks() {
 
   return (
     <nav
-      className="order-3 col-span-2 flex items-center justify-start gap-1 overflow-x-auto sm:order-0 sm:col-span-1 sm:justify-center"
+      className="order-3 col-span-2 hidden sm:flex items-center justify-start gap-1 overflow-x-auto sm:order-0 sm:col-span-1 sm:justify-center"
       aria-label={t('primaryNavigation')}
     >
       {NAV_LINKS.map((link) => (

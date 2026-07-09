@@ -1,11 +1,19 @@
 {
   "AuthGuard": {
-    "checkingSession": "Oturumunuz kontrol ediliyor..."
+    "checkingSession": "Oturumunuz kontrol ediliyor...",
+    "checkingWorkspace": "Çalışma alanınız kontrol ediliyor...",
+    "retry": "Tekrar dene",
+    "workspaceError": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin."
   },
   "GoogleJoinButton": {
+    "checkingWorkspace": "Çalışma alanı kontrol ediliyor...",
     "label": "Google ile katıl",
     "loading": "Google ile oturum açma yükleniyor",
-    "notConfigured": "Google ile oturum açma yapılandırılmamış"
+    "notConfigured": "Google ile oturum açma yapılandırılmamış",
+    "retry": "Tekrar dene",
+    "signInError": "Google ile oturum açılamadı. Tekrar deneyin.",
+    "signingIn": "Oturum açılıyor...",
+    "workspaceError": "Çalışma alanınız kontrol edilemedi."
   },
   "HomePage": {
     "articles": {
@@ -257,7 +265,8 @@
       "finalizing": "Tamamlanıyor...",
       "getStarted": "Başla",
       "next": "İleri",
-      "remove": "{value} değerini kaldır"
+      "remove": "{value} değerini kaldır",
+      "retry": "Tekrar dene"
     },
     "articleSettings": {
       "articleStyle": "Makale stili",
@@ -293,7 +302,9 @@
       "selectLanguage": "Dil seç",
       "title": "İşletmeniz Hakkında"
     },
+    "checkingWorkspace": "Çalışma alanınız kontrol ediliyor...",
     "errors": {
+      "checkWorkspace": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin.",
       "checkScanStatus": "Tarama durumu kontrol edilemedi. Tekrar taramayı deneyin.",
       "completeScanBeforeFinalize": "Kurulumu tamamlamadan önce web sitesi taramasını bitirin.",
       "finalize": "Kurulum tamamlanamadı. Alanları gözden geçirip tekrar deneyin.",
