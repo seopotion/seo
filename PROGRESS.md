@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Local development
 
 - ✅ `npm run dev` runs api + worker + web (concurrently); local API server, ElasticMQ SQS, `db:init` — all verified live
-- ✅ Management CLI (`apps/cli`, citty) — `npm run cli -- <infra check | db init>`, `--output json` for agents
+- ✅ Management CLI (`apps/cli`, citty) — `npm run cli -- <infra check | db init | db set-plan>`, `--output json` for agents. `db set-plan --org|--user <email> --plan` is a dev/staging paywall escape hatch until Stripe billing lands ([#13](https://github.com/seopotion/seo/issues/13))
 
 ## Always-green gates
 
