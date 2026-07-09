@@ -6,7 +6,7 @@ import {
   type SetupPresets,
   SetupPresetsSchema,
 } from '@shared/schemas';
-import type { SetupStatus, StrategyStatus } from '@shared/types';
+import type { EntitlementPlan, SetupStatus, StrategyStatus } from '@shared/types';
 import { type Document, ObjectId, type WithId } from 'mongodb';
 import { getDb } from '../client';
 
@@ -104,5 +104,16 @@ export const OrgRepo = {
       { _id: new ObjectId(id) },
       { $set: { strategy_status: status } },
     );
+  },
+
+  /**
+   * Override the entitlement plan directly. A dev/staging admin escape hatch
+   * (via the `db set-plan` CLI) while Stripe billing (#13) is unbuilt. Returns
+   * true when an org matched the id.
+   */
+  async setPlan(id: string, plan: EntitlementPlan): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { plan } });
+    return res.matchedCount === 1;
   },
 };

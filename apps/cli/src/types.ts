@@ -56,6 +56,11 @@ export interface DbInitData {
   collections: string[];
 }
 
+export interface SetPlanData {
+  org_id: string;
+  plan: string;
+}
+
 export type Stage = 'staging' | 'prod';
 
 export interface PrereqCheck {

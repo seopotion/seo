@@ -1,3 +1,4 @@
+import { ObjectId } from 'mongodb';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '../src/client';
 import { OrgRepo } from '../src/repositories/org.repo';
@@ -44,5 +45,25 @@ describe('OrgRepo (integration)', () => {
 
   test('findById returns null for an invalid id', async () => {
     expect(await OrgRepo.findById('not-an-objectid')).toBeNull();
+  });
+
+  test('setPlan flips the entitlement plan and reports the match', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_1',
+      website_url: 'https://plan.com',
+      setup_status: 'setup_scan_in_progress',
+    });
+    expect(org.plan).toBe('free');
+
+    const matched = await OrgRepo.setPlan(org.id, 'paid');
+    expect(matched).toBe(true);
+
+    const found = await OrgRepo.findById(org.id);
+    expect(found?.plan).toBe('paid');
+  });
+
+  test('setPlan returns false when no org matches', async () => {
+    expect(await OrgRepo.setPlan(new ObjectId().toString(), 'paid')).toBe(false);
+    expect(await OrgRepo.setPlan('not-an-objectid', 'paid')).toBe(false);
   });
 });
