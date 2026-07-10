@@ -1,9 +1,13 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
+import { clearToken } from '@/lib/auth';
+import { useActiveOrganization } from '@/lib/organizations';
+import { clearWorkspaceStatusCache } from '@/lib/session';
 
 type HomeData = {
   published: number;
@@ -21,21 +25,60 @@ const emptyHomeData: HomeData = {
 
 export default function HomePage() {
   const t = useTranslations('HomePage');
+  const {
+    error: organizationError,
+    loading: organizationLoading,
+    organization,
+  } = useActiveOrganization();
+  const router = useRouter();
   const [data, setData] = useState<HomeData | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const handleUnauthorized = useCallback(() => {
+    clearToken();
+    clearWorkspaceStatusCache();
+    router.replace('/');
+  }, [router]);
+
   // Dashboard endpoints are typed via AppType. Change a route schema in
   // apps/api and this file fails to type-check.
   useEffect(() => {
+    if (organizationLoading) return;
+
+    let cancelled = false;
+
     void (async () => {
+      setLoading(true);
+
       try {
+        if (organizationError || !organization) {
+          setData(emptyHomeData);
+          setLoadError(Boolean(organizationError));
+          return;
+        }
+
         const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
-          api.api.v0.dashboard.articles.published.$get(),
-          api.api.v0.dashboard.articles.planned.$get(),
+          api.api.v0.dashboard.articles.published.$get({
+            query: { org_id: organization.id },
+          }),
+          api.api.v0.dashboard.articles.planned.$get({
+            query: { org_id: organization.id },
+          }),
           api.api.v0.dashboard.articles.best.$get(),
           api.api.v0.dashboard.integrations.connected.$get(),
         ]);
+
+        if (cancelled) return;
+
+        if (
+          [publishedRes, plannedRes, bestRes, integrationsRes].some(
+            (response) => (response.status as number) === 401,
+          )
+        ) {
+          handleUnauthorized();
+          return;
+        }
 
         setData({
           published: publishedRes.ok ? (await publishedRes.json()).count : 0,
@@ -43,14 +86,23 @@ export default function HomePage() {
           bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
           integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
         });
+        setLoadError(Boolean(organizationError));
       } catch {
-        setData(emptyHomeData);
-        setLoadError(true);
+        if (!cancelled) {
+          setData(emptyHomeData);
+          setLoadError(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleUnauthorized, organization, organizationError, organizationLoading]);
 
   if (loading) {
     return (
@@ -82,6 +134,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
+        {/*
         <Card className="border-slate-200 shadow-none">
           <CardHeader>
             <CardTitle>{t('backlinks.title')}</CardTitle>
@@ -97,6 +150,7 @@ export default function HomePage() {
             </button>
           </CardContent>
         </Card>
+        */}
 
         <Card className="border-slate-200 shadow-none">
           <CardHeader>

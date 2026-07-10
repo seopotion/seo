@@ -1,40 +1,150 @@
 'use client';
 
-import { Archive, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { Archive, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Card, CardContent, Separator } from '@/components/ui';
+import { Link, useRouter } from '@/i18n/navigation';
+import { api } from '@/lib/api';
+import { clearToken } from '@/lib/auth';
+import { useActiveOrganization } from '@/lib/organizations';
+import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
-type PublishedArticle = {
-  id: string;
-  title: string;
-  keyword: string;
-  publishedAt: string; // ISO date string
-  volume: number;
+type ArticleListStatus = 'generated' | 'published' | 'deleted';
+
+type ArticleListItemResponse = {
+  created_at: string;
   difficulty: number;
-  contentUrl?: string;
+  id: string;
+  keyword: string;
+  published_at: string | null;
+  search_volume: number;
+  status: ArticleListStatus;
+  title: string;
+};
+
+type PublishedArticle = {
+  difficulty: number;
+  id: string;
+  keyword: string;
+  publishedAt: string;
+  status: ArticleListStatus;
+  title: string;
+  volume: number;
 };
 
 const ARTICLES_PER_PAGE = 20;
-const publishedArticles: PublishedArticle[] = [];
 
 export default function ContentHistoryPage() {
   const t = useTranslations('ContentHistoryPage');
   const locale = useLocale();
+  const router = useRouter();
+  const {
+    error: organizationError,
+    loading: organizationLoading,
+    organization,
+  } = useActiveOrganization();
   const [page, setPage] = useState(1);
+  const [articles, setArticles] = useState<PublishedArticle[]>([]);
+  const [totalArticles, setTotalArticles] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  const handleUnauthorized = useCallback(() => {
+    clearToken();
+    clearWorkspaceStatusCache();
+    router.replace('/');
+  }, [router]);
+
+  useEffect(() => {
+    if (organizationLoading) return;
+
+    if (organizationError || !organization) {
+      setArticles([]);
+      setTotalArticles(0);
+      setLoadError(Boolean(organizationError));
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    setLoading(true);
+    setLoadError(false);
+
+    let refetchingClampedPage = false;
+
+    void (async () => {
+      try {
+        const offset = (page - 1) * ARTICLES_PER_PAGE;
+        const response = await api.api.v0.dashboard.articles.$get({
+          query: {
+            org_id: organization.id,
+            limit: ARTICLES_PER_PAGE,
+            offset,
+            status: 'published',
+          },
+        });
+
+        if (cancelled) return;
+
+        if ((response.status as number) === 401) {
+          handleUnauthorized();
+          return;
+        }
+
+        if ((response.status as number) === 404) {
+          setArticles([]);
+          setTotalArticles(0);
+          setLoadError(true);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('articles_load_failed');
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          const responseTotalPages = getTotalPages(data.total);
+
+          if (page > responseTotalPages) {
+            refetchingClampedPage = true;
+            setPage(responseTotalPages);
+            return;
+          }
+
+          setArticles(mapArticleRows(data.articles));
+          setTotalArticles(data.total);
+        }
+      } catch {
+        if (!cancelled) {
+          setArticles([]);
+          setTotalArticles(0);
+          setLoadError(true);
+        }
+      } finally {
+        if (!cancelled && !refetchingClampedPage) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleUnauthorized, organization, organizationError, organizationLoading, page]);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
     [locale],
   );
-  const sortedArticles = useMemo(() => sortArticlesByPublishDate(publishedArticles), []);
-  const totalArticles = sortedArticles.length;
-  const totalPages = Math.max(1, Math.ceil(totalArticles / ARTICLES_PER_PAGE));
+  const totalPages = getTotalPages(totalArticles);
   const currentPage = Math.min(page, totalPages);
   const startIndex = totalArticles === 0 ? 0 : (currentPage - 1) * ARTICLES_PER_PAGE;
-  const visibleArticles = sortedArticles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
-  const endIndex = totalArticles === 0 ? 0 : startIndex + visibleArticles.length;
+  const endIndex = totalArticles === 0 ? 0 : startIndex + articles.length;
   const rangeLabel =
     totalArticles === 0
       ? t('pagination.emptyRange')
@@ -43,6 +153,12 @@ export default function ContentHistoryPage() {
           start: startIndex + 1,
           total: totalArticles,
         });
+  const statusMessage = getHistoryStatusMessage({
+    loadError,
+    loading: loading || organizationLoading,
+    organizationError,
+    t,
+  });
 
   return (
     <div className="grid gap-4">
@@ -68,9 +184,11 @@ export default function ContentHistoryPage() {
           <span>{t('columns.publishDate')}</span>
         </div>
 
-        {visibleArticles.length > 0 ? (
+        {statusMessage ? (
+          <StatusState message={statusMessage} />
+        ) : articles.length > 0 ? (
           <div className="divide-y divide-slate-200">
-            {visibleArticles.map((article) => (
+            {articles.map((article) => (
               <DesktopArticleRow
                 key={article.id}
                 article={article}
@@ -86,8 +204,10 @@ export default function ContentHistoryPage() {
       </section>
 
       <section aria-label={t('listLabel')} className="grid gap-2 md:hidden">
-        {visibleArticles.length > 0 ? (
-          visibleArticles.map((article) => (
+        {statusMessage ? (
+          <StatusState message={statusMessage} framed />
+        ) : articles.length > 0 ? (
+          articles.map((article) => (
             <MobileArticleCard
               key={article.id}
               article={article}
@@ -103,7 +223,7 @@ export default function ContentHistoryPage() {
 
       <PaginationControls
         currentPage={currentPage}
-        disabled={totalArticles === 0}
+        disabled={totalArticles === 0 || Boolean(statusMessage)}
         pageSize={ARTICLES_PER_PAGE}
         rangeLabel={rangeLabel}
         setPage={setPage}
@@ -129,34 +249,16 @@ function DesktopArticleRow({
   const rowClassName =
     'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_10rem_7rem_7rem] items-center gap-0 px-4 py-3 text-sm';
 
-  if (article.contentUrl) {
-    return (
-      <a
-        href={article.contentUrl}
-        aria-label={t('actions.openArticle', { title: article.title })}
-        className={cn(
-          rowClassName,
-          'text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-        )}
-      >
-        <ArticleName title={article.title} linked />
-        <span className="min-w-0 truncate px-3 text-slate-600">{article.keyword}</span>
-        <span className="min-w-0 truncate text-slate-600">
-          {formatNumber(article.volume, locale)}
-        </span>
-        <span className="min-w-0 truncate text-slate-600">
-          {formatNumber(article.difficulty, locale)}
-        </span>
-        <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
-          {publishedDate}
-        </time>
-      </a>
-    );
-  }
-
   return (
-    <div className={cn(rowClassName, 'text-slate-700')}>
-      <ArticleName title={article.title} />
+    <Link
+      href={`/content-history/${article.id}`}
+      aria-label={t('actions.openArticle', { title: article.title })}
+      className={cn(
+        rowClassName,
+        'text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+      )}
+    >
+      <ArticleName title={article.title} linked />
       <span className="min-w-0 truncate px-3 text-slate-600">{article.keyword}</span>
       <span className="min-w-0 truncate text-slate-600">
         {formatNumber(article.volume, locale)}
@@ -167,7 +269,7 @@ function DesktopArticleRow({
       <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
         {publishedDate}
       </time>
-    </div>
+    </Link>
   );
 }
 
@@ -183,61 +285,52 @@ function MobileArticleCard({
   t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
 }) {
   const publishedDate = formatPublishedDate(article.publishedAt, dateFormatter);
-  const card = (
-    <Card className="gap-3 border-slate-200 py-4 shadow-none">
-      <CardContent className="grid gap-3 px-4">
-        <ArticleName title={article.title} linked={Boolean(article.contentUrl)} />
-        <Separator />
-        <dl className="grid grid-cols-2 gap-3 text-sm">
-          <div className="min-w-0">
-            <dt className="text-slate-500 text-xs">{t('columns.keyword')}</dt>
-            <dd className="mt-1 truncate font-medium text-slate-700">{article.keyword}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-slate-500 text-xs">{t('columns.volume')}</dt>
-            <dd className="mt-1 truncate font-medium text-slate-700">
-              {formatNumber(article.volume, locale)}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-slate-500 text-xs">{t('columns.difficulty')}</dt>
-            <dd className="mt-1 truncate font-medium text-slate-700">
-              {formatNumber(article.difficulty, locale)}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-slate-500 text-xs">{t('columns.publishDate')}</dt>
-            <dd className="mt-1 truncate font-medium text-slate-700">
-              <time dateTime={article.publishedAt}>{publishedDate}</time>
-            </dd>
-          </div>
-        </dl>
-      </CardContent>
-    </Card>
+
+  return (
+    <Link
+      href={`/content-history/${article.id}`}
+      aria-label={t('actions.openArticle', { title: article.title })}
+      className="block rounded-lg transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Card className="gap-3 border-slate-200 py-4 shadow-none">
+        <CardContent className="grid gap-3 px-4">
+          <ArticleName title={article.title} linked />
+          <Separator />
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div className="min-w-0">
+              <dt className="text-slate-500 text-xs">{t('columns.keyword')}</dt>
+              <dd className="mt-1 truncate font-medium text-slate-700">{article.keyword}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-slate-500 text-xs">{t('columns.volume')}</dt>
+              <dd className="mt-1 truncate font-medium text-slate-700">
+                {formatNumber(article.volume, locale)}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-slate-500 text-xs">{t('columns.difficulty')}</dt>
+              <dd className="mt-1 truncate font-medium text-slate-700">
+                {formatNumber(article.difficulty, locale)}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-slate-500 text-xs">{t('columns.publishDate')}</dt>
+              <dd className="mt-1 truncate font-medium text-slate-700">
+                <time dateTime={article.publishedAt}>{publishedDate}</time>
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
+    </Link>
   );
-
-  if (article.contentUrl) {
-    return (
-      <a
-        href={article.contentUrl}
-        aria-label={t('actions.openArticle', { title: article.title })}
-        className="block rounded-lg transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {card}
-      </a>
-    );
-  }
-
-  return card;
 }
 
 function ArticleName({ linked = false, title }: { linked?: boolean; title: string }) {
   return (
     <span className="flex min-w-0 items-center gap-2 pr-3">
       <span className="min-w-0 truncate font-medium text-slate-950">{title}</span>
-      {linked ? (
-        <ExternalLink className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
-      ) : null}
+      {linked ? <FileText className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
     </span>
   );
 }
@@ -263,6 +356,19 @@ function EmptyState({
         <h2 className="mt-4 font-semibold text-base text-slate-950">{t('empty.title')}</h2>
         <p className="mt-2 text-slate-600 text-sm leading-6">{t('empty.description')}</p>
       </div>
+    </div>
+  );
+}
+
+function StatusState({ framed = false, message }: { framed?: boolean; message: string }) {
+  return (
+    <div
+      className={cn(
+        'grid place-items-center bg-white px-4 py-12 text-center text-slate-600 text-sm',
+        framed && 'rounded-lg border border-slate-200',
+      )}
+    >
+      {message}
     </div>
   );
 }
@@ -329,14 +435,38 @@ function PaginationControls({
   );
 }
 
-function sortArticlesByPublishDate(articles: PublishedArticle[]) {
-  return [...articles].sort((first, second) => getPublishTime(second) - getPublishTime(first));
+function getHistoryStatusMessage({
+  loadError,
+  loading,
+  organizationError,
+  t,
+}: {
+  loadError: boolean;
+  loading: boolean;
+  organizationError: ReturnType<typeof useActiveOrganization>['error'];
+  t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
+}) {
+  if (loading) return t('status.loading');
+  if (organizationError === 'no_organization') return t('status.noOrganization');
+  if (organizationError) return t('status.organizationError');
+  if (loadError) return t('status.loadError');
+  return null;
 }
 
-function getPublishTime(article: PublishedArticle) {
-  const timestamp = new Date(article.publishedAt).getTime();
+function mapArticleRows(articles: ArticleListItemResponse[]): PublishedArticle[] {
+  return articles.map((article) => ({
+    difficulty: article.difficulty,
+    id: article.id,
+    keyword: article.keyword,
+    publishedAt: article.published_at ?? article.created_at,
+    status: article.status,
+    title: article.title,
+    volume: article.search_volume,
+  }));
+}
 
-  return Number.isNaN(timestamp) ? 0 : timestamp;
+function getTotalPages(totalArticles: number) {
+  return Math.max(1, Math.ceil(totalArticles / ARTICLES_PER_PAGE));
 }
 
 function formatPublishedDate(publishedAt: string, formatter: Intl.DateTimeFormat) {

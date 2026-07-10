@@ -6,29 +6,22 @@ import {
   FileSliders,
   Home,
   LayoutList,
-  Link2,
+  // Link2,
   LogOut,
-  Megaphone,
+  // Megaphone,
   Settings,
   Sparkles,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import type { CSSProperties, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher';
 import { Button } from '@/components/ui';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
-import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
-
-type ProductOrganization = {
-  id: string;
-  name?: string;
-  website_url: string;
-};
 
 const navItems = [
   { href: '/home', key: 'home', icon: Home },
@@ -52,16 +45,16 @@ const navItems = [
     key: 'articleImprovements',
     icon: Sparkles,
   },
-  {
-    href: '/backlinks',
-    key: 'backlinks',
-    icon: Link2,
-  },
-  {
-    href: '/ads',
-    key: 'ads',
-    icon: Megaphone,
-  },
+  // {
+  //   href: '/backlinks',
+  //   key: 'backlinks',
+  //   icon: Link2,
+  // },
+  // {
+  //   href: '/ads',
+  //   key: 'ads',
+  //   icon: Megaphone,
+  // },
   {
     href: '/analytics',
     key: 'analytics',
@@ -82,9 +75,10 @@ export function ProductShell({ children }: { children: ReactNode }) {
   const t = useTranslations('ProductShell');
   const pathname = usePathname();
   const router = useRouter();
-  const [organization, setOrganization] = useState<ProductOrganization | null>(null);
-  const [organizationLoaded, setOrganizationLoaded] = useState(false);
-  const activeItem = navItems.find((item) => item.href === pathname) ?? navItems[0];
+  const { organization } = useActiveOrganization();
+  const activeItem =
+    navItems.find((item) => item.href === pathname || pathname.startsWith(`${item.href}/`)) ??
+    navItems[0];
   const isHome = pathname === '/home';
   const topbarTitle = isHome
     ? (organization?.name ?? t('organizationFallback'))
@@ -92,40 +86,6 @@ export function ProductShell({ children }: { children: ReactNode }) {
   const topbarDescription = isHome
     ? (organization?.website_url ?? t(`nav.${activeItem.key}.description`))
     : t(`nav.${activeItem.key}.description`);
-
-  useEffect(() => {
-    if (!isHome || organizationLoaded) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const orgsRes = await api.api.v0.core.organizations.$get();
-
-        if (orgsRes.ok) {
-          const { organizations } = await orgsRes.json();
-
-          if (!cancelled) {
-            setOrganization(organizations[0] ?? null);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setOrganization(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setOrganizationLoaded(true);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isHome, organizationLoaded]);
 
   function logout() {
     clearToken();
@@ -147,7 +107,7 @@ export function ProductShell({ children }: { children: ReactNode }) {
           <nav className="flex flex-col">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
               return (
                 <Link

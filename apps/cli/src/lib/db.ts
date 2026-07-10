@@ -3,9 +3,24 @@
  * logic) behind the Result contract; setOrgPlan is a dev/staging escape hatch
  * for the paid-entitlement gate while Stripe billing (#13) is unbuilt.
  */
-import { closeDb, ensureIndexes, OrgRepo, UserRepo } from '@shared/db';
+import {
+  ArticleRepo,
+  CandidateRepo,
+  closeDb,
+  ensureIndexes,
+  KeywordRepo,
+  OrgRepo,
+  UserRepo,
+} from '@shared/db';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
-import { type DbInitData, fail, ok, type Result, type SetPlanData } from '../types';
+import {
+  type DbInitData,
+  fail,
+  ok,
+  type ResetUserData,
+  type Result,
+  type SetPlanData,
+} from '../types';
 
 export async function initDb(): Promise<Result<DbInitData>> {
   try {
@@ -71,6 +86,35 @@ export async function setOrgPlan(input: {
     const matched = await OrgRepo.setPlan(orgId as string, plan);
     if (!matched) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
     return ok({ org_id: orgId as string, plan });
+  } finally {
+    await closeDb();
+  }
+}
+
+/**
+ * Delete a user's orgs and all org-scoped data (keywords, candidates,
+ * articles) so the next login re-runs onboarding. The user document stays —
+ * login recreates session state and the onboarding gate is org-presence.
+ * Idempotent: a user with no orgs is a success with zero counts. Operates
+ * against whatever `MONGODB_URI` is configured.
+ */
+export async function resetUser(input: { user?: string }): Promise<Result<ResetUserData>> {
+  const { user } = input;
+  if (!user) return fail('BAD_TARGET', 'Provide --user <email>.');
+
+  try {
+    const found = await UserRepo.findByEmail(user);
+    if (!found) return fail('USER_NOT_FOUND', `No user with email "${user}".`);
+
+    const orgs = await OrgRepo.findByUserId(found.id);
+    const deleted = { orgs: 0, keywords: 0, candidates: 0, articles: 0 };
+    for (const org of orgs) {
+      deleted.keywords += await KeywordRepo.deleteByOrgId(org.id);
+      deleted.candidates += await CandidateRepo.deleteByOrgId(org.id);
+      deleted.articles += await ArticleRepo.deleteByOrgId(org.id);
+      if (await OrgRepo.deleteById(org.id)) deleted.orgs += 1;
+    }
+    return ok({ user_id: found.id, org_ids: orgs.map((o) => o.id), deleted });
   } finally {
     await closeDb();
   }

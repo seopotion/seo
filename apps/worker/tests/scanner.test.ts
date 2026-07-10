@@ -2,14 +2,13 @@ import { SetupPresetsSchema } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
 import { scanWebsite } from '../src/scanner';
 
-describe('scanWebsite (mock)', () => {
-  test('derives brand and URLs from the website host', async () => {
+describe('scanWebsite', () => {
+  test('does not generate placeholder business, competitor, or blog data', async () => {
     const presets = await scanWebsite('https://www.clewas.com/');
 
-    expect(presets.business.name).toBe('Clewas');
-    expect(presets.blog.sitemap_url).toBe('https://clewas.com/sitemap.xml');
-    expect(presets.blog.main_blog_url).toBe('https://clewas.com/blog');
-    expect(presets.article_preferences.content_seo.internal_links).toBe(true);
+    expect(presets.business).toEqual({ name: '', language: '', country: '', description: '' });
+    expect(presets.audience).toEqual({ target: '', competitors: [] });
+    expect(presets.blog).toEqual({ sitemap_url: '', main_blog_url: '', best_articles: [] });
   });
 
   test('output validates against SetupPresetsSchema', async () => {
@@ -19,6 +18,6 @@ describe('scanWebsite (mock)', () => {
 
   test('falls back gracefully for an invalid URL', async () => {
     const presets = await scanWebsite('not a url');
-    expect(presets.business.name).toBe('Example');
+    expect(presets.business.name).toBe('');
   });
 });

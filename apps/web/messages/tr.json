@@ -46,7 +46,8 @@
     "actions": {
       "closeDetails": "Detayları kapat",
       "openArticle": "{title} detaylarını aç",
-      "researchKeyword": "AI ile anahtar kelime araştır"
+      "researchKeyword": "AI ile anahtar kelime araştır",
+      "viewArticle": "Makaleyi görüntüle"
     },
     "activeRange": "Aktif dönem",
     "agendaLabel": "İçerik ajanda listesi",
@@ -61,7 +62,73 @@
     },
     "calendarLabel": "İçerik takvimi ızgarası",
     "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
+    "editor": {
+      "actions": {
+        "close": "Editörü kapat",
+        "continueEditing": "Düzenlemeye devam et",
+        "discard": "Değişiklikleri at",
+        "save": "Oturum taslağını kaydet",
+        "saved": "Oturum taslağı kaydedildi"
+      },
+      "articleStatuses": {
+        "deleted": "Silindi",
+        "generated": "Oluşturuldu",
+        "published": "Yayınlandı"
+      },
+      "closeConfirmation": {
+        "description": "Kaydedilmemiş değişiklikler var. Değişiklikleri atın veya düzenlemeye devam edin."
+      },
+      "fields": {
+        "content": "Markdown içerik",
+        "featuredImage": "Öne çıkan görsel",
+        "featuredImagePlaceholder": "Öne çıkan görsel önizlemesi burada görünecek",
+        "metaDescription": "Meta açıklama",
+        "metaTitle": "Meta başlık",
+        "slug": "Slug",
+        "title": "Makale başlığı"
+      },
+      "imageStatuses": {
+        "complete": "Görsel tamamlandı",
+        "failed": "Görsel başarısız",
+        "pending": "Görsel bekliyor"
+      },
+      "mock": {
+        "conclusion": "{keyword} konusunu net bir okuyucu kararıyla ve bu makalenin desteklemesi gereken sonraki adımla bağlayarak bitirin.",
+        "conclusionHeading": "Sonraki adım",
+        "intent": "{keyword} arayan kişiler önce doğrudan bir cevap, ardından öneriye güvenmek için yeterli pratik detay ister.",
+        "intentHeading": "Arama niyeti",
+        "introduction": "{keyword} konusunun arkasındaki temel problemle başlayın ve okuyucunun karar vermeden önce ne öğreneceğini açıklayın.",
+        "metaDescription": "{keyword} için arama niyeti, okuyucu soruları, içerik yapısı ve yayın ekipleri için sonraki adımları kapsayan pratik SEO makale taslağı.",
+        "structure": "Yayından önce incelemeyi kolaylaştıran kısa bölümler, taranabilir başlıklar ve örnekler kullanın.",
+        "structureHeading": "Önerilen yapı"
+      },
+      "preview": {
+        "empty": "Önizlenecek içerik yok."
+      },
+      "sections": {
+        "context": "Bağlam"
+      },
+      "status": {
+        "localOnly": "Kaydedilmemiş oturum taslağı",
+        "notGenerated": "Bu makale henüz oluşturulmadı.",
+        "unsavedChanges": "Kaydedilmemiş değişiklikler",
+        "updatedAt": "Oturum taslağı kaydedildi {date}"
+      },
+      "tabs": {
+        "editor": "Editör",
+        "label": "Makale editörü modu",
+        "preview": "Önizleme"
+      },
+      "title": "Makale editörü",
+      "validation": {
+        "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
+        "metaDescriptionTarget": "Hedef: 120-160 karakter.",
+        "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
+        "required": "Zorunlu"
+      }
+    },
     "modal": {
+      "keyword": "Anahtar kelime",
       "scheduledDate": "Planlanan tarih",
       "status": "Durum",
       "title": "Makale detayları",
@@ -78,6 +145,12 @@
     "statuses": {
       "generated": "Oluşturuldu",
       "planned": "Planlandı"
+    },
+    "status": {
+      "loadError": "İçerik planlayıcı yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "loading": "İçerik planlayıcı yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
     },
     "title": "İçerik takvimi"
   },
@@ -109,12 +182,42 @@
       "previous": "Önceki",
       "range": "{start}-{end} / {total}"
     },
+    "status": {
+      "loadError": "İçerik geçmişi yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "loading": "İçerik geçmişi yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+    },
     "tableLabel": "Yayınlanan makaleler tablosu",
     "title": "İçerik geçmişi"
   },
+  "ArticleDetailPage": {
+    "actions": {
+      "back": "İçerik geçmişine dön"
+    },
+    "labels": {
+      "createdAt": "Oluşturulma",
+      "keywordId": "Anahtar kelime ID",
+      "notPublished": "Yayınlanmadı",
+      "publishedAt": "Yayınlanma",
+      "slug": "Slug"
+    },
+    "status": {
+      "loadError": "Bu makale yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "loading": "Makale yükleniyor...",
+      "notFound": "Makale bulunamadı."
+    },
+    "statuses": {
+      "deleted": "Silindi",
+      "generated": "Oluşturuldu",
+      "published": "Yayınlandı"
+    },
+    "title": "Makale"
+  },
   "ArticleSettingsPage": {
     "actions": {
-      "save": "Kaydet"
+      "save": "Kaydet",
+      "saving": "Kaydediliyor..."
     },
     "fields": {
       "articleStyle": {
@@ -127,18 +230,28 @@
         "label": "Otomatik yayınlama"
       },
       "internalLinks": {
-        "description": "Her makaleye kaç iç bağlantı ekleneceğini seçin.",
+        "description": "Oluşturulan makalelerde iç bağlantıların kullanılıp kullanılmayacağını seçin.",
         "label": "İç bağlantılar"
       },
       "tableOfContents": {
         "description": "Oluşturulan makalelere içindekiler bölümü ekleyin.",
         "label": "İçindekiler"
       }
+    },
+    "status": {
+      "loadError": "Makale ayarları yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "loading": "Makale ayarları yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
+      "saveError": "Makale ayarları kaydedilemedi. Tekrar deneyin.",
+      "saved": "Makale ayarları kaydedildi.",
+      "unsupportedFields": "Yalnızca makale stili ve iç bağlantıların açık olup olmadığı kaydedilir. Otomatik yayınlama ve içindekiler canlı API tarafından henüz desteklenmiyor."
     }
   },
   "SettingsPage": {
     "actions": {
-      "save": "Kaydet"
+      "save": "Kaydet",
+      "saving": "Kaydediliyor..."
     },
     "googleSearchConsole": {
       "comingSoon": "Yakında",
@@ -147,6 +260,15 @@
     },
     "placeholders": {
       "competitorUrl": "https://rakip.com"
+    },
+    "status": {
+      "integrationsUnsupported": "Entegrasyon seçimleri henüz kaydedilmiyor çünkü canlı entegrasyon API'si hazır değil.",
+      "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
+      "loading": "Ayarlar yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
+      "saveError": "Ayarlar kaydedilemedi. Tekrar deneyin.",
+      "saved": "Ayarlar kaydedildi."
     },
     "tabs": {
       "audienceCompetitors": "Hedef Kitle ve Rakipler",
@@ -517,7 +639,7 @@
     "onboarding": "Onboarding"
   },
   "ProductPlaceholderPage": {
-    "description": "Bu çalışma alanı, ilgili ürün akışı, veri çekme ve aksiyonlar için hazır.",
+    "description": "Bu özellik yakında yayınlanacak. Eğer acil olarak ihtiyacınız varsa yada başka bir isteğiniz olursa support@seopotıo.co üzerinden yazabilirsiniz.",
     "title": "Yakında"
   },
   "ProductShell": {

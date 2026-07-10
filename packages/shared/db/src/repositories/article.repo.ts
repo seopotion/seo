@@ -110,4 +110,10 @@ export const ArticleRepo = {
       { $set: { images_status: 'failed' } },
     );
   },
+
+  /** Delete every article for an org (used by the `db reset-user` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };

@@ -42,7 +42,7 @@ endpoint `/api/v0/setup/status` returns `setup_not_started` for any unknown
 
 Then we load the start scanning page.
 
-**Mockup — Start (Enter URL):** A single-field landing screen headed "Let's start with **your website**!" with subtext "Share your website URL and we'll instantly gather your business information to save you time." One URL input (e.g. `https://ridersdiary.sparkie.space/`) with a **Continue** button. A validation hint appears if no URL is entered.
+**Mockup — Start (Enter URL):** A single-field landing screen headed "Let's start with **your website**!" with subtext "Share your website URL and we'll instantly gather your business information to save you time." One URL input (e.g. `https://users-website.com`) with a **Continue** button. A validation hint appears if no URL is entered.
 
 Enter your website URL
 

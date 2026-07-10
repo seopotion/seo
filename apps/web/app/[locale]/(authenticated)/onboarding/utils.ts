@@ -14,17 +14,3 @@ export function isValidHttpUrl(value: string) {
     return false;
   }
 }
-
-function hostFromUrl(value: string) {
-  try {
-    return new URL(value.trim()).hostname.replace(/^www\./, '');
-  } catch {
-    return 'your website';
-  }
-}
-
-export function buildMockBusinessDescription(websiteUrl: string) {
-  const host = hostFromUrl(websiteUrl);
-
-  return `Based on the scan of ${host}, this business appears to help customers improve search visibility and content growth with practical, service-focused SEO support. The brand voice should be clear, useful, and confident for readers comparing solutions.`;
-}

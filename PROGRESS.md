@@ -20,7 +20,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 
 ## Setup / onboarding
 
-- ✅ `start_scan` → SQS → worker → `setup_scan_completed`; presets generated (mock `scanWebsite()`) + persisted
+- 🟡 `start_scan` → SQS → worker → `setup_scan_completed`; schema-valid empty presets persisted until backend real-data scan APIs are connected
 - ✅ `GET /setup/status`, `GET /setup/details`, `PATCH /setup/presets`, `POST /setup/finalize`
 - ✅ Identity server-owned (`org_id` = stringified `_id`); `start_scan` idempotent per (user, url)
 - 🟡 Onboarding parity backlog — baseline is a deliberate subset; deferred gaps in [`design/onboarding-parity-gaps.md`](design/onboarding-parity-gaps.md) — epic [#8](https://github.com/seopotion/seo/issues/8)

@@ -46,7 +46,8 @@
     "actions": {
       "closeDetails": "Close details",
       "openArticle": "Open {title} details",
-      "researchKeyword": "Research keyword with AI"
+      "researchKeyword": "Research keyword with AI",
+      "viewArticle": "View article"
     },
     "activeRange": "Active window",
     "agendaLabel": "Content agenda list",
@@ -61,7 +62,73 @@
     },
     "calendarLabel": "Content calendar grid",
     "description": "Plan one article per day across the next 45 days.",
+    "editor": {
+      "actions": {
+        "close": "Close editor",
+        "continueEditing": "Continue editing",
+        "discard": "Discard changes",
+        "save": "Save session draft",
+        "saved": "Session draft saved"
+      },
+      "articleStatuses": {
+        "deleted": "Deleted",
+        "generated": "Generated",
+        "published": "Published"
+      },
+      "closeConfirmation": {
+        "description": "You have unsaved changes. Discard them or continue editing."
+      },
+      "fields": {
+        "content": "Markdown content",
+        "featuredImage": "Featured image",
+        "featuredImagePlaceholder": "Featured image preview will appear here",
+        "metaDescription": "Meta description",
+        "metaTitle": "Meta title",
+        "slug": "Slug",
+        "title": "Article title"
+      },
+      "imageStatuses": {
+        "complete": "Image complete",
+        "failed": "Image failed",
+        "pending": "Image pending"
+      },
+      "mock": {
+        "conclusion": "End by connecting {keyword} back to a clear reader decision and the next step this article should support.",
+        "conclusionHeading": "Next step",
+        "intent": "People searching for {keyword} need a direct answer first, then enough practical detail to trust the recommendation.",
+        "intentHeading": "Search intent",
+        "introduction": "Start with the core problem behind {keyword} and explain what the reader will learn before making a decision.",
+        "metaDescription": "A practical SEO article draft for {keyword}, covering search intent, reader questions, content structure, and next steps for publishing teams.",
+        "structure": "Use short sections, scannable headings, and examples that make the article easy to review before publication.",
+        "structureHeading": "Recommended structure"
+      },
+      "preview": {
+        "empty": "Nothing to preview yet."
+      },
+      "sections": {
+        "context": "Context"
+      },
+      "status": {
+        "localOnly": "Unsaved session draft",
+        "notGenerated": "This article has not been generated yet.",
+        "unsavedChanges": "Unsaved changes",
+        "updatedAt": "Session draft saved {date}"
+      },
+      "tabs": {
+        "editor": "Editor",
+        "label": "Article editor mode",
+        "preview": "Preview"
+      },
+      "title": "Article editor",
+      "validation": {
+        "metaDescriptionRange": "Outside the 120-160 character target.",
+        "metaDescriptionTarget": "Target: 120-160 characters.",
+        "metaTitleTooLong": "Over the 60 character target.",
+        "required": "Required"
+      }
+    },
     "modal": {
+      "keyword": "Keyword",
       "scheduledDate": "Scheduled date",
       "status": "Status",
       "title": "Article details",
@@ -78,6 +145,12 @@
     "statuses": {
       "generated": "Generated",
       "planned": "Planned"
+    },
+    "status": {
+      "loadError": "Could not load the content planner. Try again when the API is available.",
+      "loading": "Loading content planner...",
+      "noOrganization": "No completed organization was found for this workspace.",
+      "organizationError": "Could not load your organization. Try again."
     },
     "title": "Content calendar"
   },
@@ -109,12 +182,42 @@
       "previous": "Previous",
       "range": "{start}-{end} of {total}"
     },
+    "status": {
+      "loadError": "Could not load content history. Try again when the API is available.",
+      "loading": "Loading content history...",
+      "noOrganization": "No completed organization was found for this workspace.",
+      "organizationError": "Could not load your organization. Try again."
+    },
     "tableLabel": "Published articles table",
     "title": "Content history"
   },
+  "ArticleDetailPage": {
+    "actions": {
+      "back": "Back to content history"
+    },
+    "labels": {
+      "createdAt": "Created",
+      "keywordId": "Keyword ID",
+      "notPublished": "Not published",
+      "publishedAt": "Published",
+      "slug": "Slug"
+    },
+    "status": {
+      "loadError": "Could not load this article. Try again when the API is available.",
+      "loading": "Loading article...",
+      "notFound": "Article not found."
+    },
+    "statuses": {
+      "deleted": "Deleted",
+      "generated": "Generated",
+      "published": "Published"
+    },
+    "title": "Article"
+  },
   "ArticleSettingsPage": {
     "actions": {
-      "save": "Save"
+      "save": "Save",
+      "saving": "Saving..."
     },
     "fields": {
       "articleStyle": {
@@ -127,18 +230,28 @@
         "label": "Auto-publish"
       },
       "internalLinks": {
-        "description": "Choose how many internal links to include in each article.",
+        "description": "Choose whether generated articles should include internal links.",
         "label": "Internal links"
       },
       "tableOfContents": {
         "description": "Include a table of contents in generated articles.",
         "label": "Table of contents"
       }
+    },
+    "status": {
+      "loadError": "Could not load article settings. Try again when the API is available.",
+      "loading": "Loading article settings...",
+      "noOrganization": "No completed organization was found for this workspace.",
+      "organizationError": "Could not load your organization. Try again.",
+      "saveError": "Could not save article settings. Try again.",
+      "saved": "Article settings saved.",
+      "unsupportedFields": "Only article style and whether internal links are enabled are saved. Auto-publish and table of contents are not supported by the live API yet."
     }
   },
   "SettingsPage": {
     "actions": {
-      "save": "Save"
+      "save": "Save",
+      "saving": "Saving..."
     },
     "googleSearchConsole": {
       "comingSoon": "Coming soon",
@@ -147,6 +260,15 @@
     },
     "placeholders": {
       "competitorUrl": "https://competitor.com"
+    },
+    "status": {
+      "integrationsUnsupported": "Integration choices are not saved yet because the live integrations API is not available.",
+      "loadError": "Could not load settings. Try again when the API is available.",
+      "loading": "Loading settings...",
+      "noOrganization": "No completed organization was found for this workspace.",
+      "organizationError": "Could not load your organization. Try again.",
+      "saveError": "Could not save settings. Try again.",
+      "saved": "Settings saved."
     },
     "tabs": {
       "audienceCompetitors": "Audience & Competitors",
@@ -517,7 +639,7 @@
     "onboarding": "Onboarding"
   },
   "ProductPlaceholderPage": {
-    "description": "This workspace area is ready for the product flow, data fetching, and actions that belong here.",
+    "description": "This feature will be published soon. You can reach through support@seopotion.co if you need it urgent, or you have any other wish.",
     "title": "Coming soon"
   },
   "ProductShell": {

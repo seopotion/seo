@@ -1,52 +1,165 @@
 'use client';
 
-import { CalendarDays, Search, X } from 'lucide-react';
+import { CalendarDays, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Separator } from '@/components/ui';
+import type { ReactNode, RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui';
+import { useRouter } from '@/i18n/navigation';
+import { api } from '@/lib/api';
+import { clearToken } from '@/lib/auth';
+import { useActiveOrganization } from '@/lib/organizations';
+import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { ArticleEditorModal } from './_components/ArticleEditorModal';
+import { createPlannerFixtureArticles } from './fixtures';
+import {
+  addDays,
+  buildCalendarWeeks,
+  DAYS_IN_RANGE,
+  formatDate,
+  formatDayNumber,
+  formatMonth,
+  formatNumber,
+  formatWeekday,
+  isFirstDayOfMonth,
+  mapPlannerKeywords,
+  startOfToday,
+} from './planner-utils';
+import type { ArticleEditorDraft, CalendarDay, PlannerArticle } from './types';
 
-type PlannerArticleStatus = 'planned' | 'generated';
-
-type PlannerArticleType =
-  | 'listicle'
-  | 'how_to_guide'
-  | 'comparison'
-  | 'product_guide'
-  | 'case_study'
-  | 'definition'
-  | 'alternatives';
-
-type PlannerArticle = {
-  id: string;
-  scheduledDate: string;
-  title: string;
-  keyword: string;
-  volume: number;
-  difficulty: number;
-  type: PlannerArticleType;
-  status: PlannerArticleStatus;
-};
-
-type CalendarDay = {
-  date: Date;
-  dateKey: string;
-  inRange: boolean;
-  article?: PlannerArticle;
-};
-
-const DAYS_IN_RANGE = 45;
-const plannerArticles: PlannerArticle[] = [];
+const PLANNER_FIXTURES_ALLOWED = process.env.NODE_ENV !== 'production';
 
 export default function ContentPlannerPage() {
   const t = useTranslations('ContentPlannerPage');
   const locale = useLocale();
+  const router = useRouter();
+  const {
+    error: organizationError,
+    loading: organizationLoading,
+    organization,
+  } = useActiveOrganization();
+  const pageContentRef = useRef<HTMLDivElement>(null);
+  const [articleDraftsById, setArticleDraftsById] = useState<Record<string, ArticleEditorDraft>>(
+    {},
+  );
+  const [plannerArticles, setPlannerArticles] = useState<PlannerArticle[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [fixturesEnabled, setFixturesEnabled] = useState(false);
+  const [fixturesResolved, setFixturesResolved] = useState(!PLANNER_FIXTURES_ALLOWED);
+  const modalOpen = Boolean(selectedArticle);
+  const selectedSavedDraft = selectedArticle?.articleId
+    ? articleDraftsById[selectedArticle.articleId]
+    : undefined;
+
+  const handleUnauthorized = useCallback(() => {
+    clearToken();
+    clearWorkspaceStatusCache();
+    router.replace('/');
+  }, [router]);
+
+  const handleSaveArticleDraft = useCallback((draftArticle: ArticleEditorDraft) => {
+    setArticleDraftsById((currentDrafts) => ({
+      ...currentDrafts,
+      [draftArticle.id]: draftArticle,
+    }));
+  }, []);
+
+  usePageContentInert(pageContentRef, modalOpen);
+
+  useEffect(() => {
+    if (!PLANNER_FIXTURES_ALLOWED) {
+      return;
+    }
+
+    const nextFixturesEnabled = new URLSearchParams(window.location.search).get('fixtures') === '1';
+
+    setFixturesEnabled(nextFixturesEnabled);
+    setFixturesResolved(true);
+  }, []);
+
+  useEffect(() => {
+    if (!fixturesResolved) {
+      return;
+    }
+
+    if (fixturesEnabled) {
+      setPlannerArticles(createPlannerFixtureArticles());
+      setLoadError(false);
+      setLoading(false);
+      return;
+    }
+
+    if (organizationLoading) return;
+
+    if (organizationError || !organization) {
+      setPlannerArticles([]);
+      setLoadError(Boolean(organizationError));
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    setLoading(true);
+    setLoadError(false);
+
+    void (async () => {
+      try {
+        const response = await api.api.v0.dashboard.planner.$get({
+          query: { org_id: organization.id },
+        });
+
+        if (cancelled) return;
+
+        if ((response.status as number) === 401) {
+          handleUnauthorized();
+          return;
+        }
+
+        if (!response.ok) {
+          setPlannerArticles([]);
+          setLoadError(true);
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setPlannerArticles(mapPlannerKeywords(data.keywords));
+        }
+      } catch {
+        if (!cancelled) {
+          setPlannerArticles([]);
+          setLoadError(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    fixturesEnabled,
+    fixturesResolved,
+    handleUnauthorized,
+    organization,
+    organizationError,
+    organizationLoading,
+  ]);
 
   const today = useMemo(() => startOfToday(), []);
   const rangeEnd = useMemo(() => addDays(today, DAYS_IN_RANGE - 1), [today]);
-  const calendarWeeks = useMemo(() => buildCalendarWeeks(today, plannerArticles), [today]);
+  const calendarWeeks = useMemo(
+    () => buildCalendarWeeks(today, plannerArticles),
+    [plannerArticles, today],
+  );
   const activeDays = useMemo(
     () => calendarWeeks.flat().filter((day) => day.inRange),
     [calendarWeeks],
@@ -59,42 +172,67 @@ export default function ContentPlannerPage() {
     () => `${formatDate(today, locale, 'medium')} - ${formatDate(rangeEnd, locale, 'medium')}`,
     [locale, rangeEnd, today],
   );
+  const statusMessage = getPlannerStatusMessage({
+    loadError,
+    loading: loading || organizationLoading,
+    organizationError,
+    t,
+  });
 
   return (
-    <div className="grid gap-4">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
-          <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <SummaryPill
-            icon={<CalendarDays className="size-4" />}
-            label={t('rangeLabel')}
-            value={dateRangeText}
-          />
-          <SummaryPill label={t('rangeDays', { count: DAYS_IN_RANGE })} value={t('activeRange')} />
-          <SummaryPill
-            label={t('scheduledCount', { count: plannerArticles.length })}
-            value={t('oneArticlePerDay')}
-          />
-        </div>
-      </header>
+    <>
+      <div ref={pageContentRef} className="grid gap-4">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
+            <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <SummaryPill
+              icon={<CalendarDays className="size-4" />}
+              label={t('rangeLabel')}
+              value={dateRangeText}
+            />
+            <SummaryPill
+              label={t('rangeDays', { count: DAYS_IN_RANGE })}
+              value={t('activeRange')}
+            />
+            <SummaryPill
+              label={t('scheduledCount', { count: plannerArticles.length })}
+              value={t('oneArticlePerDay')}
+            />
+          </div>
+        </header>
 
-      <section
-        aria-label={t('calendarLabel')}
-        className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
-      >
-        <div className="grid grid-cols-7 border-slate-200 border-b bg-slate-50">
-          {weekdayLabels.map((weekday) => (
-            <div key={weekday} className="px-3 py-2 font-semibold text-slate-600 text-xs">
-              {weekday}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-          {calendarWeeks.flat().map((day) => (
-            <PlannerDayCell
+        {statusMessage ? <StatusMessage message={statusMessage} /> : null}
+
+        <section
+          aria-label={t('calendarLabel')}
+          className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
+        >
+          <div className="grid grid-cols-7 border-slate-200 border-b bg-slate-50">
+            {weekdayLabels.map((weekday) => (
+              <div key={weekday} className="px-3 py-2 font-semibold text-slate-600 text-xs">
+                {weekday}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {calendarWeeks.flat().map((day) => (
+              <PlannerDayCell
+                key={day.dateKey}
+                day={day}
+                locale={locale}
+                onSelectArticle={setSelectedArticle}
+                t={t}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
+          {activeDays.map((day) => (
+            <PlannerAgendaRow
               key={day.dateKey}
               day={day}
               locale={locale}
@@ -102,28 +240,16 @@ export default function ContentPlannerPage() {
               t={t}
             />
           ))}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
-        {activeDays.map((day) => (
-          <PlannerAgendaRow
-            key={day.dateKey}
-            day={day}
-            locale={locale}
-            onSelectArticle={setSelectedArticle}
-            t={t}
-          />
-        ))}
-      </section>
-
-      <ArticleDetailModal
+      <ArticleEditorModal
         article={selectedArticle}
-        locale={locale}
         onClose={() => setSelectedArticle(null)}
-        t={t}
+        onSaveDraft={handleSaveArticleDraft}
+        savedDraft={selectedSavedDraft}
       />
-    </div>
+    </>
   );
 }
 
@@ -270,126 +396,28 @@ function ArticleButton({
   );
 }
 
-function ArticleDetailModal({
-  article,
-  locale,
-  onClose,
-  t,
-}: {
-  article: PlannerArticle | null;
-  locale: string;
-  onClose: () => void;
-  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
-}) {
+function usePageContentInert(pageContentRef: RefObject<HTMLDivElement | null>, active: boolean) {
   useEffect(() => {
-    if (!article) {
+    const pageContent = pageContentRef.current;
+
+    if (!pageContent) {
       return;
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose();
-      }
+    if (!active) {
+      pageContent.removeAttribute('aria-hidden');
+      pageContent.removeAttribute('inert');
+      return;
     }
 
-    document.addEventListener('keydown', handleKeyDown);
+    pageContent.setAttribute('aria-hidden', 'true');
+    pageContent.setAttribute('inert', '');
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      pageContent.removeAttribute('aria-hidden');
+      pageContent.removeAttribute('inert');
     };
-  }, [article, onClose]);
-
-  if (!article) {
-    return null;
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
-      role="presentation"
-    >
-      <button
-        type="button"
-        aria-label={t('actions.closeDetails')}
-        className="absolute inset-0 cursor-default"
-        onMouseDown={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="planner-article-detail-title"
-        className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-slate-500 text-sm">{t('modal.title')}</p>
-            <h2
-              id="planner-article-detail-title"
-              className="mt-1 line-clamp-3 font-semibold text-base text-slate-950"
-            >
-              {article.title}
-            </h2>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={t('actions.closeDetails')}
-            autoFocus
-            className="size-8"
-            onClick={onClose}
-          >
-            <X className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-
-        <Separator className="my-4" />
-
-        <dl className="grid gap-3 text-sm">
-          <DetailItem label={t('modal.type')} value={t(`articleTypes.${article.type}`)} />
-          <DetailItem
-            label={t('modal.scheduledDate')}
-            value={formatDateFromKey(article.scheduledDate, locale)}
-          />
-          <div className="grid gap-1">
-            <dt className="text-slate-500">{t('modal.status')}</dt>
-            <dd>
-              <StatusBadge status={article.status} t={t} />
-            </dd>
-          </div>
-        </dl>
-      </div>
-    </div>
-  );
-}
-
-function DetailItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="grid gap-1">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="min-w-0 truncate font-medium text-slate-950">{value}</dd>
-    </div>
-  );
-}
-
-function StatusBadge({
-  status,
-  t,
-}: {
-  status: PlannerArticleStatus;
-  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
-}) {
-  return (
-    <Badge
-      variant="secondary"
-      className={cn(
-        'w-fit border-transparent',
-        status === 'generated' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700',
-      )}
-    >
-      {t(`statuses.${status}`)}
-    </Badge>
-  );
+  }, [active, pageContentRef]);
 }
 
 function SummaryPill({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
@@ -404,90 +432,28 @@ function SummaryPill({ icon, label, value }: { icon?: ReactNode; label: string; 
   );
 }
 
-function buildCalendarWeeks(rangeStart: Date, articles: PlannerArticle[]): CalendarDay[][] {
-  const rangeEnd = addDays(rangeStart, DAYS_IN_RANGE - 1);
-  const gridStart = startOfWeekMonday(rangeStart);
-  const articleByDate = new Map(articles.map((article) => [article.scheduledDate, article]));
-  const weeks: CalendarDay[][] = [];
-  let cursor = gridStart;
-
-  while (cursor <= rangeEnd) {
-    const week: CalendarDay[] = [];
-
-    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
-      const date = addDays(cursor, dayOffset);
-      const dateKey = toDateKey(date);
-      const inRange = date >= rangeStart && date <= rangeEnd;
-
-      week.push({
-        article: inRange ? articleByDate.get(dateKey) : undefined,
-        date,
-        dateKey,
-        inRange,
-      });
-    }
-
-    weeks.push(week);
-    cursor = addDays(cursor, 7);
-  }
-
-  return weeks;
+function StatusMessage({ message }: { message: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-slate-600 text-sm">
+      {message}
+    </div>
+  );
 }
 
-function startOfToday() {
-  const today = new Date();
-
-  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
-}
-
-function startOfWeekMonday(date: Date) {
-  const day = date.getDay();
-  const offset = day === 0 ? -6 : 1 - day;
-
-  return addDays(date, offset);
-}
-
-function addDays(date: Date, days: number) {
-  const nextDate = new Date(date);
-  nextDate.setDate(date.getDate() + days);
-
-  return new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
-}
-
-function toDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-}
-
-function formatDateFromKey(dateKey: string, locale: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-
-  return formatDate(new Date(year, month - 1, day), locale, 'long');
-}
-
-function formatDate(date: Date, locale: string, dateStyle: 'medium' | 'long') {
-  return new Intl.DateTimeFormat(locale, { dateStyle }).format(date);
-}
-
-function formatWeekday(date: Date, locale: string, weekday: 'short' | 'long') {
-  return new Intl.DateTimeFormat(locale, { weekday }).format(date);
-}
-
-function formatDayNumber(date: Date, locale: string) {
-  return new Intl.DateTimeFormat(locale, { day: 'numeric' }).format(date);
-}
-
-function formatMonth(date: Date, locale: string) {
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
-}
-
-function formatNumber(value: number, locale: string) {
-  return new Intl.NumberFormat(locale).format(value);
-}
-
-function isFirstDayOfMonth(date: Date) {
-  return date.getDate() === 1;
+function getPlannerStatusMessage({
+  loadError,
+  loading,
+  organizationError,
+  t,
+}: {
+  loadError: boolean;
+  loading: boolean;
+  organizationError: ReturnType<typeof useActiveOrganization>['error'];
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
+}) {
+  if (loading) return t('status.loading');
+  if (organizationError === 'no_organization') return t('status.noOrganization');
+  if (organizationError) return t('status.organizationError');
+  if (loadError) return t('status.loadError');
+  return null;
 }

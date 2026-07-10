@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher';
 import { Button, Card, CardContent } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
@@ -37,11 +37,13 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [scanState, setScanState] = useState<ScanState>('idle');
+  const [orgId, setOrgId] = useState<string | null>(null);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [isFinishing, setIsFinishing] = useState(false);
   const [workspaceGate, setWorkspaceGate] = useState<'checking' | 'error' | 'ready'>('checking');
+  const scanRunIdRef = useRef(0);
 
   const checkWorkspaceGate = useCallback(
     async (isCancelled: () => boolean = () => false) => {
@@ -88,6 +90,12 @@ export default function OnboardingPage() {
     };
   }, [checkWorkspaceGate]);
 
+  useEffect(() => {
+    return () => {
+      scanRunIdRef.current += 1;
+    };
+  }, []);
+
   function clearErrors(...keys: string[]) {
     setErrors((currentErrors) => {
       const nextErrors = { ...currentErrors };
@@ -114,7 +122,9 @@ export default function OnboardingPage() {
   }
 
   function updateWebsiteUrl(value: string) {
+    scanRunIdRef.current += 1;
     updateField('websiteUrl', value, ['websiteUrl', 'scan']);
+    setOrgId(null);
     setScanState('idle');
   }
 
@@ -189,18 +199,27 @@ export default function OnboardingPage() {
       return nextErrors;
     });
     setScanState('scanning');
+    setOrgId(null);
+
+    const scanRunId = scanRunIdRef.current + 1;
+    scanRunIdRef.current = scanRunId;
+    const websiteUrl = form.websiteUrl.trim();
 
     try {
-      const scrapeResult = await scanWebsiteForOnboarding(form.websiteUrl);
+      const scanResult = await scanWebsiteForOnboarding(websiteUrl);
+
+      if (scanRunIdRef.current !== scanRunId) return;
 
       setForm((currentForm) => ({
         ...currentForm,
-        businessDescription: scrapeResult.businessDescription,
-        targetAudience: scrapeResult.targetAudience,
+        ...scanResult.formPatch,
       }));
+      setOrgId(scanResult.orgId);
       setScanState('complete');
       clearErrors('scan', 'businessDescription', 'targetAudience');
     } catch (error) {
+      if (scanRunIdRef.current !== scanRunId) return;
+
       if (error instanceof OnboardingApiError && error.reason === 'unauthorized') {
         clearToken();
         clearWorkspaceStatusCache();
@@ -245,7 +264,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (scanState !== 'complete') {
+    if (scanState !== 'complete' || !orgId) {
       setErrors((currentErrors) => ({
         ...currentErrors,
         finalize: t('errors.completeScanBeforeFinalize'),
@@ -257,8 +276,17 @@ export default function OnboardingPage() {
     setErrors({});
 
     try {
-      await completeOnboarding(form);
-      setWorkspaceStatusCache(true);
+      await completeOnboarding(orgId, form);
+      const workspaceStatus = await getWorkspaceStatus({ useCache: false });
+
+      if (!workspaceStatus.ok && workspaceStatus.reason === 'unauthorized') {
+        clearToken();
+        clearWorkspaceStatusCache();
+        router.replace('/');
+        return;
+      }
+
+      setWorkspaceStatusCache(workspaceStatus.ok ? workspaceStatus.setupComplete : true);
       router.replace('/home', { locale });
     } catch (error) {
       if (error instanceof OnboardingApiError && error.reason === 'unauthorized') {
