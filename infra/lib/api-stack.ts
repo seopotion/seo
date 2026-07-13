@@ -9,10 +9,15 @@ import {
 } from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import { CachePolicy, Distribution, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
+import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import { Provider } from 'aws-cdk-lib/custom-resources';
@@ -106,6 +111,29 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: scanDlq, maxReceiveCount: 3 },
     });
 
+    // Dead-letter queue: strategy tasks that fail repeatedly land here instead
+    // of retrying/expiring silently. 14-day retention gives time to inspect.
+    const strategyDlq = new Queue(this, 'StrategyDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Strategy task queue. Visibility timeout >= worker timeout so an
+    // in-flight message isn't redelivered while the worker is still
+    // processing it. After maxReceiveCount failed deliveries the message
+    // moves to the DLQ.
+    const strategyQueue = new Queue(this, 'StrategyQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
+    });
+
+    // Provider secret env vars — read from process.env at synth/deploy host.
+    // Deployed-secret provisioning (SSM SecureString) is deferred; the `?? ''`
+    // fallback is intentional until that lands.
+    const providerEnv = {
+      DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN ?? '',
+      DATAFORSEO_PASSWORD: process.env.DATAFORSEO_PASSWORD ?? '',
+    };
+
     // API Lambda — produces scan tasks.
     const apiFn = new NodejsFunction(this, 'ApiFn', {
       entry: join(projectRoot, 'apps/api/src/index.ts'),
@@ -115,10 +143,17 @@ export class ApiStack extends Stack {
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(30),
       memorySize: 512,
-      environment: { ...mongoEnv, ...authEnv, SCAN_QUEUE_URL: scanQueue.queueUrl },
+      environment: {
+        ...mongoEnv,
+        ...authEnv,
+        ...providerEnv,
+        SCAN_QUEUE_URL: scanQueue.queueUrl,
+        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+      },
       bundling,
     });
     scanQueue.grantSendMessages(apiFn);
+    strategyQueue.grantSendMessages(apiFn);
     jwtSecretParam.grantRead(apiFn);
     mongoUriParam.grantRead(apiFn);
 
@@ -136,6 +171,134 @@ export class ApiStack extends Stack {
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(workerFn);
+
+    // Strategy worker Lambda — consumes strategy tasks from the queue.
+    const strategyWorkerFn = new NodejsFunction(this, 'StrategyWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/strategy.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        ...providerEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+      },
+      bundling,
+    });
+    strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(strategyWorkerFn);
+
+    // Dead-letter queue: generation tasks that fail repeatedly land here.
+    const generationDlq = new Queue(this, 'GenerationDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Generation task queue. Visibility timeout >= worker timeout so an
+    // in-flight message isn't redelivered mid-generation. After maxReceiveCount
+    // failed deliveries the message moves to the DLQ.
+    const generationQueue = new Queue(this, 'GenerationQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: generationDlq, maxReceiveCount: 3 },
+    });
+
+    // Article images (#51): private per-stage bucket + CloudFront (OAC) — durable,
+    // provider-independent image URLs. Objects are immutable at a given key
+    // (retries overwrite BEFORE the URL is stored), so long default TTLs are safe.
+    const imagesBucket = new Bucket(this, 'ImagesBucket', {
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+    });
+    const imagesCdn = new Distribution(this, 'ImagesCdn', {
+      defaultBehavior: {
+        origin: S3BucketOrigin.withOriginAccessControl(imagesBucket),
+        viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+      },
+    });
+
+    // Dead-letter queue: image tasks that fail repeatedly land here.
+    const imagesDlq = new Queue(this, 'ImagesDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    // Image task queue. Visibility timeout >= worker timeout so an in-flight
+    // message isn't redelivered mid-generation (image generation is slow).
+    const imagesQueue = new Queue(this, 'ImagesQueue', {
+      visibilityTimeout: Duration.minutes(15),
+      deadLetterQueue: { queue: imagesDlq, maxReceiveCount: 3 },
+    });
+
+    // Images worker Lambda — consumes image tasks; plans, generates, and stores
+    // article images. FAL_KEY follows the existing synth-time provider-secret
+    // pattern (SSM provisioning deferred — #9/#43).
+    const imagesWorkerFn = new NodejsFunction(this, 'ImagesWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/images.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        FAL_KEY: process.env.FAL_KEY ?? '',
+        IMAGES_BUCKET: imagesBucket.bucketName,
+        IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
+      },
+      bundling,
+    });
+    imagesWorkerFn.addEventSource(new SqsEventSource(imagesQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(imagesWorkerFn);
+    imagesBucket.grantPut(imagesWorkerFn);
+
+    // Generation worker Lambda — consumes generation tasks; produces articles.
+    const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/generation.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(10),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
+      },
+      bundling,
+    });
+    generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(generationWorkerFn);
+    imagesQueue.grantSendMessages(generationWorkerFn);
+
+    // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
+    // generation queue. No provider secret needed (it only reads Mongo + sends SQS).
+    const generationSchedulerFn = new NodejsFunction(this, 'GenerationSchedulerFn', {
+      entry: join(projectRoot, 'apps/worker/src/generation-scheduler.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(2),
+      memorySize: 256,
+      environment: {
+        ...mongoEnv,
+        GENERATION_QUEUE_URL: generationQueue.queueUrl,
+      },
+      bundling,
+    });
+    generationQueue.grantSendMessages(generationSchedulerFn);
+    mongoUriParam.grantRead(generationSchedulerFn);
+
+    // Daily at 07:00 UTC — articles generate on/after their scheduled day.
+    new Rule(this, 'GenerationSchedule', {
+      schedule: Schedule.cron({ minute: '0', hour: '7' }),
+      targets: [new LambdaFunction(generationSchedulerFn)],
+    });
 
     // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
     // custom resource below (Create/Update), so indexes exist before traffic.
@@ -179,5 +342,8 @@ export class ApiStack extends Stack {
       value: httpApi.apiEndpoint,
       description: 'Base URL of the HTTP API — set as NEXT_PUBLIC_API_URL for the web app',
     });
+
+    // Image CDN domain — the base of every stored article-image URL.
+    new CfnOutput(this, 'ImagesCdnDomain', { value: imagesCdn.distributionDomainName });
   }
 }

@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { SetupPresetsSchema } from '@shared/schemas';
+import { STRATEGY_STATUSES } from '@shared/types';
 
 // Org-scoped read: the caller passes org_id; the handler checks ownership.
 export const OrgQuery = z.object({
@@ -79,6 +80,9 @@ const PlannerKeyword = z
 
 export const PlannerResponse = z
   .object({
+    // Automatic-strategy job state (#47) so the planner can show the plan as
+    // pending / completed / failed; 'none' for orgs that never ran a paid job.
+    strategy_status: z.enum(STRATEGY_STATUSES).openapi({ example: 'completed' }),
     keywords: z.array(PlannerKeyword),
   })
   .openapi('PlannerResponse');
@@ -106,6 +110,9 @@ const ArticleListItem = z
   .openapi('ArticleListItem');
 
 export const ArticlesQuery = z.object({
+  org_id: z
+    .string()
+    .openapi({ param: { name: 'org_id', in: 'query' }, example: '6650f1a2b3c4d5e6f7a8b9c0' }),
   status: z
     .enum(ARTICLE_STATUSES)
     .optional()

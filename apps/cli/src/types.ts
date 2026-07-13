@@ -56,6 +56,17 @@ export interface DbInitData {
   collections: string[];
 }
 
+export interface SetPlanData {
+  org_id: string;
+  plan: string;
+}
+
+export interface ResetUserData {
+  user_id: string;
+  org_ids: string[];
+  deleted: { orgs: number; keywords: number; candidates: number; articles: number };
+}
+
 export type Stage = 'staging' | 'prod';
 
 export interface PrereqCheck {

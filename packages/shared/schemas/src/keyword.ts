@@ -1,7 +1,11 @@
 import { z } from 'zod';
+import { ARTICLE_TYPES, SEARCH_INTENTS } from './candidate';
 
 /** Keyword statuses. Only `scheduled` today; the enum leaves room to grow. */
 export const KEYWORD_STATUSES = ['scheduled'] as const;
+
+/** Generation lifecycle for a scheduled keyword (#55). */
+export const GENERATION_STATUSES = ['pending', 'generating', 'generated', 'failed'] as const;
 
 /**
  * Keyword entity — one org-scoped record per planner (calendar) opportunity.
@@ -12,6 +16,8 @@ export const KeywordSchema = z.object({
   id: z.string(),
   org_id: z.string(),
   keyword: z.string(),
+  // Derived from `keyword` by the repository; optional so pre-existing docs still parse.
+  normalized_keyword: z.string().optional(),
   status: z.enum(KEYWORD_STATUSES),
   // Date-only (yyyy-mm-dd) the article is scheduled to generate/publish.
   scheduled_date: z.string(),
@@ -19,10 +25,27 @@ export const KeywordSchema = z.object({
   difficulty: z.number().int(),
   // null until article generation links an article back to the keyword.
   article_id: z.string().nullable(),
+  // Planner brief (populated by the #47 strategy job; null for older/manual entries).
+  article_type: z.enum(ARTICLE_TYPES).nullable().default(null),
+  intent: z.enum(SEARCH_INTENTS).nullable().default(null),
+  opportunity_score: z.number().nullable().default(null),
+  serp_competitors: z.array(z.string()).nullable().default(null),
   created_at: z.date(),
+  // Generation lifecycle (#55). Defaulted so pre-#55 planner docs still parse.
+  generation_status: z.enum(GENERATION_STATUSES).default('pending'),
+  generation_attempts: z.number().int().default(0),
+  generation_error: z.string().nullable().default(null),
+  generation_started_at: z.date().nullable().default(null),
 });
 export type Keyword = z.infer<typeof KeywordSchema>;
 
-/** Input for creating a keyword — the server assigns `id` and `created_at`. */
-export const CreateKeywordInput = KeywordSchema.omit({ id: true, created_at: true });
-export type CreateKeywordInput = z.infer<typeof CreateKeywordInput>;
+/** Input for creating a keyword — the server assigns `id`/`created_at`; the repo derives `normalized_keyword`. */
+export const CreateKeywordInput = KeywordSchema.omit({
+  id: true,
+  normalized_keyword: true,
+  created_at: true,
+});
+// `z.input` (not `z.infer`/`z.output`) so the defaulted brief fields (article_type,
+// intent, opportunity_score, serp_competitors) stay optional in the type, matching
+// the runtime contract — see the same rationale on `CreateCandidateInput`.
+export type CreateKeywordInput = z.input<typeof CreateKeywordInput>;

@@ -3,6 +3,7 @@ import {
   CreateKeywordInput as CreateKeywordInputSchema,
   type Keyword,
   KeywordSchema,
+  normalizeKeyword,
 } from '@shared/schemas';
 import { type Document, ObjectId, type WithId } from 'mongodb';
 import { getDb } from '../client';
@@ -31,8 +32,9 @@ export const KeywordRepo = {
   async create(input: CreateKeywordInput): Promise<Keyword> {
     const data = CreateKeywordInputSchema.parse(input); // validate on write
     const created_at = new Date();
-    const res = await (await collection()).insertOne({ ...data, created_at });
-    return toEntity({ _id: res.insertedId, ...data, created_at });
+    const normalized_keyword = normalizeKeyword(data.keyword);
+    const res = await (await collection()).insertOne({ ...data, normalized_keyword, created_at });
+    return toEntity({ _id: res.insertedId, ...data, normalized_keyword, created_at });
   },
 
   /** Link a generated article back to its keyword (article_id null -> set). */
@@ -42,5 +44,88 @@ export const KeywordRepo = {
       { _id: new ObjectId(id) },
       { $set: { article_id: articleId } },
     );
+  },
+
+  async findById(id: string): Promise<Keyword | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOne({ _id: new ObjectId(id) });
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
+   * Atomically claim a keyword for generation. Succeeds only when it is
+   * unlinked and not already terminal/in-flight (a 'generating' claim older
+   * than 15min is treated as stale and reclaimable). Mirrors OrgRepo.claimStrategy.
+   */
+  async claimGeneration(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const staleBefore = new Date(Date.now() - 15 * 60 * 1000);
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        article_id: null,
+        $or: [
+          { generation_status: { $in: ['pending', 'failed'] } },
+          { generation_status: { $exists: false } },
+          { generation_status: 'generating', generation_started_at: { $lt: staleBefore } },
+        ],
+      },
+      {
+        $set: { generation_status: 'generating', generation_started_at: new Date() },
+        $inc: { generation_attempts: 1 },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  /** Record a generation failure (retryable until the attempt cap / DLQ). */
+  async failGeneration(id: string, error: string): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { generation_status: 'failed', generation_error: error } },
+    );
+  },
+
+  /** Atomically link the generated article and mark the keyword done. */
+  async linkArticle(id: string, articleId: string): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { article_id: articleId, generation_status: 'generated', generation_error: null } },
+    );
+  },
+
+  /**
+   * Due entries across all orgs for the daily scheduler: scheduled on/before
+   * `today` (yyyy-mm-dd), not yet linked, not generated, under the attempt cap.
+   */
+  async listDueForGeneration(today: string, maxAttempts: number): Promise<Keyword[]> {
+    const docs = await (await collection())
+      .find({
+        scheduled_date: { $lte: today },
+        article_id: null,
+        generation_status: { $ne: 'generated' },
+        $or: [
+          { generation_attempts: { $lt: maxAttempts } },
+          { generation_attempts: { $exists: false } },
+        ],
+      })
+      .toArray();
+    return docs.map(toEntity);
+  },
+
+  /** Normalized set of every keyword already on this org's planner. */
+  async scheduledNormalizedSet(orgId: string): Promise<Set<string>> {
+    const docs = await (await collection())
+      .find({ org_id: orgId }, { projection: { keyword: 1 } })
+      .toArray();
+    return new Set(docs.map((d) => normalizeKeyword(d.keyword as string)));
+  },
+
+  /** Delete every keyword for an org (used by the `db reset-user` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
   },
 };

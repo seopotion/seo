@@ -4,12 +4,17 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../.env --env-file-if-exists=.env --import tsx src/dev.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "scheduler:local": "node --env-file-if-exists=../../.env --env-file-if-exists=.env --import tsx src/run-scheduler.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1075.0",
+    "@aws-sdk/client-s3": "^3.1075.0",
     "@shared/db": "*",
+    "@shared/generation": "*",
+    "@shared/keywords": "*",
     "@shared/logger": "*",
+    "@shared/providers": "*",
     "@shared/schemas": "*",
     "@shared/types": "*"
   }

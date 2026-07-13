@@ -1,0 +1,15 @@
+{
+  "name": "@shared/generation",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@shared/providers": "*",
+    "@shared/schemas": "*",
+    "zod": "^4.4.3"
+  }
+}
