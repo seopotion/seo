@@ -11,6 +11,24 @@ vi.mock('@shared/db', () => ({
   OrgRepo: { completeScan },
 }));
 
+const { scanWebsite } = vi.hoisted(() => ({
+  scanWebsite: vi.fn(async () => ({
+    business: {
+      name: 'Clewas',
+      language: 'English',
+      country: 'Global (English)',
+      description: 'desc',
+    },
+    audience: { target: 'devs', competitors: [] },
+    blog: { sitemap_url: 's', main_blog_url: 'b', best_articles: [] },
+    article_preferences: {
+      content_seo: { article_style: 'x', internal_links: true, llm_instructions: 'y' },
+      engagement: { image_style: 'z' },
+    },
+  })),
+}));
+vi.mock('../src/scanner', () => ({ scanWebsite }));
+
 import { handler } from '../src/index';
 
 function sqsEvent(body: unknown): SQSEvent {

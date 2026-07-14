@@ -224,7 +224,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ArticleDetailResponse } },
-          description: 'Full article record (mock sample data)',
+          description: 'Full article record',
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
