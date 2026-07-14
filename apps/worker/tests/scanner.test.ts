@@ -1,3 +1,4 @@
+import type { LlmCompleteParams } from '@shared/providers';
 import { SetupPresetsSchema } from '@shared/schemas';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -36,7 +37,7 @@ const BLOG = {
 /** A fake LlmClient whose `complete` returns the given text. */
 function llmReturning(text: string) {
   return {
-    complete: vi.fn(async () => ({
+    complete: vi.fn(async (_params: LlmCompleteParams) => ({
       text,
       model: 'test-model',
       usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
