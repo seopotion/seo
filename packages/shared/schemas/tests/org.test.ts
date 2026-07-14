@@ -21,4 +21,15 @@ describe('OrgSchema entitlement', () => {
     expect(isPaid(OrgSchema.parse({ ...base, plan: 'trial' }))).toBe(false);
     expect(isPaid(OrgSchema.parse(base))).toBe(false);
   });
+
+  test('accepts optional WordPress connection fields', () => {
+    const connectedAt = new Date('2026-07-14T10:00:00.000Z');
+    const org = OrgSchema.parse({
+      ...base,
+      wordpress_token: 'wordpress-token',
+      wordpress_connected_at: connectedAt,
+    });
+    expect(org.wordpress_token).toBe('wordpress-token');
+    expect(org.wordpress_connected_at).toEqual(connectedAt);
+  });
 });

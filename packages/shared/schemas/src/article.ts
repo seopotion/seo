@@ -47,6 +47,7 @@ export const ArticleSchema = z.object({
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),
   published_at: z.date().nullable(),
+  wordpress_post_id: z.number().int().positive().optional(),
   // Image pipeline (#51). Defaulted so pre-#51 docs still parse. The future
   // publisher must require images_status === 'complete' before publishing.
   images: z.array(ArticleImageSchema).default([]),
@@ -55,7 +56,11 @@ export const ArticleSchema = z.object({
 export type Article = z.infer<typeof ArticleSchema>;
 
 /** Input for creating an article — the server assigns `id` and `created_at`. */
-export const CreateArticleInput = ArticleSchema.omit({ id: true, created_at: true });
+export const CreateArticleInput = ArticleSchema.omit({
+  id: true,
+  created_at: true,
+  wordpress_post_id: true,
+});
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the
 // type, matching the runtime contract — same rationale as `CreateKeywordInput`.
 export type CreateArticleInput = z.input<typeof CreateArticleInput>;

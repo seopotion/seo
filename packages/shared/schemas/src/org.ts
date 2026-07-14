@@ -17,6 +17,8 @@ export const OrgSchema = z.object({
   // Automatic-strategy job lifecycle (#47).
   strategy_status: z.enum(STRATEGY_STATUSES).default('none'),
   name: z.string().optional(),
+  wordpress_token: z.string().optional(),
+  wordpress_connected_at: z.date().optional(),
   // Populated by the scanner worker once scanning completes.
   presets: SetupPresetsSchema.optional(),
   created_at: z.date(),

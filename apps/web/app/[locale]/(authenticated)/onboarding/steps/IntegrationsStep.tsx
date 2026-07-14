@@ -16,15 +16,15 @@ import type { OnboardingForm, UpdateOnboardingField } from '../types';
 export const integrationOptions = [
   {
     id: 'wordpress',
-    name: 'WordPress.com',
+    labelKey: 'wordpress',
     logoSrc: '/integrations/wordpress.svg',
   },
   {
     id: 'framer',
-    name: 'Framer',
+    labelKey: 'framer',
     logoSrc: '/integrations/framer.svg',
   },
-];
+] as const;
 
 export function IntegrationsStep({
   form,
@@ -64,11 +64,12 @@ export function IntegrationsStep({
                 <span className="flex size-9 items-center justify-center">
                   <Image src={integration.logoSrc} alt="" width={20} height={20} aria-hidden />
                 </span>
-                <span className="font-semibold">{integration.name}</span>
+                <span className="font-semibold">{t(`providers.${integration.labelKey}`)}</span>
               </Button>
             );
           })}
         </div>
+        <p className="mt-2 text-gray-500 text-sm">{t('connectWordPressLater')}</p>
       </div>
 
       <div className="mt-6">

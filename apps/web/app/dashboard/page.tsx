@@ -29,8 +29,7 @@ export default function DashboardPage() {
       return;
     }
     void (async () => {
-      // Article counts are org-scoped, so resolve the active org first, then
-      // fetch its Home stats. best/integrations aren't org-scoped yet (gated).
+      // Org-scoped Home stats need the active org; best remains globally gated.
       const orgsRes = await api.api.v0.core.organizations.$get();
       const activeOrg = orgsRes.ok ? ((await orgsRes.json()).organizations[0] ?? null) : null;
       setOrg(activeOrg);
@@ -43,14 +42,16 @@ export default function DashboardPage() {
           ? api.api.v0.dashboard.articles.planned.$get({ query: { org_id: activeOrg.id } })
           : null,
         api.api.v0.dashboard.articles.best.$get(),
-        api.api.v0.dashboard.integrations.connected.$get(),
+        activeOrg
+          ? api.api.v0.dashboard.integrations.connected.$get({ query: { org_id: activeOrg.id } })
+          : null,
       ]);
 
       setData({
         published: publishedRes?.ok ? (await publishedRes.json()).count : 0,
         planned: plannedRes?.ok ? (await plannedRes.json()).count : 0,
         bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
-        integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
+        integrations: integrationsRes?.ok ? (await integrationsRes.json()).integrations.length : 0,
       });
       setLoading(false);
     })();

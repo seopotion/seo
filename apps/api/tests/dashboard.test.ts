@@ -1,8 +1,28 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const {
+  editWordPressArticle,
+  saveWordPressConnection,
+  setWordPressPostId,
+  submitWordPressArticle,
+  testWordPressIntegration,
+} = vi.hoisted(() => ({
+  editWordPressArticle: vi.fn(),
+  saveWordPressConnection: vi.fn(),
+  setWordPressPostId: vi.fn(),
+  submitWordPressArticle: vi.fn(),
+  testWordPressIntegration: vi.fn(),
+}));
 
 // Google verification is mocked — no network, no real token needed.
 vi.mock('../src/clients/google', () => ({
   verifyGoogleIdToken: vi.fn(async () => ({ sub: 'g-sub-123', email: 'u@example.com', name: 'U' })),
+}));
+
+vi.mock('../src/clients/wordpress', () => ({
+  editWordPressArticle,
+  submitWordPressArticle,
+  testWordPressIntegration,
 }));
 
 vi.mock('@shared/db', () => {
@@ -48,6 +68,7 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      images_status: 'complete',
     },
     {
       id: 'art_2',
@@ -64,6 +85,8 @@ vi.mock('@shared/db', () => {
       status: 'published',
       created_at: now,
       published_at: now,
+      images_status: 'complete',
+      wordpress_post_id: 222,
     },
     // Owned by org_3 (user_2) — never visible to user_1 via detail reads.
     {
@@ -81,6 +104,41 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      images_status: 'complete',
+    },
+    {
+      id: 'art_4',
+      org_id: 'org_2',
+      keyword_id: 'kw_4',
+      title: 'Disconnected Article',
+      slug: 'disconnected-article',
+      keyword: 'disconnected',
+      meta_description: 'm',
+      featured_image_url: 'https://x/4.png',
+      content: '# d',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      created_at: now,
+      published_at: null,
+      images_status: 'complete',
+    },
+    {
+      id: 'art_5',
+      org_id: 'org_1',
+      keyword_id: 'kw_5',
+      title: 'Images Pending',
+      slug: 'images-pending',
+      keyword: 'images pending',
+      meta_description: 'm',
+      featured_image_url: '',
+      content: '# e',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      created_at: now,
+      published_at: null,
+      images_status: 'pending',
     },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
@@ -92,6 +150,8 @@ vi.mock('@shared/db', () => {
         website_url: 'https://clewas.com',
         setup_status: 'setup_complete',
         strategy_status: 'completed',
+        wordpress_token: 'stored-site-token',
+        wordpress_connected_at: now,
         presets: {
           business: {
             name: 'Clewas',
@@ -155,6 +215,19 @@ vi.mock('@shared/db', () => {
       { id: 'org_3', user_id: 'user_2', website_url: 'https://other.com', created_at: now },
     ],
   ]);
+  saveWordPressConnection.mockImplementation(
+    async (id: string, token: string, connectedAt: Date) => {
+      const org = orgs.get(id);
+      if (org) {
+        org.wordpress_token = token;
+        org.wordpress_connected_at = connectedAt;
+      }
+    },
+  );
+  setWordPressPostId.mockImplementation(async (id: string, postId: number) => {
+    const article = articles.find((candidate) => candidate.id === id);
+    if (article) Object.assign(article, { wordpress_post_id: postId });
+  });
   return {
     UserRepo: {
       upsertByGoogleSub: vi.fn(async (input: { google_sub: string; email: string }) => ({
@@ -166,6 +239,7 @@ vi.mock('@shared/db', () => {
     },
     OrgRepo: {
       findById: vi.fn(async (id: string) => orgs.get(id) ?? null),
+      saveWordPressConnection,
       updatePresets: vi.fn(async (id: string, presets: unknown) => {
         const o = orgs.get(id);
         if (o) o.presets = presets;
@@ -198,6 +272,7 @@ vi.mock('@shared/db', () => {
         async (orgId: string, status: string) =>
           articles.filter((a) => a.org_id === orgId && a.status === status).length,
       ),
+      setWordPressPostId,
     },
   };
 });
@@ -206,6 +281,20 @@ import { testClient } from 'hono/testing';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
+
+beforeEach(() => {
+  editWordPressArticle.mockReset();
+  editWordPressArticle.mockResolvedValue({ status: 200, body: { success: true, post_id: 222 } });
+  saveWordPressConnection.mockClear();
+  setWordPressPostId.mockClear();
+  submitWordPressArticle.mockReset();
+  submitWordPressArticle.mockResolvedValue({
+    status: 200,
+    body: { success: true, post_id: 321 },
+  });
+  testWordPressIntegration.mockReset();
+  testWordPressIntegration.mockResolvedValue({ success: true });
+});
 
 async function login(): Promise<string> {
   const res = await client.api.v0.core.login.$post({ json: { id_token: 'fake-google-token' } });
@@ -281,11 +370,289 @@ describe('dashboard home routes', () => {
 
   test('GET /integrations/connected is empty for a fresh org', async () => {
     const token = await login();
-    const res = await client.api.v0.dashboard.integrations.connected.$get(undefined, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_2' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     expect(res.status).toBe(200);
-    expect((await res.json()).integrations).toHaveLength(0);
+    if (res.status === 200) expect((await res.json()).integrations).toHaveLength(0);
+  });
+});
+
+describe('dashboard WordPress integration', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  test('connects an owned org and saves the token only after plugin success', async () => {
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'secret-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(testWordPressIntegration).toHaveBeenCalledWith('https://clewas.com', 'secret-token');
+    expect(saveWordPressConnection).toHaveBeenCalledWith('org_1', 'secret-token', expect.any(Date));
+    expect(testWordPressIntegration.mock.invocationCallOrder[0]).toBeLessThan(
+      saveWordPressConnection.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  test.each([
+    'org_3',
+    'missing-org',
+  ])('does not call the plugin for foreign/missing org %s', async (org_id) => {
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id, token: 'secret-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(testWordPressIntegration).not.toHaveBeenCalled();
+    expect(saveWordPressConnection).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    'invalid_integration_key',
+    'integration_not_configured',
+  ])('returns plugin error %s without saving the token', async (error_code) => {
+    testWordPressIntegration.mockResolvedValueOnce({ success: false, error_code });
+
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'rejected-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ success: false, error_code });
+    expect(saveWordPressConnection).not.toHaveBeenCalled();
+  });
+
+  test('returns a plugin failure without saving the token', async () => {
+    testWordPressIntegration.mockResolvedValueOnce({
+      success: false,
+      error_code: 'post_creation_failed',
+    });
+
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'plugin-failure-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ success: false, error_code: 'post_creation_failed' });
+    expect(saveWordPressConnection).not.toHaveBeenCalled();
+  });
+
+  test('returns a network failure without saving the token', async () => {
+    testWordPressIntegration.mockRejectedValueOnce(new Error('network down'));
+
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'network-failure-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({
+      success: false,
+      error_code: 'wordpress_request_failed',
+    });
+    expect(saveWordPressConnection).not.toHaveBeenCalled();
+  });
+
+  test('lists the saved WordPress connection without exposing the token', async () => {
+    const opts = await auth();
+    await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'never-return-this-token' } },
+      opts,
+    );
+
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    const body = await res.json();
+    expect(body.integrations).toEqual([
+      {
+        id: 'wordpress',
+        provider: 'wordpress',
+        connected_at: expect.any(String),
+      },
+    ]);
+    expect(JSON.stringify(body)).not.toContain('never-return-this-token');
+    expect(body.integrations[0]).not.toHaveProperty('token');
+    expect(body.integrations[0]).not.toHaveProperty('wordpress_token');
+  });
+
+  test.each([
+    'org_3',
+    'missing-org',
+  ])('GET /integrations/connected 404s for foreign/missing org %s', async (org_id) => {
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id } },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('dashboard WordPress article routes', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  test('requires authentication', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post({
+      param: { id: 'art_1' },
+    });
+
+    expect(res.status).toBe(401);
+    expect(submitWordPressArticle).not.toHaveBeenCalled();
+  });
+
+  test('creates an owned image-complete article and persists only the returned post ID', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, post_id: 321 });
+    expect(submitWordPressArticle).toHaveBeenCalledWith(
+      'https://clewas.com',
+      expect.any(String),
+      expect.objectContaining({ id: 'art_1', status: 'generated', published_at: null }),
+    );
+    expect(setWordPressPostId).toHaveBeenCalledWith('art_1', 321);
+
+    const article = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_1' } },
+      opts,
+    );
+    expect(article.status).toBe(200);
+    if (article.status === 200) {
+      expect(await article.json()).toMatchObject({
+        status: 'generated',
+        published_at: null,
+        wordpress_post_id: 321,
+      });
+    }
+  });
+
+  test('rejects create until article images are complete', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_5' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Article images are not complete' });
+    expect(submitWordPressArticle).not.toHaveBeenCalled();
+    expect(setWordPressPostId).not.toHaveBeenCalled();
+  });
+
+  test('rejects create when the article org has no WordPress connection', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_4' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'WordPress is not connected' });
+    expect(submitWordPressArticle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    'art_3',
+    'missing-article',
+  ])('does not submit a foreign or missing article %s', async (id) => {
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Article not found' });
+    expect(submitWordPressArticle).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    400, 403, 409, 500,
+  ] as const)('passes through a plugin %s create response without persisting', async (status) => {
+    submitWordPressArticle.mockResolvedValueOnce({
+      status,
+      body: { error: `plugin-${status}` },
+    });
+
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(status);
+    expect(await res.json()).toEqual({ error: `plugin-${status}` });
+    expect(setWordPressPostId).not.toHaveBeenCalled();
+  });
+
+  test('requires a stored WordPress post ID before update', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$put(
+      { param: { id: 'art_5' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Article has not been submitted to WordPress' });
+    expect(editWordPressArticle).not.toHaveBeenCalled();
+  });
+
+  test('updates by stored WordPress ID and passes warnings through without changing status', async () => {
+    editWordPressArticle.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        success: true,
+        post_id: 222,
+        warnings: ['Featured image could not be assigned.'],
+      },
+    });
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$put(
+      { param: { id: 'art_2' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      post_id: 222,
+      warnings: ['Featured image could not be assigned.'],
+    });
+    expect(editWordPressArticle).toHaveBeenCalledWith(
+      'https://clewas.com',
+      expect.any(String),
+      222,
+      expect.objectContaining({ id: 'art_2', status: 'published' }),
+    );
+    expect(setWordPressPostId).not.toHaveBeenCalled();
+
+    const article = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_2' } },
+      opts,
+    );
+    expect(article.status).toBe(200);
+    if (article.status === 200) {
+      expect(await article.json()).toMatchObject({
+        status: 'published',
+        wordpress_post_id: 222,
+      });
+    }
   });
 });
 

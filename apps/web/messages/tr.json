@@ -193,7 +193,11 @@
   },
   "ArticleDetailPage": {
     "actions": {
-      "back": "İçerik geçmişine dön"
+      "back": "İçerik geçmişine dön",
+      "publishWordPress": "WordPress'e gönder",
+      "publishingWordPress": "WordPress'e gönderiliyor...",
+      "updateWordPress": "WordPress'i güncelle",
+      "updatingWordPress": "WordPress güncelleniyor..."
     },
     "labels": {
       "createdAt": "Oluşturulma",
@@ -212,7 +216,14 @@
       "generated": "Oluşturuldu",
       "published": "Yayınlandı"
     },
-    "title": "Makale"
+    "title": "Makale",
+    "wordpress": {
+      "pluginError": "WordPress isteği tamamlayamadı: {error}",
+      "published": "WordPress'e gönderildi.",
+      "requestError": "WordPress'e ulaşılamadı. Tekrar deneyin.",
+      "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
+      "warnings": "WordPress isteği uyarılarla tamamladı:"
+    }
   },
   "ArticleSettingsPage": {
     "actions": {
@@ -262,7 +273,6 @@
       "competitorUrl": "https://rakip.com"
     },
     "status": {
-      "integrationsUnsupported": "Entegrasyon seçimleri henüz kaydedilmiyor çünkü canlı entegrasyon API'si hazır değil.",
       "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "Ayarlar yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
@@ -276,6 +286,25 @@
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
       "label": "Ayar bölümleri"
+    },
+    "wordpress": {
+      "connectAndTest": "Bağlan ve test et",
+      "connected": "WordPress bağlı.",
+      "connectedSuccess": "WordPress bağlantısı başarıyla kuruldu ve test edildi.",
+      "connecting": "Bağlanıyor...",
+      "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
+      "description": "Kendi sunucunuzdaki WordPress sitesinde SEO Potion eklentisine bağlanın.",
+      "invalidToken": "Entegrasyon token'ı reddedildi.",
+      "loadError": "Kayıtlı WordPress bağlantı durumu yüklenemedi.",
+      "loading": "WordPress bağlantısı kontrol ediliyor...",
+      "notConnected": "WordPress bağlı değil.",
+      "pluginNotConfigured": "SEO Potion eklentisi bu WordPress sitesinde yapılandırılmamış.",
+      "requestFailed": "WordPress sitesine ulaşılamadı. Siteyi kontrol edip tekrar deneyin.",
+      "siteUrl": "Site URL'si",
+      "title": "Kendi sunucunuzdaki WordPress",
+      "token": "Entegrasyon token'ı",
+      "tokenHelp": "WordPress'te SEO Potion → Manage sayfasını açın, güçlü bir entegrasyon token'ı seçip kaydedin ve aynı token'ı buraya yapıştırın. Kayıtlı token'lar hiçbir zaman gösterilmez.",
+      "tokenPlaceholder": "Eklenti entegrasyon token'ını girin"
     }
   },
   "LandingPage": {
@@ -445,6 +474,11 @@
     },
     "integrations": {
       "availableIntegrations": "Mevcut entegrasyonlar",
+      "connectWordPressLater": "WordPress'i daha sonra Ayarlar'dan bağlayabilirsiniz.",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress"
+      },
       "referralSource": "Bizi nereden duydunuz?",
       "selectOption": "Bir seçenek seç",
       "title": "Entegrasyonlar ve Referans Kaynağı"

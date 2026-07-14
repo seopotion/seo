@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -22,7 +21,6 @@ import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { TextEntryList } from '../../onboarding/components/TextEntryList';
 import { countries, languages } from '../../onboarding/constants';
-import { integrationOptions } from '../../onboarding/steps/IntegrationsStep';
 import type { TextEntry } from '../../onboarding/types';
 import { createEntryId, isValidHttpUrl } from '../../onboarding/utils';
 
@@ -40,13 +38,15 @@ type SettingsForm = {
   businessName: string;
   competitors: TextEntry[];
   country: string;
-  integrations: string[];
   language: string;
   targetAudience: string;
 };
 
+type IntegrationLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsSaveState = 'error' | 'idle' | 'saved';
+type WordPressActionState = 'error' | 'idle' | 'loading' | 'success';
+type WordPressError = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 
 type GeneralSettingsResponse = {
   audience: {
@@ -66,7 +66,6 @@ const initialSettings: SettingsForm = {
   businessName: '',
   competitors: [],
   country: countries[0].value,
-  integrations: [],
   language: languages[0].value,
   targetAudience: '',
 };
@@ -112,7 +111,6 @@ export default function SettingsPage() {
   const t = useTranslations('SettingsPage');
   const businessT = useTranslations('Onboarding.business');
   const audienceT = useTranslations('Onboarding.audience');
-  const integrationsT = useTranslations('Onboarding.integrations');
   const optionsT = useTranslations('Onboarding.options');
   const validationT = useTranslations('Onboarding.validation');
   const router = useRouter();
@@ -125,9 +123,14 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsForm>(initialSettings);
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [competitorError, setCompetitorError] = useState('');
+  const [integrationLoadState, setIntegrationLoadState] = useState<IntegrationLoadState>('idle');
   const [loadState, setLoadState] = useState<SettingsLoadState>('idle');
   const [saveState, setSaveState] = useState<SettingsSaveState>('idle');
   const [saving, setSaving] = useState(false);
+  const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
+  const [wordpressConnected, setWordpressConnected] = useState(false);
+  const [wordpressError, setWordpressError] = useState<WordPressError>('connectFailed');
+  const [wordpressToken, setWordpressToken] = useState('');
   const editRevisionRef = useRef(0);
 
   const handleUnauthorized = useCallback(() => {
@@ -173,6 +176,57 @@ export default function SettingsPage() {
       } catch {
         if (!cancelled) {
           setLoadState('error');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleUnauthorized, organization, organizationLoading]);
+
+  useEffect(() => {
+    if (organizationLoading) return;
+
+    if (!organization) {
+      setIntegrationLoadState('idle');
+      setWordpressConnected(false);
+      setWordpressToken('');
+      return;
+    }
+
+    let cancelled = false;
+
+    setIntegrationLoadState('loading');
+    setWordpressActionState('idle');
+    setWordpressToken('');
+
+    void (async () => {
+      try {
+        const response = await api.api.v0.dashboard.integrations.connected.$get({
+          query: { org_id: organization.id },
+        });
+
+        if ((response.status as number) === 401) {
+          handleUnauthorized();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('integrations_load_failed');
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setWordpressConnected(
+            data.integrations.some((integration) => integration.provider === 'wordpress'),
+          );
+          setIntegrationLoadState('ready');
+        }
+      } catch {
+        if (!cancelled) {
+          setIntegrationLoadState('error');
         }
       }
     })();
@@ -267,16 +321,55 @@ export default function SettingsPage() {
     setCompetitorError('');
   }
 
-  function toggleIntegration(integrationId: string) {
-    setSettings((currentSettings) => {
-      const selected = currentSettings.integrations.includes(integrationId);
+  async function connectWordPress() {
+    const token = wordpressToken.trim();
 
-      return {
-        ...currentSettings,
-        integrations: selected ? [] : [integrationId],
-      };
-    });
-    markEdited();
+    if (
+      !organization ||
+      !token ||
+      integrationLoadState === 'loading' ||
+      wordpressActionState === 'loading'
+    ) {
+      return;
+    }
+
+    setWordpressActionState('loading');
+
+    try {
+      const response = await api.api.v0.dashboard.integrations.wordpress.$post({
+        json: { org_id: organization.id, token },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorCode = 'error_code' in data ? data.error_code : '';
+        setWordpressError(
+          errorCode === 'invalid_integration_key'
+            ? 'invalidToken'
+            : errorCode === 'integration_not_configured'
+              ? 'pluginNotConfigured'
+              : errorCode === 'wordpress_request_failed'
+                ? 'requestFailed'
+                : 'connectFailed',
+        );
+        setWordpressActionState('error');
+        return;
+      }
+
+      setIntegrationLoadState('ready');
+      setWordpressConnected(true);
+      setWordpressToken('');
+      setWordpressActionState('success');
+    } catch {
+      setWordpressError('requestFailed');
+      setWordpressActionState('error');
+    }
   }
 
   if (
@@ -445,40 +538,83 @@ export default function SettingsPage() {
         aria-labelledby="settings-tab-integrations"
         hidden={activeTab !== 'integrations'}
       >
-        <div className="grid gap-4">
-          <FieldPanel>
-            <p className="font-medium text-sm leading-none">
-              {integrationsT('availableIntegrations')}
-            </p>
-            <p className="mt-1 text-slate-500 text-sm">{t('status.integrationsUnsupported')}</p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-              {integrationOptions.map((integration) => {
-                const selected = settings.integrations.includes(integration.id);
+        <FieldPanel>
+          <div>
+            <p className="font-medium text-sm leading-none">{t('wordpress.title')}</p>
+            <p className="mt-1 text-slate-500 text-sm">{t('wordpress.description')}</p>
+          </div>
 
-                return (
-                  <Button
-                    key={integration.id}
-                    type="button"
-                    variant="outline"
-                    onClick={() => toggleIntegration(integration.id)}
-                    aria-pressed={selected}
-                    className={cn(
-                      'h-auto justify-start gap-3 px-3 py-3 text-left',
-                      selected
-                        ? 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary'
-                        : 'text-foreground',
-                    )}
-                  >
-                    <span className="flex size-9 items-center justify-center">
-                      <Image src={integration.logoSrc} alt="" width={20} height={20} aria-hidden />
-                    </span>
-                    <span className="font-semibold">{integration.name}</span>
-                  </Button>
-                );
-              })}
+          {integrationLoadState === 'loading' ? (
+            <StatusPanel>{t('wordpress.loading')}</StatusPanel>
+          ) : null}
+          {integrationLoadState === 'error' ? (
+            <StatusPanel tone="error">{t('wordpress.loadError')}</StatusPanel>
+          ) : null}
+          {integrationLoadState === 'ready' && wordpressActionState !== 'success' ? (
+            <StatusPanel tone={wordpressConnected ? 'success' : 'neutral'}>
+              {t(wordpressConnected ? 'wordpress.connected' : 'wordpress.notConnected')}
+            </StatusPanel>
+          ) : null}
+          {wordpressActionState === 'success' ? (
+            <StatusPanel tone="success">{t('wordpress.connectedSuccess')}</StatusPanel>
+          ) : null}
+          {wordpressActionState === 'error' ? (
+            <StatusPanel tone="error">{t(`wordpress.${wordpressError}`)}</StatusPanel>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="wordpress-site-url">{t('wordpress.siteUrl')}</Label>
+              <Input
+                className="mt-2"
+                id="wordpress-site-url"
+                type="url"
+                value={organization?.website_url ?? ''}
+                readOnly
+              />
             </div>
-          </FieldPanel>
-        </div>
+            <div>
+              <Label htmlFor="wordpress-token">{t('wordpress.token')}</Label>
+              <Input
+                autoComplete="off"
+                className="mt-2"
+                id="wordpress-token"
+                type="password"
+                value={wordpressToken}
+                placeholder={t('wordpress.tokenPlaceholder')}
+                spellCheck={false}
+                onChange={(event) => {
+                  setWordpressToken(event.target.value);
+                  setWordpressActionState('idle');
+                }}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+
+                  event.preventDefault();
+                  void connectWordPress();
+                }}
+              />
+              <p className="mt-1 text-slate-500 text-xs">{t('wordpress.tokenHelp')}</p>
+            </div>
+          </div>
+
+          <div>
+            <Button
+              type="button"
+              onClick={connectWordPress}
+              disabled={
+                !organization ||
+                !wordpressToken.trim() ||
+                integrationLoadState === 'loading' ||
+                wordpressActionState === 'loading'
+              }
+            >
+              {wordpressActionState === 'loading'
+                ? t('wordpress.connecting')
+                : t('wordpress.connectAndTest')}
+            </Button>
+          </div>
+        </FieldPanel>
       </div>
 
       <div
@@ -518,6 +654,7 @@ function StatusPanel({
 }) {
   return (
     <div
+      aria-live="polite"
       className={cn(
         'rounded-md border px-4 py-3 text-sm',
         tone === 'error' && 'border-red-200 bg-red-50 text-red-700',

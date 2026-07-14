@@ -51,6 +51,14 @@ export const ArticleRepo = {
     return toEntity({ _id: res.insertedId, ...data, created_at });
   },
 
+  async setWordPressPostId(id: string, postId: number): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { wordpress_post_id: postId } },
+    );
+  },
+
   /** Persist the image plan once (set-if-absent) — a retry never re-plans (#51). */
   async setImagePlan(id: string, images: ArticleImage[]): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;

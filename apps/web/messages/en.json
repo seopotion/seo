@@ -193,7 +193,11 @@
   },
   "ArticleDetailPage": {
     "actions": {
-      "back": "Back to content history"
+      "back": "Back to content history",
+      "publishWordPress": "Send to WordPress",
+      "publishingWordPress": "Sending to WordPress...",
+      "updateWordPress": "Update WordPress",
+      "updatingWordPress": "Updating WordPress..."
     },
     "labels": {
       "createdAt": "Created",
@@ -212,7 +216,14 @@
       "generated": "Generated",
       "published": "Published"
     },
-    "title": "Article"
+    "title": "Article",
+    "wordpress": {
+      "pluginError": "WordPress could not complete the request: {error}",
+      "published": "Sent to WordPress.",
+      "requestError": "WordPress could not be reached. Try again.",
+      "updated": "The WordPress post was updated from the stored article.",
+      "warnings": "WordPress completed the request with warnings:"
+    }
   },
   "ArticleSettingsPage": {
     "actions": {
@@ -262,7 +273,6 @@
       "competitorUrl": "https://competitor.com"
     },
     "status": {
-      "integrationsUnsupported": "Integration choices are not saved yet because the live integrations API is not available.",
       "loadError": "Could not load settings. Try again when the API is available.",
       "loading": "Loading settings...",
       "noOrganization": "No completed organization was found for this workspace.",
@@ -276,6 +286,25 @@
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",
       "label": "Settings sections"
+    },
+    "wordpress": {
+      "connectAndTest": "Connect & test",
+      "connected": "WordPress is connected.",
+      "connectedSuccess": "WordPress connected and tested successfully.",
+      "connecting": "Connecting...",
+      "connectFailed": "WordPress could not be connected. Check the token and try again.",
+      "description": "Connect the SEO Potion plugin on your self-hosted WordPress site.",
+      "invalidToken": "The integration token was rejected.",
+      "loadError": "Could not load the saved WordPress connection state.",
+      "loading": "Checking the WordPress connection...",
+      "notConnected": "WordPress is not connected.",
+      "pluginNotConfigured": "The SEO Potion plugin is not configured on this WordPress site.",
+      "requestFailed": "The WordPress site could not be reached. Check the site and try again.",
+      "siteUrl": "Site URL",
+      "title": "Self-hosted WordPress",
+      "token": "Integration token",
+      "tokenHelp": "In WordPress, open SEO Potion → Manage, choose and save a strong integration token, then paste the same token here. Saved tokens are never shown.",
+      "tokenPlaceholder": "Enter the plugin integration token"
     }
   },
   "LandingPage": {
@@ -445,6 +474,11 @@
     },
     "integrations": {
       "availableIntegrations": "Available integrations",
+      "connectWordPressLater": "You can connect WordPress later from Settings.",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Self-hosted WordPress"
+      },
       "referralSource": "How did you hear about us?",
       "selectOption": "Select an option",
       "title": "Integrations And Referral Source"

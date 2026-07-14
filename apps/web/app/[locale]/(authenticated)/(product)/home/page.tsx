@@ -66,7 +66,9 @@ export default function HomePage() {
             query: { org_id: organization.id },
           }),
           api.api.v0.dashboard.articles.best.$get(),
-          api.api.v0.dashboard.integrations.connected.$get(),
+          api.api.v0.dashboard.integrations.connected.$get({
+            query: { org_id: organization.id },
+          }),
         ]);
 
         if (cancelled) return;

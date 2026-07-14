@@ -43,10 +43,10 @@ export const ArticleCountResponse = z
   })
   .openapi('ArticleCountResponse');
 
-const ConnectedIntegration = z
+export const ConnectedIntegration = z
   .object({
     id: z.string(),
-    provider: z.string(),
+    provider: z.literal('wordpress'),
     connected_at: z.string(),
   })
   .openapi('ConnectedIntegration');
@@ -56,6 +56,24 @@ export const ConnectedIntegrationsResponse = z
     integrations: z.array(ConnectedIntegration),
   })
   .openapi('ConnectedIntegrationsResponse');
+
+export const WordPressConnectionBody = z
+  .object({
+    org_id: z.string(),
+    token: z.string().min(1),
+  })
+  .openapi('WordPressConnectionBody');
+
+export const WordPressConnectionResponse = z
+  .object({ success: z.literal(true) })
+  .openapi('WordPressConnectionResponse');
+
+export const WordPressConnectionErrorResponse = z
+  .object({
+    success: z.literal(false),
+    error_code: z.string(),
+  })
+  .openapi('WordPressConnectionErrorResponse');
 
 /**
  * Content Planner schemas (design/product-flow.md §2.1). The monthly calendar
@@ -156,6 +174,7 @@ export const ArticleDetailResponse = z
     featured_image_url: z.string(),
     content: z.string(),
     status: z.enum(ARTICLE_STATUSES),
+    wordpress_post_id: z.number().int().positive().optional(),
     created_at: z.string(),
     published_at: z.string().nullable(),
   })
@@ -166,6 +185,18 @@ export const ArticleNotFoundResponse = z
     error: z.string().openapi({ example: 'Article not found' }),
   })
   .openapi('ArticleNotFoundResponse');
+
+export const WordPressArticleResponse = z
+  .object({
+    success: z.literal(true),
+    post_id: z.number().int().positive(),
+    warnings: z.array(z.string()).optional(),
+  })
+  .openapi('WordPressArticleResponse');
+
+export const WordPressArticleErrorResponse = z
+  .object({ error: z.string() })
+  .openapi('WordPressArticleErrorResponse');
 
 /**
  * Settings schemas (design/product-flow.md §2.3 + §2.6). Post-onboarding, the
