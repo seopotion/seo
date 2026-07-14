@@ -1,53 +1,77 @@
-import type { SetupPresets } from '@shared/schemas';
+import { parseJsonObject } from '@shared/generation';
+import type { LlmClient, LlmMessage } from '@shared/providers';
+import { type SetupPresets, SetupPresetsSchema } from '@shared/schemas';
+import { discoverBlog, fetchSite } from './scrape';
 
-function hostOf(url: string): string {
+export interface ScanClients {
+  llm: LlmClient;
+}
+
+function domainOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '');
   } catch {
-    return 'example.com';
+    return url;
   }
 }
 
-function brandOf(host: string): string {
-  const label = host.split('.')[0] || 'example';
-  return label.charAt(0).toUpperCase() + label.slice(1);
+/**
+ * Prompt for the LLM-owned preset fields. Competitors and blog URLs are handled
+ * deterministically (manual entry / sitemap) and deliberately excluded here.
+ */
+function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
+  const system = [
+    'You are an SEO onboarding assistant.',
+    'From the scraped website content, produce onboarding presets as JSON.',
+    'Respond with ONLY a JSON object of this exact shape:',
+    '{ "business": { "name": string, "language": string, "country": string, "description": string },',
+    '  "audience": { "target": string },',
+    '  "article_preferences": {',
+    '    "content_seo": { "article_style": string, "internal_links": boolean, "llm_instructions": string },',
+    '    "engagement": { "image_style": string } } }',
+    'Do NOT include competitors or blog URLs — those are handled separately.',
+    'language is the primary content language (e.g. "English"); country is the target market',
+    '(e.g. "Global (English)"). description is 2-4 sentences summarizing the business.',
+    'target describes the ideal audience. article_style / image_style are short phrases.',
+  ].join('\n');
+
+  const user = pageText
+    ? `Website: ${url}\n\nScraped homepage content:\n${pageText}`
+    : `Website: ${url}\n\n(The homepage could not be fetched. Infer reasonable presets from the domain name "${domainOf(url)}".)`;
+
+  return [
+    { role: 'system', content: system },
+    { role: 'user', content: user },
+  ];
 }
 
 /**
- * Website scanner — MOCK implementation. Generates deterministic placeholder
- * presets derived from the URL so the onboarding flow is exercisable end-to-end
- * without scraping or AI. Replace with real scrape + LLM calls later.
+ * Real website scanner. Scrapes the homepage + sitemap and calls the LLM to
+ * generate onboarding presets. Competitors are left empty for manual entry.
+ * Always returns a valid SetupPresets on success; only unparseable/invalid LLM
+ * output throws (the worker then re-throws → SQS retry → DLQ).
  * See design/product-flow.md §1.1.
  */
-export async function scanWebsite(websiteUrl: string): Promise<SetupPresets> {
-  const host = hostOf(websiteUrl);
-  const brand = brandOf(host);
+export async function scanWebsite(url: string, { llm }: ScanClients): Promise<SetupPresets> {
+  const [page, blog] = await Promise.all([fetchSite(url), discoverBlog(url)]);
 
-  return {
-    business: {
-      name: brand,
-      language: 'English',
-      country: 'Global (English)',
-      description: `${brand} provides products and services via ${host}. (mock description — replace with AI-generated copy)`,
-    },
-    audience: {
-      target: `People searching for solutions related to ${brand}.`,
-      competitors: ['competitor-a.com', 'competitor-b.com'],
-    },
-    blog: {
-      sitemap_url: `https://${host}/sitemap.xml`,
-      main_blog_url: `https://${host}/blog`,
-      best_articles: [`https://${host}/blog/getting-started`, `https://${host}/blog/how-it-works`],
-    },
-    article_preferences: {
-      content_seo: {
-        article_style: 'Informative, practical, SEO-optimized',
-        internal_links: true,
-        llm_instructions: `Write in a clear, helpful tone for ${brand}'s audience.`,
-      },
-      engagement: {
-        image_style: 'Clean, modern, minimal',
-      },
-    },
+  const res = await llm.complete({
+    messages: buildScanPrompt(url, page?.text ?? null),
+    responseFormat: 'json',
+  });
+
+  const fields = parseJsonObject(res.text) as {
+    business?: unknown;
+    audience?: { target?: unknown };
+    article_preferences?: unknown;
   };
+
+  // SetupPresetsSchema is the single validation gate — a malformed/incomplete
+  // LLM object throws here and dead-letters rather than persisting junk.
+  return SetupPresetsSchema.parse({
+    business: fields.business,
+    audience: { target: fields.audience?.target, competitors: [] },
+    blog,
+    article_preferences: fields.article_preferences,
+  });
 }
