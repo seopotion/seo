@@ -3,10 +3,10 @@ const SCRAPE_CHAR_BUDGET = 8_000;
 const USER_AGENT = 'Mozilla/5.0 (compatible; SeoPotionScanner/1.0; +https://seopotion.com/bot)';
 const MAX_BEST_ARTICLES = 5;
 const MAX_SITEMAP_URLS = 200;
+const MAX_RESPONSE_BYTES = 5_000_000; // 5 MB cap on fetched homepage/sitemap bodies
 
 export interface ScrapedPage {
   text: string;
-  links: string[];
 }
 
 export interface BlogInfo {
@@ -25,6 +25,8 @@ async function fetchText(url: string): Promise<string | null> {
       signal: controller.signal,
     });
     if (!res.ok) return null;
+    const declaredLength = Number(res.headers.get('content-length'));
+    if (declaredLength > MAX_RESPONSE_BYTES) return null;
     return await res.text();
   } catch {
     return null;
@@ -44,25 +46,11 @@ function htmlToText(html: string): string {
     .slice(0, SCRAPE_CHAR_BUDGET);
 }
 
-/** Extract absolute href targets from anchor tags. */
-function extractLinks(html: string, baseUrl: string): string[] {
-  const links: string[] = [];
-  const re = /<a\b[^>]*href=["']([^"']+)["']/gi;
-  for (const m of html.matchAll(re)) {
-    try {
-      links.push(new URL(m[1]!, baseUrl).toString());
-    } catch {
-      // ignore malformed hrefs
-    }
-  }
-  return links;
-}
-
 /** Fetch + parse a website homepage. Returns null if the page can't be fetched. */
 export async function fetchSite(url: string): Promise<ScrapedPage | null> {
   const html = await fetchText(url);
   if (html === null) return null;
-  return { text: htmlToText(html), links: extractLinks(html, url) };
+  return { text: htmlToText(html) };
 }
 
 /** Sitemap URLs declared in robots.txt (`Sitemap:` lines). */

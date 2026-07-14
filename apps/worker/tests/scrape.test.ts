@@ -2,14 +2,17 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { discoverBlog, fetchSite } from '../src/scrape';
 
 /** Route fetch by URL; unmatched URLs resolve to a 404-ish response. */
-function stubFetch(routes: Record<string, string>) {
+function stubFetch(routes: Record<string, string>, contentLengths: Record<string, number> = {}) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string) => {
-      const body = routes[String(input)];
+      const key = String(input);
+      const body = routes[key];
+      const length = contentLengths[key];
       return {
         ok: body !== undefined,
         status: body !== undefined ? 200 : 404,
+        headers: new Headers(length !== undefined ? { 'content-length': String(length) } : {}),
         text: async () => body ?? '',
       } as Response;
     }),
@@ -19,7 +22,7 @@ function stubFetch(routes: Record<string, string>) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('fetchSite', () => {
-  test('strips HTML to visible text and extracts absolute links', async () => {
+  test('strips HTML to visible text', async () => {
     stubFetch({
       'https://clewas.com':
         '<html><head><style>x{}</style><script>bad()</script></head>' +
@@ -29,7 +32,6 @@ describe('fetchSite', () => {
     const page = await fetchSite('https://clewas.com');
 
     expect(page?.text).toBe('Clewas Blog');
-    expect(page?.links).toContain('https://clewas.com/blog');
   });
 
   test('returns null when the fetch throws', async () => {
@@ -38,6 +40,15 @@ describe('fetchSite', () => {
       vi.fn(async () => {
         throw new Error('network');
       }),
+    );
+
+    expect(await fetchSite('https://clewas.com')).toBeNull();
+  });
+
+  test('returns null when the declared content-length exceeds the cap', async () => {
+    stubFetch(
+      { 'https://clewas.com': '<html><body>Hello</body></html>' },
+      { 'https://clewas.com': 6_000_000 },
     );
 
     expect(await fetchSite('https://clewas.com')).toBeNull();
