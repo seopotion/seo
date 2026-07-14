@@ -25,3 +25,10 @@ export function getImageClients() {
     image: createFalClient({ apiKey: process.env.FAL_KEY ?? '' }),
   };
 }
+
+/** Build the LLM client the scanner worker needs, from env. */
+export function getScanClients() {
+  return {
+    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+  };
+}

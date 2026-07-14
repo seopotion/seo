@@ -166,7 +166,10 @@ export class ApiStack extends Stack {
       runtime: Runtime.NODEJS_22_X,
       timeout: Duration.seconds(120),
       memorySize: 512,
-      environment: mongoEnv,
+      environment: {
+        ...mongoEnv,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+      },
       bundling,
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));

@@ -2,6 +2,7 @@ import { OrgRepo } from '@shared/db';
 import { ScanTask } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
+import { getScanClients } from './providers';
 import { scanWebsite } from './scanner';
 
 /**
@@ -18,7 +19,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       logger.appendKeys({ org_id });
       logger.info('scanning website', { website_url });
 
-      const presets = await scanWebsite(website_url);
+      const presets = await scanWebsite(website_url, getScanClients());
       await OrgRepo.completeScan(org_id, presets);
 
       logger.info('scan completed');
