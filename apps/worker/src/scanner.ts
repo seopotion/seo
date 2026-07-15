@@ -30,8 +30,9 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     '    "content_seo": { "article_style": string, "internal_links": boolean, "llm_instructions": string },',
     '    "engagement": { "image_style": string } } }',
     'Do NOT include competitors or blog URLs — those are handled separately.',
-    'language is the primary content language (e.g. "English"); country is the target market',
-    '(e.g. "Global (English)"). description is 2-4 sentences summarizing the business.',
+    'language is the primary content language (e.g. "English"); country is the primary target',
+    'market as a plain country name (e.g. "United States") — never a region or "Global".',
+    'description is 2-4 sentences summarizing the business.',
     'target describes the ideal audience. article_style / image_style are short phrases.',
   ].join('\n');
 

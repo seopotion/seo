@@ -20,6 +20,15 @@ describe('resolveConfig', () => {
     expect(c.difficultyCeiling).toBe(45);
   });
 
+  it('maps the "Global (English)" preset to the default DataForSEO location', () => {
+    const global = {
+      ...presets,
+      business: { ...presets.business, country: 'Global (English)' },
+    };
+    const c = resolveConfig(global);
+    expect(c.locationName).toBe('United States');
+  });
+
   it('caller overrides win and merge deeply', () => {
     const c = resolveConfig(presets, { serpTopN: 5, weights: { volume: 0.9 } as never });
     expect(c.serpTopN).toBe(5);

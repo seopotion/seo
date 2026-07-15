@@ -28,6 +28,15 @@ function num(raw: unknown): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 }
 
+/**
+ * Labs site endpoints require `target` as a bare domain ("without https:// and
+ * www."), but org/competitor URLs arrive as full URLs — strip scheme, www, and path.
+ */
+function bareDomain(target: string): string {
+  const host = target.includes('://') ? new URL(target).hostname : (target.split('/')[0] as string);
+  return host.replace(/^www\./, '');
+}
+
 /** Normalize one Labs `items[]` entry into a KeywordMetric. */
 function toKeywordMetric(item: Record<string, unknown>): KeywordMetric {
   const info = (item.keyword_info ?? {}) as Record<string, unknown>;
@@ -125,18 +134,29 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
 
     const body = (await res.json()) as {
       status_code?: number;
-      tasks?: Array<{ status_code?: number; result?: unknown[] }>;
+      status_message?: string;
+      tasks?: Array<{ status_code?: number; status_message?: string; result?: unknown[] }>;
     };
+
+    // status_message is the provider's own text (never credentials) — keep it so
+    // logs name the rejected field instead of a bare category.
+    const detail = (msg?: string) => (msg ? `: ${msg}` : '');
 
     if (typeof body.status_code === 'number' && body.status_code >= 30000) {
       const category = categorizeApiStatus(body.status_code);
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})`);
+      throw new DataForSeoError(
+        category,
+        `DataForSEO request failed (${category})${detail(body.status_message)}`,
+      );
     }
 
     const taskResult = body.tasks?.[0];
     if (taskResult?.status_code && taskResult.status_code >= 30000) {
       const category = categorizeApiStatus(taskResult.status_code);
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})`);
+      throw new DataForSeoError(
+        category,
+        `DataForSEO request failed (${category})${detail(taskResult.status_message)}`,
+      );
     }
 
     return taskResult?.result ?? [];
@@ -152,7 +172,7 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
 
   return {
     async keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
-      const task: Record<string, unknown> = { target: params.target };
+      const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
       if (params.limit) task.limit = params.limit;
@@ -161,7 +181,7 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     },
 
     async rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
-      const task: Record<string, unknown> = { target: params.target };
+      const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
       if (params.limit) task.limit = params.limit;
