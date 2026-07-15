@@ -101,11 +101,12 @@ All endpoints auth-protected and ownership-checked, on the dashboard router:
   `webmasters.readonly`, `access_type=offline`, `prompt=consent`,
   `redirect_uri = <web origin>/dashboard/gsc/callback`, and `state` = short-lived
   signed HS256 JWT `{ org_id, user_id }` (reuses our signer; CSRF-proof).
-- `POST /dashboard/gsc/connect` `{ org_id, code, state }` — verify `state` (and that
-  it matches the caller), exchange the code server-side (`google-auth-library`
-  `OAuth2Client`, already a dependency), encrypt + upsert the refresh token with
-  `site_url: null`, list the account's GSC properties, return
-  `{ sites: [{ site_url, permission_level }] }`.
+- `POST /dashboard/gsc/connect` `{ code, state }` — verify `state` (its `user_id`
+  must match the caller; `org_id` comes from the state, so the callback page never
+  carries it), exchange the code server-side (`google-auth-library` `OAuth2Client`,
+  already a dependency), encrypt + upsert the refresh token with `site_url: null`,
+  list the account's GSC properties, return
+  `{ org_id, sites: [{ site_url, permission_level }] }`.
 - `POST /dashboard/gsc/site` `{ org_id, site_url }` — validate the choice against a
   fresh site list (reject anything not in the account), set `site_url` → connected.
 - `DELETE /dashboard/gsc?org_id=` — disconnect (delete the row); needed to
