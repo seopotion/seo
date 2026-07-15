@@ -27,6 +27,7 @@ import {
   listSites,
   querySearchAnalytics,
 } from '../src/clients/gsc';
+import { config } from '../src/config';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -58,6 +59,10 @@ describe('exchangeCode', () => {
 
     expect(await exchangeCode('auth-code')).toEqual({ refreshToken: 'rt-1', email: 'owner@x.com' });
     expect(getToken).toHaveBeenCalledWith('auth-code');
+    expect(verifyIdToken).toHaveBeenCalledWith({
+      idToken: 'idt',
+      audience: config.GOOGLE_CLIENT_ID,
+    });
   });
 
   test('throws when Google returns no refresh token', async () => {
@@ -97,6 +102,17 @@ describe('listSites', () => {
   test('maps invalid_grant refresh failures to GscAuthRevokedError', async () => {
     getAccessToken.mockRejectedValue(new Error('invalid_grant: token revoked'));
     await expect(listSites('rt-revoked')).rejects.toBeInstanceOf(GscAuthRevokedError);
+  });
+
+  test('throws when Google mints no access token', async () => {
+    getAccessToken.mockResolvedValue({ token: null });
+    await expect(listSites('rt-1')).rejects.toThrow(/no access token/);
+  });
+
+  test('throws on a non-OK response', async () => {
+    getAccessToken.mockResolvedValue({ token: 'at-1' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('boom', { status: 403 })));
+    await expect(listSites('rt-1')).rejects.toThrow(/403/);
   });
 });
 
