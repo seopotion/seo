@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   // Dashboard is gated behind login; bounce to home if there's no token.
-  // Otherwise load the four Home endpoints (all typed via AppType — change a
+  // Otherwise load the Home endpoints (all typed via AppType — change a
   // route schema in apps/api and this file fails to type-check).
   useEffect(() => {
     if (!getToken()) {
