@@ -2,7 +2,7 @@ import { categorizeProviderHttpStatus, isRetryableProviderError, ProviderError }
 import type { LlmClient, LlmCompleteParams, LlmConfig, LlmResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const DEFAULT_MODEL = 'anthropic/claude-sonnet-4.6';
+const DEFAULT_MODEL = 'z-ai/glm-5.2';
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 200;
