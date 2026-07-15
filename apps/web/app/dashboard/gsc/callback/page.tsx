@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
 
@@ -18,6 +18,9 @@ function CallbackInner() {
   const [sites, setSites] = useState<Site[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The OAuth code is single-use; guard against Strict Mode's double effect
+  // invocation so we never POST the same code to /connect twice.
+  const exchanged = useRef(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -30,6 +33,8 @@ function CallbackInner() {
       setError('Google connection was cancelled or failed.');
       return;
     }
+    if (exchanged.current) return;
+    exchanged.current = true;
     void (async () => {
       const res = await api.api.v0.dashboard.gsc.connect.$post({ json: { code, state } });
       if (!res.ok) {
