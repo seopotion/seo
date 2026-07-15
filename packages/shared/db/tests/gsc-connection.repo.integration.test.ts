@@ -42,9 +42,9 @@ describe('GscConnectionRepo (integration)', () => {
     expect((await GscConnectionRepo.findByOrgId('org_a'))?.site_url).toBe('sc-domain:a.com');
 
     await GscConnectionRepo.markRefreshFailed('org_a');
-    expect(
-      (await GscConnectionRepo.findByOrgId('org_a'))?.last_refresh_failed_at,
-    ).toBeInstanceOf(Date);
+    expect((await GscConnectionRepo.findByOrgId('org_a'))?.last_refresh_failed_at).toBeInstanceOf(
+      Date,
+    );
   });
 
   test('deleteByOrgId removes the row and reports it', async () => {
