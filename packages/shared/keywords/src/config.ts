@@ -24,6 +24,15 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   endpointLimits: { keywordsForSite: 200, rankedKeywords: 200, keywordIdeas: 200 },
 };
 
+// The scanner's LLM may emit "Global (English)" as the target market, but DataForSEO
+// has no worldwide location — fall back to its largest dataset.
+const GLOBAL_COUNTRY = 'Global (English)';
+const DEFAULT_LOCATION = 'United States';
+
+function toLocationName(country: string): string {
+  return country === GLOBAL_COUNTRY ? DEFAULT_LOCATION : country;
+}
+
 /** Merge defaults + caller overrides, deriving location/language from presets when absent. */
 export function resolveConfig(
   presets: SetupPresets,
@@ -35,7 +44,7 @@ export function resolveConfig(
     weights: { ...DEFAULT_CONFIG.weights, ...partial.weights },
     endpointLimits: { ...DEFAULT_CONFIG.endpointLimits, ...partial.endpointLimits },
     authorityDomains: partial.authorityDomains ?? DEFAULT_CONFIG.authorityDomains,
-    locationName: partial.locationName ?? presets.business.country,
+    locationName: partial.locationName ?? toLocationName(presets.business.country),
     languageName: partial.languageName ?? presets.business.language,
   };
 }

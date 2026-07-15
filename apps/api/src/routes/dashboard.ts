@@ -1,10 +1,14 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { ArticleRepo, KeywordRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, GscConnectionRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { domainRatingFromRank } from '@shared/providers';
-import type { Article } from '@shared/schemas';
+import { type Article, isGscConnected } from '@shared/schemas';
+import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
+import { decryptSecret } from '../lib/crypto';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
+import { getGscTokenKey } from '../lib/secrets';
+import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/dashboard';
 
@@ -40,6 +44,29 @@ function toArticleDetail(a: Article) {
   };
 }
 
+/** Search Analytics window: the trailing 28 days, as yyyy-mm-dd bounds. */
+function analyticsWindow(): { startDate: string; endDate: string } {
+  const end = new Date();
+  const start = new Date(end.getTime() - 28 * 24 * 60 * 60 * 1000);
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * The GSC gate (#12): decrypt the org's refresh token when a healthy, finalized
+ * connection exists; null keeps the caller on the gated response shape.
+ */
+async function gscAccess(org_id: string): Promise<{ token: string; siteUrl: string } | null> {
+  const conn = await GscConnectionRepo.findByOrgId(org_id);
+  if (!isGscConnected(conn)) return null;
+  return {
+    token: decryptSecret(conn.refresh_token_enc, await getGscTokenKey()),
+    siteUrl: conn.site_url,
+  };
+}
+
 /** Domain ratings refresh at most weekly — older values re-fetch inline on read (#12). */
 const DOMAIN_RATING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -56,17 +83,121 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       tags: ['dashboard'],
       method: 'get',
       path: '/articles/best',
-      summary: 'Best-performing articles (gated until Google Search Console is connected)',
+      summary: 'Best-performing pages by Search Console clicks (gated until GSC is connected)',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.BestArticlesResponse } },
-          description: 'Best articles; empty + gated until live Google data is connected',
+          description: 'Top pages by clicks (28 days); empty + gated without a GSC connection',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
       },
     }),
-    (c) => c.json({ articles: [], gated: true }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+
+      const access = await gscAccess(org_id);
+      if (!access) return c.json({ articles: [], gated: true }, 200);
+
+      try {
+        const rows = await gsc.querySearchAnalytics(access.token, access.siteUrl, {
+          ...analyticsWindow(),
+          dimensions: ['page'],
+          rowLimit: 10,
+        });
+        const { articles: published } = await ArticleRepo.listByOrg(org_id, {
+          status: 'published',
+          limit: 100,
+          offset: 0,
+        });
+        const articles = rows.map((row) => {
+          const url = row.keys[0] ?? '';
+          const match = published.find((a: Article) => url.includes(`/${a.slug}`));
+          return { url, clicks: Math.round(row.clicks), title: match?.title ?? null };
+        });
+        return c.json({ articles, gated: false }, 200);
+      } catch (err) {
+        // Revoked access closes the gate until reconnect; transient provider
+        // errors also degrade to the gated shape rather than a 500.
+        if (err instanceof gsc.GscAuthRevokedError) {
+          await GscConnectionRepo.markRefreshFailed(org_id);
+        } else {
+          logger.warn('GSC read failed for /articles/best', { org_id, error: err as Error });
+        }
+        return c.json({ articles: [], gated: true }, 200);
+      }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'get',
+      path: '/search-performance',
+      summary: '28-day Search Console totals (gated until GSC is connected)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.SearchPerformanceResponse } },
+          description: 'Clicks/impressions/CTR/position totals; nulls while gated',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+
+      const gatedBody = {
+        gated: true,
+        clicks: null,
+        impressions: null,
+        ctr: null,
+        position: null,
+      };
+      const access = await gscAccess(org_id);
+      if (!access) return c.json(gatedBody, 200);
+
+      try {
+        const rows = await gsc.querySearchAnalytics(
+          access.token,
+          access.siteUrl,
+          analyticsWindow(),
+        );
+        const row = rows[0];
+        return c.json(
+          {
+            gated: false,
+            clicks: row?.clicks ?? 0,
+            impressions: row?.impressions ?? 0,
+            ctr: row?.ctr ?? 0,
+            position: row?.position ?? 0,
+          },
+          200,
+        );
+      } catch (err) {
+        if (err instanceof gsc.GscAuthRevokedError) {
+          await GscConnectionRepo.markRefreshFailed(org_id);
+        } else {
+          logger.warn('GSC read failed for /search-performance', { org_id, error: err as Error });
+        }
+        return c.json(gatedBody, 200);
+      }
+    },
   )
   .openapi(
     createRoute({

@@ -73,7 +73,8 @@ export const infraCommand = defineCommand({
     preflight: defineCommand({
       meta: {
         name: 'preflight',
-        description: 'Verify per-stage deploy prerequisites (SSM secrets, GOOGLE_CLIENT_ID)',
+        description:
+          'Verify per-stage deploy prerequisites (SSM secrets, GOOGLE_CLIENT_ID, WEB_ORIGIN)',
       },
       args: {
         ...outputOption,
