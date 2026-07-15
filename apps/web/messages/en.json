@@ -49,7 +49,6 @@
       "researchKeyword": "Research keyword with AI",
       "viewArticle": "View article"
     },
-    "activeRange": "Active window",
     "agendaLabel": "Content agenda list",
     "articleTypes": {
       "alternatives": "Alternatives",
@@ -139,8 +138,6 @@
       "volume": "Volume"
     },
     "oneArticlePerDay": "1 article per day",
-    "rangeDays": "{count} days",
-    "rangeLabel": "Range",
     "scheduledCount": "{count} scheduled",
     "statuses": {
       "generated": "Generated",
@@ -445,8 +442,10 @@
     },
     "integrations": {
       "availableIntegrations": "Available integrations",
+      "comingSoon": "Coming soon",
       "referralSource": "How did you hear about us?",
       "selectOption": "Select an option",
+      "settingsNotice": "Once onboarding is complete, you can connect and manage integrations from Settings in your dashboard.",
       "title": "Integrations And Referral Source"
     },
     "options": {

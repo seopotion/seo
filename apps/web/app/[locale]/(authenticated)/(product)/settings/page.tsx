@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Badge,
   Button,
   Input,
   Label,
@@ -451,7 +452,7 @@ export default function SettingsPage() {
               {integrationsT('availableIntegrations')}
             </p>
             <p className="mt-1 text-slate-500 text-sm">{t('status.integrationsUnsupported')}</p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {integrationOptions.map((integration) => {
                 const selected = settings.integrations.includes(integration.id);
 
@@ -473,6 +474,9 @@ export default function SettingsPage() {
                       <Image src={integration.logoSrc} alt="" width={20} height={20} aria-hidden />
                     </span>
                     <span className="font-semibold">{integration.name}</span>
+                    {integration.comingSoon ? (
+                      <Badge variant="secondary">{integrationsT('comingSoon')}</Badge>
+                    ) : null}
                   </Button>
                 );
               })}

@@ -1,8 +1,8 @@
 'use client';
 
-import { CalendarDays, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode, RefObject } from 'react';
+import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
@@ -14,9 +14,7 @@ import { cn } from '@/lib/utils';
 import { ArticleEditorModal } from './_components/ArticleEditorModal';
 import { createPlannerFixtureArticles } from './fixtures';
 import {
-  addDays,
   buildCalendarWeeks,
-  DAYS_IN_RANGE,
   formatDate,
   formatDayNumber,
   formatMonth,
@@ -155,7 +153,6 @@ export default function ContentPlannerPage() {
   ]);
 
   const today = useMemo(() => startOfToday(), []);
-  const rangeEnd = useMemo(() => addDays(today, DAYS_IN_RANGE - 1), [today]);
   const calendarWeeks = useMemo(
     () => buildCalendarWeeks(today, plannerArticles),
     [plannerArticles, today],
@@ -167,10 +164,6 @@ export default function ContentPlannerPage() {
   const weekdayLabels = useMemo(
     () => calendarWeeks[0]?.map((day) => formatWeekday(day.date, locale, 'short')) ?? [],
     [calendarWeeks, locale],
-  );
-  const dateRangeText = useMemo(
-    () => `${formatDate(today, locale, 'medium')} - ${formatDate(rangeEnd, locale, 'medium')}`,
-    [locale, rangeEnd, today],
   );
   const statusMessage = getPlannerStatusMessage({
     loadError,
@@ -187,21 +180,10 @@ export default function ContentPlannerPage() {
             <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
             <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <SummaryPill
-              icon={<CalendarDays className="size-4" />}
-              label={t('rangeLabel')}
-              value={dateRangeText}
-            />
-            <SummaryPill
-              label={t('rangeDays', { count: DAYS_IN_RANGE })}
-              value={t('activeRange')}
-            />
-            <SummaryPill
-              label={t('scheduledCount', { count: plannerArticles.length })}
-              value={t('oneArticlePerDay')}
-            />
-          </div>
+          <SummaryPill
+            label={t('scheduledCount', { count: plannerArticles.length })}
+            value={t('oneArticlePerDay')}
+          />
         </header>
 
         {statusMessage ? <StatusMessage message={statusMessage} /> : null}
@@ -420,10 +402,9 @@ function usePageContentInert(pageContentRef: RefObject<HTMLDivElement | null>, a
   }, [active, pageContentRef]);
 }
 
-function SummaryPill({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) {
+function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-      {icon ? <span className="shrink-0 text-slate-500">{icon}</span> : null}
       <div className="min-w-0">
         <p className="truncate text-slate-500 text-xs">{label}</p>
         <p className="truncate font-medium text-slate-950 text-sm">{value}</p>
