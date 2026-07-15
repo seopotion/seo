@@ -22,8 +22,7 @@ describe('secret crypto (AES-256-GCM)', () => {
 
   test('rejects a tampered payload', () => {
     const buf = Buffer.from(encryptSecret('secret', key), 'base64');
-    // biome-ignore lint/suspicious/noExplicitAny: TypeScript Buffer index access issue
-    (buf as any)[buf.length - 1] ^= 0xff;
+    buf[buf.length - 1] = buf[buf.length - 1]! ^ 0xff;
     expect(() => decryptSecret(buf.toString('base64'), key)).toThrow();
   });
 });
