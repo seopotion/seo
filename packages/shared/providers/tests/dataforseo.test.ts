@@ -122,6 +122,51 @@ describe('keywordsForSite', () => {
       category: 'auth',
     });
   });
+
+  test('body errors carry the API status_message for diagnosis', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status_code: 40501,
+            status_message: "Invalid Field: 'location_name'.",
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    await expect(client().keywordsForSite({ target: 'x' })).rejects.toThrow(
+      /Invalid Field: 'location_name'/,
+    );
+  });
+
+  test('task-level errors carry the API status_message for diagnosis', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status_code: 20000,
+            tasks: [{ status_code: 40501, status_message: 'Invalid Field: target.' }],
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    await expect(client().keywordsForSite({ target: 'x' })).rejects.toThrow(
+      /Invalid Field: target/,
+    );
+  });
+
+  test('normalizes a full URL target to a bare domain', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(labsResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().keywordsForSite({ target: 'https://www.clewas.com/' });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual([
+      { target: 'clewas.com' },
+    ]);
+  });
 });
 
 function serpResponse(items: unknown[]) {
@@ -156,6 +201,15 @@ describe('rankedKeywords', () => {
     const out = await client().rankedKeywords({ target: 'x.com' });
     expect(out[0]).toMatchObject({ keyword: 'seo', search_volume: 50 });
     expect(fetchMock.mock.calls[0]![0]).toContain('/dataforseo_labs/google/ranked_keywords/live');
+  });
+
+  test('normalizes a full URL target to a bare domain', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(labsResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().rankedKeywords({ target: 'http://competitor.io/pricing' });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual([
+      { target: 'competitor.io' },
+    ]);
   });
 });
 
