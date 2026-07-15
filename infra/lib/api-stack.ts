@@ -65,6 +65,21 @@ export class ApiStack extends Stack {
       { parameterName: cfg.jwtSecretParam },
     );
 
+    // GSC secrets (#12): OAuth client secret + refresh-token encryption key.
+    // Same out-of-band SecureString pattern as the JWT secret:
+    //   aws ssm put-parameter --name /seo/<stage>/google-client-secret --type SecureString --value <secret>
+    //   aws ssm put-parameter --name /seo/<stage>/gsc-token-key --type SecureString --value "$(openssl rand -base64 32)"
+    const googleClientSecretParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'GoogleClientSecretParam',
+      { parameterName: cfg.googleClientSecretParam },
+    );
+    const gscTokenKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'GscTokenKeyParam',
+      { parameterName: cfg.gscTokenKeyParam },
+    );
+
     // Mongo connection string SecureString — read by every Lambda that talks to
     // Mongo (API + worker + db-init). Resolved at runtime, cached ~1h.
     const mongoUriParam = StringParameter.fromSecureStringParameterAttributes(
@@ -79,6 +94,9 @@ export class ApiStack extends Stack {
     const authEnv = {
       JWT_SECRET_PARAM: cfg.jwtSecretParam,
       GOOGLE_CLIENT_ID: cfg.googleClientId,
+      GOOGLE_CLIENT_SECRET_PARAM: cfg.googleClientSecretParam,
+      GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
+      WEB_ORIGIN: cfg.webOrigin,
     };
 
     // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
@@ -155,6 +173,8 @@ export class ApiStack extends Stack {
     scanQueue.grantSendMessages(apiFn);
     strategyQueue.grantSendMessages(apiFn);
     jwtSecretParam.grantRead(apiFn);
+    googleClientSecretParam.grantRead(apiFn);
+    gscTokenKeyParam.grantRead(apiFn);
     mongoUriParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.

@@ -22,4 +22,7 @@ export async function ensureIndexes(): Promise<void> {
     .createIndex({ org_id: 1, normalized_keyword: 1 }, { unique: true });
   await db.collection('candidates').createIndex({ org_id: 1, status: 1 });
   await db.collection('candidates').createIndex({ org_id: 1, opportunity_score: -1 });
+  // One GSC connection per org (#12); the unique index makes upsertToken safe
+  // under concurrent connect callbacks.
+  await db.collection('gsc_connections').createIndex({ org_id: 1 }, { unique: true });
 }

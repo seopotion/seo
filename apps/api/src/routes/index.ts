@@ -5,6 +5,7 @@ import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
 import core from './core';
 import dashboard from './dashboard';
+import gsc from './gsc';
 import keywords from './keywords';
 import setup from './setup';
 
@@ -23,7 +24,8 @@ const routes = app
   .route(`/api/${API_VERSION}/core`, core)
   .route(`/api/${API_VERSION}/setup`, setup)
   .route(`/api/${API_VERSION}/keywords`, keywords)
-  .route(`/api/${API_VERSION}/dashboard`, dashboard);
+  .route(`/api/${API_VERSION}/dashboard`, dashboard)
+  .route(`/api/${API_VERSION}/dashboard/gsc`, gsc);
 
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',

@@ -38,8 +38,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ Design fully mapped vs live Outrank — every surface in [`design/product-flow.md`](design/product-flow.md)
 - ✅ Home UI (`apps/web/app/dashboard/page.tsx`) — token-gated, renders cards from the typed client
 - ✅ Planner, settings, article history (list/detail) + Home counts (published/planned) are real org-scoped repo reads — [#58](https://github.com/seopotion/seo/issues/58); articles read empty until the generation pipeline ([#56](https://github.com/seopotion/seo/issues/56)) populates them
-- 🟡 Home `best`/`integrations` stay mock/empty — gated on GSC ([#12](https://github.com/seopotion/seo/issues/12)) and integrations ([#7](https://github.com/seopotion/seo/issues/7))
-- 🟡 Domain Rating live (DataForSEO badge); Google Search Console remains — [#12](https://github.com/seopotion/seo/issues/12)
+- 🟡 Home `integrations` stays mock/empty — gated on integrations — [#7](https://github.com/seopotion/seo/issues/7)
+- ✅ Domain Rating + Google Search Console — [#12](https://github.com/seopotion/seo/issues/12) (deploy needs human-gated SSM params + Google redirect URIs — see PR)
 - ⬜ Subscription (Free/Paid) + Stripe billing + promo codes — [#13](https://github.com/seopotion/seo/issues/13)
 - ⬜ Paid keyword research → 30-day plan → scheduled generation/images → optional auto-publish — backend epic [#56](https://github.com/seopotion/seo/issues/56)
 - 🟡 Keyword pipeline wired behind a paid-entitlement seam (`Org.plan`/`isPaid`): manual research API `POST /keywords/research` + `/keywords/candidates` ([#50](https://github.com/seopotion/seo/issues/50)) and an automatic 30-day content strategy — paid `/setup/finalize` → SQS strategy queue → strategy worker Lambda runs `@shared/keywords` and cluster-spreads a 30-day planner ([#47](https://github.com/seopotion/seo/issues/47)); library from [#49](https://github.com/seopotion/seo/issues/49)/[#54](https://github.com/seopotion/seo/issues/54). Deployed-env provider secret provisioning still manual/deferred ([#9](https://github.com/seopotion/seo/issues/9)/[#43](https://github.com/seopotion/seo/issues/43))
