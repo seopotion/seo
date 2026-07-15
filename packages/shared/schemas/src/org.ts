@@ -19,6 +19,11 @@ export const OrgSchema = z.object({
   name: z.string().optional(),
   // Populated by the scanner worker once scanning completes.
   presets: SetupPresetsSchema.optional(),
+  // Latest 0–100 Domain Rating for the dashboard badge (#12); refreshed by the
+  // scanner worker and the stale-refresh path in GET /dashboard/domain-rating.
+  domain_rating: z
+    .object({ value: z.number().int().min(0).max(100), checked_at: z.date() })
+    .optional(),
   created_at: z.date(),
 });
 export type Org = z.infer<typeof OrgSchema>;

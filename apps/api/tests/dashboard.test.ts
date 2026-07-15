@@ -1,8 +1,15 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Google verification is mocked — no network, no real token needed.
 vi.mock('../src/clients/google', () => ({
   verifyGoogleIdToken: vi.fn(async () => ({ sub: 'g-sub-123', email: 'u@example.com', name: 'U' })),
+}));
+
+const { backlinksSummary } = vi.hoisted(() => ({
+  backlinksSummary: vi.fn(async (_target: string) => ({ rank: 730 })),
+}));
+vi.mock('../src/clients/providers', () => ({
+  getDataForSeoClient: () => ({ backlinksSummary }),
 }));
 
 vi.mock('@shared/db', () => {
@@ -114,6 +121,7 @@ vi.mock('@shared/db', () => {
             engagement: { image_style: 'Sketch' },
           },
         },
+        domain_rating: { value: 41, checked_at: new Date() },
         created_at: now,
       },
     ],
@@ -154,6 +162,17 @@ vi.mock('@shared/db', () => {
       'org_3',
       { id: 'org_3', user_id: 'user_2', website_url: 'https://other.com', created_at: now },
     ],
+    [
+      'org_stale',
+      {
+        id: 'org_stale',
+        user_id: 'user_1',
+        website_url: 'https://www.stale.com',
+        setup_status: 'setup_complete',
+        domain_rating: { value: 12, checked_at: new Date('2026-01-01T00:00:00Z') },
+        created_at: now,
+      },
+    ],
   ]);
   return {
     UserRepo: {
@@ -169,6 +188,10 @@ vi.mock('@shared/db', () => {
       updatePresets: vi.fn(async (id: string, presets: unknown) => {
         const o = orgs.get(id);
         if (o) o.presets = presets;
+      }),
+      updateDomainRating: vi.fn(async (id: string, value: number) => {
+        const o = orgs.get(id);
+        if (o) o.domain_rating = { value, checked_at: new Date() };
       }),
     },
     KeywordRepo: {
@@ -452,6 +475,74 @@ describe('dashboard settings persistence', () => {
     const res = await client.api.v0.dashboard.settings.articles.$get(
       { query: { org_id: 'unknown' } },
       opts,
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /dashboard/domain-rating', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  beforeEach(() => {
+    backlinksSummary.mockClear();
+    backlinksSummary.mockResolvedValue({ rank: 730 });
+  });
+
+  test('rejects requests without a token', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get({
+      query: { org_id: 'org_1' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('returns the stored value without a provider call when fresh', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(41);
+    expect(backlinksSummary).not.toHaveBeenCalled();
+  });
+
+  test('re-fetches and persists when stale', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_stale' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(73);
+    expect(backlinksSummary).toHaveBeenCalledWith('stale.com');
+  });
+
+  test('falls back to the stale value when the provider fails', async () => {
+    backlinksSummary.mockRejectedValueOnce(new Error('down'));
+    // org_stale was refreshed by the previous test's mock store write; use a
+    // fresh failure path org: org_2 has no rating at all.
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_2' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBeNull();
+  });
+
+  test('fetches for an org that has no rating yet', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_2' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(73);
+  });
+
+  test('404s for an org the caller does not own', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_3' } },
+      await auth(),
     );
     expect(res.status).toBe(404);
   });

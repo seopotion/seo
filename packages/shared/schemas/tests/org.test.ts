@@ -22,3 +22,23 @@ describe('OrgSchema entitlement', () => {
     expect(isPaid(OrgSchema.parse(base))).toBe(false);
   });
 });
+
+describe('OrgSchema domain rating', () => {
+  test('is optional (back-compat with stored orgs)', () => {
+    expect(OrgSchema.parse(base).domain_rating).toBeUndefined();
+  });
+
+  test('parses a stored value with its check timestamp', () => {
+    const org = OrgSchema.parse({
+      ...base,
+      domain_rating: { value: 42, checked_at: new Date('2026-07-15T00:00:00Z') },
+    });
+    expect(org.domain_rating?.value).toBe(42);
+  });
+
+  test('rejects out-of-range values', () => {
+    expect(() =>
+      OrgSchema.parse({ ...base, domain_rating: { value: 101, checked_at: new Date() } }),
+    ).toThrow();
+  });
+});

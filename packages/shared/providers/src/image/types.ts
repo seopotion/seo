@@ -21,7 +21,7 @@ export interface ImageResult {
 
 export interface ImageConfig {
   apiKey: string;
-  /** Defaults to 'fal-ai/flux/dev'. */
+  /** Defaults to 'fal-ai/flux-2'. */
   defaultModel?: string;
   /** Defaults to 'https://fal.run'. */
   baseUrl?: string;

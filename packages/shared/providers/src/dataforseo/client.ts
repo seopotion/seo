@@ -2,6 +2,7 @@ import type { SearchIntent } from '@shared/schemas';
 import { SEARCH_INTENTS } from '@shared/schemas';
 import { categorizeApiStatus, categorizeHttpStatus, DataForSeoError, isRetryable } from './errors';
 import type {
+  BacklinksSummary,
   DataForSeoConfig,
   KeywordMetric,
   SeedKeywordsParams,
@@ -56,12 +57,22 @@ function toSerpResult(item: Record<string, unknown>): SerpResult {
   };
 }
 
+/**
+ * DataForSEO's backlink rank is 0–1000; the dashboard badge shows a 0–100
+ * DR-style score (#12). Clamped so provider drift can't break the schema.
+ */
+export function domainRatingFromRank(rank: number | null): number | null {
+  if (rank === null) return null;
+  return Math.max(0, Math.min(100, Math.round(rank / 10)));
+}
+
 export type DataForSeoClient = {
   keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
   bulkKeywordDifficulty(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
   serpGoogleOrganic(params: SerpParams): Promise<SerpResult[]>;
+  backlinksSummary(target: string): Promise<BacklinksSummary>;
 };
 
 export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClient {
@@ -184,6 +195,12 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       return itemsOf(result)
         .filter((item) => item.type === 'organic')
         .map(toSerpResult);
+    },
+
+    async backlinksSummary(target: string): Promise<BacklinksSummary> {
+      const result = await request('/backlinks/summary/live', { target });
+      const first = (result[0] ?? {}) as Record<string, unknown>;
+      return { rank: num(first.rank) };
     },
   };
 }

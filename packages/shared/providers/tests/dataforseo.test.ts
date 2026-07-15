@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createDataForSeoClient } from '../src';
+import { createDataForSeoClient, domainRatingFromRank } from '../src';
 
 function labsResponse(items: unknown[]) {
   return new Response(
@@ -223,5 +223,56 @@ describe('serpGoogleOrganic', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toContain('/serp/google/organic/live/advanced');
     expect(JSON.parse(init.body as string)).toEqual([{ keyword: 'seo tools' }]);
+  });
+});
+
+describe('backlinksSummary', () => {
+  // The backlinks summary endpoint returns fields directly on result[0] — no items[] nesting.
+  function summaryResponse(result: unknown[]) {
+    return new Response(
+      JSON.stringify({ status_code: 20000, tasks: [{ status_code: 20000, result }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+  }
+
+  test('extracts rank from result[0]', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(summaryResponse([{ target: 'example.com', rank: 423, backlinks: 12 }]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await client().backlinksSummary('example.com');
+
+    expect(out).toEqual({ rank: 423 });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/backlinks/summary/live');
+    expect(JSON.parse(init.body as string)).toEqual([{ target: 'example.com' }]);
+  });
+
+  test('nulls a missing rank', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(summaryResponse([{ target: 'x' }])));
+    expect(await client().backlinksSummary('x')).toEqual({ rank: null });
+  });
+
+  test('nulls rank on an empty result', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(summaryResponse([])));
+    expect(await client().backlinksSummary('x')).toEqual({ rank: null });
+  });
+});
+
+describe('domainRatingFromRank', () => {
+  test('normalizes 0–1000 rank to a 0–100 rating', () => {
+    expect(domainRatingFromRank(423)).toBe(42);
+    expect(domainRatingFromRank(0)).toBe(0);
+    expect(domainRatingFromRank(1000)).toBe(100);
+  });
+
+  test('clamps out-of-range values', () => {
+    expect(domainRatingFromRank(1200)).toBe(100);
+    expect(domainRatingFromRank(-5)).toBe(0);
+  });
+
+  test('passes null through', () => {
+    expect(domainRatingFromRank(null)).toBeNull();
   });
 });
