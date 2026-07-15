@@ -66,4 +66,18 @@ describe('OrgRepo (integration)', () => {
     expect(await OrgRepo.setPlan(new ObjectId().toString(), 'paid')).toBe(false);
     expect(await OrgRepo.setPlan('not-an-objectid', 'paid')).toBe(false);
   });
+
+  test('updateDomainRating stores value + checked_at, readable via findById', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_dr',
+      website_url: 'https://dr.example.com',
+      setup_status: 'setup_scan_in_progress',
+    });
+
+    await OrgRepo.updateDomainRating(org.id, 42);
+
+    const found = await OrgRepo.findById(org.id);
+    expect(found?.domain_rating?.value).toBe(42);
+    expect(found?.domain_rating?.checked_at).toBeInstanceOf(Date);
+  });
 });

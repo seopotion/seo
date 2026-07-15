@@ -117,6 +117,15 @@ export const OrgRepo = {
     return res.matchedCount === 1;
   },
 
+  /** Store the latest Domain Rating (0–100) with its fetch timestamp (#12). */
+  async updateDomainRating(id: string, value: number): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { domain_rating: { value, checked_at: new Date() } } },
+    );
+  },
+
   /** Delete the org (used by the `db reset-user` CLI). Returns true when a doc matched. */
   async deleteById(id: string): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;
