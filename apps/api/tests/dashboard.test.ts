@@ -12,6 +12,23 @@ vi.mock('../src/clients/providers', () => ({
   getDataForSeoClient: () => ({ backlinksSummary }),
 }));
 
+const { querySearchAnalytics, GscAuthRevokedError } = vi.hoisted(() => {
+  class GscAuthRevokedError extends Error {}
+  return { querySearchAnalytics: vi.fn(), GscAuthRevokedError };
+});
+vi.mock('../src/clients/gsc', () => ({ querySearchAnalytics, GscAuthRevokedError }));
+
+const gscKey = vi.hoisted(() => Buffer.alloc(32, 7));
+vi.mock('../src/lib/secrets', () => ({ getGscTokenKey: vi.fn(async () => gscKey) }));
+
+const { gscConnections, markRefreshFailed } = vi.hoisted(() => ({
+  gscConnections: new Map<string, Record<string, unknown>>(),
+  markRefreshFailed: vi.fn(async (orgId: string) => {
+    const c = gscConnections.get(orgId);
+    if (c) c.last_refresh_failed_at = new Date();
+  }),
+}));
+
 vi.mock('@shared/db', () => {
   // org_1 (owned by user_1) has data; org_2 (also user_1) is empty.
   const now = new Date('2026-07-02T08:00:00.000Z');
@@ -222,10 +239,15 @@ vi.mock('@shared/db', () => {
           articles.filter((a) => a.org_id === orgId && a.status === status).length,
       ),
     },
+    GscConnectionRepo: {
+      findByOrgId: vi.fn(async (orgId: string) => gscConnections.get(orgId) ?? null),
+      markRefreshFailed,
+    },
   };
 });
 
 import { testClient } from 'hono/testing';
+import { encryptSecret } from '../src/lib/crypto';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
@@ -293,13 +315,16 @@ describe('dashboard home routes', () => {
 
   test('GET /articles/best is empty and gated until Google data is connected', async () => {
     const token = await login();
-    const res = await client.api.v0.dashboard.articles.best.$get(undefined, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.articles).toHaveLength(0);
-    expect(json.gated).toBe(true);
+    if (res.status === 200) {
+      const json = await res.json();
+      expect(json.articles).toHaveLength(0);
+      expect(json.gated).toBe(true);
+    }
   });
 
   test('GET /integrations/connected is empty for a fresh org', async () => {
@@ -406,11 +431,16 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
   });
 
   test('static /articles/best still resolves after adding /articles/:id', async () => {
-    const res = await client.api.v0.dashboard.articles.best.$get(undefined, await auth());
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.articles).toHaveLength(0);
-    expect(json.gated).toBe(true);
+    if (res.status === 200) {
+      const json = await res.json();
+      expect(json.articles).toHaveLength(0);
+      expect(json.gated).toBe(true);
+    }
   });
 });
 
@@ -477,6 +507,140 @@ describe('dashboard settings persistence', () => {
       opts,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe('GSC-gated home cards', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  function connectOrg1() {
+    gscConnections.set('org_1', {
+      id: 'c1',
+      org_id: 'org_1',
+      refresh_token_enc: encryptSecret('rt-live', Buffer.alloc(32, 7)),
+      site_url: 'sc-domain:clewas.com',
+      google_email: 'o@x.com',
+      connected_at: new Date(),
+      last_refresh_failed_at: null,
+    });
+  }
+
+  beforeEach(() => {
+    gscConnections.clear();
+    querySearchAnalytics.mockReset();
+  });
+
+  test('best stays gated without a connection', async () => {
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.gated).toBe(true);
+      expect(body.articles).toHaveLength(0);
+    }
+  });
+
+  test('best returns top pages with slug-matched titles when connected', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockResolvedValueOnce([
+      {
+        keys: ['https://clewas.com/blog/notion-builder'],
+        clicks: 41.2,
+        impressions: 900,
+        ctr: 0.04,
+        position: 7,
+      },
+      {
+        keys: ['https://clewas.com/pricing'],
+        clicks: 12,
+        impressions: 300,
+        ctr: 0.04,
+        position: 9,
+      },
+    ]);
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.gated).toBe(false);
+      expect(body.articles).toEqual([
+        { url: 'https://clewas.com/blog/notion-builder', clicks: 41, title: 'Notion Builder' },
+        { url: 'https://clewas.com/pricing', clicks: 12, title: null },
+      ]);
+    }
+    // The stored token decrypts back to the raw refresh token for the query.
+    expect(querySearchAnalytics).toHaveBeenCalledWith(
+      'rt-live',
+      'sc-domain:clewas.com',
+      expect.objectContaining({ dimensions: ['page'], rowLimit: 10 }),
+    );
+  });
+
+  test('revoked access re-gates and stamps the failure', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new GscAuthRevokedError('revoked'));
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).toHaveBeenCalledWith('org_1');
+  });
+
+  test('best 404s for an org the caller does not own', async () => {
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_3' } },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('search-performance is gated without a connection, live with one', async () => {
+    const gated = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(gated.status).toBe(200);
+    if (gated.status === 200) {
+      expect(await gated.json()).toEqual({
+        gated: true,
+        clicks: null,
+        impressions: null,
+        ctr: null,
+        position: null,
+      });
+    }
+
+    connectOrg1();
+    querySearchAnalytics.mockResolvedValueOnce([
+      { keys: [], clicks: 120, impressions: 4000, ctr: 0.03, position: 12.4 },
+    ]);
+    const live = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(live.status).toBe(200);
+    if (live.status === 200) {
+      expect(await live.json()).toEqual({
+        gated: false,
+        clicks: 120,
+        impressions: 4000,
+        ctr: 0.03,
+        position: 12.4,
+      });
+    }
   });
 });
 
