@@ -1,6 +1,8 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { ArticleRepo, KeywordRepo, OrgRepo } from '@shared/db';
+import { domainRatingFromRank } from '@shared/providers';
 import type { Article } from '@shared/schemas';
+import { getDataForSeoClient } from '../clients/providers';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
@@ -37,6 +39,9 @@ function toArticleDetail(a: Article) {
     published_at: a.published_at ? a.published_at.toISOString() : null,
   };
 }
+
+/** Domain ratings refresh at most weekly — older values re-fetch inline on read (#12). */
+const DOMAIN_RATING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Dashboard Home routes (design/product-flow.md, Dashboard §1). All require a
@@ -137,6 +142,51 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       },
     }),
     (c) => c.json({ integrations: [] }),
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'get',
+      path: '/domain-rating',
+      summary: 'Latest Domain Rating for the org (re-fetched when older than 7 days)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.DomainRatingResponse } },
+          description: 'Domain rating; null when never rated and the provider is unavailable',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+
+      const current = org.domain_rating ?? null;
+      if (current && Date.now() - current.checked_at.getTime() < DOMAIN_RATING_MAX_AGE_MS) {
+        return c.json({ rating: current.value }, 200);
+      }
+
+      // Stale or missing: re-fetch inline, falling back to the stored value
+      // (or null) when the provider is down — the badge degrades, never errors.
+      try {
+        const domain = new URL(org.website_url).hostname.replace(/^www\./, '');
+        const { rank } = await getDataForSeoClient().backlinksSummary(domain);
+        const rating = domainRatingFromRank(rank);
+        if (rating === null) return c.json({ rating: current?.value ?? null }, 200);
+        await OrgRepo.updateDomainRating(org_id, rating);
+        return c.json({ rating }, 200);
+      } catch {
+        return c.json({ rating: current?.value ?? null }, 200);
+      }
+    },
   )
   // --- Content Planner (§2.1) ---
   .openapi(

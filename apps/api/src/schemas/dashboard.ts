@@ -57,6 +57,14 @@ export const ConnectedIntegrationsResponse = z
   })
   .openapi('ConnectedIntegrationsResponse');
 
+export const DomainRatingResponse = z
+  .object({
+    // 0–100 badge value; null when the org was never rated and the provider is
+    // unavailable.
+    rating: z.number().int().min(0).max(100).nullable(),
+  })
+  .openapi('DomainRatingResponse');
+
 /**
  * Content Planner schemas (design/product-flow.md §2.1). The monthly calendar
  * is a list of scheduled keywords; each card's affordance depends on whether an

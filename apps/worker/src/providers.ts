@@ -26,9 +26,13 @@ export function getImageClients() {
   };
 }
 
-/** Build the LLM client the scanner worker needs, from env. */
+/** Build the LLM + DataForSEO clients the scanner worker needs, from env. */
 export function getScanClients() {
   return {
     llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    dataForSeo: createDataForSeoClient({
+      login: process.env.DATAFORSEO_LOGIN ?? '',
+      password: process.env.DATAFORSEO_PASSWORD ?? '',
+    }),
   };
 }

@@ -168,6 +168,7 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
+        ...providerEnv,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
       },
       bundling,

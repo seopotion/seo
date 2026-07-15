@@ -12,6 +12,7 @@ type HomeData = {
   planned: number;
   bestGated: boolean;
   integrations: number;
+  domainRating: number | null;
 };
 
 export default function DashboardPage() {
@@ -35,22 +36,27 @@ export default function DashboardPage() {
       const activeOrg = orgsRes.ok ? ((await orgsRes.json()).organizations[0] ?? null) : null;
       setOrg(activeOrg);
 
-      const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
-        activeOrg
-          ? api.api.v0.dashboard.articles.published.$get({ query: { org_id: activeOrg.id } })
-          : null,
-        activeOrg
-          ? api.api.v0.dashboard.articles.planned.$get({ query: { org_id: activeOrg.id } })
-          : null,
-        api.api.v0.dashboard.articles.best.$get(),
-        api.api.v0.dashboard.integrations.connected.$get(),
-      ]);
+      const [publishedRes, plannedRes, bestRes, integrationsRes, domainRatingRes] =
+        await Promise.all([
+          activeOrg
+            ? api.api.v0.dashboard.articles.published.$get({ query: { org_id: activeOrg.id } })
+            : null,
+          activeOrg
+            ? api.api.v0.dashboard.articles.planned.$get({ query: { org_id: activeOrg.id } })
+            : null,
+          api.api.v0.dashboard.articles.best.$get(),
+          api.api.v0.dashboard.integrations.connected.$get(),
+          activeOrg
+            ? api.api.v0.dashboard['domain-rating'].$get({ query: { org_id: activeOrg.id } })
+            : null,
+        ]);
 
       setData({
         published: publishedRes?.ok ? (await publishedRes.json()).count : 0,
         planned: plannedRes?.ok ? (await plannedRes.json()).count : 0,
         bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
         integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
+        domainRating: domainRatingRes?.ok ? (await domainRatingRes.json()).rating : null,
       });
       setLoading(false);
     })();
@@ -88,7 +94,7 @@ export default function DashboardPage() {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={badge}>Domain Rating —</span>
+          <span style={badge}>Domain Rating {data?.domainRating ?? '—'}</span>
           <button type="button" onClick={logout}>
             Log out
           </button>
