@@ -248,6 +248,7 @@ vi.mock('@shared/db', () => {
 
 import { testClient } from 'hono/testing';
 import { encryptSecret } from '../src/lib/crypto';
+import { logger } from '../src/logger';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
@@ -531,6 +532,7 @@ describe('GSC-gated home cards', () => {
   beforeEach(() => {
     gscConnections.clear();
     querySearchAnalytics.mockReset();
+    markRefreshFailed.mockClear();
   });
 
   test('best stays gated without a connection', async () => {
@@ -599,6 +601,25 @@ describe('GSC-gated home cards', () => {
     expect(markRefreshFailed).toHaveBeenCalledWith('org_1');
   });
 
+  test('transient (non-revoked) errors re-gate without stamping and log a warning', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new Error('GSC 503'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'GSC read failed for /articles/best',
+      expect.objectContaining({ org_id: 'org_1', error: expect.any(Error) }),
+    );
+    warnSpy.mockRestore();
+  });
+
   test('best 404s for an org the caller does not own', async () => {
     const res = await client.api.v0.dashboard.articles.best.$get(
       { query: { org_id: 'org_3' } },
@@ -641,6 +662,25 @@ describe('GSC-gated home cards', () => {
         position: 12.4,
       });
     }
+  });
+
+  test('search-performance: transient (non-revoked) errors re-gate and log a warning', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new Error('network blip'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const res = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'GSC read failed for /search-performance',
+      expect.objectContaining({ org_id: 'org_1', error: expect.any(Error) }),
+    );
+    warnSpy.mockRestore();
   });
 });
 

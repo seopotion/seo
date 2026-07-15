@@ -8,6 +8,7 @@ import { decryptSecret } from '../lib/crypto';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { getGscTokenKey } from '../lib/secrets';
+import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/dashboard';
 
@@ -128,6 +129,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         // errors also degrade to the gated shape rather than a 500.
         if (err instanceof gsc.GscAuthRevokedError) {
           await GscConnectionRepo.markRefreshFailed(org_id);
+        } else {
+          logger.warn('GSC read failed for /articles/best', { org_id, error: err as Error });
         }
         return c.json({ articles: [], gated: true }, 200);
       }
@@ -189,6 +192,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       } catch (err) {
         if (err instanceof gsc.GscAuthRevokedError) {
           await GscConnectionRepo.markRefreshFailed(org_id);
+        } else {
+          logger.warn('GSC read failed for /search-performance', { org_id, error: err as Error });
         }
         return c.json(gatedBody, 200);
       }
