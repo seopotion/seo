@@ -21,9 +21,9 @@ export async function runMigrations(): Promise<MigrationReport> {
   // Never comma-split — legacy strings may contain natural-language commas.
   // $expr + aggregation $type: a plain {$type: 'string'} query would also
   // match arrays whose *elements* are strings and re-wrap them on every run.
-  const audienceRes = await db.collection('orgs').updateMany(
-    { $expr: { $eq: [{ $type: '$presets.audience.target' }, 'string'] } },
-    [
+  const audienceRes = await db
+    .collection('orgs')
+    .updateMany({ $expr: { $eq: [{ $type: '$presets.audience.target' }, 'string'] } }, [
       {
         $set: {
           'presets.audience.target': {
@@ -31,8 +31,7 @@ export async function runMigrations(): Promise<MigrationReport> {
           },
         },
       },
-    ],
-  );
+    ]);
 
   const keywords = db.collection('keywords');
 
