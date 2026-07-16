@@ -501,6 +501,28 @@ describe('dashboard settings persistence', () => {
     }
   });
 
+  test('PATCH /settings/general audience target array survives edit + reads', async () => {
+    const opts = await auth();
+    const patched = await client.api.v0.dashboard.settings.general.$patch(
+      { json: { org_id: 'org_1', audience: { target: ['makers', 'founders'] } } },
+      opts,
+    );
+    expect(patched.status).toBe(200);
+    if (patched.status === 200) {
+      expect((await patched.json()).audience.target).toEqual(['makers', 'founders']);
+    }
+
+    const get = await client.api.v0.dashboard.settings.general.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(get.status).toBe(200);
+    if (get.status === 200) {
+      // Still an array (never joined into a string) after persistence.
+      expect((await get.json()).audience.target).toEqual(['makers', 'founders']);
+    }
+  });
+
   test('settings 404 for an org the caller does not own', async () => {
     const opts = await auth();
     const res = await client.api.v0.dashboard.settings.articles.$get(

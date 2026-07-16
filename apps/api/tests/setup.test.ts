@@ -278,6 +278,34 @@ describe('setup routes', () => {
     );
   });
 
+  test('PATCH /presets replaces the audience target array wholesale (no join)', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { audience: { target: ['Desalination plant operators', 'Utility managers'] } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.audience.target).toEqual([
+      'Desalination plant operators',
+      'Utility managers',
+    ]);
+    expect(OrgRepo.updatePresets).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({
+        audience: expect.objectContaining({
+          target: ['Desalination plant operators', 'Utility managers'],
+        }),
+      }),
+    );
+  });
+
   test('PATCH /presets returns 404 for an org owned by another user', async () => {
     const res = await client.api.v0.setup.presets.$patch(
       { json: { org_id: 'other_users_org', presets: { business: { name: 'Hijack' } } } },
