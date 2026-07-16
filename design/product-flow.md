@@ -42,7 +42,7 @@ endpoint `/api/v0/setup/status` returns `setup_not_started` for any unknown
 
 Then we load the start scanning page.
 
-**Mockup — Start (Enter URL):** A single-field landing screen headed "Let's start with **your website**!" with subtext "Share your website URL and we'll instantly gather your business information to save you time." One URL input (e.g. `https://ridersdiary.sparkie.space/`) with a **Continue** button. A validation hint appears if no URL is entered.
+**Mockup — Start (Enter URL):** A single-field landing screen headed "Let's start with **your website**!" with subtext "Share your website URL and we'll instantly gather your business information to save you time." One URL input (e.g. `https://users-website.com`) with a **Continue** button. A validation hint appears if no URL is entered.
 
 Enter your website URL
 
@@ -171,7 +171,7 @@ billing/subscription. The active product is tracked in a `current_product_id` co
 discounts).
 
 **The `products` entity (theirs, ~50 columns — the real tenant record).** Confirms the
-scan/onboarding output lives here, not on the org: `name` ("Sparkie"), `url`, `description`
+scan/onboarding output lives here, not on the org: `name` ("Seo Potion"), `url`, `description`
 (rich markdown — features/advantages/problems-solved, confirms parity-gaps G6),
 `target_audiences[]` (**5 segments — an array**, confirms G3), `niche`, `sitemap_url`,
 `blog_root_url`, `example_article_urls`, `status`. Plus operational flags our baseline has no
@@ -426,7 +426,7 @@ action affordance depends on whether the article exists yet:
 - Article generation itself (keyword → published article) is a **later** worker; baseline
   can stop at "keywords scheduled".
 
-**Corrected trial observation (2026-07-01, Sparkie).** An earlier note here claimed the
+**Corrected trial observation (2026-07-01, Seo Potion).** An earlier note here claimed the
 trial planner stays *empty because keyword generation is paywalled*. **That was wrong** — it
 was async lag, not a paywall. Re-inspected on the paid trial: the account is a Stripe
 `trialing` subscription (plan **"All in One"**, `isTrialSubscription: true`) and the planner

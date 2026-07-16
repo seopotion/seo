@@ -9,22 +9,36 @@ export const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/clien
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
 type UseGoogleLoginOptions = {
-  onLoggedIn: () => void;
+  onLoggedIn: () => Promise<void> | void;
+  onLoginError?: () => void;
+  onLoginStart?: () => void;
 };
 
-export function useGoogleLogin({ onLoggedIn }: UseGoogleLoginOptions) {
+export function useGoogleLogin({ onLoggedIn, onLoginError, onLoginStart }: UseGoogleLoginOptions) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   const handleCredential = useCallback(
     async (response: GoogleCredentialResponse) => {
-      const res = await api.api.v0.core.login.$post({ json: { id_token: response.credential } });
-      if (!res.ok) return;
+      onLoginStart?.();
 
-      const { token } = await res.json();
-      setToken(token);
-      onLoggedIn();
+      try {
+        const res = await api.api.v0.core.login.$post({
+          json: { id_token: response.credential },
+        });
+
+        if (!res.ok) {
+          onLoginError?.();
+          return;
+        }
+
+        const { token } = await res.json();
+        setToken(token);
+        await onLoggedIn();
+      } catch {
+        onLoginError?.();
+      }
     },
-    [onLoggedIn],
+    [onLoggedIn, onLoginError, onLoginStart],
   );
 
   const initialize = useCallback(() => {

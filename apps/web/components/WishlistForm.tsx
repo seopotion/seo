@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { Button } from './ui/button';
@@ -23,6 +24,7 @@ function getTrackingFields() {
 }
 
 export function WishlistForm({ source = 'landing_page' }: WishlistFormProps) {
+  const t = useTranslations('WishlistForm');
   const [email, setEmail] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -71,7 +73,7 @@ export function WishlistForm({ source = 'landing_page' }: WishlistFormProps) {
     <div className="mx-auto w-full max-w-xl">
       <form className="flex flex-col gap-3 sm:flex-row" onSubmit={onSubmit}>
         <div className="absolute left-[-10000px] h-px w-px overflow-hidden">
-          <label htmlFor={`${source}-website`}>Website</label>
+          <label htmlFor={`${source}-website`}>{t('honeypotLabel')}</label>
           <input
             id={`${source}-website`}
             name="website"
@@ -84,7 +86,7 @@ export function WishlistForm({ source = 'landing_page' }: WishlistFormProps) {
         <Input
           type="email"
           name="email"
-          placeholder="Enter your email"
+          placeholder={t('emailPlaceholder')}
           autoComplete="email"
           value={email}
           disabled={isLoading || showSuccess}
@@ -100,19 +102,13 @@ export function WishlistForm({ source = 'landing_page' }: WishlistFormProps) {
           disabled={isLoading || showSuccess}
           className="h-11 rounded-lg bg-orange-400 px-5 text-white shadow-sm hover:bg-orange-500 sm:min-w-40"
         >
-          {isLoading ? 'Joining...' : 'Join the wishlist'}
+          {isLoading ? t('joining') : t('submit')}
         </Button>
       </form>
       {showSuccess ? (
-        <p className="mt-3 text-center text-green-700 text-sm">
-          You&rsquo;re on the SEO Potion wishlist. We&rsquo;ll let you know when early access opens.
-        </p>
+        <p className="mt-3 text-center text-green-700 text-sm">{t('success')}</p>
       ) : null}
-      {showError ? (
-        <p className="mt-3 text-center text-red-600 text-sm">
-          Something went wrong. Please try again.
-        </p>
-      ) : null}
+      {showError ? <p className="mt-3 text-center text-red-600 text-sm">{t('error')}</p> : null}
     </div>
   );
 }
