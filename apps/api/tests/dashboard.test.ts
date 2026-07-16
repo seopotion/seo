@@ -123,7 +123,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',
@@ -156,7 +156,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',
@@ -498,6 +498,28 @@ describe('dashboard settings persistence', () => {
       // Audience untouched; language sibling preserved.
       expect(body.business.language).toBeTruthy();
       expect(body.audience.competitors.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('PATCH /settings/general audience target array survives edit + reads', async () => {
+    const opts = await auth();
+    const patched = await client.api.v0.dashboard.settings.general.$patch(
+      { json: { org_id: 'org_1', audience: { target: ['makers', 'founders'] } } },
+      opts,
+    );
+    expect(patched.status).toBe(200);
+    if (patched.status === 200) {
+      expect((await patched.json()).audience.target).toEqual(['makers', 'founders']);
+    }
+
+    const get = await client.api.v0.dashboard.settings.general.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(get.status).toBe(200);
+    if (get.status === 200) {
+      // Still an array (never joined into a string) after persistence.
+      expect((await get.json()).audience.target).toEqual(['makers', 'founders']);
     }
   });
 

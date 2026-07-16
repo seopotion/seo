@@ -16,7 +16,7 @@ const presetsFixture = {
     country: 'Global (English)',
     description: 'An example business.',
   },
-  audience: { target: 'Developers', competitors: ['acme.com'] },
+  audience: { target: ['Developers'], competitors: ['acme.com'] },
   blog: {
     sitemap_url: 'https://example.com/sitemap.xml',
     main_blog_url: 'https://example.com/blog',
@@ -274,6 +274,34 @@ describe('setup routes', () => {
       '6650f1a2b3c4d5e6f7a8b9c0',
       expect.objectContaining({
         business: expect.objectContaining({ name: 'Renamed Co', language: 'English' }),
+      }),
+    );
+  });
+
+  test('PATCH /presets replaces the audience target array wholesale (no join)', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { audience: { target: ['Desalination plant operators', 'Utility managers'] } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.audience.target).toEqual([
+      'Desalination plant operators',
+      'Utility managers',
+    ]);
+    expect(OrgRepo.updatePresets).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({
+        audience: expect.objectContaining({
+          target: ['Desalination plant operators', 'Utility managers'],
+        }),
       }),
     );
   });

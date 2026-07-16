@@ -12,7 +12,14 @@ export const SetupPresetsSchema = z.object({
     description: z.string(),
   }),
   audience: z.object({
-    target: z.string(),
+    // Distinct audience segments (max 7 per design note). The preprocess keeps
+    // pre-migration string documents parsing regardless of deploy ordering:
+    // '' -> [], non-empty -> [string] — never comma-split, since legacy
+    // strings may contain natural-language commas (#99).
+    target: z.preprocess(
+      (v) => (typeof v === 'string' ? (v === '' ? [] : [v]) : v),
+      z.array(z.string()).max(7),
+    ),
     competitors: z.array(z.string()),
   }),
   blog: z.object({
