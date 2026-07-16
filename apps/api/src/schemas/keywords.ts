@@ -14,8 +14,10 @@ export const KeywordMetric = z
   .openapi('KeywordMetric');
 export type KeywordMetric = z.infer<typeof KeywordMetric>;
 
+// Seed is trimmed server-side; whitespace-only or oversized seeds are rejected
+// before any paid provider call (#99).
 export const ResearchBody = z
-  .object({ org_id: z.string(), seed: z.string().min(1) })
+  .object({ org_id: z.string(), seed: z.string().trim().min(1).max(200) })
   .openapi('ResearchBody');
 
 export const ResearchResponse = z

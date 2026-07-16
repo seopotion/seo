@@ -1,3 +1,4 @@
+import { DataForSeoError } from '@shared/providers';
 import { testClient } from 'hono/testing';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -83,6 +84,78 @@ describe('POST /research', () => {
     const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
     expect(res.status).toBe(402);
     expect(keywordIdeas).not.toHaveBeenCalled();
+  });
+
+  test('403 for an org owned by someone else', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce({ ok: false, reason: 'not_owner' });
+    const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
+    expect(res.status).toBe(403);
+    expect(keywordIdeas).not.toHaveBeenCalled();
+  });
+
+  test('400 for a whitespace-only seed, before any provider call', async () => {
+    const res = await app.request('/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ org_id: 'o1', seed: '   ' }),
+    });
+    expect(res.status).toBe(400);
+    expect(loadOwnedPaidOrg).not.toHaveBeenCalled();
+    expect(keywordIdeas).not.toHaveBeenCalled();
+  });
+
+  test('400 for a seed above the 200-char cap', async () => {
+    const res = await app.request('/research', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ org_id: 'o1', seed: 'x'.repeat(201) }),
+    });
+    expect(res.status).toBe(400);
+    expect(keywordIdeas).not.toHaveBeenCalled();
+  });
+
+  test('502 when the keyword provider fails', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce(paidOrg);
+    bulkKeywordDifficulty.mockRejectedValueOnce(new DataForSeoError('http_error', 'boom'));
+    keywordIdeas.mockResolvedValueOnce([]);
+    const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
+    expect(res.status).toBe(502);
+  });
+
+  test('caps similar at 20, excludes the normalized seed, and rounds metrics', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce(paidOrg);
+    bulkKeywordDifficulty.mockResolvedValueOnce([
+      {
+        keyword: 'crm',
+        search_volume: 500.6,
+        difficulty: 40.4,
+        cpc: 2,
+        competition: 0.5,
+        trend: 0,
+        intent: 'commercial',
+      },
+    ]);
+    const idea = (i: number) => ({
+      keyword: i === 0 ? '  CRM  ' : `idea ${i}`, // idea 0 is the seed, differently cased
+      search_volume: 100.9,
+      difficulty: 10.2,
+      cpc: 1,
+      competition: 0.1,
+      trend: 0,
+      intent: null,
+    });
+    keywordIdeas.mockResolvedValueOnce(Array.from({ length: 25 }, (_, i) => idea(i)));
+
+    const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+    const body = await res.json();
+    expect(body.seed.search_volume).toBe(501);
+    expect(body.seed.difficulty).toBe(40);
+    expect(body.similar).toHaveLength(20);
+    expect(body.similar.map((m) => m.keyword)).not.toContain('  CRM  ');
+    expect(body.similar[0]!.search_volume).toBe(101);
+    expect(body.similar[0]!.difficulty).toBe(10);
   });
 });
 

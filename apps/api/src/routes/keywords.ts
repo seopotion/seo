@@ -13,6 +13,15 @@ function gateStatus(reason: Exclude<OwnedPaidResult, { ok: true }>['reason']): 4
   return reason === 'not_found' ? 404 : reason === 'not_owner' ? 403 : 402;
 }
 
+/** Normalize provider metrics at the API boundary: volume/difficulty are ints (#99). */
+function normMetric(m: schemas.KeywordMetric): schemas.KeywordMetric {
+  return {
+    ...m,
+    search_volume: m.search_volume === null ? null : Math.round(m.search_volume),
+    difficulty: m.difficulty === null ? null : Math.round(m.difficulty),
+  };
+}
+
 /**
  * Keyword-research routes. Chained `.openapi()` calls so the resulting type
  * (and the OpenAPI spec) capture every endpoint. See design/product-flow.md.
@@ -34,6 +43,8 @@ const keywords = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.ResearchResponse } },
           description: 'Seed + similar keyword metrics',
         },
+        400: { description: 'Validation failed (empty/whitespace or oversized seed)' },
+        401: { description: 'Missing or invalid bearer token' },
         402: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Active paid entitlement required',
@@ -80,8 +91,9 @@ const keywords = new OpenAPIHono<AuthEnv>()
         const norm = seed.trim().toLowerCase();
         const similar = ideas
           .filter((m) => m.keyword.trim().toLowerCase() !== norm)
-          .slice(0, RESEARCH_LIMIT);
-        return c.json({ seed: seedMetric, similar }, 200);
+          .slice(0, RESEARCH_LIMIT)
+          .map(normMetric);
+        return c.json({ seed: normMetric(seedMetric), similar }, 200);
       } catch (err) {
         if (err instanceof DataForSeoError)
           return c.json({ error: 'keyword provider failed' }, 502);
@@ -105,6 +117,8 @@ const keywords = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.SelectResponse } },
           description: 'Candidates inserted (deduped)',
         },
+        400: { description: 'Validation failed (empty keywords list or malformed metrics)' },
+        401: { description: 'Missing or invalid bearer token' },
         402: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Active paid entitlement required',
