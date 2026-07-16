@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const presets = {
   business: { name: 'Acme', language: 'English', country: 'United States', description: 'x' },
-  audience: { target: 't', competitors: [] },
+  audience: { target: ['t'], competitors: [] },
   blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
   article_preferences: {
     content_seo: { article_style: '', internal_links: false, llm_instructions: '' },

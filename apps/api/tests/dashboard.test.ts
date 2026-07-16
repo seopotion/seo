@@ -123,7 +123,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',
@@ -156,7 +156,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',

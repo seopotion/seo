@@ -25,7 +25,7 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'From the scraped website content, produce onboarding presets as JSON.',
     'Respond with ONLY a JSON object of this exact shape:',
     '{ "business": { "name": string, "language": string, "country": string, "description": string },',
-    '  "audience": { "target": string },',
+    '  "audience": { "target": string[] },',
     '  "article_preferences": {',
     '    "content_seo": { "article_style": string, "internal_links": boolean, "llm_instructions": string },',
     '    "engagement": { "image_style": string } } }',
@@ -33,7 +33,8 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'language is the primary content language (e.g. "English"); country is the primary target',
     'market as a plain country name (e.g. "United States") — never a region or "Global".',
     'description is 2-4 sentences summarizing the business.',
-    'target describes the ideal audience. article_style / image_style are short phrases.',
+    'target is an array of 3-7 short, distinct audience segments (one segment per entry —',
+    'never a single comma-separated sentence). article_style / image_style are short phrases.',
   ].join('\n');
 
   const user = pageText

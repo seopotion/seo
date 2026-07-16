@@ -17,7 +17,7 @@ const LLM_JSON = JSON.stringify({
     country: 'Global (English)',
     description: 'Clewas helps teams improve search visibility.',
   },
-  audience: { target: 'Founders comparing SEO solutions.' },
+  audience: { target: ['Founders comparing SEO solutions.'] },
   article_preferences: {
     content_seo: {
       article_style: 'Practical',
@@ -60,9 +60,20 @@ describe('scanWebsite', () => {
 
     expect(() => SetupPresetsSchema.parse(presets)).not.toThrow();
     expect(presets.business.name).toBe('Clewas');
-    expect(presets.audience.target).toBe('Founders comparing SEO solutions.');
+    expect(presets.audience.target).toEqual(['Founders comparing SEO solutions.']);
     expect(presets.audience.competitors).toEqual([]);
     expect(presets.blog).toEqual(BLOG);
+  });
+
+  test('coerces a string audience target from the LLM into a single-element array', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const stringTarget = JSON.parse(LLM_JSON);
+    stringTarget.audience = { target: 'SEO founders, and marketers' };
+    const llm = llmReturning(JSON.stringify(stringTarget));
+
+    const presets = await scanWebsite('https://clewas.com', { llm });
+
+    expect(presets.audience.target).toEqual(['SEO founders, and marketers']);
   });
 
   test('completes with a valid preset when the homepage cannot be fetched', async () => {

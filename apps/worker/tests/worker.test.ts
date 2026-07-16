@@ -20,7 +20,7 @@ const { scanWebsite } = vi.hoisted(() => ({
       country: 'Global (English)',
       description: 'desc',
     },
-    audience: { target: 'devs', competitors: [] },
+    audience: { target: ['devs'], competitors: [] },
     blog: { sitemap_url: 's', main_blog_url: 'b', best_articles: [] },
     article_preferences: {
       content_seo: { article_style: 'x', internal_links: true, llm_instructions: 'y' },

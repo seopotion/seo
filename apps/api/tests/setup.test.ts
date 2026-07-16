@@ -16,7 +16,7 @@ const presetsFixture = {
     country: 'Global (English)',
     description: 'An example business.',
   },
-  audience: { target: 'Developers', competitors: ['acme.com'] },
+  audience: { target: ['Developers'], competitors: ['acme.com'] },
   blog: {
     sitemap_url: 'https://example.com/sitemap.xml',
     main_blog_url: 'https://example.com/blog',
