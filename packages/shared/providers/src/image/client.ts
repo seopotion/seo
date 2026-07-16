@@ -2,7 +2,7 @@ import { categorizeProviderHttpStatus, isRetryableProviderError, ProviderError }
 import type { ImageClient, ImageConfig, ImageGenerateParams, ImageResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://fal.run';
-const DEFAULT_MODEL = 'fal-ai/flux/dev';
+const DEFAULT_MODEL = 'fal-ai/flux-2';
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 500;

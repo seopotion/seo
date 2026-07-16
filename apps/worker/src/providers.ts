@@ -25,3 +25,14 @@ export function getImageClients() {
     image: createFalClient({ apiKey: process.env.FAL_KEY ?? '' }),
   };
 }
+
+/** Build the LLM + DataForSEO clients the scanner worker needs, from env. */
+export function getScanClients() {
+  return {
+    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    dataForSeo: createDataForSeoClient({
+      login: process.env.DATAFORSEO_LOGIN ?? '',
+      password: process.env.DATAFORSEO_PASSWORD ?? '',
+    }),
+  };
+}

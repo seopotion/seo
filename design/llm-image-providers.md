@@ -15,9 +15,9 @@ existing DataForSEO client and follow the same factory + normalized-error patter
 | Concern | Choice |
 | --- | --- |
 | LLM provider | **OpenRouter** (`https://openrouter.ai/api/v1/chat/completions`) |
-| LLM default model | **`anthropic/claude-sonnet-4.6`** — outline, full-article, and humanization passes |
+| LLM default model | **`z-ai/glm-5.2`** — outline, full-article, and humanization passes |
 | Image provider | **fal.ai** (`https://fal.run/{model}`) |
-| Image default model | **`fal-ai/flux/dev`** (FLUX.1 [dev]) — cover/OG + inline images |
+| Image default model | **`fal-ai/flux-2`** (FLUX.2 [dev]) — cover/OG + inline images |
 | Staging vs prod | One provider account for both; **separate API keys per stage** via per-stage SSM |
 
 Model is a per-call parameter (defaulted from client config), so the models above are
@@ -33,13 +33,14 @@ Model is a per-call parameter (defaulted from client config), so the models abov
 - The response includes a real `usage.cost` (USD), letting us replace cost **estimates**
   with **measured** spend per article.
 
-### Why fal.ai + FLUX.1 [dev]
+### Why fal.ai + FLUX.2 [dev]
 
-- Simple synchronous REST (`POST https://fal.run/fal-ai/flux/dev`) returns image URLs
+- Simple synchronous REST (`POST https://fal.run/fal-ai/flux-2`) returns image URLs
   directly — no SDK required, consistent with our fetch-based client style.
-- FLUX.1 [dev] is a good quality/cost balance for blog cover and inline imagery. `schnell`
-  (cheaper/faster) and `flux-pro` (higher quality) are drop-in model-id swaps if the
-  default proves wrong.
+- FLUX.2 [dev] is a good quality/cost balance for blog cover and inline imagery — current
+  generation, commercially licensed, and ~half the per-megapixel cost of FLUX.1 [dev]
+  ($0.012 vs $0.025/MP). `flux-2-pro` (higher quality) and `flux-2-flex` are drop-in
+  model-id swaps if the default proves wrong.
 
 ## Provider-neutral interfaces
 
@@ -83,7 +84,7 @@ interface LlmClient {
 
 type LlmConfig = {
   apiKey: string;
-  defaultModel?: string;   // default 'anthropic/claude-sonnet-4.6'
+  defaultModel?: string;   // default 'z-ai/glm-5.2'
   baseUrl?: string;        // default 'https://openrouter.ai/api/v1'
   timeoutMs?: number;
   maxRetries?: number;
@@ -120,7 +121,7 @@ interface ImageClient {
 
 type ImageConfig = {
   apiKey: string;
-  defaultModel?: string;   // default 'fal-ai/flux/dev'
+  defaultModel?: string;   // default 'fal-ai/flux-2'
   baseUrl?: string;        // default 'https://fal.run'
   timeoutMs?: number;
   maxRetries?: number;
@@ -182,11 +183,11 @@ replace these with measured spend once the pipeline runs.
 
 | Step | Model | Rough tokens / count | Est. cost |
 | --- | --- | --- | --- |
-| Outline | Claude Sonnet | ~1k in / ~1.5k out | $0.01–0.03 |
-| Full article | Claude Sonnet | ~2k in / ~5k out | $0.03–0.08 |
-| Humanization pass | Claude Sonnet | ~5k in / ~5k out | $0.02–0.05 |
-| Images | FLUX.1 [dev] | ~3 images (1 cover + ~2 inline) | $0.08–0.15 |
-| **Total** | | | **~$0.15–0.30** |
+| Outline | GLM 5.2 | ~1k in / ~1.5k out | $0.01–0.03 |
+| Full article | GLM 5.2 | ~2k in / ~5k out | $0.03–0.08 |
+| Humanization pass | GLM 5.2 | ~5k in / ~5k out | $0.02–0.05 |
+| Images | FLUX.2 [dev] | ~3 images (1 cover + ~2 inline) @ $0.012/MP | $0.04–0.06 |
+| **Total** | | | **~$0.10–0.22** |
 
 Operational limits carried by the clients: per-request timeout (default ~30s for LLM,
 longer for image), bounded retries with backoff on retryable categories, and normalized

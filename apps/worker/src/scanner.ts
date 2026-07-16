@@ -1,4 +1,7 @@
-import type { SetupPresets } from '@shared/schemas';
+import { parseJsonObject } from '@shared/generation';
+import type { LlmClient, LlmMessage } from '@shared/providers';
+import { type SetupPresets, SetupPresetsSchema } from '@shared/schemas';
+import { discoverBlog, fetchSite } from './scrape';
 
 export async function scanWebsite(_websiteUrl: string): Promise<SetupPresets> {
   return {
@@ -28,4 +31,13 @@ export async function scanWebsite(_websiteUrl: string): Promise<SetupPresets> {
       },
     },
   };
+
+  // SetupPresetsSchema is the single validation gate — a malformed/incomplete
+  // LLM object throws here and dead-letters rather than persisting junk.
+  return SetupPresetsSchema.parse({
+    business: fields.business,
+    audience: { target: fields.audience?.target, competitors: [] },
+    blog,
+    article_preferences: fields.article_preferences,
+  });
 }

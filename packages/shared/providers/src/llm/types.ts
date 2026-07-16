@@ -30,7 +30,7 @@ export interface LlmResult {
 
 export interface LlmConfig {
   apiKey: string;
-  /** Defaults to 'anthropic/claude-sonnet-4.6'. */
+  /** Defaults to 'z-ai/glm-5.2'. */
   defaultModel?: string;
   /** Defaults to 'https://openrouter.ai/api/v1'. */
   baseUrl?: string;

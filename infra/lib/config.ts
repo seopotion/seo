@@ -6,6 +6,9 @@ interface StageConfig {
   logLevel: string; // POWERTOOLS_LOG_LEVEL
   jwtSecretParam: string; // SSM SecureString NAME (not value)
   mongoUriParam: string; // SSM SecureString NAME (not value)
+  googleClientSecretParam: string; // SSM SecureString NAME (not value)
+  gscTokenKeyParam: string; // SSM SecureString NAME (not value)
+  webOrigin: string; // web app origin — GSC OAuth redirect URI base
 }
 
 export const STAGE_CONFIG: Record<Stage, StageConfig> = {
@@ -15,6 +18,9 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     logLevel: 'INFO',
     jwtSecretParam: '/seo/staging/jwt-secret',
     mongoUriParam: '/seo/staging/mongo-uri',
+    googleClientSecretParam: '/seo/staging/google-client-secret',
+    gscTokenKeyParam: '/seo/staging/gsc-token-key',
+    webOrigin: process.env.WEB_ORIGIN_STAGING ?? '',
   },
   prod: {
     mongoDb: 'seo_prod',
@@ -22,5 +28,8 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     logLevel: 'INFO',
     jwtSecretParam: '/seo/prod/jwt-secret',
     mongoUriParam: '/seo/prod/mongo-uri',
+    googleClientSecretParam: '/seo/prod/google-client-secret',
+    gscTokenKeyParam: '/seo/prod/gsc-token-key',
+    webOrigin: process.env.WEB_ORIGIN_PROD ?? '',
   },
 };

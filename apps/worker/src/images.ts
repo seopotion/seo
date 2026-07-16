@@ -12,7 +12,7 @@ import { getImageClients } from './providers';
 import { storeImage } from './storage';
 
 /** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
-const IMAGE_MODEL = 'fal-ai/flux/dev';
+const IMAGE_MODEL = 'fal-ai/flux-2';
 
 /** Deterministic S3 key per slot — retries overwrite, never duplicate (#51). */
 function slotKey(articleId: string, role: ArticleImage['role'], index: number, ext: string) {

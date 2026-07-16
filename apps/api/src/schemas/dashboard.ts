@@ -22,10 +22,10 @@ export const OrgNotFoundResponse = z
 
 const BestArticle = z
   .object({
-    id: z.string(),
-    title: z.string(),
     url: z.string(),
     clicks: z.number().int(),
+    // Matched against our published articles by slug; null for other site pages.
+    title: z.string().nullable(),
   })
   .openapi('BestArticle');
 
@@ -56,6 +56,25 @@ export const ConnectedIntegrationsResponse = z
     integrations: z.array(ConnectedIntegration),
   })
   .openapi('ConnectedIntegrationsResponse');
+
+export const SearchPerformanceResponse = z
+  .object({
+    // Gated until a healthy GSC connection exists; metrics are 28-day totals.
+    gated: z.boolean(),
+    clicks: z.number().nullable(),
+    impressions: z.number().nullable(),
+    ctr: z.number().nullable(),
+    position: z.number().nullable(),
+  })
+  .openapi('SearchPerformanceResponse');
+
+export const DomainRatingResponse = z
+  .object({
+    // 0–100 badge value; null when the org was never rated and the provider is
+    // unavailable.
+    rating: z.number().int().min(0).max(100).nullable(),
+  })
+  .openapi('DomainRatingResponse');
 
 /**
  * Content Planner schemas (design/product-flow.md §2.1). The monthly calendar
