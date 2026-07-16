@@ -17,7 +17,12 @@ const {
   enqueueStrategyTask,
 } = vi.hoisted(() => ({
   ensureIndexes: vi.fn(async () => {}),
-  runMigrations: vi.fn(async () => ({ audience_target_migrated: 2 })),
+  runMigrations: vi.fn(async () => ({
+    audience_target_migrated: 2,
+    normalized_backfilled: 0,
+    date_dupes_resolved: 0,
+    keyword_dupes_removed: 0,
+  })),
   closeDb: vi.fn(async () => {}),
   setPlan: vi.fn(async () => true),
   // Default: a finalized org with presets, so paid escalation kicks off strategy.

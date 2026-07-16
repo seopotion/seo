@@ -94,7 +94,8 @@ describe('KeywordRepo (integration)', () => {
       org_id: 'org_gen',
       keyword: 'fail me',
       status: 'scheduled',
-      scheduled_date: '2026-07-01',
+      // Distinct from 'claim me': unique (org_id, scheduled_date) index (#99).
+      scheduled_date: '2026-07-02',
       search_volume: 10,
       difficulty: 1,
       article_id: null,
@@ -120,11 +121,12 @@ describe('KeywordRepo (integration)', () => {
         article_id: null,
         ...over,
       });
+    // Distinct dates: keywords carry a unique (org_id, scheduled_date) index (#99).
     const due = await mk({ scheduled_date: '2026-07-01' });
     await mk({ scheduled_date: '2999-01-01' }); // future
-    const linked = await mk({});
+    const linked = await mk({ scheduled_date: '2026-07-02' });
     await KeywordRepo.linkArticle(linked.id, 'x'); // linked + generated
-    const capped = await mk({});
+    const capped = await mk({ scheduled_date: '2026-07-03' });
     await db.collection('keywords').updateOne(
       { _id: (await import('mongodb')).ObjectId.createFromHexString(capped.id) },
       {
