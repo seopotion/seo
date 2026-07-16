@@ -74,7 +74,7 @@ const input = (): PipelineInput => ({
       country: 'United States',
       description: 'pet food',
     },
-    audience: { target: 'dog owners', competitors: ['comp.com'] },
+    audience: { target: ['dog owners'], competitors: ['comp.com'] },
     blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
     article_preferences: {
       content_seo: { article_style: '', internal_links: false, llm_instructions: '' },

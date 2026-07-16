@@ -33,6 +33,30 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    migrate: defineCommand({
+      meta: { name: 'migrate', description: 'Run idempotent data migrations (before db init)' },
+      args: { ...outputOption, ...verboseOption },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { migrateDb } = await import('../lib/db');
+
+          emitter.step('db:migrate', 'start');
+
+          if (args.verbose) {
+            emitter.info('Running runMigrations()');
+          }
+
+          const result = await migrateDb();
+          emitter.step('db:migrate', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.OP_FAILED);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'set-plan': defineCommand({
       meta: {
         name: 'set-plan',

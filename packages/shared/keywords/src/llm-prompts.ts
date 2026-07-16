@@ -7,7 +7,7 @@ function businessContext(presets: SetupPresets): string {
   return [
     `Business: ${presets.business.name}`,
     `Description: ${presets.business.description}`,
-    `Target audience: ${presets.audience.target}`,
+    `Target audience: ${presets.audience.target.join(', ')}`,
     `Country: ${presets.business.country}`,
     `Language: ${presets.business.language}`,
   ].join('\n');
