@@ -1,3 +1,4 @@
+import type { z } from '@hono/zod-openapi';
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import {
   addCandidates,
@@ -8,7 +9,6 @@ import {
 } from '@shared/db';
 import { DataForSeoError } from '@shared/providers';
 import { type Candidate, isPaid, type Keyword } from '@shared/schemas';
-import type { z } from '@hono/zod-openapi';
 import { getDataForSeoClient } from '../clients/providers';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { loadOwnedPaidOrg, type OwnedPaidResult } from '../lib/load-owned-paid-org';

@@ -1,30 +1,36 @@
 import type { SQSEvent } from 'aws-lambda';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { findById, setStrategyStatus, addCandidates, scheduleCandidate, listByOrg, findByNormalized } =
-  vi.hoisted(() => ({
-    findById: vi.fn(),
-    setStrategyStatus: vi.fn(async () => {}),
-    // addCandidates echoes inserted candidates back with ids + normalized keys,
-    // like the real service, so the worker can schedule them by id.
-    addCandidates: vi.fn(async (_orgId: string, items: { keyword: string }[]) =>
-      items.map((c, i) => ({
-        ...c,
-        id: `cand_${i}`,
-        normalized_keyword: c.keyword.trim().toLowerCase().replace(/\s+/g, ' '),
-        status: 'candidate',
-      })),
-    ),
-    scheduleCandidate: vi.fn(
-      async (cand: { id: string; keyword: string }, scheduled_date: string) => ({
-        ok: true,
-        created: true,
-        keyword: { id: `kw_${cand.id}`, candidate_id: cand.id, scheduled_date },
-      }),
-    ),
-    listByOrg: vi.fn(async () => []),
-    findByNormalized: vi.fn(async () => null),
-  }));
+const {
+  findById,
+  setStrategyStatus,
+  addCandidates,
+  scheduleCandidate,
+  listByOrg,
+  findByNormalized,
+} = vi.hoisted(() => ({
+  findById: vi.fn(),
+  setStrategyStatus: vi.fn(async () => {}),
+  // addCandidates echoes inserted candidates back with ids + normalized keys,
+  // like the real service, so the worker can schedule them by id.
+  addCandidates: vi.fn(async (_orgId: string, items: { keyword: string }[]) =>
+    items.map((c, i) => ({
+      ...c,
+      id: `cand_${i}`,
+      normalized_keyword: c.keyword.trim().toLowerCase().replace(/\s+/g, ' '),
+      status: 'candidate',
+    })),
+  ),
+  scheduleCandidate: vi.fn(
+    async (cand: { id: string; keyword: string }, scheduled_date: string) => ({
+      ok: true,
+      created: true,
+      keyword: { id: `kw_${cand.id}`, candidate_id: cand.id, scheduled_date },
+    }),
+  ),
+  listByOrg: vi.fn(async () => []),
+  findByNormalized: vi.fn(async () => null),
+}));
 vi.mock('@shared/db', () => ({
   OrgRepo: { findById, setStrategyStatus },
   KeywordRepo: { listByOrg },

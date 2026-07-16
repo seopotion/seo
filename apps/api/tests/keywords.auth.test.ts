@@ -6,7 +6,12 @@ const { addCandidates, scheduleCandidate, CandidateRepo, KeywordRepo } = vi.hois
   addCandidates: vi.fn(),
   scheduleCandidate: vi.fn(),
   CandidateRepo: { findById: vi.fn(), listByOrg: vi.fn(), releaseAfterUnschedule: vi.fn() },
-  KeywordRepo: { findById: vi.fn(), findByOrgAndDate: vi.fn(), reschedulePending: vi.fn(), deleteUnstarted: vi.fn() },
+  KeywordRepo: {
+    findById: vi.fn(),
+    findByOrgAndDate: vi.fn(),
+    reschedulePending: vi.fn(),
+    deleteUnstarted: vi.fn(),
+  },
 }));
 vi.mock('@shared/db', () => ({ addCandidates, scheduleCandidate, CandidateRepo, KeywordRepo }));
 

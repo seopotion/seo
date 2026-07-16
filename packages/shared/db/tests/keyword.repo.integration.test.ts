@@ -221,10 +221,12 @@ describe('KeywordRepo (integration)', () => {
 
     // Same normalized keyword via a different candidate row.
     await getDb().then((db) =>
-      db.collection('candidates').updateOne(
-        { org_id: 'org_sched', normalized_keyword: 'crm pricing' },
-        { $set: { keyword: 'Best  CRM  software', normalized_keyword: 'best crm software x' } },
-      ),
+      db
+        .collection('candidates')
+        .updateOne(
+          { org_id: 'org_sched', normalized_keyword: 'crm pricing' },
+          { $set: { keyword: 'Best  CRM  software', normalized_keyword: 'best crm software x' } },
+        ),
     );
     const renamed = await CandidateRepo.findById(other!.id);
     const kwErr = await KeywordRepo.createFromCandidate(renamed!, '2026-09-06').catch((e) => e);
