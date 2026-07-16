@@ -1,5 +1,7 @@
 import type { OnboardingForm } from './types';
 
+export const MAX_TARGET_AUDIENCES = 7;
+
 export const steps = [
   'websiteScan',
   'businessInfo',

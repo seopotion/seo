@@ -1,5 +1,6 @@
 'use client';
 
+import type { SetupPresets } from '@shared/schemas';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
@@ -22,10 +23,15 @@ import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { TextEntryList } from '../../onboarding/components/TextEntryList';
-import { countries, languages } from '../../onboarding/constants';
+import { countries, languages, MAX_TARGET_AUDIENCES } from '../../onboarding/constants';
 import { integrationOptions } from '../../onboarding/steps/IntegrationsStep';
 import type { TextEntry } from '../../onboarding/types';
-import { createEntryId, isValidHttpUrl } from '../../onboarding/utils';
+import {
+  createEntryId,
+  isValidHttpUrl,
+  stringsToTextEntries,
+  textEntriesToStrings,
+} from '../../onboarding/utils';
 
 const settingsTabs = [
   'business',
@@ -43,24 +49,13 @@ type SettingsForm = {
   country: string;
   integrations: string[];
   language: string;
-  targetAudience: string;
+  targetAudience: TextEntry[];
 };
 
 type SettingsLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsSaveState = 'error' | 'idle' | 'saved';
 
-type GeneralSettingsResponse = {
-  audience: {
-    competitors: string[];
-    target: string;
-  };
-  business: {
-    country: string;
-    description: string;
-    language: string;
-    name: string;
-  };
-};
+type GeneralSettingsResponse = Pick<SetupPresets, 'audience' | 'business'>;
 
 const initialSettings: SettingsForm = {
   businessDescription: '',
@@ -69,15 +64,8 @@ const initialSettings: SettingsForm = {
   country: countries[0].value,
   integrations: [],
   language: languages[0].value,
-  targetAudience: '',
+  targetAudience: [],
 };
-
-function toTextEntries(prefix: string, values: string[]): TextEntry[] {
-  return values
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => ({ id: createEntryId(prefix), value }));
-}
 
 function mergeGeneralSettings(
   data: GeneralSettingsResponse,
@@ -87,10 +75,10 @@ function mergeGeneralSettings(
     ...currentSettings,
     businessDescription: data.business.description,
     businessName: data.business.name,
-    competitors: toTextEntries('competitor', data.audience.competitors),
+    competitors: stringsToTextEntries(data.audience.competitors, 'competitor'),
     country: data.business.country,
     language: data.business.language,
-    targetAudience: data.audience.target,
+    targetAudience: stringsToTextEntries(data.audience.target, 'audience'),
   };
 }
 
@@ -98,7 +86,7 @@ function buildGeneralSettingsPatch(settings: SettingsForm) {
   return {
     audience: {
       competitors: settings.competitors.map((entry) => entry.value.trim()).filter(Boolean),
-      target: settings.targetAudience.trim(),
+      target: textEntriesToStrings(settings.targetAudience),
     },
     business: {
       country: settings.country,
@@ -124,6 +112,8 @@ export default function SettingsPage() {
   } = useActiveOrganization();
   const [activeTab, setActiveTab] = useState<SettingsTab>('business');
   const [settings, setSettings] = useState<SettingsForm>(initialSettings);
+  const [audienceDraft, setAudienceDraft] = useState('');
+  const [audienceError, setAudienceError] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [competitorError, setCompetitorError] = useState('');
   const [loadState, setLoadState] = useState<SettingsLoadState>('idle');
@@ -257,6 +247,41 @@ export default function SettingsPage() {
     markEdited();
     setCompetitorDraft('');
     setCompetitorError('');
+  }
+
+  function updateAudienceDraft(value: string) {
+    setAudienceDraft(value);
+    setAudienceError('');
+  }
+
+  function addAudienceEntry() {
+    const value = audienceDraft.trim();
+
+    if (!value) return;
+
+    if (settings.targetAudience.length >= MAX_TARGET_AUDIENCES) {
+      setAudienceError(validationT('targetAudienceMax', { max: MAX_TARGET_AUDIENCES }));
+      return;
+    }
+
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      targetAudience: [...currentSettings.targetAudience, { id: createEntryId('audience'), value }],
+    }));
+    markEdited();
+    setAudienceDraft('');
+    setAudienceError('');
+  }
+
+  function removeAudienceEntry(id: string) {
+    if (!settings.targetAudience.some((audience) => audience.id === id)) return;
+
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      targetAudience: currentSettings.targetAudience.filter((audience) => audience.id !== id),
+    }));
+    markEdited();
+    setAudienceError('');
   }
 
   function removeCompetitorEntry(id: string) {
@@ -411,14 +436,17 @@ export default function SettingsPage() {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <FieldPanel>
-            <Label htmlFor="target-audience">{audienceT('targetAudience')}</Label>
-            <Textarea
-              className="mt-2"
-              id="target-audience"
-              value={settings.targetAudience}
-              onChange={(event) => updateSetting('targetAudience', event.target.value)}
+            <TextEntryList
+              ariaInvalid={Boolean(audienceError)}
+              draft={audienceDraft}
+              entries={settings.targetAudience}
+              errors={audienceError ? [audienceError] : undefined}
+              inputId="target-audience"
+              label={audienceT('targetAudience')}
+              onAdd={addAudienceEntry}
+              onDraftChange={updateAudienceDraft}
+              onRemove={removeAudienceEntry}
               placeholder={audienceT('targetAudiencePlaceholder')}
-              rows={5}
             />
           </FieldPanel>
 
