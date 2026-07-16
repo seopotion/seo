@@ -15,6 +15,8 @@ export const GENERATION_STATUSES = ['pending', 'generating', 'generated', 'faile
 export const KeywordSchema = z.object({
   id: z.string(),
   org_id: z.string(),
+  // Source candidate-pool linkage (#99); null for legacy / pre-#99 records.
+  candidate_id: z.string().nullable().default(null),
   keyword: z.string(),
   // Derived from `keyword` by the repository; optional so pre-existing docs still parse.
   normalized_keyword: z.string().optional(),
