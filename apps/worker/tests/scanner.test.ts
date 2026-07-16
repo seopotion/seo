@@ -52,17 +52,17 @@ beforeEach(() => {
 });
 
 describe('scanWebsite', () => {
-  test('does not generate placeholder business, competitor, or blog data', async () => {
-    const presets = await scanWebsite('https://www.clewas.com/');
+  test('assembles presets from scrape + LLM; competitors empty, blog from sitemap', async () => {
+    fetchSite.mockResolvedValue({ text: 'Clewas helps with SEO', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    const presets = await scanWebsite('https://clewas.com', { llm });
 
     expect(() => SetupPresetsSchema.parse(presets)).not.toThrow();
     expect(presets.business.name).toBe('Clewas');
     expect(presets.audience.target).toEqual(['Founders comparing SEO solutions.']);
     expect(presets.audience.competitors).toEqual([]);
     expect(presets.blog).toEqual(BLOG);
-    expect(presets.business).toEqual({ name: '', language: '', country: '', description: '' });
-    expect(presets.audience).toEqual({ target: '', competitors: [] });
-    expect(presets.blog).toEqual({ sitemap_url: '', main_blog_url: '', best_articles: [] });
   });
 
   test('coerces a string audience target from the LLM into a single-element array', async () => {
@@ -87,8 +87,11 @@ describe('scanWebsite', () => {
     expect(userMessage).toContain('clewas.com');
   });
 
-  test('falls back gracefully for an invalid URL', async () => {
-    const presets = await scanWebsite('not a url');
-    expect(presets.business.name).toBe('');
+  test('rejects when the LLM returns invalid JSON', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+
+    await expect(
+      scanWebsite('https://clewas.com', { llm: llmReturning('not json') }),
+    ).rejects.toThrow();
   });
 });
