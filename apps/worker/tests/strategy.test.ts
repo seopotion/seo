@@ -1,20 +1,36 @@
 import type { SQSEvent } from 'aws-lambda';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { findById, setStrategyStatus, addCandidates, createKeyword, listByOrg, setStatus } =
+const { findById, setStrategyStatus, addCandidates, scheduleCandidate, listByOrg, findByNormalized } =
   vi.hoisted(() => ({
     findById: vi.fn(),
     setStrategyStatus: vi.fn(async () => {}),
-    addCandidates: vi.fn(async () => []),
-    createKeyword: vi.fn(async () => ({})),
+    // addCandidates echoes inserted candidates back with ids + normalized keys,
+    // like the real service, so the worker can schedule them by id.
+    addCandidates: vi.fn(async (_orgId: string, items: { keyword: string }[]) =>
+      items.map((c, i) => ({
+        ...c,
+        id: `cand_${i}`,
+        normalized_keyword: c.keyword.trim().toLowerCase().replace(/\s+/g, ' '),
+        status: 'candidate',
+      })),
+    ),
+    scheduleCandidate: vi.fn(
+      async (cand: { id: string; keyword: string }, scheduled_date: string) => ({
+        ok: true,
+        created: true,
+        keyword: { id: `kw_${cand.id}`, candidate_id: cand.id, scheduled_date },
+      }),
+    ),
     listByOrg: vi.fn(async () => []),
-    setStatus: vi.fn(async () => {}),
+    findByNormalized: vi.fn(async () => null),
   }));
 vi.mock('@shared/db', () => ({
   OrgRepo: { findById, setStrategyStatus },
-  KeywordRepo: { create: createKeyword, listByOrg },
-  CandidateRepo: { findByNormalized: vi.fn(async () => null), setStatus },
+  KeywordRepo: { listByOrg },
+  CandidateRepo: { findByNormalized },
   addCandidates,
+  scheduleCandidate,
 }));
 
 const { runKeywordPipeline } = vi.hoisted(() => ({ runKeywordPipeline: vi.fn() }));
@@ -98,7 +114,9 @@ describe('strategy worker', () => {
     await handler(event({ org_id: 'o1' }), {} as never, () => {});
 
     expect(addCandidates).toHaveBeenCalledTimes(1);
-    expect(createKeyword).toHaveBeenCalledTimes(2); // rejected one excluded
+    expect(scheduleCandidate).toHaveBeenCalledTimes(2); // rejected one excluded
+    // Stored candidates (with ids) are what get scheduled — candidate_id linkage.
+    expect(scheduleCandidate.mock.calls[0]![0]).toMatchObject({ id: expect.any(String) });
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
   });
 
@@ -106,7 +124,46 @@ describe('strategy worker', () => {
     findById.mockResolvedValue({ ...org, strategy_status: 'completed' });
     await handler(event({ org_id: 'o1' }), {} as never, () => {});
     expect(runKeywordPipeline).not.toHaveBeenCalled();
-    expect(createKeyword).not.toHaveBeenCalled();
+    expect(scheduleCandidate).not.toHaveBeenCalled();
+  });
+
+  test('skips dates occupied by existing (e.g. manual) planner entries', async () => {
+    findById.mockResolvedValue(org);
+    const today = new Date().toISOString().slice(0, 10);
+    listByOrg.mockResolvedValue([
+      { keyword: 'manual entry', opportunity_score: null, scheduled_date: today },
+    ] as never);
+    runKeywordPipeline.mockResolvedValue({ candidates: [candidate('a', 0.9)], stats: {} });
+
+    await handler(event({ org_id: 'o1' }), {} as never, () => {});
+
+    expect(scheduleCandidate).toHaveBeenCalledTimes(1);
+    const requestedDate = scheduleCandidate.mock.calls[0]![1];
+    expect(requestedDate).not.toBe(today); // shifted off the occupied day
+  });
+
+  test('a per-entry conflict does not fail the job; a date race retries once', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    runKeywordPipeline.mockResolvedValue({
+      candidates: [candidate('a', 0.9), candidate('b', 0.8)],
+      stats: {},
+    });
+    // First entry loses a date race, then succeeds on the next free day;
+    // second entry hits a non-retryable conflict and is skipped.
+    scheduleCandidate
+      .mockResolvedValueOnce({ ok: false, reason: 'date_occupied' } as never)
+      .mockResolvedValueOnce({
+        ok: true,
+        created: true,
+        keyword: { id: 'kw_a', candidate_id: 'cand_0', scheduled_date: '2027-01-02' },
+      } as never)
+      .mockResolvedValueOnce({ ok: false, reason: 'keyword_already_scheduled' } as never);
+
+    await handler(event({ org_id: 'o1' }), {} as never, () => {});
+
+    expect(scheduleCandidate).toHaveBeenCalledTimes(3);
+    expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed'); // job still completes
   });
 
   test('budgets remaining schedule against already-scheduled strategy keywords (redelivery)', async () => {
@@ -123,7 +180,7 @@ describe('strategy worker', () => {
 
     await handler(event({ org_id: 'o1' }), {} as never, () => {});
 
-    expect(createKeyword.mock.calls.length).toBeLessThanOrEqual(2); // PLAN_DAYS(30) - 28
+    expect(scheduleCandidate.mock.calls.length).toBeLessThanOrEqual(2); // PLAN_DAYS(30) - 28
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
   });
 
