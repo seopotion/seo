@@ -19,6 +19,12 @@ const Organization = z
     website_url: z.string(),
     setup_status: z.enum(SETUP_STATUSES),
     name: z.string().optional(),
+    // Server-computed entitlement capabilities (#99) — the frontend must not
+    // derive these from `plan` (#13 may move entitlement to Stripe state).
+    capabilities: z.object({
+      keyword_research: z.boolean(),
+      keyword_scheduling: z.boolean(),
+    }),
   })
   .openapi('Organization');
 
