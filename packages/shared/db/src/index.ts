@@ -9,6 +9,7 @@ export { OrgRepo } from './repositories/org.repo';
 export { UserRepo } from './repositories/user.repo';
 export { addCandidates } from './services/add-candidates';
 export {
+  isDuplicateKeyError,
   type ScheduleConflict,
   type ScheduleResult,
   scheduleCandidate,

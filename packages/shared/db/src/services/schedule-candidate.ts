@@ -13,6 +13,14 @@ export type ScheduleResult =
   | { ok: true; created: boolean; keyword: Keyword }
   | { ok: false; reason: ScheduleConflict };
 
+/**
+ * Duplicate-key check for callers outside this package (routes must not
+ * import the Mongo driver directly).
+ */
+export function isDuplicateKeyError(err: unknown): boolean {
+  return err instanceof MongoServerError && err.code === 11000;
+}
+
 /** Which unique keyword index a duplicate-key error tripped. */
 function dupKey(err: unknown): 'date' | 'keyword' | 'candidate' | null {
   if (!(err instanceof MongoServerError) || err.code !== 11000) return null;
