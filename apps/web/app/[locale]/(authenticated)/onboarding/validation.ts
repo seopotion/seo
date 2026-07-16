@@ -1,3 +1,4 @@
+import { MAX_TARGET_AUDIENCES } from './constants';
 import type { Errors, OnboardingForm, ScanState } from './types';
 import { isValidHttpUrl } from './utils';
 
@@ -58,6 +59,8 @@ export function validateStep({
   if (stepIndex === 2) {
     if (!audienceDraft.trim() && form.targetAudience.length === 0) {
       nextErrors.targetAudience = t('targetAudienceRequired');
+    } else if (form.targetAudience.length + (audienceDraft.trim() ? 1 : 0) > MAX_TARGET_AUDIENCES) {
+      nextErrors.targetAudience = t('targetAudienceMax', { max: MAX_TARGET_AUDIENCES });
     }
 
     if (competitorDraft.trim() && !isValidHttpUrl(competitorDraft)) {

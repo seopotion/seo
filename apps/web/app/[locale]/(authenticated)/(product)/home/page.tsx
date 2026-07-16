@@ -65,7 +65,9 @@ export default function HomePage() {
           api.api.v0.dashboard.articles.planned.$get({
             query: { org_id: organization.id },
           }),
-          api.api.v0.dashboard.articles.best.$get(),
+          api.api.v0.dashboard.articles.best.$get({
+            query: { org_id: organization.id },
+          }),
           api.api.v0.dashboard.integrations.connected.$get(),
         ]);
 

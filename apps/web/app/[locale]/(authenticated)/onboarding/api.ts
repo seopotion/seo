@@ -1,8 +1,8 @@
 import type { SetupPresets } from '@shared/schemas';
 import type { SetupStatus } from '@shared/types';
 import { api } from '@/lib/api';
-import type { OnboardingForm, TextEntry } from './types';
-import { createEntryId, isValidHttpUrl } from './utils';
+import type { OnboardingForm } from './types';
+import { isValidHttpUrl, stringsToTextEntries, textEntriesToStrings } from './utils';
 
 const SCAN_POLL_INTERVAL_MS = 2000;
 const SCAN_POLL_TIMEOUT_MS = 120_000;
@@ -104,13 +104,6 @@ function normalizeCompetitor(value: string) {
   return trimmedValue;
 }
 
-function toTextEntries(prefix: string, values: string[]): TextEntry[] {
-  return values
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => ({ id: createEntryId(prefix), value }));
-}
-
 function toBlogPosts(values: string[]): [string, string, string] {
   const blogPosts = values.map((value) => value.trim()).filter(Boolean);
 
@@ -124,15 +117,15 @@ function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
     blogPosts: toBlogPosts(presets.blog.best_articles),
     businessDescription: presets.business.description,
     businessName: presets.business.name,
-    competitors: toTextEntries(
-      'competitor',
+    competitors: stringsToTextEntries(
       presets.audience.competitors.map((competitor) => normalizeCompetitor(competitor)),
+      'competitor',
     ),
     country: presets.business.country,
     internalLinksCount: presets.article_preferences.content_seo.internal_links ? '1' : '0',
     language: presets.business.language,
     sitemapUrl: presets.blog.sitemap_url,
-    targetAudience: toTextEntries('audience', [presets.audience.target]),
+    targetAudience: stringsToTextEntries(presets.audience.target, 'audience'),
   };
 }
 
@@ -145,10 +138,7 @@ function buildPresetsPatch(form: OnboardingForm): SetupPresetsPatch {
       description: form.businessDescription.trim(),
     },
     audience: {
-      target: form.targetAudience
-        .map((entry) => entry.value.trim())
-        .filter(Boolean)
-        .join(', '),
+      target: textEntriesToStrings(form.targetAudience),
       competitors: form.competitors.map((entry) => entry.value.trim()).filter(Boolean),
     },
     blog: {

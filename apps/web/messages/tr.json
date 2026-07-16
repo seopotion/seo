@@ -508,6 +508,7 @@
       "languageRequired": "Dil zorunludur.",
       "required": "{label} zorunludur.",
       "scanBeforeContinuing": "Devam etmeden önce web sitesini tarayın.",
+      "targetAudienceMax": "En fazla {max} hedef kitle ekleyebilirsiniz.",
       "targetAudienceRequired": "En az bir hedef kitle ekleyin.",
       "urlWithProtocol": "http veya https ile başlayan geçerli bir URL girin.",
       "validUrl": "Geçerli bir {label} girin.",
