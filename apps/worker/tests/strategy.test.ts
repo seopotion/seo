@@ -56,7 +56,7 @@ const org = {
   strategy_status: 'pending',
   presets: {
     business: { name: 'X', language: 'English', country: 'Global (English)' },
-    audience: { target: 'devs', competitors: [] },
+    audience: { target: ['devs'], competitors: [] },
   },
   created_at: new Date(),
 };

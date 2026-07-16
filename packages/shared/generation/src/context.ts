@@ -10,7 +10,7 @@ export function buildContext(org: Org, keyword: Keyword): GenerationContext {
     businessDescription: p.business.description,
     language: p.business.language,
     country: p.business.country,
-    audience: p.audience.target,
+    audience: p.audience.target.join(', '),
     competitors: p.audience.competitors,
     articleStyle: p.article_preferences.content_seo.article_style,
     internalLinks: p.article_preferences.content_seo.internal_links,
