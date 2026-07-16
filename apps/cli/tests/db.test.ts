@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 const {
   ensureIndexes,
+  runMigrations,
   closeDb,
   setPlan,
   findById,
@@ -16,6 +17,7 @@ const {
   enqueueStrategyTask,
 } = vi.hoisted(() => ({
   ensureIndexes: vi.fn(async () => {}),
+  runMigrations: vi.fn(async () => ({ audience_target_migrated: 2 })),
   closeDb: vi.fn(async () => {}),
   setPlan: vi.fn(async () => true),
   // Default: a finalized org with presets, so paid escalation kicks off strategy.
@@ -43,6 +45,7 @@ const {
 
 vi.mock('@shared/db', () => ({
   ensureIndexes,
+  runMigrations,
   closeDb,
   OrgRepo: {
     setPlan,
@@ -60,7 +63,7 @@ vi.mock('@shared/db', () => ({
 
 vi.mock('../src/lib/sqs', () => ({ enqueueStrategyTask }));
 
-import { initDb, resetUser, setOrgPlan } from '../src/lib/db';
+import { initDb, migrateDb, resetUser, setOrgPlan } from '../src/lib/db';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -81,6 +84,26 @@ describe('initDb', () => {
     if (res.ok) throw new Error('expected failure');
     expect(res.error.code).toBe('DB_INIT_FAILED');
     expect(res.error.message).toContain('no mongo');
+    expect(closeDb).toHaveBeenCalledOnce();
+  });
+});
+
+describe('migrateDb', () => {
+  test('runs migrations and returns the report', async () => {
+    const res = await migrateDb();
+    expect(runMigrations).toHaveBeenCalledOnce();
+    expect(closeDb).toHaveBeenCalledOnce();
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.audience_target_migrated).toBe(2);
+  });
+
+  test('maps a thrown error to a DB_MIGRATE_FAILED Result', async () => {
+    runMigrations.mockRejectedValueOnce(new Error('no mongo'));
+    const res = await migrateDb();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('DB_MIGRATE_FAILED');
     expect(closeDb).toHaveBeenCalledOnce();
   });
 });
