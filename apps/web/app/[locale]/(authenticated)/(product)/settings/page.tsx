@@ -1,6 +1,7 @@
 'use client';
 
 import type { SetupPresets } from '@shared/schemas';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
@@ -19,6 +20,7 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -52,10 +54,15 @@ type SettingsForm = {
   targetAudience: TextEntry[];
 };
 
-type SettingsLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsSaveState = 'error' | 'idle' | 'saved';
 
 type GeneralSettingsResponse = Pick<SetupPresets, 'audience' | 'business'>;
+
+type GeneralSettingsMutationVariables = {
+  organizationId: string;
+  saveRevision: number;
+  settings: SettingsForm;
+};
 
 const initialSettings: SettingsForm = {
   businessDescription: '',
@@ -110,68 +117,116 @@ export default function SettingsPage() {
     loading: organizationLoading,
     organization,
   } = useActiveOrganization();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SettingsTab>('business');
   const [settings, setSettings] = useState<SettingsForm>(initialSettings);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [audienceError, setAudienceError] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [competitorError, setCompetitorError] = useState('');
-  const [loadState, setLoadState] = useState<SettingsLoadState>('idle');
+  const [initializedOrganizationId, setInitializedOrganizationId] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
   const [saveState, setSaveState] = useState<SettingsSaveState>('idle');
-  const [saving, setSaving] = useState(false);
   const editRevisionRef = useRef(0);
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
+
+  const settingsQuery = useQuery({
+    queryKey: dashboardQueryKeys.generalSettings(organization?.id ?? ''),
+    queryFn: async () => {
+      if (!organization) {
+        throw new Error('organization_required');
+      }
+
+      const response = await api.api.v0.dashboard.settings.general.$get({
+        query: { org_id: organization.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) {
+        throw new Error('settings_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: !redirecting && !organizationLoading && Boolean(organization),
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 60 * 1000,
+  });
 
   useEffect(() => {
-    if (organizationLoading) return;
+    if (!organization || !settingsQuery.data) return;
 
-    if (!organization) {
-      setLoadState('idle');
-      return;
+    const isNewOrganization = initializedOrganizationId !== organization.id;
+
+    if (!isNewOrganization && editRevisionRef.current !== 0) return;
+
+    if (isNewOrganization) {
+      editRevisionRef.current = 0;
+      setSaveState('idle');
     }
 
-    let cancelled = false;
+    setSettings((currentSettings) =>
+      mergeGeneralSettings(
+        settingsQuery.data,
+        isNewOrganization ? initialSettings : currentSettings,
+      ),
+    );
+    setInitializedOrganizationId(organization.id);
+  }, [initializedOrganizationId, organization, settingsQuery.data]);
 
-    setLoadState('loading');
-    setSaveState('idle');
+  const saveSettingsMutation = useMutation({
+    mutationFn: async ({
+      organizationId,
+      settings: settingsToSave,
+    }: GeneralSettingsMutationVariables) => {
+      const response = await api.api.v0.dashboard.settings.general.$patch({
+        json: {
+          org_id: organizationId,
+          ...buildGeneralSettingsPatch(settingsToSave),
+        },
+      });
 
-    void (async () => {
-      try {
-        const response = await api.api.v0.dashboard.settings.general.$get({
-          query: { org_id: organization.id },
-        });
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('settings_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
-          setLoadState('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadState('error');
-        }
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationLoading]);
+      if (!response.ok) {
+        throw new Error('settings_save_failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, { organizationId, saveRevision }) => {
+      queryClient.setQueryData<GeneralSettingsResponse>(
+        dashboardQueryKeys.generalSettings(organizationId),
+        data,
+      );
+
+      if (editRevisionRef.current === saveRevision) {
+        setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
+        setSaveState('saved');
+      }
+    },
+    onError: (error, { saveRevision }) => {
+      if (error instanceof Error && error.message === 'unauthorized') return;
+
+      if (editRevisionRef.current === saveRevision) {
+        setSaveState('error');
+      }
+    },
+  });
 
   function markEdited() {
     editRevisionRef.current += 1;
@@ -189,45 +244,18 @@ export default function SettingsPage() {
     markEdited();
   }
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+  function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!organization || saving) return;
+    if (!organization || saveSettingsMutation.isPending) return;
 
-    setSaving(true);
     setSaveState('idle');
 
-    const saveRevision = editRevisionRef.current;
-
-    try {
-      const response = await api.api.v0.dashboard.settings.general.$patch({
-        json: {
-          org_id: organization.id,
-          ...buildGeneralSettingsPatch(settings),
-        },
-      });
-
-      if ((response.status as number) === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('settings_save_failed');
-      }
-
-      const data = await response.json();
-      if (editRevisionRef.current === saveRevision) {
-        setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
-        setSaveState('saved');
-      }
-    } catch {
-      if (editRevisionRef.current === saveRevision) {
-        setSaveState('error');
-      }
-    } finally {
-      setSaving(false);
-    }
+    saveSettingsMutation.mutate({
+      organizationId: organization.id,
+      saveRevision: editRevisionRef.current,
+      settings,
+    });
   }
 
   function addCompetitorEntry() {
@@ -306,10 +334,11 @@ export default function SettingsPage() {
   }
 
   if (
+    redirecting ||
     organizationLoading ||
     organizationError === 'unauthorized' ||
-    loadState === 'loading' ||
-    (organization && loadState === 'idle')
+    (organization && settingsQuery.isPending) ||
+    (organization && Boolean(settingsQuery.data) && initializedOrganizationId !== organization.id)
   ) {
     return <StatusPanel>{t('status.loading')}</StatusPanel>;
   }
@@ -322,7 +351,7 @@ export default function SettingsPage() {
     return <StatusPanel tone="error">{t('status.organizationError')}</StatusPanel>;
   }
 
-  if (loadState === 'error') {
+  if (settingsQuery.isError) {
     return <StatusPanel tone="error">{t('status.loadError')}</StatusPanel>;
   }
 
@@ -533,8 +562,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={saving || !organization}>
-          {saving ? t('actions.saving') : t('actions.save')}
+        <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
+          {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
         </Button>
       </div>
     </form>

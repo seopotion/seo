@@ -1,5 +1,6 @@
 'use client';
 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -40,28 +42,32 @@ export default function ContentPlannerPage() {
     loading: organizationLoading,
     organization,
   } = useActiveOrganization();
+  const queryClient = useQueryClient();
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const observedStrategyRef = useRef<{
+    organizationId: string;
+    status: StrategyStatus;
+  } | null>(null);
   const [articleDraftsById, setArticleDraftsById] = useState<Record<string, ArticleEditorDraft>>(
     {},
   );
-  const [plannerArticles, setPlannerArticles] = useState<PlannerArticle[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [strategyStatus, setStrategyStatus] = useState<StrategyStatus>('none');
   const [fixturesEnabled, setFixturesEnabled] = useState(false);
   const [pendingPreviewEnabled, setPendingPreviewEnabled] = useState(false);
   const [fixturesResolved, setFixturesResolved] = useState(!PLANNER_FIXTURES_ALLOWED);
+  const [redirecting, setRedirecting] = useState(false);
   const modalOpen = Boolean(selectedArticle);
   const selectedSavedDraft = selectedArticle?.articleId
     ? articleDraftsById[selectedArticle.articleId]
     : undefined;
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
 
   const handleSaveArticleDraft = useCallback((draftArticle: ArticleEditorDraft) => {
     setArticleDraftsById((currentDrafts) => ({
@@ -84,119 +90,90 @@ export default function ContentPlannerPage() {
     setFixturesResolved(true);
   }, []);
 
+  const plannerQueryEnabled =
+    fixturesResolved &&
+    !fixturesEnabled &&
+    !pendingPreviewEnabled &&
+    !redirecting &&
+    !organizationLoading &&
+    !organizationError &&
+    Boolean(organization);
+  const plannerQuery = useQuery({
+    queryKey: dashboardQueryKeys.planner(organization?.id ?? ''),
+    queryFn: async () => {
+      if (!organization) {
+        throw new Error('organization_required');
+      }
+
+      const response = await api.api.v0.dashboard.planner.$get({
+        query: { org_id: organization.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) {
+        throw new Error('planner_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: plannerQueryEnabled,
+    refetchInterval: (query) =>
+      query.state.data?.strategy_status === 'pending' ? PLANNER_POLL_INTERVAL_MS : false,
+    staleTime: (query) => (query.state.data?.strategy_status === 'pending' ? 0 : 60 * 60 * 1000),
+  });
+
   useEffect(() => {
-    if (!fixturesResolved) {
-      return;
-    }
-
-    if (pendingPreviewEnabled) {
-      setPlannerArticles([]);
-      setLoadError(false);
-      setStrategyStatus('pending');
-      setLoading(false);
-      return;
-    }
-
-    if (fixturesEnabled) {
-      setPlannerArticles(createPlannerFixtureArticles());
-      setLoadError(false);
-      setStrategyStatus('none');
-      setLoading(false);
-      return;
-    }
-
-    if (organizationLoading) return;
-
-    if (organizationError || !organization) {
-      setPlannerArticles([]);
-      setLoadError(Boolean(organizationError));
-      setStrategyStatus('none');
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    let pollTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    setLoading(true);
-    setLoadError(false);
-    setStrategyStatus('none');
-
-    const requestPlanner = async (background: boolean) => {
-      try {
-        const response = await api.api.v0.dashboard.planner.$get({
-          query: { org_id: organization.id },
-        });
-
-        if (cancelled) return;
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return false;
-        }
-
-        if (!response.ok) {
-          if (!background) {
-            setPlannerArticles([]);
-            setLoadError(true);
-          }
-          return background;
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setStrategyStatus(data.strategy_status);
-          setPlannerArticles(mapPlannerKeywords(data.keywords));
-        }
-
-        return data.strategy_status === 'pending';
-      } catch {
-        if (!cancelled && !background) {
-          setPlannerArticles([]);
-          setLoadError(true);
-        }
-        return background;
-      } finally {
-        if (!cancelled && !background) {
-          setLoading(false);
-        }
+    if (!plannerQueryEnabled || !organization || !plannerQuery.data) {
+      if (!plannerQueryEnabled) {
+        observedStrategyRef.current = null;
       }
+      return;
+    }
+
+    const currentObservation = {
+      organizationId: organization.id,
+      status: plannerQuery.data.strategy_status,
     };
+    const previousObservation = observedStrategyRef.current;
 
-    const pollPlanner = async () => {
-      const shouldContinuePolling = await requestPlanner(true);
+    if (
+      previousObservation?.organizationId === currentObservation.organizationId &&
+      previousObservation.status === 'pending' &&
+      currentObservation.status !== 'pending'
+    ) {
+      void queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.home(organization.id),
+      });
+    }
 
-      if (!cancelled && shouldContinuePolling) {
-        pollTimeout = setTimeout(() => void pollPlanner(), PLANNER_POLL_INTERVAL_MS);
-      }
-    };
-
-    void (async () => {
-      const shouldPoll = await requestPlanner(false);
-
-      if (!cancelled && shouldPoll) {
-        pollTimeout = setTimeout(() => void pollPlanner(), PLANNER_POLL_INTERVAL_MS);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (pollTimeout) {
-        clearTimeout(pollTimeout);
-      }
-    };
-  }, [
-    fixturesEnabled,
-    fixturesResolved,
-    handleUnauthorized,
-    organization,
-    organizationError,
-    organizationLoading,
-    pendingPreviewEnabled,
-  ]);
+    observedStrategyRef.current = currentObservation;
+  }, [organization, plannerQuery.data, plannerQueryEnabled, queryClient]);
 
   const today = useMemo(() => startOfToday(), []);
+  const plannerArticles = useMemo(() => {
+    if (pendingPreviewEnabled) return [];
+    if (fixturesEnabled) return createPlannerFixtureArticles();
+    if (!plannerQuery.data) return [];
+
+    return mapPlannerKeywords(plannerQuery.data.keywords);
+  }, [fixturesEnabled, pendingPreviewEnabled, plannerQuery.data]);
+  const strategyStatus: StrategyStatus = pendingPreviewEnabled
+    ? 'pending'
+    : fixturesEnabled
+      ? 'none'
+      : (plannerQuery.data?.strategy_status ?? 'none');
+  const loadError =
+    !fixturesEnabled &&
+    !pendingPreviewEnabled &&
+    !plannerQuery.data &&
+    plannerQuery.isError &&
+    !redirecting;
+  const loading =
+    !fixturesResolved || redirecting || (plannerQueryEnabled && plannerQuery.isPending);
   const calendarWeeks = useMemo(
     () => buildCalendarWeeks(today, plannerArticles),
     [plannerArticles, today],

@@ -1,11 +1,13 @@
 'use client';
 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 
@@ -31,78 +33,57 @@ export default function HomePage() {
     organization,
   } = useActiveOrganization();
   const router = useRouter();
-  const [data, setData] = useState<HomeData | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const handleUnauthorized = useCallback(() => {
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
 
   // Dashboard endpoints are typed via AppType. Change a route schema in
   // apps/api and this file fails to type-check.
-  useEffect(() => {
-    if (organizationLoading) return;
+  const homeQuery = useQuery({
+    queryKey: dashboardQueryKeys.home(organization?.id ?? ''),
+    queryFn: async (): Promise<HomeData> => {
+      if (!organization) return emptyHomeData;
 
-    let cancelled = false;
+      const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
+        api.api.v0.dashboard.articles.published.$get({
+          query: { org_id: organization.id },
+        }),
+        api.api.v0.dashboard.articles.planned.$get({
+          query: { org_id: organization.id },
+        }),
+        api.api.v0.dashboard.articles.best.$get({
+          query: { org_id: organization.id },
+        }),
+        api.api.v0.dashboard.integrations.connected.$get(),
+      ]);
 
-    void (async () => {
-      setLoading(true);
-
-      try {
-        if (organizationError || !organization) {
-          setData(emptyHomeData);
-          setLoadError(Boolean(organizationError));
-          return;
-        }
-
-        const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
-          api.api.v0.dashboard.articles.published.$get({
-            query: { org_id: organization.id },
-          }),
-          api.api.v0.dashboard.articles.planned.$get({
-            query: { org_id: organization.id },
-          }),
-          api.api.v0.dashboard.articles.best.$get(),
-          api.api.v0.dashboard.integrations.connected.$get(),
-        ]);
-
-        if (cancelled) return;
-
-        if (
-          [publishedRes, plannedRes, bestRes, integrationsRes].some(
-            (response) => (response.status as number) === 401,
-          )
-        ) {
-          handleUnauthorized();
-          return;
-        }
-
-        setData({
-          published: publishedRes.ok ? (await publishedRes.json()).count : 0,
-          planned: plannedRes.ok ? (await plannedRes.json()).count : 0,
-          bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
-          integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
-        });
-        setLoadError(Boolean(organizationError));
-      } catch {
-        if (!cancelled) {
-          setData(emptyHomeData);
-          setLoadError(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (
+        [publishedRes, plannedRes, bestRes, integrationsRes].some(
+          (response) => (response.status as number) === 401,
+        )
+      ) {
+        handleUnauthorized();
+        return emptyHomeData;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationError, organizationLoading]);
+      return {
+        published: publishedRes.ok ? (await publishedRes.json()).count : 0,
+        planned: plannedRes.ok ? (await plannedRes.json()).count : 0,
+        bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
+        integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
+      };
+    },
+    enabled: !organizationLoading && Boolean(organization),
+    staleTime: 60 * 60 * 1000,
+  });
+  const data = homeQuery.data ?? emptyHomeData;
+  const loadError = Boolean(organizationError) || homeQuery.isError;
+  const loading = organizationLoading || (Boolean(organization) && homeQuery.isPending);
 
   if (loading) {
     return (

@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
   BarChart3,
@@ -75,6 +76,7 @@ export function ProductShell({ children }: { children: ReactNode }) {
   const t = useTranslations('ProductShell');
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { organization } = useActiveOrganization();
   const activeItem =
     navItems.find((item) => item.href === pathname || pathname.startsWith(`${item.href}/`)) ??
@@ -90,6 +92,7 @@ export function ProductShell({ children }: { children: ReactNode }) {
   function logout() {
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
   }
 
