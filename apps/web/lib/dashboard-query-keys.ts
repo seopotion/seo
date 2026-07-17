@@ -1,3 +1,5 @@
+import type { CandidateStatus } from '@shared/schemas';
+
 export const dashboardQueryKeys = {
   all: ['dashboard'] as const,
   organization: (organizationId: string) =>
@@ -6,6 +8,18 @@ export const dashboardQueryKeys = {
     [...dashboardQueryKeys.organization(organizationId), 'home'] as const,
   planner: (organizationId: string) =>
     [...dashboardQueryKeys.organization(organizationId), 'planner'] as const,
+  candidatePool: (organizationId: string) =>
+    [...dashboardQueryKeys.organization(organizationId), 'candidate-pool'] as const,
+  candidatePoolPages: (organizationId: string) =>
+    [...dashboardQueryKeys.candidatePool(organizationId), 'pages'] as const,
+  candidatePoolList: (organizationId: string, status: CandidateStatus, limit: number) =>
+    [...dashboardQueryKeys.candidatePoolPages(organizationId), status, limit] as const,
+  candidatePoolPage: (
+    organizationId: string,
+    status: CandidateStatus,
+    limit: number,
+    offset: number,
+  ) => [...dashboardQueryKeys.candidatePoolList(organizationId, status, limit), offset] as const,
   articles: (organizationId: string) =>
     [...dashboardQueryKeys.organization(organizationId), 'articles'] as const,
   articleLists: (organizationId: string) =>

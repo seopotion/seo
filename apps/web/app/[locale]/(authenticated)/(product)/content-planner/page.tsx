@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoaderCircle, Search } from 'lucide-react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LoaderCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -14,9 +14,13 @@ import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { ArticleEditorModal } from './_components/ArticleEditorModal';
+import { ChooseKeywordModal } from './_components/ChooseKeywordModal';
+import { ResearchKeywordsModal } from './_components/ResearchKeywordsModal';
+import { TargetKeywordsSection } from './_components/TargetKeywordsSection';
 import { createPlannerFixtureArticles } from './fixtures';
 import {
   buildCalendarWeeks,
+  combineTargetKeywords,
   formatDate,
   formatDayNumber,
   formatMonth,
@@ -30,6 +34,7 @@ import type { ArticleEditorDraft, CalendarDay, PlannerArticle } from './types';
 
 const PLANNER_FIXTURES_ALLOWED = process.env.NODE_ENV !== 'production';
 const PLANNER_POLL_INTERVAL_MS = 30_000;
+const CANDIDATE_PAGE_SIZE = 50;
 
 type StrategyStatus = 'none' | 'pending' | 'completed' | 'failed';
 
@@ -42,8 +47,11 @@ export default function ContentPlannerPage() {
     loading: organizationLoading,
     organization,
   } = useActiveOrganization();
+  const canResearchKeywords = organization?.capabilities?.keyword_research ?? false;
+  const canScheduleKeywords = organization?.capabilities?.keyword_scheduling ?? false;
   const queryClient = useQueryClient();
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const organizationIdRef = useRef(organization?.id);
   const observedStrategyRef = useRef<{
     organizationId: string;
     status: StrategyStatus;
@@ -52,11 +60,13 @@ export default function ContentPlannerPage() {
     {},
   );
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
+  const [chooserDateKey, setChooserDateKey] = useState<string | null>(null);
+  const [researchModalOpen, setResearchModalOpen] = useState(false);
   const [fixturesEnabled, setFixturesEnabled] = useState(false);
   const [pendingPreviewEnabled, setPendingPreviewEnabled] = useState(false);
   const [fixturesResolved, setFixturesResolved] = useState(!PLANNER_FIXTURES_ALLOWED);
   const [redirecting, setRedirecting] = useState(false);
-  const modalOpen = Boolean(selectedArticle);
+  const modalOpen = Boolean(selectedArticle) || Boolean(chooserDateKey) || researchModalOpen;
   const selectedSavedDraft = selectedArticle?.articleId
     ? articleDraftsById[selectedArticle.articleId]
     : undefined;
@@ -75,6 +85,42 @@ export default function ContentPlannerPage() {
       [draftArticle.id]: draftArticle,
     }));
   }, []);
+  const handleCloseArticle = useCallback(() => {
+    setSelectedArticle(null);
+  }, []);
+  const handleCloseResearch = useCallback(() => {
+    setResearchModalOpen(false);
+  }, []);
+  const handleCloseChooser = useCallback(() => {
+    setChooserDateKey(null);
+  }, []);
+  const handleOpenResearch = useCallback(() => {
+    setSelectedArticle(null);
+    setChooserDateKey(null);
+    setResearchModalOpen(true);
+  }, []);
+  const handleChooseDate = useCallback((dateKey: string) => {
+    setSelectedArticle(null);
+    setResearchModalOpen(false);
+    setChooserDateKey(dateKey);
+  }, []);
+  const handleSelectArticle = useCallback((article: PlannerArticle) => {
+    setChooserDateKey(null);
+    setResearchModalOpen(false);
+    setSelectedArticle(article);
+  }, []);
+
+  useEffect(() => {
+    if (organizationIdRef.current === organization?.id) {
+      return;
+    }
+
+    organizationIdRef.current = organization?.id;
+    setArticleDraftsById({});
+    setSelectedArticle(null);
+    setChooserDateKey(null);
+    setResearchModalOpen(false);
+  }, [organization?.id]);
 
   usePageContentInert(pageContentRef, modalOpen);
 
@@ -153,6 +199,50 @@ export default function ContentPlannerPage() {
     observedStrategyRef.current = currentObservation;
   }, [organization, plannerQuery.data, plannerQueryEnabled, queryClient]);
 
+  const candidateQueryEnabled =
+    plannerQueryEnabled &&
+    plannerQuery.data !== undefined &&
+    plannerQuery.data.strategy_status !== 'pending';
+  const candidateQuery = useInfiniteQuery({
+    queryKey: dashboardQueryKeys.candidatePoolList(
+      organization?.id ?? '',
+      'candidate',
+      CANDIDATE_PAGE_SIZE,
+    ),
+    queryFn: async ({ pageParam }) => {
+      if (!organization) {
+        throw new Error('organization_required');
+      }
+
+      const response = await api.api.v0.keywords.candidates.$get({
+        query: {
+          limit: String(CANDIDATE_PAGE_SIZE),
+          offset: String(pageParam),
+          org_id: organization.id,
+          status: 'candidate',
+        },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) {
+        throw new Error('candidate_pool_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: candidateQueryEnabled,
+    getNextPageParam: (lastPage) => {
+      const nextOffset = lastPage.offset + lastPage.limit;
+      return nextOffset < lastPage.total ? nextOffset : undefined;
+    },
+    initialPageParam: 0,
+    staleTime: 60 * 60 * 1000,
+  });
+
   const today = useMemo(() => startOfToday(), []);
   const plannerArticles = useMemo(() => {
     if (pendingPreviewEnabled) return [];
@@ -166,6 +256,14 @@ export default function ContentPlannerPage() {
     : fixturesEnabled
       ? 'none'
       : (plannerQuery.data?.strategy_status ?? 'none');
+  const candidates = useMemo(
+    () => candidateQuery.data?.pages.flatMap((page) => page.candidates) ?? [],
+    [candidateQuery.data],
+  );
+  const targetKeywords = useMemo(
+    () => combineTargetKeywords(candidates, plannerArticles),
+    [candidates, plannerArticles],
+  );
   const loadError =
     !fixturesEnabled &&
     !pendingPreviewEnabled &&
@@ -174,6 +272,27 @@ export default function ContentPlannerPage() {
     !redirecting;
   const loading =
     !fixturesResolved || redirecting || (plannerQueryEnabled && plannerQuery.isPending);
+  const targetKeywordsLoading =
+    !fixturesEnabled &&
+    !pendingPreviewEnabled &&
+    (loading || (candidateQueryEnabled && candidateQuery.isPending));
+  const targetKeywordsLoadError =
+    candidateQuery.isError && !redirecting && !fixturesEnabled && !pendingPreviewEnabled;
+  const researchAvailable =
+    Boolean(organization) &&
+    !fixturesEnabled &&
+    !pendingPreviewEnabled &&
+    !redirecting &&
+    !organizationLoading &&
+    !organizationError;
+  const schedulingAvailable =
+    candidateQueryEnabled &&
+    Boolean(organization) &&
+    !fixturesEnabled &&
+    !pendingPreviewEnabled &&
+    !redirecting &&
+    !organizationLoading &&
+    !organizationError;
   const calendarWeeks = useMemo(
     () => buildCalendarWeeks(today, plannerArticles),
     [plannerArticles, today],
@@ -201,12 +320,6 @@ export default function ContentPlannerPage() {
             <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
             <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
           </div>
-          {strategyStatus !== 'pending' ? (
-            <SummaryPill
-              label={t('scheduledCount', { count: plannerArticles.length })}
-              value={t('oneArticlePerDay')}
-            />
-          ) : null}
         </header>
 
         {statusMessage ? <StatusMessage message={statusMessage} /> : null}
@@ -218,6 +331,29 @@ export default function ContentPlannerPage() {
           />
         ) : (
           <>
+            <TargetKeywordsSection
+              canResearch={canResearchKeywords}
+              hasMore={candidateQuery.hasNextPage}
+              loadError={targetKeywordsLoadError}
+              loading={targetKeywordsLoading}
+              loadingMore={candidateQuery.isFetchingNextPage}
+              onLoadMore={() => void candidateQuery.fetchNextPage()}
+              onResearch={handleOpenResearch}
+              onRetry={() => void candidateQuery.refetch()}
+              researchAvailable={researchAvailable}
+              targetKeywords={targetKeywords}
+            />
+
+            <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <h2 className="font-semibold text-base text-slate-950">
+                {t('contentCalendar.title')}
+              </h2>
+              <SummaryPill
+                label={t('scheduledCount', { count: plannerArticles.length })}
+                value={t('oneArticlePerDay')}
+              />
+            </header>
+
             <section
               aria-label={t('calendarLabel')}
               className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
@@ -232,10 +368,13 @@ export default function ContentPlannerPage() {
               <div className="grid grid-cols-7">
                 {calendarWeeks.flat().map((day) => (
                   <PlannerDayCell
+                    canSchedule={canScheduleKeywords}
+                    chooserAvailable={schedulingAvailable}
                     key={day.dateKey}
                     day={day}
                     locale={locale}
-                    onSelectArticle={setSelectedArticle}
+                    onChooseDate={handleChooseDate}
+                    onSelectArticle={handleSelectArticle}
                     t={t}
                   />
                 ))}
@@ -245,10 +384,13 @@ export default function ContentPlannerPage() {
             <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
               {activeDays.map((day) => (
                 <PlannerAgendaRow
+                  canSchedule={canScheduleKeywords}
+                  chooserAvailable={schedulingAvailable}
                   key={day.dateKey}
                   day={day}
                   locale={locale}
-                  onSelectArticle={setSelectedArticle}
+                  onChooseDate={handleChooseDate}
+                  onSelectArticle={handleSelectArticle}
                   t={t}
                 />
               ))}
@@ -259,9 +401,34 @@ export default function ContentPlannerPage() {
 
       <ArticleEditorModal
         article={selectedArticle}
-        onClose={() => setSelectedArticle(null)}
+        onClose={handleCloseArticle}
         onSaveDraft={handleSaveArticleDraft}
         savedDraft={selectedSavedDraft}
+      />
+      <ResearchKeywordsModal
+        key={organization?.id ?? 'no-organization'}
+        canResearch={canResearchKeywords}
+        onClose={handleCloseResearch}
+        onUnauthorized={handleUnauthorized}
+        open={researchModalOpen}
+        organizationId={organization?.id ?? ''}
+      />
+      <ChooseKeywordModal
+        key={`${organization?.id ?? 'no-organization'}-${chooserDateKey ?? 'no-date'}`}
+        canSchedule={canScheduleKeywords}
+        candidates={candidates}
+        dateKey={chooserDateKey}
+        hasMore={candidateQuery.hasNextPage}
+        loadError={targetKeywordsLoadError}
+        loading={targetKeywordsLoading}
+        loadingMore={candidateQuery.isFetchingNextPage}
+        onClose={handleCloseChooser}
+        onLoadMore={() => void candidateQuery.fetchNextPage()}
+        onOpenResearch={handleOpenResearch}
+        onRetry={() => void candidateQuery.refetch()}
+        onUnauthorized={handleUnauthorized}
+        open={Boolean(chooserDateKey)}
+        organizationId={organization?.id ?? ''}
       />
     </>
   );
@@ -290,13 +457,19 @@ function PendingStrategyPanel({
 }
 
 function PlannerDayCell({
+  canSchedule,
+  chooserAvailable,
   day,
   locale,
+  onChooseDate,
   onSelectArticle,
   t,
 }: {
+  canSchedule: boolean;
+  chooserAvailable: boolean;
   day: CalendarDay;
   locale: string;
+  onChooseDate: (dateKey: string) => void;
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
@@ -342,9 +515,16 @@ function PlannerDayCell({
             variant="outline"
             size="sm"
             className="h-auto min-h-9 w-full justify-start whitespace-normal px-2 py-1.5 text-left text-xs leading-snug"
+            aria-label={t(
+              canSchedule
+                ? 'actions.chooseKeywordForDate'
+                : 'actions.chooseKeywordPaidFeatureForDate',
+              { date: formatDate(day.date, locale, 'long') },
+            )}
+            disabled={!chooserAvailable}
+            onClick={() => onChooseDate(day.dateKey)}
           >
-            <Search className="size-3.5" aria-hidden="true" />
-            <span className="min-w-0">{t('actions.researchKeyword')}</span>
+            <span className="min-w-0">{t('actions.chooseKeyword')}</span>
           </Button>
         ) : null}
       </div>
@@ -353,13 +533,19 @@ function PlannerDayCell({
 }
 
 function PlannerAgendaRow({
+  canSchedule,
+  chooserAvailable,
   day,
   locale,
+  onChooseDate,
   onSelectArticle,
   t,
 }: {
+  canSchedule: boolean;
+  chooserAvailable: boolean;
   day: CalendarDay;
   locale: string;
+  onChooseDate: (dateKey: string) => void;
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
@@ -392,9 +578,16 @@ function PlannerAgendaRow({
           variant="outline"
           size="sm"
           className="h-auto min-h-9 w-full justify-start whitespace-normal px-3 py-2 text-left text-sm leading-snug"
+          aria-label={t(
+            canSchedule
+              ? 'actions.chooseKeywordForDate'
+              : 'actions.chooseKeywordPaidFeatureForDate',
+            { date: formatDate(day.date, locale, 'long') },
+          )}
+          disabled={!chooserAvailable}
+          onClick={() => onChooseDate(day.dateKey)}
         >
-          <Search className="size-4" aria-hidden="true" />
-          <span className="min-w-0">{t('actions.researchKeyword')}</span>
+          <span className="min-w-0">{t('actions.chooseKeyword')}</span>
         </Button>
       )}
     </div>
@@ -436,24 +629,53 @@ function usePageContentInert(pageContentRef: RefObject<HTMLDivElement | null>, a
   useEffect(() => {
     const pageContent = pageContentRef.current;
 
-    if (!pageContent) {
+    if (!pageContent || !active) {
       return;
     }
 
-    if (!active) {
-      pageContent.removeAttribute('aria-hidden');
-      pageContent.removeAttribute('inert');
-      return;
-    }
+    const backgroundElements = [pageContent, ...getAncestorSiblings(pageContent)];
+    const previousAttributes = backgroundElements.map((element) => ({
+      ariaHidden: element.getAttribute('aria-hidden'),
+      element,
+      inert: element.hasAttribute('inert'),
+    }));
 
-    pageContent.setAttribute('aria-hidden', 'true');
-    pageContent.setAttribute('inert', '');
+    for (const element of backgroundElements) {
+      element.setAttribute('aria-hidden', 'true');
+      element.setAttribute('inert', '');
+    }
 
     return () => {
-      pageContent.removeAttribute('aria-hidden');
-      pageContent.removeAttribute('inert');
+      for (const { ariaHidden, element, inert } of previousAttributes) {
+        if (ariaHidden === null) {
+          element.removeAttribute('aria-hidden');
+        } else {
+          element.setAttribute('aria-hidden', ariaHidden);
+        }
+
+        if (!inert) {
+          element.removeAttribute('inert');
+        }
+      }
     };
   }, [active, pageContentRef]);
+}
+
+function getAncestorSiblings(element: HTMLElement) {
+  const siblings: HTMLElement[] = [];
+  let branch = element.parentElement;
+
+  while (branch?.parentElement && branch.parentElement !== document.body) {
+    for (const sibling of branch.parentElement.children) {
+      if (sibling !== branch && sibling instanceof HTMLElement) {
+        siblings.push(sibling);
+      }
+    }
+
+    branch = branch.parentElement;
+  }
+
+  return siblings;
 }
 
 function SummaryPill({ label, value }: { label: string; value: string }) {

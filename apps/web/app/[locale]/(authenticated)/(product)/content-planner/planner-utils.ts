@@ -1,18 +1,209 @@
-import type { CalendarDay, PlannerArticle, PlannerKeywordResponse } from './types';
+import type {
+  CalendarDay,
+  CandidateAddApiError,
+  CandidateKeywordResponse,
+  CandidateScheduleError,
+  KeywordMetric,
+  KeywordResearchApiError,
+  PlannerArticle,
+  PlannerKeywordResponse,
+  ResearchSeedError,
+  TargetKeyword,
+  TargetKeywordStatus,
+} from './types';
 
 export const DAYS_IN_RANGE = 45;
+export const RESEARCH_SEED_MAX_LENGTH = 200;
+
+const CANDIDATE_SCHEDULE_CONFLICTS = new Set<CandidateScheduleError>([
+  'candidate_already_scheduled',
+  'candidate_not_schedulable',
+  'date_occupied',
+  'keyword_already_scheduled',
+]);
+
+export function isCandidateScheduleSuccess(status: number) {
+  return status === 200 || status === 201;
+}
+
+export function getKeywordResearchApiError(status: number): KeywordResearchApiError {
+  if (status === 400) return 'invalid';
+  if (status === 401) return 'unauthorized';
+  if (status === 402) return 'upgrade';
+  if (status === 403) return 'forbidden';
+  if (status === 404) return 'not_found';
+  if (status === 502) return 'provider';
+  return 'generic';
+}
+
+export function getCandidateAddApiError(status: number): CandidateAddApiError {
+  if (status === 400) return 'invalid';
+  if (status === 401) return 'unauthorized';
+  if (status === 402) return 'upgrade';
+  if (status === 403) return 'forbidden';
+  if (status === 404) return 'not_found';
+  return 'generic';
+}
+
+export function getCandidateScheduleError(
+  status: number,
+  responseBody?: unknown,
+): CandidateScheduleError {
+  if (status === 400) {
+    return 'invalid_date';
+  }
+
+  if (status === 402) {
+    return 'upgrade';
+  }
+
+  if (status === 404) {
+    return 'not_found';
+  }
+
+  if (
+    status === 409 &&
+    typeof responseBody === 'object' &&
+    responseBody !== null &&
+    'error' in responseBody &&
+    typeof responseBody.error === 'string' &&
+    CANDIDATE_SCHEDULE_CONFLICTS.has(responseBody.error as CandidateScheduleError)
+  ) {
+    return responseBody.error as CandidateScheduleError;
+  }
+
+  return 'generic';
+}
+
+export function validateResearchSeed(value: string): {
+  error: ResearchSeedError | null;
+  seed: string;
+} {
+  const seed = value.trim();
+
+  if (!seed) {
+    return { error: 'required', seed };
+  }
+
+  if (seed.length > RESEARCH_SEED_MAX_LENGTH) {
+    return { error: 'too_long', seed };
+  }
+
+  return { error: null, seed };
+}
+
+export function combineResearchResults(
+  seed: KeywordMetric,
+  similar: KeywordMetric[],
+): KeywordMetric[] {
+  const seenKeywords = new Set<string>();
+  const results: KeywordMetric[] = [];
+
+  for (const metric of [seed, ...similar]) {
+    const normalizedKeyword = metric.keyword.trim().replace(/\s+/g, ' ').toLowerCase();
+
+    if (seenKeywords.has(normalizedKeyword)) {
+      continue;
+    }
+
+    seenKeywords.add(normalizedKeyword);
+    results.push(metric);
+  }
+
+  return results;
+}
 
 export function mapPlannerKeywords(keywords: PlannerKeywordResponse[]): PlannerArticle[] {
   return keywords.map((keyword) => ({
     articleId: keyword.article_id,
+    candidateId: keyword.candidate_id,
     difficulty: keyword.difficulty,
+    generationError: keyword.generation_error,
+    generationStatus: keyword.generation_status,
     id: keyword.id,
+    intent: keyword.intent,
     keyword: keyword.keyword,
+    opportunityScore: keyword.opportunity_score,
     scheduledDate: keyword.scheduled_date,
-    status: keyword.article_id ? 'generated' : 'planned',
+    status: keyword.article_id !== null ? 'generated' : 'planned',
     title: keyword.keyword,
     volume: keyword.search_volume,
   }));
+}
+
+export function combineTargetKeywords(
+  candidates: CandidateKeywordResponse[],
+  plannerArticles: PlannerArticle[],
+): TargetKeyword[] {
+  const plannerCandidateIds = new Set(
+    plannerArticles.flatMap((article) =>
+      article.candidateId !== null ? [article.candidateId] : [],
+    ),
+  );
+  const seenCandidateIds = new Set<string>();
+  const seenPlannerCandidateIds = new Set<string>();
+  const targetKeywords: TargetKeyword[] = [];
+
+  for (const candidate of candidates) {
+    if (plannerCandidateIds.has(candidate.id) || seenCandidateIds.has(candidate.id)) {
+      continue;
+    }
+
+    seenCandidateIds.add(candidate.id);
+    targetKeywords.push({
+      candidateId: candidate.id,
+      difficulty: candidate.difficulty,
+      id: candidate.id,
+      intent: candidate.intent,
+      keyword: candidate.keyword,
+      opportunityScore: candidate.opportunity_score,
+      schedulable: candidate.schedulable,
+      source: 'candidate',
+      status: 'available',
+      volume: candidate.search_volume,
+    });
+  }
+
+  for (const article of plannerArticles) {
+    if (article.candidateId !== null && seenPlannerCandidateIds.has(article.candidateId)) {
+      continue;
+    }
+
+    if (article.candidateId !== null) {
+      seenPlannerCandidateIds.add(article.candidateId);
+    }
+
+    targetKeywords.push({
+      candidateId: article.candidateId,
+      difficulty: article.difficulty,
+      id: article.id,
+      intent: article.intent,
+      keyword: article.keyword,
+      opportunityScore: article.opportunityScore,
+      schedulable: false,
+      source: 'planner',
+      status: getPlannerTargetKeywordStatus(article),
+      volume: article.volume,
+    });
+  }
+
+  return targetKeywords;
+}
+
+function getPlannerTargetKeywordStatus(article: PlannerArticle): TargetKeywordStatus {
+  if (article.articleId !== null || article.generationStatus === 'generated') {
+    return 'generated';
+  }
+
+  if (article.generationStatus === 'generating') {
+    return 'generating';
+  }
+
+  if (article.generationStatus === 'failed') {
+    return 'failed';
+  }
+
+  return 'scheduled';
 }
 
 export function buildCalendarWeeks(rangeStart: Date, articles: PlannerArticle[]): CalendarDay[][] {
