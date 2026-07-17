@@ -147,7 +147,9 @@
       "loadError": "Could not load the content planner. Try again when the API is available.",
       "loading": "Loading content planner...",
       "noOrganization": "No completed organization was found for this workspace.",
-      "organizationError": "Could not load your organization. Try again."
+      "organizationError": "Could not load your organization. Try again.",
+      "pendingHeading": "Your 30-day content plan is in progress",
+      "pendingSupportingText": "This might take 6–10 minutes."
     },
     "title": "Content calendar"
   },

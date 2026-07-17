@@ -1,6 +1,6 @@
 'use client';
 
-import { Search } from 'lucide-react';
+import { LoaderCircle, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +27,9 @@ import {
 import type { ArticleEditorDraft, CalendarDay, PlannerArticle } from './types';
 
 const PLANNER_FIXTURES_ALLOWED = process.env.NODE_ENV !== 'production';
+const PLANNER_POLL_INTERVAL_MS = 30_000;
+
+type StrategyStatus = 'none' | 'pending' | 'completed' | 'failed';
 
 export default function ContentPlannerPage() {
   const t = useTranslations('ContentPlannerPage');
@@ -45,7 +48,9 @@ export default function ContentPlannerPage() {
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [strategyStatus, setStrategyStatus] = useState<StrategyStatus>('none');
   const [fixturesEnabled, setFixturesEnabled] = useState(false);
+  const [pendingPreviewEnabled, setPendingPreviewEnabled] = useState(false);
   const [fixturesResolved, setFixturesResolved] = useState(!PLANNER_FIXTURES_ALLOWED);
   const modalOpen = Boolean(selectedArticle);
   const selectedSavedDraft = selectedArticle?.articleId
@@ -72,9 +77,10 @@ export default function ContentPlannerPage() {
       return;
     }
 
-    const nextFixturesEnabled = new URLSearchParams(window.location.search).get('fixtures') === '1';
+    const searchParams = new URLSearchParams(window.location.search);
 
-    setFixturesEnabled(nextFixturesEnabled);
+    setFixturesEnabled(searchParams.get('fixtures') === '1');
+    setPendingPreviewEnabled(searchParams.get('pending') === '1');
     setFixturesResolved(true);
   }, []);
 
@@ -83,9 +89,18 @@ export default function ContentPlannerPage() {
       return;
     }
 
+    if (pendingPreviewEnabled) {
+      setPlannerArticles([]);
+      setLoadError(false);
+      setStrategyStatus('pending');
+      setLoading(false);
+      return;
+    }
+
     if (fixturesEnabled) {
       setPlannerArticles(createPlannerFixtureArticles());
       setLoadError(false);
+      setStrategyStatus('none');
       setLoading(false);
       return;
     }
@@ -95,16 +110,19 @@ export default function ContentPlannerPage() {
     if (organizationError || !organization) {
       setPlannerArticles([]);
       setLoadError(Boolean(organizationError));
+      setStrategyStatus('none');
       setLoading(false);
       return;
     }
 
     let cancelled = false;
+    let pollTimeout: ReturnType<typeof setTimeout> | undefined;
 
     setLoading(true);
     setLoadError(false);
+    setStrategyStatus('none');
 
-    void (async () => {
+    const requestPlanner = async (background: boolean) => {
       try {
         const response = await api.api.v0.dashboard.planner.$get({
           query: { org_id: organization.id },
@@ -114,34 +132,59 @@ export default function ContentPlannerPage() {
 
         if ((response.status as number) === 401) {
           handleUnauthorized();
-          return;
+          return false;
         }
 
         if (!response.ok) {
-          setPlannerArticles([]);
-          setLoadError(true);
-          return;
+          if (!background) {
+            setPlannerArticles([]);
+            setLoadError(true);
+          }
+          return background;
         }
 
         const data = await response.json();
 
         if (!cancelled) {
+          setStrategyStatus(data.strategy_status);
           setPlannerArticles(mapPlannerKeywords(data.keywords));
         }
+
+        return data.strategy_status === 'pending';
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !background) {
           setPlannerArticles([]);
           setLoadError(true);
         }
+        return background;
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !background) {
           setLoading(false);
         }
+      }
+    };
+
+    const pollPlanner = async () => {
+      const shouldContinuePolling = await requestPlanner(true);
+
+      if (!cancelled && shouldContinuePolling) {
+        pollTimeout = setTimeout(() => void pollPlanner(), PLANNER_POLL_INTERVAL_MS);
+      }
+    };
+
+    void (async () => {
+      const shouldPoll = await requestPlanner(false);
+
+      if (!cancelled && shouldPoll) {
+        pollTimeout = setTimeout(() => void pollPlanner(), PLANNER_POLL_INTERVAL_MS);
       }
     })();
 
     return () => {
       cancelled = true;
+      if (pollTimeout) {
+        clearTimeout(pollTimeout);
+      }
     };
   }, [
     fixturesEnabled,
@@ -150,6 +193,7 @@ export default function ContentPlannerPage() {
     organization,
     organizationError,
     organizationLoading,
+    pendingPreviewEnabled,
   ]);
 
   const today = useMemo(() => startOfToday(), []);
@@ -180,49 +224,60 @@ export default function ContentPlannerPage() {
             <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
             <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
           </div>
-          <SummaryPill
-            label={t('scheduledCount', { count: plannerArticles.length })}
-            value={t('oneArticlePerDay')}
-          />
+          {strategyStatus !== 'pending' ? (
+            <SummaryPill
+              label={t('scheduledCount', { count: plannerArticles.length })}
+              value={t('oneArticlePerDay')}
+            />
+          ) : null}
         </header>
 
         {statusMessage ? <StatusMessage message={statusMessage} /> : null}
 
-        <section
-          aria-label={t('calendarLabel')}
-          className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
-        >
-          <div className="grid grid-cols-7 border-slate-200 border-b bg-slate-50">
-            {weekdayLabels.map((weekday) => (
-              <div key={weekday} className="px-3 py-2 font-semibold text-slate-600 text-xs">
-                {weekday}
+        {strategyStatus === 'pending' ? (
+          <PendingStrategyPanel
+            heading={t('status.pendingHeading')}
+            supportingText={t('status.pendingSupportingText')}
+          />
+        ) : (
+          <>
+            <section
+              aria-label={t('calendarLabel')}
+              className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
+            >
+              <div className="grid grid-cols-7 border-slate-200 border-b bg-slate-50">
+                {weekdayLabels.map((weekday) => (
+                  <div key={weekday} className="px-3 py-2 font-semibold text-slate-600 text-xs">
+                    {weekday}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {calendarWeeks.flat().map((day) => (
-              <PlannerDayCell
-                key={day.dateKey}
-                day={day}
-                locale={locale}
-                onSelectArticle={setSelectedArticle}
-                t={t}
-              />
-            ))}
-          </div>
-        </section>
+              <div className="grid grid-cols-7">
+                {calendarWeeks.flat().map((day) => (
+                  <PlannerDayCell
+                    key={day.dateKey}
+                    day={day}
+                    locale={locale}
+                    onSelectArticle={setSelectedArticle}
+                    t={t}
+                  />
+                ))}
+              </div>
+            </section>
 
-        <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
-          {activeDays.map((day) => (
-            <PlannerAgendaRow
-              key={day.dateKey}
-              day={day}
-              locale={locale}
-              onSelectArticle={setSelectedArticle}
-              t={t}
-            />
-          ))}
-        </section>
+            <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
+              {activeDays.map((day) => (
+                <PlannerAgendaRow
+                  key={day.dateKey}
+                  day={day}
+                  locale={locale}
+                  onSelectArticle={setSelectedArticle}
+                  t={t}
+                />
+              ))}
+            </section>
+          </>
+        )}
       </div>
 
       <ArticleEditorModal
@@ -232,6 +287,28 @@ export default function ContentPlannerPage() {
         savedDraft={selectedSavedDraft}
       />
     </>
+  );
+}
+
+function PendingStrategyPanel({
+  heading,
+  supportingText,
+}: {
+  heading: string;
+  supportingText: string;
+}) {
+  return (
+    <section
+      role="status"
+      aria-live="polite"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-12 text-center"
+    >
+      <div className="grid justify-items-center gap-2">
+        <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
+        <h2 className="font-semibold text-slate-950 text-base">{heading}</h2>
+        <p className="text-slate-600 text-sm">{supportingText}</p>
+      </div>
+    </section>
   );
 }
 

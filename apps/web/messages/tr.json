@@ -147,7 +147,9 @@
       "loadError": "İçerik planlayıcı yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "İçerik planlayıcı yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
-      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
+      "pendingHeading": "30 günlük içerik planınız hazırlanıyor",
+      "pendingSupportingText": "Bu işlem 6–10 dakika sürebilir."
     },
     "title": "İçerik takvimi"
   },
