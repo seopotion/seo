@@ -3,7 +3,7 @@ import { mergePresets } from '../src/lib/merge-presets';
 
 const base = {
   business: { name: 'Old Co', language: 'English', country: 'US', description: 'Old.' },
-  audience: { target: 'Devs', competitors: ['a.com', 'b.com'] },
+  audience: { target: ['Devs'], competitors: ['a.com', 'b.com'] },
   blog: {
     sitemap_url: 'https://x.com/sitemap.xml',
     main_blog_url: 'https://x.com/blog',
@@ -32,7 +32,7 @@ describe('mergePresets', () => {
   test('replaces array fields wholesale rather than concatenating', () => {
     const result = mergePresets(base, { audience: { competitors: ['c.com'] } });
     expect(result.audience.competitors).toEqual(['c.com']);
-    expect(result.audience.target).toBe('Devs');
+    expect(result.audience.target).toEqual(['Devs']);
   });
 
   test('merges the two-level nest under article_preferences', () => {

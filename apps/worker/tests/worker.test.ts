@@ -1,10 +1,11 @@
+import type { SetupPresets } from '@shared/schemas';
 import type { SQSEvent } from 'aws-lambda';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // vi.hoisted runs with the hoisted vi.mock factory, so the spy is initialized
 // before the factory references it.
 const { completeScan, updateDomainRating } = vi.hoisted(() => ({
-  completeScan: vi.fn(async (_id: string, _presets: { business: { name: string } }) => {}),
+  completeScan: vi.fn(async (_id: string, _presets: SetupPresets) => {}),
   updateDomainRating: vi.fn(async (_id: string, _value: number) => {}),
 }));
 
@@ -20,7 +21,7 @@ const { scanWebsite } = vi.hoisted(() => ({
       country: 'Global (English)',
       description: 'desc',
     },
-    audience: { target: 'devs', competitors: [] },
+    audience: { target: ['devs'], competitors: [] },
     blog: { sitemap_url: 's', main_blog_url: 'b', best_articles: [] },
     article_preferences: {
       content_seo: { article_style: 'x', internal_links: true, llm_instructions: 'y' },
@@ -62,7 +63,7 @@ describe('scanner worker', () => {
     vi.clearAllMocks();
   });
 
-  test('generates presets and completes the scan for the org', async () => {
+  test('stores scan presets and completes the scan for the org', async () => {
     await handler(
       sqsEvent({ org_id: '6650f1a2b3c4d5e6f7a8b9c0', website_url: 'https://clewas.com' }),
       {} as never,
@@ -73,6 +74,7 @@ describe('scanner worker', () => {
     const [orgId, presets] = completeScan.mock.calls[0] ?? [];
     expect(orgId).toBe('6650f1a2b3c4d5e6f7a8b9c0');
     expect(presets?.business.name).toBe('Clewas');
+    expect(presets?.audience.competitors).toEqual([]);
   });
 
   test('stamps the domain rating after a successful scan', async () => {

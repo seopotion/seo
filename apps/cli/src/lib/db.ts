@@ -9,7 +9,9 @@ import {
   closeDb,
   ensureIndexes,
   KeywordRepo,
+  type MigrationReport,
   OrgRepo,
+  runMigrations,
   UserRepo,
 } from '@shared/db';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
@@ -29,6 +31,22 @@ export async function initDb(): Promise<Result<DbInitData>> {
   } catch (e) {
     return fail(
       'DB_INIT_FAILED',
+      (e as Error).message,
+      'Is MongoDB running? Try `docker compose up -d mongo`.',
+    );
+  } finally {
+    await closeDb();
+  }
+}
+
+/** Run idempotent data migrations (#99) — always before `db init` on deploy. */
+export async function migrateDb(): Promise<Result<MigrationReport>> {
+  try {
+    const report = await runMigrations();
+    return ok(report);
+  } catch (e) {
+    return fail(
+      'DB_MIGRATE_FAILED',
       (e as Error).message,
       'Is MongoDB running? Try `docker compose up -d mongo`.',
     );
