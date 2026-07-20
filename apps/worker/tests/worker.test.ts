@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // vi.hoisted runs with the hoisted vi.mock factory, so the spy is initialized
 // before the factory references it.
-const { completeScan } = vi.hoisted(() => ({
+const { completeScan, updateDomainRating } = vi.hoisted(() => ({
   completeScan: vi.fn(async (_id: string, _presets: SetupPresets) => {}),
+  updateDomainRating: vi.fn(async (_id: string, _value: number) => {}),
 }));
 
 vi.mock('@shared/db', () => ({
@@ -58,6 +59,10 @@ function sqsEvent(body: unknown): SQSEvent {
 }
 
 describe('scanner worker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   test('stores scan presets and completes the scan for the org', async () => {
     await handler(
       sqsEvent({ org_id: '6650f1a2b3c4d5e6f7a8b9c0', website_url: 'https://clewas.com' }),
@@ -68,7 +73,7 @@ describe('scanner worker', () => {
     expect(completeScan).toHaveBeenCalledTimes(1);
     const [orgId, presets] = completeScan.mock.calls[0] ?? [];
     expect(orgId).toBe('6650f1a2b3c4d5e6f7a8b9c0');
-    expect(presets?.business.name).toBe('');
+    expect(presets?.business.name).toBe('Clewas');
     expect(presets?.audience.competitors).toEqual([]);
   });
 

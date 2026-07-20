@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import {
   ARTICLE_TYPES,
+  ArticleVideoSchema,
   GENERATION_STATUSES,
   SEARCH_INTENTS,
   SetupPresetsSchema,
@@ -192,6 +193,8 @@ export const ArticleDetailResponse = z
     status: z.enum(ARTICLE_STATUSES),
     created_at: z.string(),
     published_at: z.string().nullable(),
+    // Auto-sourced YouTube embed (#85); the iframe is also in `content`.
+    video: ArticleVideoSchema.nullable(),
   })
   .openapi('ArticleDetailResponse');
 

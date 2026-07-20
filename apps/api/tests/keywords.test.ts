@@ -1,6 +1,8 @@
 import { DataForSeoError } from '@shared/providers';
+import type { Context, Next } from 'hono';
 import { testClient } from 'hono/testing';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import type { AuthEnv } from '../src/middlewares/auth';
 
 const { loadOwnedPaidOrg } = vi.hoisted(() => ({ loadOwnedPaidOrg: vi.fn() }));
 vi.mock('../src/lib/load-owned-paid-org', () => ({ loadOwnedPaidOrg }));
@@ -46,7 +48,7 @@ vi.mock('../src/middlewares/auth', async (orig) => {
   const actual = await orig<typeof import('../src/middlewares/auth')>();
   return {
     ...actual,
-    authMiddleware: async (c: any, next: any) => {
+    authMiddleware: async (c: Context<AuthEnv>, next: Next) => {
       c.set('auth', { userId: 'u1', email: 'u1@example.com' });
       await next();
     },

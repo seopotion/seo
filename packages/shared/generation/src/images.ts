@@ -78,6 +78,17 @@ export function parseImagePlan(text: string, headings: string[]): ImagePlan {
   return plan;
 }
 
+/** Insert a markdown/HTML block right after the `## heading` line. Throws when missing. */
+export function injectBlockAfterHeading(content: string, heading: string, block: string): string {
+  const lines = content.split('\n');
+  const idx = lines.findIndex(
+    (l) => /^##\s+/.test(l) && l.replace(/^##\s+/, '').trim() === heading,
+  );
+  if (idx === -1) throw new Error(`heading not found in content: ${heading}`);
+  lines.splice(idx + 1, 0, '', block);
+  return lines.join('\n');
+}
+
 /** Insert `![alt](url)` right after the `## heading` line. Throws when missing. */
 export function injectImageAfterHeading(
   content: string,
@@ -85,11 +96,5 @@ export function injectImageAfterHeading(
   alt: string,
   url: string,
 ): string {
-  const lines = content.split('\n');
-  const idx = lines.findIndex(
-    (l) => /^##\s+/.test(l) && l.replace(/^##\s+/, '').trim() === heading,
-  );
-  if (idx === -1) throw new Error(`heading not found in content: ${heading}`);
-  lines.splice(idx + 1, 0, '', `![${alt}](${url})`);
-  return lines.join('\n');
+  return injectBlockAfterHeading(content, heading, `![${alt}](${url})`);
 }

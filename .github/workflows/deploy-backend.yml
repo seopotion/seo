@@ -67,4 +67,5 @@ jobs:
           DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never

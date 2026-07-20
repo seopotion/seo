@@ -26,6 +26,18 @@ export const ArticleImageSchema = z.object({
 export type ArticleImage = z.infer<typeof ArticleImageSchema>;
 
 /**
+ * The auto-sourced YouTube embed (#85). Null means no video — toggle off, no
+ * relevant result, or the (non-fatal) video step failed.
+ */
+export const ArticleVideoSchema = z.object({
+  video_id: z.string(),
+  title: z.string(),
+  // Exact H2 text the iframe embed follows in `content`.
+  section_heading: z.string(),
+});
+export type ArticleVideo = z.infer<typeof ArticleVideoSchema>;
+
+/**
  * Article entity. `title` is the generated SEO title (distinct from `keyword`);
  * `keyword` is denormalized so the Content History table renders without a join.
  * The AI editing layer and `publish_error` are deferred. See design/product-flow.md §2.2.
@@ -51,6 +63,8 @@ export const ArticleSchema = z.object({
   // publisher must require images_status === 'complete' before publishing.
   images: z.array(ArticleImageSchema).default([]),
   images_status: z.enum(IMAGES_STATUSES).default('pending'),
+  // YouTube embed (#85). Defaulted so pre-#85 docs still parse.
+  video: ArticleVideoSchema.nullable().default(null),
 });
 export type Article = z.infer<typeof ArticleSchema>;
 
