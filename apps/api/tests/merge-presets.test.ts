@@ -11,7 +11,7 @@ const base = {
   },
   article_preferences: {
     content_seo: { article_style: 'Formal', internal_links: false, llm_instructions: 'old' },
-    engagement: { image_style: 'Minimal' },
+    engagement: { image_style: 'Minimal', include_youtube_video: true },
   },
 };
 

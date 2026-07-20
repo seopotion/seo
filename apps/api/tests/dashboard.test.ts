@@ -72,6 +72,7 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      video: { video_id: 'v1', title: 'Widget basics', section_heading: 'Intro' },
     },
     {
       id: 'art_2',
@@ -88,6 +89,7 @@ vi.mock('@shared/db', () => {
       status: 'published',
       created_at: now,
       published_at: now,
+      video: null,
     },
     // Owned by org_3 (user_2) — never visible to user_1 via detail reads.
     {
@@ -105,6 +107,7 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      video: null,
     },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
@@ -415,6 +418,11 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(body.id).toBe('art_1');
       // Date entity fields are serialized to ISO strings in the response.
       expect(typeof body.created_at).toBe('string');
+      expect(body.video).toEqual({
+        video_id: 'v1',
+        title: 'Widget basics',
+        section_heading: 'Intro',
+      });
     }
 
     const missing = await client.api.v0.dashboard.articles[':id'].$get(

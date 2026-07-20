@@ -35,6 +35,8 @@ export const SetupPresetsSchema = z.object({
     }),
     engagement: z.object({
       image_style: z.string(),
+      // YouTube embed toggle (#85). Defaulted so pre-#85 docs parse unchanged.
+      include_youtube_video: z.boolean().default(true),
     }),
   }),
 });
