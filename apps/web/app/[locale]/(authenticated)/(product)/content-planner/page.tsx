@@ -240,6 +240,7 @@ export default function ContentPlannerPage() {
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
     initialPageParam: 0,
+    refetchOnWindowFocus: false,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -315,13 +316,6 @@ export default function ContentPlannerPage() {
   return (
     <>
       <div ref={pageContentRef} className="grid gap-4">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
-            <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
-          </div>
-        </header>
-
         {statusMessage ? <StatusMessage message={statusMessage} /> : null}
 
         {strategyStatus === 'pending' ? (

@@ -123,7 +123,7 @@ export function TargetKeywordsSection({
                 className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                  <h3 className="min-w-0 break-words font-semibold text-slate-950 text-sm">
+                  <h3 className="min-w-0 wrap-break-words font-semibold text-slate-950 text-sm">
                     {targetKeyword.keyword}
                   </h3>
                   <TargetKeywordStatusBadge status={targetKeyword.status} t={t} />
