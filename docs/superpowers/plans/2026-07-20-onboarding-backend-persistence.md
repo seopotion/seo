@@ -622,12 +622,82 @@ Part of #73"
 
 ---
 
+## Task 5: Minimal frontend reconciliation (keep `check:all` green)
+
+Scope is **only** what the schema change forces: fix type errors and make the
+`internal_links` → `internal_links_count` mapping lossless (the frontend already
+collects the 0–3 value). Do **not** add new form-field wiring for
+`table_of_contents` / `youtube_videos` / `auto_publish` — that is the deferred
+frontend feature task.
+
+**Files:**
+- Modify: `apps/web/app/[locale]/(authenticated)/onboarding/api.ts` (lines 125, 152)
+- Modify: `apps/web/app/[locale]/(authenticated)/(product)/article-settings/page.tsx` (lines 38, 67, 75)
+
+**Interfaces:**
+- Consumes: reshaped `SetupPresets` (Task 1) + `ArticlesSettingsPatchBody` (Task 4).
+
+- [ ] **Step 1: Fix the onboarding api read/write mapping**
+
+In `apps/web/app/[locale]/(authenticated)/onboarding/api.ts`:
+- Line 125 (`mapPresetsToFormPatch`) — read the count directly (lossless):
+
+```ts
+    internalLinksCount: String(presets.article_preferences.content_seo.internal_links_count),
+```
+
+- Line 152 (`buildPresetsPatch`, inside `article_preferences.content_seo`) — write the count:
+
+```ts
+        internal_links_count: Number.parseInt(form.internalLinksCount, 10),
+```
+
+- [ ] **Step 2: Fix the article-settings page type + mapping**
+
+In `apps/web/app/[locale]/(authenticated)/(product)/article-settings/page.tsx`:
+- Line 38 — the local `ArticleSettingsResponse.content_seo` field:
+
+```ts
+      internal_links_count: number;
+```
+
+- Line 67 (`mergeArticleSettings`):
+
+```ts
+    internalLinksCount: String(data.article_preferences.content_seo.internal_links_count),
+```
+
+- Line 75 (`buildArticleSettingsPatch`, inside `content_seo`):
+
+```ts
+      internal_links_count: Number.parseInt(settings.internalLinksCount, 10),
+```
+
+- [ ] **Step 3: Full typecheck (backend + web) + test**
+
+Run: `npm run check:all && npm test`
+Expected: PASS — web now compiles against the new `AppType`; no remaining `internal_links`/`include_youtube_video` references in `apps/web` (`grep -rn "internal_links\b\|include_youtube_video" apps/web/app | grep -v internal_links_count` returns nothing).
+
+- [ ] **Step 4: Lint + commit**
+
+```bash
+npm run lint:fix
+git add "apps/web/app/[locale]/(authenticated)/onboarding/api.ts" "apps/web/app/[locale]/(authenticated)/(product)/article-settings/page.tsx"
+git commit -m "[frontend] onboarding/settings: map internal_links_count (#73)
+
+Minimal reconciliation to the new backend shape; keeps check:all green.
+Part of #73"
+```
+
+---
+
 ## Final verification
 
 - [ ] `npm run lint` — clean.
-- [ ] `npm run check:all` — backend + web typecheck clean (the web app compiles against the new `AppType`; the frontend still sends the old shape but that's a separate frontend task — confirm the typecheck reflects only expected drift, i.e. web code paths that read `internal_links`/`include_youtube_video` will now fail to typecheck and are handled in the frontend task, NOT here).
+- [ ] `npm run check:all` — backend + shared + web typecheck fully clean (Task 5 reconciles the web read/write sites).
 - [ ] `npm test` — all suites green.
 - [ ] `grep -rn "include_youtube_video\|content_seo\.internal_links\b" apps packages | grep -v node_modules` — only the plan/spec docs remain.
+- [ ] `grep -rn "internal_links\b" apps/web/app | grep -v internal_links_count` — nothing (no stale web references).
 
-> **Web typecheck caveat:** `check:all` includes the web app, which imports `AppType`. The web files `apps/web/.../article-settings/page.tsx` and `apps/web/.../onboarding/api.ts` read `internal_links` / map `include_youtube_video` and will fail to typecheck against the new shape. These are frontend-owned and out of scope per the spec. **Before starting, confirm with the maintainer** whether to (a) land the backend on its own branch accepting that `check:all` web half is red until the paired frontend PR, or (b) include the minimal frontend field-mapping fixes to keep `check:all` green. Do not silently expand scope — surface this at the Task 1 review checkpoint.
+> **Scope note:** Task 5 is deliberately minimal — it fixes type errors and makes the `internal_links_count` mapping lossless. Full frontend wiring of the new toggles (`table_of_contents`, `youtube_videos`, `auto_publish`) through the onboarding/settings forms is a separate frontend task and is **not** part of this plan.
 ```
