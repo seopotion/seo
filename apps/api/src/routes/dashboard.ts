@@ -41,6 +41,7 @@ function toArticleDetail(a: Article) {
     status: a.status,
     created_at: a.created_at.toISOString(),
     published_at: a.published_at ? a.published_at.toISOString() : null,
+    video: a.video,
   };
 }
 
