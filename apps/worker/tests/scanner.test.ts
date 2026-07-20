@@ -21,7 +21,6 @@ const LLM_JSON = JSON.stringify({
   article_preferences: {
     content_seo: {
       article_style: 'Practical',
-      internal_links: true,
       llm_instructions: 'Be clear.',
     },
     engagement: { image_style: 'Clean, minimal' },

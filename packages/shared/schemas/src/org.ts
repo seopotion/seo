@@ -2,6 +2,9 @@ import { ENTITLEMENT_PLANS, SETUP_STATUSES, STRATEGY_STATUSES } from '@shared/ty
 import { z } from 'zod';
 import { SetupPresetsSchema } from './presets';
 
+/** Publishing platforms a user can select during onboarding (#73). */
+export const ONBOARDING_INTEGRATIONS = ['wordpress', 'wordpress-com', 'framer'] as const;
+
 /**
  * Organization entity — the shape app code and the API work with.
  * `id` is a string (the stringified Mongo `_id`); the raw `_id` never
@@ -23,6 +26,14 @@ export const OrgSchema = z.object({
   // scanner worker and the stale-refresh path in GET /dashboard/domain-rating.
   domain_rating: z
     .object({ value: z.number().int().min(0).max(100), checked_at: z.date() })
+    .optional(),
+  // Onboarding metadata captured at finalize (#73). Distinct from the connected
+  // integrations concept (dashboard.integrations.connected).
+  onboarding: z
+    .object({
+      referral_source: z.string().optional(),
+      integrations: z.array(z.enum(ONBOARDING_INTEGRATIONS)).optional(),
+    })
     .optional(),
   created_at: z.date(),
 });

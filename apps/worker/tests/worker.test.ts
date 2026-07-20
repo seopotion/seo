@@ -24,8 +24,14 @@ const { scanWebsite } = vi.hoisted(() => ({
     audience: { target: ['devs'], competitors: [] },
     blog: { sitemap_url: 's', main_blog_url: 'b', best_articles: [] },
     article_preferences: {
-      content_seo: { article_style: 'x', internal_links: true, llm_instructions: 'y' },
-      engagement: { image_style: 'z' },
+      content_seo: {
+        article_style: 'x',
+        internal_links_count: 1,
+        table_of_contents: true,
+        llm_instructions: 'y',
+      },
+      engagement: { image_style: 'z', youtube_videos: true },
+      publishing: { auto_publish: false },
     },
   })),
 }));

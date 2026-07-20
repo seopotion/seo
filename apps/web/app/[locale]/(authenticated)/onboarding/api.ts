@@ -122,7 +122,7 @@ function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
       'competitor',
     ),
     country: presets.business.country,
-    internalLinksCount: presets.article_preferences.content_seo.internal_links ? '1' : '0',
+    internalLinksCount: String(presets.article_preferences.content_seo.internal_links_count),
     language: presets.business.language,
     sitemapUrl: presets.blog.sitemap_url,
     targetAudience: stringsToTextEntries(presets.audience.target, 'audience'),
@@ -149,7 +149,7 @@ function buildPresetsPatch(form: OnboardingForm): SetupPresetsPatch {
     article_preferences: {
       content_seo: {
         article_style: form.articleStyle,
-        internal_links: Number.parseInt(form.internalLinksCount, 10) > 0,
+        internal_links_count: Number.parseInt(form.internalLinksCount, 10),
       },
     },
   };
