@@ -35,10 +35,17 @@
     "loadError": "Dashboard API kullanılamıyor, bu yüzden boş geliştirme verisi gösteriliyor.",
     "loading": "Ana sayfa yükleniyor...",
     "recommended": {
-      "done": "tamamlandı",
-      "integration": "Bir yayınlama entegrasyonu bağla",
-      "keywords": "Üretimi başlatmak için anahtar kelime ekle",
-      "searchConsole": "Google Search Console'u bağla",
+      "actions": {
+        "addKeywords": "Üretimi başlatmak için anahtar kelime ekle",
+        "allCaughtUp": "Her şey yolunda — şu an ilgilenmen gereken bir şey yok.",
+        "connectSearchConsole": "Performans verisi için Google Search Console'u bağla",
+        "generationFailed": "{count, plural, one {# makale üretilemedi — incele} other {# makale üretilemedi — incele}}",
+        "overdue": "{count, plural, one {# planlanmış makalenin tarihi geçti} other {# planlanmış makalenin tarihi geçti}}",
+        "planNext": "Planlanmış içerik yok — bir sonraki makaleni planla",
+        "strategyFailed": "İçerik stratejin oluşturulamadı — tekrar dene",
+        "strategyPending": "İçerik stratejin hâlâ oluşturuluyor",
+        "upgrade": "Anahtar kelime araştırmasını açmak için yükselt"
+      },
       "title": "Önerilen Aksiyonlar"
     }
   },

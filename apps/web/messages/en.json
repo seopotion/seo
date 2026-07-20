@@ -35,10 +35,17 @@
     "loadError": "Dashboard API is unavailable, so empty development data is shown.",
     "loading": "Loading home...",
     "recommended": {
-      "done": "done",
-      "integration": "Connect a publishing integration",
-      "keywords": "Add keywords to start generating",
-      "searchConsole": "Connect Google Search Console",
+      "actions": {
+        "addKeywords": "Add keywords to start generating",
+        "allCaughtUp": "You're all caught up — nothing needs your attention.",
+        "connectSearchConsole": "Connect Google Search Console to unlock performance data",
+        "generationFailed": "{count, plural, one {# article failed to generate — review it} other {# articles failed to generate — review them}}",
+        "overdue": "{count, plural, one {# scheduled article is overdue} other {# scheduled articles are overdue}}",
+        "planNext": "Nothing is scheduled — plan your next article",
+        "strategyFailed": "Your content strategy failed to build — try again",
+        "strategyPending": "Your content strategy is still being built",
+        "upgrade": "Upgrade to unlock keyword research"
+      },
       "title": "Recommended Actions"
     }
   },
