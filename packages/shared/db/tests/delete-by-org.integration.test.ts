@@ -23,10 +23,11 @@ describe('delete-by-org (integration)', () => {
     const col = (await getDb()).collection('keywords');
     const orgA = `reset_kw_a_${timestamp}`;
     const orgB = `reset_kw_b_${timestamp}`;
+    // Distinct dates: keywords carry a unique (org_id, scheduled_date) index (#99).
     await col.insertMany([
-      { org_id: orgA, keyword: 'k1' },
-      { org_id: orgA, keyword: 'k2' },
-      { org_id: orgB, keyword: 'k3' },
+      { org_id: orgA, keyword: 'k1', scheduled_date: '2026-07-01' },
+      { org_id: orgA, keyword: 'k2', scheduled_date: '2026-07-02' },
+      { org_id: orgB, keyword: 'k3', scheduled_date: '2026-07-01' },
     ]);
 
     expect(await KeywordRepo.deleteByOrgId(orgA)).toBe(2);

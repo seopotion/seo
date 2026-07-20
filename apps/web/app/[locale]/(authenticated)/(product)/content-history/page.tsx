@@ -1,5 +1,6 @@
 'use client';
 
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -7,6 +8,7 @@ import { Badge, Button, Card, CardContent, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -34,7 +36,16 @@ type PublishedArticle = {
   volume: number;
 };
 
+type ContentHistoryData = {
+  articles: PublishedArticle[];
+  total: number;
+};
+
 const ARTICLES_PER_PAGE = 20;
+const emptyContentHistoryData: ContentHistoryData = {
+  articles: [],
+  total: 0,
+};
 
 export default function ContentHistoryPage() {
   const t = useTranslations('ContentHistoryPage');
@@ -46,101 +57,78 @@ export default function ContentHistoryPage() {
     organization,
   } = useActiveOrganization();
   const [page, setPage] = useState(1);
-  const [articles, setArticles] = useState<PublishedArticle[]>([]);
-  const [totalArticles, setTotalArticles] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const queryClient = useQueryClient();
+  const offset = (page - 1) * ARTICLES_PER_PAGE;
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
+
+  const historyQuery = useQuery({
+    queryKey: dashboardQueryKeys.articleList(
+      organization?.id ?? '',
+      'published',
+      ARTICLES_PER_PAGE,
+      offset,
+    ),
+    queryFn: async (): Promise<ContentHistoryData> => {
+      if (!organization) return emptyContentHistoryData;
+
+      const response = await api.api.v0.dashboard.articles.$get({
+        query: {
+          org_id: organization.id,
+          limit: ARTICLES_PER_PAGE,
+          offset,
+          status: 'published',
+        },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return emptyContentHistoryData;
+      }
+
+      if (!response.ok) {
+        throw new Error('articles_load_failed');
+      }
+
+      const data = await response.json();
+
+      return {
+        articles: mapArticleRows(data.articles),
+        total: data.total,
+      };
+    },
+    enabled: !redirecting && !organizationLoading && Boolean(organization),
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 60 * 1000,
+  });
 
   useEffect(() => {
-    if (organizationLoading) return;
+    if (!historyQuery.data || historyQuery.isError || historyQuery.isPlaceholderData) return;
 
-    if (organizationError || !organization) {
-      setArticles([]);
-      setTotalArticles(0);
-      setLoadError(Boolean(organizationError));
-      setLoading(false);
-      return;
+    const responseTotalPages = getTotalPages(historyQuery.data.total);
+
+    if (page > responseTotalPages) {
+      setPage(responseTotalPages);
     }
-
-    let cancelled = false;
-
-    setLoading(true);
-    setLoadError(false);
-
-    let refetchingClampedPage = false;
-
-    void (async () => {
-      try {
-        const offset = (page - 1) * ARTICLES_PER_PAGE;
-        const response = await api.api.v0.dashboard.articles.$get({
-          query: {
-            org_id: organization.id,
-            limit: ARTICLES_PER_PAGE,
-            offset,
-            status: 'published',
-          },
-        });
-
-        if (cancelled) return;
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if ((response.status as number) === 404) {
-          setArticles([]);
-          setTotalArticles(0);
-          setLoadError(true);
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('articles_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          const responseTotalPages = getTotalPages(data.total);
-
-          if (page > responseTotalPages) {
-            refetchingClampedPage = true;
-            setPage(responseTotalPages);
-            return;
-          }
-
-          setArticles(mapArticleRows(data.articles));
-          setTotalArticles(data.total);
-        }
-      } catch {
-        if (!cancelled) {
-          setArticles([]);
-          setTotalArticles(0);
-          setLoadError(true);
-        }
-      } finally {
-        if (!cancelled && !refetchingClampedPage) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationError, organizationLoading, page]);
+  }, [historyQuery.data, historyQuery.isError, historyQuery.isPlaceholderData, page]);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
     [locale],
   );
+  const data = historyQuery.isError ? emptyContentHistoryData : historyQuery.data;
+  const articles = data?.articles ?? emptyContentHistoryData.articles;
+  const totalArticles = data?.total ?? emptyContentHistoryData.total;
+  const loadError = historyQuery.isError;
+  const loading =
+    redirecting || organizationLoading || (Boolean(organization) && historyQuery.isPending);
   const totalPages = getTotalPages(totalArticles);
   const currentPage = Math.min(page, totalPages);
   const startIndex = totalArticles === 0 ? 0 : (currentPage - 1) * ARTICLES_PER_PAGE;
@@ -155,7 +143,7 @@ export default function ContentHistoryPage() {
         });
   const statusMessage = getHistoryStatusMessage({
     loadError,
-    loading: loading || organizationLoading,
+    loading,
     organizationError,
     t,
   });

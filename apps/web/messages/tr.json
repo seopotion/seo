@@ -44,9 +44,11 @@
   },
   "ContentPlannerPage": {
     "actions": {
+      "chooseKeyword": "+ Anahtar kelime seç",
+      "chooseKeywordForDate": "{date} için bir anahtar kelime seç",
+      "chooseKeywordPaidFeatureForDate": "{date} için bir anahtar kelime seç. Ücretli özellik.",
       "closeDetails": "Detayları kapat",
       "openArticle": "{title} detaylarını aç",
-      "researchKeyword": "AI ile anahtar kelime araştır",
       "viewArticle": "Makaleyi görüntüle"
     },
     "agendaLabel": "İçerik ajanda listesi",
@@ -60,6 +62,52 @@
       "product_guide": "Ürün rehberi"
     },
     "calendarLabel": "İçerik takvimi ızgarası",
+    "chooseKeyword": {
+      "actions": {
+        "close": "Anahtar kelime seçiciyi kapat",
+        "loadMore": "Daha fazla yükle",
+        "loadingMore": "Yükleniyor...",
+        "research": "Anahtar Kelime Araştır",
+        "retry": "Tekrar dene",
+        "schedule": "Planla",
+        "scheduling": "Planlanıyor..."
+      },
+      "columns": {
+        "action": "Planlama aksiyonu",
+        "difficulty": "Zorluk",
+        "intent": "Arama niyeti",
+        "keyword": "Anahtar kelime",
+        "opportunityScore": "Fırsat puanı",
+        "volume": "Hacim"
+      },
+      "description": "Bu takvim tarihi için kullanılabilir bir hedef anahtar kelime seçin.",
+      "errors": {
+        "candidate_already_scheduled": "Bu hedef anahtar kelime az önce planlandı. Kullanılabilir anahtar kelimeler ve planlayıcı yenilendi.",
+        "candidate_not_schedulable": "Bu hedef anahtar kelime artık planlanamaz. Kullanılabilir anahtar kelimeler yenilendi.",
+        "date_occupied": "Bu tarih az önce doldu. Planlayıcı yenilendi.",
+        "generic": "Bu anahtar kelime planlanamadı. Tekrar deneyin.",
+        "invalid_date": "Bu takvim tarihi artık geçerli değil.",
+        "keyword_already_scheduled": "Bu anahtar kelime içerik planında zaten mevcut. Kullanılabilir anahtar kelimeler ve planlayıcı yenilendi.",
+        "not_found": "Bu hedef anahtar kelime artık kullanılamıyor."
+      },
+      "listLabel": "Kullanılabilir hedef anahtar kelimeler",
+      "missingMetrics": "Gerekli hacim veya zorluk metrikleri eksik.",
+      "states": {
+        "emptyDescription": "Hedef havuzunuza yeni fırsatlar eklemek için anahtar kelime araştırın.",
+        "emptyTitle": "Kullanılabilir hedef anahtar kelime yok",
+        "loadError": "Kullanılabilir hedef anahtar kelimeler yüklenemedi. Tekrar deneyin.",
+        "loading": "Kullanılabilir hedef anahtar kelimeler yükleniyor..."
+      },
+      "tableLabel": "Kullanılabilir hedef anahtar kelimeler",
+      "title": "{date} için bir anahtar kelime seç",
+      "upgrade": {
+        "description": "Hedef anahtar kelimeleri içerik takviminizde planlamak için ücretli bir plana yükseltin.",
+        "title": "Anahtar kelime planlama ücretli bir özelliktir"
+      }
+    },
+    "contentCalendar": {
+      "title": "İçerik Takvimi"
+    },
     "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
     "editor": {
       "actions": {
@@ -138,6 +186,60 @@
       "volume": "Volume"
     },
     "oneArticlePerDay": "Günde 1 makale",
+    "researchKeywords": {
+      "actions": {
+        "add": "Ekle",
+        "added": "Eklendi",
+        "adding": "Ekleniyor...",
+        "close": "Anahtar kelime araştırmasını kapat",
+        "search": "Ara",
+        "searching": "Aranıyor...",
+        "skipped": "Zaten mevcut"
+      },
+      "addErrors": {
+        "forbidden": "Bu anahtar kelimeyi ekleme yetkiniz yok.",
+        "generic": "Bu anahtar kelime eklenemedi. Tekrar deneyin.",
+        "invalid": "Bu anahtar kelime eklenemedi.",
+        "not_found": "Bu organizasyon artık kullanılamıyor."
+      },
+      "columns": {
+        "action": "Aksiyon",
+        "difficulty": "Zorluk",
+        "intent": "Arama niyeti",
+        "keyword": "Anahtar kelime",
+        "volume": "Hacim"
+      },
+      "description": "İlgili anahtar kelimeleri bulun ve sonuçları hedef havuzunuza tek tek ekleyin.",
+      "errors": {
+        "forbidden": "Bu organizasyon için anahtar kelime araştırma yetkiniz yok.",
+        "generic": "Anahtar kelime araştırması şu anda kullanılamıyor. Tekrar deneyin.",
+        "invalid": "Geçerli bir anahtar kelime veya konu girin.",
+        "not_found": "Bu organizasyon artık kullanılamıyor.",
+        "provider": "Anahtar kelime veri sağlayıcısı şu anda kullanılamıyor. Daha sonra tekrar deneyin.",
+        "required": "Bir anahtar kelime veya konu girin.",
+        "too_long": "Aramayı en fazla 200 karakterle sınırlayın."
+      },
+      "form": {
+        "characterCount": "{count}/{max}",
+        "label": "Anahtar kelime veya konu",
+        "placeholder": "örn. içerik pazarlaması"
+      },
+      "results": {
+        "count": "{count} sonuç",
+        "listLabel": "Anahtar kelime araştırma sonuçları",
+        "tableLabel": "Anahtar kelime araştırma sonuçları",
+        "title": "Araştırma sonuçları"
+      },
+      "states": {
+        "empty": "İlgili fırsatları görmek için bir anahtar kelime veya konu arayın.",
+        "loading": "Anahtar kelimeler araştırılıyor..."
+      },
+      "title": "Anahtar Kelime Araştır",
+      "upgrade": {
+        "description": "Anahtar kelime araştırmak ve içerik planınıza eklemek için ücretli bir plana yükseltin.",
+        "title": "Anahtar kelime araştırması ücretli bir özelliktir"
+      }
+    },
     "scheduledCount": "{count} planlandı",
     "statuses": {
       "generated": "Oluşturuldu",
@@ -147,9 +249,52 @@
       "loadError": "İçerik planlayıcı yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "İçerik planlayıcı yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
-      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
+      "pendingHeading": "30 günlük içerik planınız hazırlanıyor",
+      "pendingSupportingText": "Bu işlem 6–10 dakika sürebilir."
     },
-    "title": "İçerik takvimi"
+    "targetKeywords": {
+      "actions": {
+        "loadMore": "Daha fazla yükle",
+        "loadingMore": "Yükleniyor...",
+        "research": "Anahtar Kelime Araştır",
+        "retry": "Tekrar dene"
+      },
+      "columns": {
+        "difficulty": "Zorluk",
+        "intent": "Arama niyeti",
+        "keyword": "Anahtar kelime",
+        "opportunityScore": "Fırsat puanı",
+        "status": "Durum",
+        "volume": "Hacim"
+      },
+      "description": "İçerik planınız için kullanılabilir ve planlanmış anahtar kelimeleri inceleyin.",
+      "intents": {
+        "commercial": "Ticari",
+        "informational": "Bilgilendirici",
+        "navigational": "Gezinme",
+        "transactional": "İşlemsel"
+      },
+      "listLabel": "Hedef anahtar kelimeler listesi",
+      "notAvailable": "—",
+      "researchPaidFeature": "Ücretli özellik",
+      "states": {
+        "emptyDescription": "Kullanılabilir ve planlanmış anahtar kelimeler burada görünecek.",
+        "emptyTitle": "Henüz hedef anahtar kelime yok",
+        "loadError": "Kullanılabilir anahtar kelimeler yüklenemedi. İçerik takvimini kullanmaya devam edebilirsiniz.",
+        "loading": "Hedef anahtar kelimeler yükleniyor..."
+      },
+      "statuses": {
+        "available": "Kullanılabilir",
+        "failed": "Başarısız",
+        "generated": "Oluşturuldu",
+        "generating": "Oluşturuluyor",
+        "scheduled": "Planlandı"
+      },
+      "tableLabel": "Hedef anahtar kelimeler tablosu",
+      "title": "Hedef Anahtar Kelimeler"
+    },
+    "title": "İçerik planlayıcı"
   },
   "ContentHistoryPage": {
     "actions": {

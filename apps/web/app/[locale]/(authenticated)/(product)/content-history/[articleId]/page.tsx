@@ -1,13 +1,16 @@
 'use client';
 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Badge, Button, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
+import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -34,8 +37,13 @@ export default function ArticleDetailPage() {
   const router = useRouter();
   const params = useParams<{ articleId?: string | string[] }>();
   const articleId = Array.isArray(params.articleId) ? params.articleId[0] : params.articleId;
-  const [article, setArticle] = useState<ArticleDetail | null>(null);
-  const [loadState, setLoadState] = useState<ArticleLoadState>('loading');
+  const {
+    error: organizationError,
+    loading: organizationLoading,
+    organization,
+  } = useActiveOrganization();
+  const [redirecting, setRedirecting] = useState(false);
+  const queryClient = useQueryClient();
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
@@ -43,62 +51,55 @@ export default function ArticleDetailPage() {
   );
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
 
-  useEffect(() => {
-    if (!articleId) {
-      setArticle(null);
-      setLoadState('not_found');
-      return;
-    }
+  const articleQuery = useQuery({
+    queryKey: dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
+    queryFn: async (): Promise<ArticleDetail | null> => {
+      if (!organization || !articleId) return null;
 
-    let cancelled = false;
+      const response = await api.api.v0.dashboard.articles[':id'].$get({
+        param: { id: articleId },
+      });
 
-    setArticle(null);
-    setLoadState('loading');
-
-    void (async () => {
-      try {
-        const response = await api.api.v0.dashboard.articles[':id'].$get({
-          param: { id: articleId },
-        });
-
-        if (cancelled) return;
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if ((response.status as number) === 404) {
-          setLoadState('not_found');
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('article_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setArticle(data);
-          setLoadState('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadState('error');
-        }
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return null;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [articleId, handleUnauthorized]);
+      if ((response.status as number) === 404) {
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error('article_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: !redirecting && !organizationLoading && Boolean(organization && articleId),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const article = articleQuery.data ?? null;
+  const loadState: ArticleLoadState = !articleId
+    ? 'not_found'
+    : redirecting || organizationLoading
+      ? 'loading'
+      : organizationError || !organization
+        ? 'error'
+        : articleQuery.isPending
+          ? 'loading'
+          : articleQuery.isError
+            ? 'error'
+            : article
+              ? 'ready'
+              : 'not_found';
 
   const statusMessage =
     loadState === 'loading'
