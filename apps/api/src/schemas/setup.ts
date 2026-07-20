@@ -1,5 +1,9 @@
 import { z } from '@hono/zod-openapi';
-import { SetupPresetsSchema } from '@shared/schemas';
+import {
+  ONBOARDING_INTEGRATIONS,
+  PublishingPrefsSchema,
+  SetupPresetsSchema,
+} from '@shared/schemas';
 import { SETUP_STATUSES } from '@shared/types';
 
 export const StartScanBody = z
@@ -61,6 +65,7 @@ export const SetupPresetsPatchSchema = z
         engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement
           .partial()
           .optional(),
+        publishing: PublishingPrefsSchema.partial().optional(),
       })
       .optional(),
   })
@@ -77,6 +82,8 @@ export const FinalizeBody = z
   .object({
     org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
     presets: SetupPresetsPatchSchema.optional(),
+    referral_source: z.string().optional(),
+    integrations: z.array(z.enum(ONBOARDING_INTEGRATIONS)).optional(),
   })
   .openapi('FinalizeBody');
 

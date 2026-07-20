@@ -4,6 +4,7 @@ import {
   ArticleVideoSchema,
   GENERATION_STATUSES,
   IMAGES_STATUSES,
+  PublishingPrefsSchema,
   SEARCH_INTENTS,
   SetupPresetsSchema,
 } from '@shared/schemas';
@@ -266,6 +267,7 @@ export const ArticlesSettingsPatchBody = z
       .partial()
       .optional(),
     engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement.partial().optional(),
+    publishing: PublishingPrefsSchema.partial().optional(),
   })
   .openapi('ArticlesSettingsPatch');
 

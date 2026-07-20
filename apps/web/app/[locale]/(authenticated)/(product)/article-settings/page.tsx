@@ -35,7 +35,7 @@ type ArticleSettingsResponse = {
   article_preferences: {
     content_seo: {
       article_style: string;
-      internal_links: boolean;
+      internal_links_count: number;
       llm_instructions: string;
     };
     engagement: {
@@ -64,7 +64,7 @@ function mergeArticleSettings(
   return {
     ...currentSettings,
     articleStyle: data.article_preferences.content_seo.article_style,
-    internalLinksCount: data.article_preferences.content_seo.internal_links ? '1' : '0',
+    internalLinksCount: String(data.article_preferences.content_seo.internal_links_count),
   };
 }
 
@@ -72,7 +72,7 @@ function buildArticleSettingsPatch(settings: ArticleSettingsForm) {
   return {
     content_seo: {
       article_style: settings.articleStyle,
-      internal_links: Number.parseInt(settings.internalLinksCount, 10) > 0,
+      internal_links_count: Number.parseInt(settings.internalLinksCount, 10),
     },
   };
 }

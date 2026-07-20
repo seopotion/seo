@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { isPaid, OrgSchema } from '../src/org';
+import { isPaid, ONBOARDING_INTEGRATIONS, OrgSchema } from '../src/org';
 
 const base = {
   id: '1',
@@ -40,5 +40,30 @@ describe('OrgSchema domain rating', () => {
     expect(() =>
       OrgSchema.parse({ ...base, domain_rating: { value: 101, checked_at: new Date() } }),
     ).toThrow();
+  });
+});
+
+describe('OrgSchema.onboarding', () => {
+  test('onboarding is optional', () => {
+    expect(OrgSchema.parse(base).onboarding).toBeUndefined();
+  });
+
+  test('accepts referral_source + valid integrations', () => {
+    const org = OrgSchema.parse({
+      ...base,
+      onboarding: { referral_source: 'LinkedIn', integrations: ['wordpress', 'framer'] },
+    });
+    expect(org.onboarding).toEqual({
+      referral_source: 'LinkedIn',
+      integrations: ['wordpress', 'framer'],
+    });
+  });
+
+  test('rejects an unknown integration id', () => {
+    expect(() => OrgSchema.parse({ ...base, onboarding: { integrations: ['wix'] } })).toThrow();
+  });
+
+  test('exposes the integration enum values', () => {
+    expect(ONBOARDING_INTEGRATIONS).toEqual(['wordpress', 'wordpress-com', 'framer']);
   });
 });

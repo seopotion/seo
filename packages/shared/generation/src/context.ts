@@ -13,7 +13,7 @@ export function buildContext(org: Org, keyword: Keyword): GenerationContext {
     audience: p.audience.target.join(', '),
     competitors: p.audience.competitors,
     articleStyle: p.article_preferences.content_seo.article_style,
-    internalLinks: p.article_preferences.content_seo.internal_links,
+    internalLinks: p.article_preferences.content_seo.internal_links_count > 0,
     llmInstructions: p.article_preferences.content_seo.llm_instructions,
     keyword: keyword.keyword,
     articleType: keyword.article_type ?? null,

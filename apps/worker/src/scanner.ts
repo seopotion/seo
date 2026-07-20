@@ -27,7 +27,7 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     '{ "business": { "name": string, "language": string, "country": string, "description": string },',
     '  "audience": { "target": string[] },',
     '  "article_preferences": {',
-    '    "content_seo": { "article_style": string, "internal_links": boolean, "llm_instructions": string },',
+    '    "content_seo": { "article_style": string, "llm_instructions": string },',
     '    "engagement": { "image_style": string } } }',
     'Do NOT include competitors or blog URLs — those are handled separately.',
     'language is the primary content language (e.g. "English"); country is the primary target',
