@@ -72,7 +72,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       // ships without a video; never fail or delay generation over this.
       let content = result.article.content;
       let video: ArticleVideo | null = null;
-      if (org.presets.article_preferences.engagement.include_youtube_video) {
+      if (org.presets.article_preferences.engagement.youtube_videos) {
         try {
           const headings = extractH2s(content);
           const candidates =

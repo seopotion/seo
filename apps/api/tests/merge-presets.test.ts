@@ -10,8 +10,14 @@ const base = {
     best_articles: ['https://x.com/1'],
   },
   article_preferences: {
-    content_seo: { article_style: 'Formal', internal_links: false, llm_instructions: 'old' },
-    engagement: { image_style: 'Minimal', include_youtube_video: true },
+    content_seo: {
+      article_style: 'Formal',
+      internal_links_count: 0,
+      table_of_contents: true,
+      llm_instructions: 'old',
+    },
+    engagement: { image_style: 'Minimal', youtube_videos: true },
+    publishing: { auto_publish: false },
   },
 };
 
@@ -37,9 +43,9 @@ describe('mergePresets', () => {
 
   test('merges the two-level nest under article_preferences', () => {
     const result = mergePresets(base, {
-      article_preferences: { content_seo: { internal_links: true } },
+      article_preferences: { content_seo: { internal_links_count: 3 } },
     });
-    expect(result.article_preferences.content_seo.internal_links).toBe(true);
+    expect(result.article_preferences.content_seo.internal_links_count).toBe(3);
     expect(result.article_preferences.content_seo.article_style).toBe('Formal');
     expect(result.article_preferences.engagement.image_style).toBe('Minimal');
   });

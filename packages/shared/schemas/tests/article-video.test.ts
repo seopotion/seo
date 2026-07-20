@@ -24,7 +24,7 @@ const basePresetsDoc = {
   audience: { target: ['makers'], competitors: [] },
   blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
   article_preferences: {
-    content_seo: { article_style: 'x', internal_links: false, llm_instructions: '' },
+    content_seo: { article_style: 'x', internal_links_count: 0, llm_instructions: '' },
     engagement: { image_style: 'Sketch' },
   },
 };
@@ -40,10 +40,10 @@ describe('Article.video (#85)', () => {
   });
 });
 
-describe('presets include_youtube_video (#85)', () => {
-  test('pre-#85 docs default to true', () => {
+describe('presets youtube_videos (#73)', () => {
+  test('defaults to true when omitted', () => {
     const p = SetupPresetsSchema.parse(basePresetsDoc);
-    expect(p.article_preferences.engagement.include_youtube_video).toBe(true);
+    expect(p.article_preferences.engagement.youtube_videos).toBe(true);
   });
 
   test('an explicit false is preserved', () => {
@@ -51,10 +51,10 @@ describe('presets include_youtube_video (#85)', () => {
       ...basePresetsDoc,
       article_preferences: {
         ...basePresetsDoc.article_preferences,
-        engagement: { image_style: 'Sketch', include_youtube_video: false },
+        engagement: { image_style: 'Sketch', youtube_videos: false },
       },
     };
     const p = SetupPresetsSchema.parse(doc);
-    expect(p.article_preferences.engagement.include_youtube_video).toBe(false);
+    expect(p.article_preferences.engagement.youtube_videos).toBe(false);
   });
 });

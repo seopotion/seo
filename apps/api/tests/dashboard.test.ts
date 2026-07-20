@@ -148,10 +148,12 @@ vi.mock('@shared/db', () => {
           article_preferences: {
             content_seo: {
               article_style: 'Informative',
-              internal_links: true,
+              internal_links_count: 1,
+              table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch' },
+            engagement: { image_style: 'Sketch', youtube_videos: true },
+            publishing: { auto_publish: false },
           },
         },
         domain_rating: { value: 41, checked_at: new Date() },
@@ -181,10 +183,12 @@ vi.mock('@shared/db', () => {
           article_preferences: {
             content_seo: {
               article_style: 'Informative',
-              internal_links: true,
+              internal_links_count: 1,
+              table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch' },
+            engagement: { image_style: 'Sketch', youtube_videos: true },
+            publishing: { auto_publish: false },
           },
         },
         created_at: now,

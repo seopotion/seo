@@ -23,8 +23,14 @@ const presetsFixture = {
     best_articles: ['https://example.com/blog/post-1'],
   },
   article_preferences: {
-    content_seo: { article_style: 'Conversational', internal_links: true, llm_instructions: '' },
-    engagement: { image_style: 'Minimal' },
+    content_seo: {
+      article_style: 'Conversational',
+      internal_links_count: 1,
+      table_of_contents: true,
+      llm_instructions: '',
+    },
+    engagement: { image_style: 'Minimal', youtube_videos: true },
+    publishing: { auto_publish: false },
   },
 };
 
