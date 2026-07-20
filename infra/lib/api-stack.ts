@@ -291,6 +291,7 @@ export class ApiStack extends Stack {
       environment: {
         ...mongoEnv,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
         IMAGES_QUEUE_URL: imagesQueue.queueUrl,
       },
       bundling,

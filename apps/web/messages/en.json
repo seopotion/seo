@@ -44,9 +44,11 @@
   },
   "ContentPlannerPage": {
     "actions": {
+      "chooseKeyword": "+ Choose keyword",
+      "chooseKeywordForDate": "Choose a keyword for {date}",
+      "chooseKeywordPaidFeatureForDate": "Choose a keyword for {date}. Paid feature.",
       "closeDetails": "Close details",
       "openArticle": "Open {title} details",
-      "researchKeyword": "Research keyword with AI",
       "viewArticle": "View article"
     },
     "agendaLabel": "Content agenda list",
@@ -60,6 +62,52 @@
       "product_guide": "Product guide"
     },
     "calendarLabel": "Content calendar grid",
+    "chooseKeyword": {
+      "actions": {
+        "close": "Close keyword chooser",
+        "loadMore": "Load more",
+        "loadingMore": "Loading...",
+        "research": "Research Keywords",
+        "retry": "Retry",
+        "schedule": "Schedule",
+        "scheduling": "Scheduling..."
+      },
+      "columns": {
+        "action": "Scheduling action",
+        "difficulty": "Difficulty",
+        "intent": "Intent",
+        "keyword": "Keyword",
+        "opportunityScore": "Opportunity score",
+        "volume": "Volume"
+      },
+      "description": "Choose an available target keyword for this calendar date.",
+      "errors": {
+        "candidate_already_scheduled": "This target keyword was just scheduled. Available keywords and the planner were refreshed.",
+        "candidate_not_schedulable": "This target keyword is no longer available to schedule. Available keywords were refreshed.",
+        "date_occupied": "This date was just taken. The planner was refreshed.",
+        "generic": "This keyword could not be scheduled. Try again.",
+        "invalid_date": "This calendar date is no longer valid.",
+        "keyword_already_scheduled": "This keyword is already on the content plan. Available keywords and the planner were refreshed.",
+        "not_found": "This target keyword is no longer available."
+      },
+      "listLabel": "Available target keywords",
+      "missingMetrics": "Required volume or difficulty metrics are missing.",
+      "states": {
+        "emptyDescription": "Research keywords to add new opportunities to your target pool.",
+        "emptyTitle": "No available target keywords",
+        "loadError": "Available target keywords could not be loaded. Try again.",
+        "loading": "Loading available target keywords..."
+      },
+      "tableLabel": "Available target keywords",
+      "title": "Choose a keyword for {date}",
+      "upgrade": {
+        "description": "Upgrade to a paid plan to schedule target keywords on your content calendar.",
+        "title": "Keyword scheduling is a paid feature"
+      }
+    },
+    "contentCalendar": {
+      "title": "Content Calendar"
+    },
     "description": "Plan one article per day across the next 45 days.",
     "editor": {
       "actions": {
@@ -138,6 +186,60 @@
       "volume": "Volume"
     },
     "oneArticlePerDay": "1 article per day",
+    "researchKeywords": {
+      "actions": {
+        "add": "Add",
+        "added": "Added",
+        "adding": "Adding...",
+        "close": "Close keyword research",
+        "search": "Search",
+        "searching": "Searching...",
+        "skipped": "Already exists"
+      },
+      "addErrors": {
+        "forbidden": "You do not have access to add this keyword.",
+        "generic": "This keyword could not be added. Try again.",
+        "invalid": "This keyword could not be added.",
+        "not_found": "This organization is no longer available."
+      },
+      "columns": {
+        "action": "Action",
+        "difficulty": "Difficulty",
+        "intent": "Intent",
+        "keyword": "Keyword",
+        "volume": "Volume"
+      },
+      "description": "Find related keywords and add individual results to your target pool.",
+      "errors": {
+        "forbidden": "You do not have access to research keywords for this organization.",
+        "generic": "Keyword research is unavailable right now. Try again.",
+        "invalid": "Enter a valid keyword or topic.",
+        "not_found": "This organization is no longer available.",
+        "provider": "The keyword data provider is unavailable right now. Try again later.",
+        "required": "Enter a keyword or topic.",
+        "too_long": "Keep the search to 200 characters or fewer."
+      },
+      "form": {
+        "characterCount": "{count}/{max}",
+        "label": "Keyword or topic",
+        "placeholder": "e.g. content marketing"
+      },
+      "results": {
+        "count": "{count, plural, one {# result} other {# results}}",
+        "listLabel": "Keyword research results",
+        "tableLabel": "Keyword research results",
+        "title": "Research results"
+      },
+      "states": {
+        "empty": "Search for a keyword or topic to see related opportunities.",
+        "loading": "Researching keywords..."
+      },
+      "title": "Research Keywords",
+      "upgrade": {
+        "description": "Upgrade to a paid plan to research keywords and add them to your content plan.",
+        "title": "Keyword research is a paid feature"
+      }
+    },
     "scheduledCount": "{count} scheduled",
     "statuses": {
       "generated": "Generated",
@@ -147,9 +249,52 @@
       "loadError": "Could not load the content planner. Try again when the API is available.",
       "loading": "Loading content planner...",
       "noOrganization": "No completed organization was found for this workspace.",
-      "organizationError": "Could not load your organization. Try again."
+      "organizationError": "Could not load your organization. Try again.",
+      "pendingHeading": "Your 30-day content plan is in progress",
+      "pendingSupportingText": "This might take 6–10 minutes."
     },
-    "title": "Content calendar"
+    "targetKeywords": {
+      "actions": {
+        "loadMore": "Load more",
+        "loadingMore": "Loading...",
+        "research": "Research Keywords",
+        "retry": "Retry"
+      },
+      "columns": {
+        "difficulty": "Difficulty",
+        "intent": "Intent",
+        "keyword": "Keyword",
+        "opportunityScore": "Opportunity score",
+        "status": "Status",
+        "volume": "Volume"
+      },
+      "description": "Review available and scheduled keywords for your content plan.",
+      "intents": {
+        "commercial": "Commercial",
+        "informational": "Informational",
+        "navigational": "Navigational",
+        "transactional": "Transactional"
+      },
+      "listLabel": "Target keywords list",
+      "notAvailable": "—",
+      "researchPaidFeature": "Paid feature",
+      "states": {
+        "emptyDescription": "Available and scheduled keywords will appear here.",
+        "emptyTitle": "No target keywords yet",
+        "loadError": "Available keywords could not be loaded. The content calendar is still available.",
+        "loading": "Loading target keywords..."
+      },
+      "statuses": {
+        "available": "Available",
+        "failed": "Failed",
+        "generated": "Generated",
+        "generating": "Generating",
+        "scheduled": "Scheduled"
+      },
+      "tableLabel": "Target keywords table",
+      "title": "Target Keywords"
+    },
+    "title": "Content planner"
   },
   "ContentHistoryPage": {
     "actions": {

@@ -15,6 +15,10 @@ import { clearToken } from './auth';
 import { clearWorkspaceStatusCache } from './session';
 
 export type ProductOrganization = {
+  capabilities: {
+    keyword_research: boolean;
+    keyword_scheduling: boolean;
+  };
   id: string;
   name?: string;
   setup_status: SetupStatus;

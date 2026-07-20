@@ -8,6 +8,7 @@ export {
   buildImagePlanPrompt,
   extractH2s,
   ImagePlanSchema,
+  injectBlockAfterHeading,
   injectImageAfterHeading,
   parseImagePlan,
 } from './images';
@@ -16,3 +17,11 @@ export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
 export type * from './types';
 export { countWords, validateArticle } from './validate';
+export type { VideoPickInput } from './video';
+export {
+  buildVideoEmbed,
+  buildVideoPickPrompt,
+  languageCodeFromName,
+  parseVideoPick,
+  VideoPickSchema,
+} from './video';

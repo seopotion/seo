@@ -36,22 +36,35 @@ vi.mock('@shared/db', () => {
     {
       id: 'kw_1',
       org_id: 'org_1',
+      // Legacy entry: no candidate linkage/classification (#99 nullable fields).
+      candidate_id: null,
       keyword: 'landing pages',
       status: 'scheduled',
       scheduled_date: '2026-07-02',
       search_volume: 170,
       difficulty: 36,
+      article_type: null,
+      intent: null,
+      opportunity_score: null,
+      generation_status: 'generated',
+      generation_error: null,
       article_id: 'art_1',
       created_at: now,
     },
     {
       id: 'kw_2',
       org_id: 'org_1',
+      candidate_id: 'cand_2',
       keyword: 'notion builder',
       status: 'scheduled',
       scheduled_date: '2026-07-03',
       search_volume: 2400,
       difficulty: 48,
+      article_type: 'how_to_guide',
+      intent: 'informational',
+      opportunity_score: 0.7,
+      generation_status: 'pending',
+      generation_error: null,
       article_id: null,
       created_at: now,
     },
@@ -72,6 +85,7 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      video: { video_id: 'v1', title: 'Widget basics', section_heading: 'Intro' },
     },
     {
       id: 'art_2',
@@ -88,6 +102,7 @@ vi.mock('@shared/db', () => {
       status: 'published',
       created_at: now,
       published_at: now,
+      video: null,
     },
     // Owned by org_3 (user_2) — never visible to user_1 via detail reads.
     {
@@ -105,6 +120,7 @@ vi.mock('@shared/db', () => {
       status: 'generated',
       created_at: now,
       published_at: null,
+      video: null,
     },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
@@ -359,6 +375,22 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(keywords[0]?.article_id).toBe('art_1');
       expect(keywords[1]?.article_id).toBeNull();
       expect(strategy_status).toBe('completed');
+      // #99: candidate linkage, classification, and generation state exposed.
+      expect(keywords[0]).toMatchObject({
+        candidate_id: null,
+        article_type: null,
+        intent: null,
+        opportunity_score: null,
+        generation_status: 'generated',
+        generation_error: null,
+      });
+      expect(keywords[1]).toMatchObject({
+        candidate_id: 'cand_2',
+        article_type: 'how_to_guide',
+        intent: 'informational',
+        opportunity_score: 0.7,
+        generation_status: 'pending',
+      });
     }
   });
 
@@ -415,6 +447,11 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(body.id).toBe('art_1');
       // Date entity fields are serialized to ISO strings in the response.
       expect(typeof body.created_at).toBe('string');
+      expect(body.video).toEqual({
+        video_id: 'v1',
+        title: 'Widget basics',
+        section_heading: 'Intro',
+      });
     }
 
     const missing = await client.api.v0.dashboard.articles[':id'].$get(

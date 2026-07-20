@@ -1,4 +1,5 @@
 import {
+  type Candidate,
   type CreateKeywordInput,
   CreateKeywordInput as CreateKeywordInputSchema,
   type Keyword,
@@ -35,6 +36,72 @@ export const KeywordRepo = {
     const normalized_keyword = normalizeKeyword(data.keyword);
     const res = await (await collection()).insertOne({ ...data, normalized_keyword, created_at });
     return toEntity({ _id: res.insertedId, ...data, normalized_keyword, created_at });
+  },
+
+  async findByOrgAndDate(orgId: string, date: string): Promise<Keyword | null> {
+    const doc = await (await collection()).findOne({ org_id: orgId, scheduled_date: date });
+    return doc ? toEntity(doc) : null;
+  },
+
+  async findByCandidateId(orgId: string, candidateId: string): Promise<Keyword | null> {
+    const doc = await (await collection()).findOne({ org_id: orgId, candidate_id: candidateId });
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
+   * Create a planner entry from a candidate (#99), copying its metrics and
+   * classification. Unique-index violations (occupied date / duplicate
+   * keyword / already-scheduled candidate) propagate for the scheduling
+   * service to map into typed conflicts.
+   */
+  async createFromCandidate(candidate: Candidate, scheduledDate: string): Promise<Keyword> {
+    if (candidate.search_volume === null || candidate.difficulty === null) {
+      throw new Error(`candidate ${candidate.id} is missing metrics required by KeywordSchema`);
+    }
+    return KeywordRepo.create({
+      org_id: candidate.org_id,
+      candidate_id: candidate.id,
+      keyword: candidate.keyword,
+      status: 'scheduled',
+      scheduled_date: scheduledDate,
+      search_volume: candidate.search_volume,
+      difficulty: candidate.difficulty,
+      article_id: null,
+      article_type: candidate.article_type,
+      intent: candidate.intent,
+      opportunity_score: candidate.opportunity_score,
+      serp_competitors: candidate.serp_competitors,
+    });
+  },
+
+  /**
+   * Move an ungenerated planner entry to a new date (#99). Conditional on
+   * `pending` + unlinked so an in-flight/finished generation never moves; a
+   * unique-index violation on the destination date propagates to the caller.
+   */
+  async reschedulePending(keywordId: string, scheduledDate: string): Promise<Keyword | null> {
+    if (!ObjectId.isValid(keywordId)) return null;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(keywordId), article_id: null, generation_status: 'pending' },
+      { $set: { scheduled_date: scheduledDate } },
+      { returnDocument: 'after' },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
+   * Delete a planner entry only while generation has not produced or started
+   * anything (#99): unlinked and `pending`/`failed`. Returns the deleted
+   * keyword so the caller can release its candidate.
+   */
+  async deleteUnstarted(keywordId: string): Promise<Keyword | null> {
+    if (!ObjectId.isValid(keywordId)) return null;
+    const doc = await (await collection()).findOneAndDelete({
+      _id: new ObjectId(keywordId),
+      article_id: null,
+      generation_status: { $in: ['pending', 'failed'] },
+    });
+    return doc ? toEntity(doc) : null;
   },
 
   /** Link a generated article back to its keyword (article_id null -> set). */

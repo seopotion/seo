@@ -74,6 +74,36 @@ describe('core auth routes', () => {
     const json = await res.json();
     expect(json.organizations).toHaveLength(1);
     expect(json.organizations[0]?.id).toBe('org_1');
+    // Free/legacy org (no plan): capabilities are computed server-side as false.
+    expect(json.organizations[0]?.capabilities).toEqual({
+      keyword_research: false,
+      keyword_scheduling: false,
+    });
+  });
+
+  test('GET /organizations reports capabilities true for a paid org', async () => {
+    const { OrgRepo } = await import('@shared/db');
+    vi.mocked(OrgRepo.findByUserId).mockResolvedValueOnce([
+      {
+        id: 'org_paid',
+        user_id: 'user_1',
+        website_url: 'https://example.com',
+        setup_status: 'setup_complete',
+        plan: 'paid',
+        strategy_status: 'none',
+        created_at: new Date(),
+      },
+    ]);
+    const token = await login();
+    const res = await client.api.v0.core.organizations.$get(undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.organizations[0]?.capabilities).toEqual({
+      keyword_research: true,
+      keyword_scheduling: true,
+    });
   });
 
   test('GET /status reflects setup completion', async () => {

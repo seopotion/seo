@@ -41,6 +41,7 @@ function toArticleDetail(a: Article) {
     status: a.status,
     created_at: a.created_at.toISOString(),
     published_at: a.published_at ? a.published_at.toISOString() : null,
+    video: a.video,
   };
 }
 
@@ -351,11 +352,17 @@ const dashboard = new OpenAPIHono<AuthEnv>()
           strategy_status: org.strategy_status ?? 'none',
           keywords: keywords.map((k) => ({
             id: k.id,
+            candidate_id: k.candidate_id,
             keyword: k.keyword,
             status: k.status,
             scheduled_date: k.scheduled_date,
             search_volume: k.search_volume,
             difficulty: k.difficulty,
+            article_type: k.article_type,
+            intent: k.intent,
+            opportunity_score: k.opportunity_score,
+            generation_status: k.generation_status,
+            generation_error: k.generation_error,
             article_id: k.article_id,
           })),
         },

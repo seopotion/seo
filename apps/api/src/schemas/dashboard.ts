@@ -1,5 +1,11 @@
 import { z } from '@hono/zod-openapi';
-import { SetupPresetsSchema } from '@shared/schemas';
+import {
+  ARTICLE_TYPES,
+  ArticleVideoSchema,
+  GENERATION_STATUSES,
+  SEARCH_INTENTS,
+  SetupPresetsSchema,
+} from '@shared/schemas';
 import { STRATEGY_STATUSES } from '@shared/types';
 
 // Org-scoped read: the caller passes org_id; the handler checks ownership.
@@ -86,12 +92,22 @@ export const DomainRatingResponse = z
 const PlannerKeyword = z
   .object({
     id: z.string(),
+    // Source candidate linkage (#99); null for legacy records.
+    candidate_id: z.string().nullable(),
     keyword: z.string(),
     status: z.enum(['scheduled']),
     // ISO date (yyyy-mm-dd) the article is scheduled to generate/publish.
     scheduled_date: z.string(),
     search_volume: z.number().int(),
     difficulty: z.number().int(),
+    // Classification from the candidate/strategy pipeline; null for older entries.
+    article_type: z.enum(ARTICLE_TYPES).nullable(),
+    intent: z.enum(SEARCH_INTENTS).nullable(),
+    opportunity_score: z.number().nullable(),
+    // Generation lifecycle (#55): the keyword is the provisional display title
+    // until article_id is populated by the generation worker.
+    generation_status: z.enum(GENERATION_STATUSES),
+    generation_error: z.string().nullable(),
     // null until a keyword has been turned into an article by the (later) worker.
     article_id: z.string().nullable(),
   })
@@ -177,6 +193,8 @@ export const ArticleDetailResponse = z
     status: z.enum(ARTICLE_STATUSES),
     created_at: z.string(),
     published_at: z.string().nullable(),
+    // Auto-sourced YouTube embed (#85); the iframe is also in `content`.
+    video: ArticleVideoSchema.nullable(),
   })
   .openapi('ArticleDetailResponse');
 
