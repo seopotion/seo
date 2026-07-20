@@ -73,14 +73,18 @@ export const OrgRepo = {
     await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { presets: data } });
   },
 
-  /** Persist final presets and flip the org to `setup_complete` (single update). */
-  async finalize(id: string, presets: SetupPresets): Promise<void> {
+  /** Persist final presets (+ optional onboarding metadata) and flip the org to
+   * `setup_complete` in a single update. */
+  async finalize(
+    id: string,
+    presets: SetupPresets,
+    onboarding?: { referral_source?: string; integrations?: string[] },
+  ): Promise<void> {
     if (!ObjectId.isValid(id)) return;
     const data = SetupPresetsSchema.parse(presets); // validate on write
-    await (await collection()).updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { presets: data, setup_status: 'setup_complete' } },
-    );
+    const set: Record<string, unknown> = { presets: data, setup_status: 'setup_complete' };
+    if (onboarding) set.onboarding = onboarding;
+    await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: set });
   },
 
   /**

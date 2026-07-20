@@ -179,7 +179,7 @@ const setup = new OpenAPIHono<AuthEnv>()
       },
     }),
     async (c) => {
-      const { org_id, presets } = c.req.valid('json');
+      const { org_id, presets, referral_source, integrations } = c.req.valid('json');
       const { userId } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) {
@@ -189,7 +189,20 @@ const setup = new OpenAPIHono<AuthEnv>()
         return c.json({ error: 'Setup is not ready to finalize' }, 409);
       }
       const merged = mergePresets(org.presets, presets);
-      await OrgRepo.finalize(org_id, merged);
+      // Build with only the keys that were actually provided — storing an
+      // explicit `undefined`/`null` would fail the optional-array read-parse.
+      const onboarding =
+        referral_source !== undefined || integrations !== undefined
+          ? {
+              ...(referral_source !== undefined ? { referral_source } : {}),
+              ...(integrations !== undefined ? { integrations } : {}),
+            }
+          : undefined;
+      if (onboarding) {
+        await OrgRepo.finalize(org_id, merged, onboarding);
+      } else {
+        await OrgRepo.finalize(org_id, merged);
+      }
       // Paid orgs get an automatic 30-day strategy. claimStrategy guarantees
       // exactly one job across finalize retries / re-finalize (#47).
       if (isPaid(org) && (await OrgRepo.claimStrategy(org_id))) {

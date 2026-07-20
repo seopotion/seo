@@ -389,6 +389,33 @@ describe('setup routes', () => {
     expect(res.status).toBe(409);
   });
 
+  test('finalize persists referral_source + integrations onto onboarding', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          referral_source: 'LinkedIn',
+          integrations: ['wordpress'],
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    expect(OrgRepo.finalize).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', expect.any(Object), {
+      referral_source: 'LinkedIn',
+      integrations: ['wordpress'],
+    });
+  });
+
+  test('finalize rejects an unknown integration id', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      // @ts-expect-error — 'wix' is not a valid ONBOARDING_INTEGRATIONS member
+      { json: { org_id: '6650f1a2b3c4d5e6f7a8b9c0', integrations: ['wix'] } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(400);
+  });
+
   test('GET /health returns OK', async () => {
     const res = await app.request('/health');
     expect(res.status).toBe(200);
