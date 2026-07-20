@@ -265,9 +265,8 @@ function toDateKey(date: Date) {
 }
 
 export function formatDateFromKey(dateKey: string, locale: string) {
-  const [year, month, day] = dateKey.split('-').map(Number);
-
-  return formatDate(new Date(year, month - 1, day), locale, 'long');
+  // `T00:00:00` (no `Z`) parses as local midnight, matching toDateKey above.
+  return formatDate(new Date(`${dateKey}T00:00:00`), locale, 'long');
 }
 
 export function formatDate(date: Date, locale: string, dateStyle: 'medium' | 'long') {
