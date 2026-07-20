@@ -572,6 +572,27 @@ describe('dashboard settings persistence', () => {
     );
     expect(res.status).toBe(404);
   });
+
+  test('PATCH /settings/articles updates publishing + content_seo counts', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.settings.articles.$patch(
+      {
+        json: {
+          org_id: 'org_1',
+          content_seo: { internal_links_count: 2, table_of_contents: false },
+          publishing: { auto_publish: true },
+        },
+      },
+      opts,
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.article_preferences.content_seo.internal_links_count).toBe(2);
+      expect(body.article_preferences.content_seo.table_of_contents).toBe(false);
+      expect(body.article_preferences.publishing.auto_publish).toBe(true);
+    }
+  });
 });
 
 describe('GSC-gated home cards', () => {
