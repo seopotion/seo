@@ -262,8 +262,6 @@
     },
     "targetKeywords": {
       "actions": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading...",
         "research": "Research Keywords",
         "retry": "Retry"
       },
@@ -284,6 +282,14 @@
       },
       "listLabel": "Target keywords list",
       "notAvailable": "—",
+      "pagination": {
+        "label": "Target keywords pagination",
+        "next": "Next",
+        "page": "Page {page} of {totalPages}",
+        "perPage": "{count} per page",
+        "previous": "Previous",
+        "range": "{start}-{end} of {total}"
+      },
       "researchPaidFeature": "Paid feature",
       "states": {
         "emptyDescription": "Available and scheduled keywords will appear here.",

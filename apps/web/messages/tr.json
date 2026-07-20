@@ -262,8 +262,6 @@
     },
     "targetKeywords": {
       "actions": {
-        "loadMore": "Daha fazla yükle",
-        "loadingMore": "Yükleniyor...",
         "research": "Anahtar Kelime Araştır",
         "retry": "Tekrar dene"
       },
@@ -284,6 +282,14 @@
       },
       "listLabel": "Hedef anahtar kelimeler listesi",
       "notAvailable": "—",
+      "pagination": {
+        "label": "Hedef anahtar kelimeler sayfalaması",
+        "next": "Sonraki",
+        "page": "Sayfa {page} / {totalPages}",
+        "perPage": "Sayfa başına {count}",
+        "previous": "Önceki",
+        "range": "{start}-{end} / {total}"
+      },
       "researchPaidFeature": "Ücretli özellik",
       "states": {
         "emptyDescription": "Kullanılabilir ve planlanmış anahtar kelimeler burada görünecek.",

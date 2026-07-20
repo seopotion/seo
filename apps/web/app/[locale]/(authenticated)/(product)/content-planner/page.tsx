@@ -244,6 +244,22 @@ export default function ContentPlannerPage() {
     staleTime: 60 * 60 * 1000,
   });
 
+  // Target Keywords paginates client-side, so the whole candidate pool has to be in hand.
+  useEffect(() => {
+    if (
+      candidateQuery.hasNextPage &&
+      !candidateQuery.isFetchingNextPage &&
+      !candidateQuery.isError
+    ) {
+      void candidateQuery.fetchNextPage();
+    }
+  }, [
+    candidateQuery.fetchNextPage,
+    candidateQuery.hasNextPage,
+    candidateQuery.isError,
+    candidateQuery.isFetchingNextPage,
+  ]);
+
   const today = useMemo(() => startOfToday(), []);
   const plannerArticles = useMemo(() => {
     if (pendingPreviewEnabled) return [];
@@ -327,11 +343,8 @@ export default function ContentPlannerPage() {
           <>
             <TargetKeywordsSection
               canResearch={canResearchKeywords}
-              hasMore={candidateQuery.hasNextPage}
               loadError={targetKeywordsLoadError}
-              loading={targetKeywordsLoading}
-              loadingMore={candidateQuery.isFetchingNextPage}
-              onLoadMore={() => void candidateQuery.fetchNextPage()}
+              loading={targetKeywordsLoading || candidateQuery.isFetchingNextPage}
               onResearch={handleOpenResearch}
               onRetry={() => void candidateQuery.refetch()}
               researchAvailable={researchAvailable}
