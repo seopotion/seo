@@ -100,6 +100,10 @@ export const ScheduleParams = z.object({
   candidate_id: z.string().openapi({ param: { name: 'candidate_id', in: 'path' } }),
 });
 
+export const CandidateParams = z.object({
+  candidate_id: z.string().openapi({ param: { name: 'candidate_id', in: 'path' } }),
+});
+
 export const ScheduledKeywordParams = z.object({
   keyword_id: z.string().openapi({ param: { name: 'keyword_id', in: 'path' } }),
 });

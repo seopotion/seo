@@ -103,6 +103,21 @@ export const CandidateRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  /**
+   * Conditionally reject a candidate: only a `candidate` may be rejected, so a
+   * scheduled/`selected` or already-rejected one is refused and concurrent
+   * rejections have exactly one winner.
+   */
+  async rejectIfCandidate(candidateId: string): Promise<boolean> {
+    if (!ObjectId.isValid(candidateId)) return false;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(candidateId), status: 'candidate' },
+      { $set: { status: 'rejected', updated_at: new Date() } },
+      { returnDocument: 'after' },
+    );
+    return doc !== null;
+  },
+
   /** Return a `selected` candidate to the pool after unscheduling (#99). */
   async releaseAfterUnschedule(candidateId: string): Promise<boolean> {
     if (!ObjectId.isValid(candidateId)) return false;

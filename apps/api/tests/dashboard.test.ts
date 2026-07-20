@@ -75,6 +75,7 @@ vi.mock('@shared/db', () => {
       org_id: 'org_1',
       keyword_id: 'kw_1',
       title: 'Landing Pages',
+      meta_title: 'Landing Pages Guide',
       slug: 'landing-pages',
       keyword: 'landing pages',
       meta_description: 'm',
@@ -83,7 +84,9 @@ vi.mock('@shared/db', () => {
       difficulty: 36,
       search_volume: 170,
       status: 'generated',
+      images_status: 'pending',
       created_at: now,
+      updated_at: null,
       published_at: null,
       video: { video_id: 'v1', title: 'Widget basics', section_heading: 'Intro' },
     },
@@ -92,6 +95,7 @@ vi.mock('@shared/db', () => {
       org_id: 'org_1',
       keyword_id: 'kw_2',
       title: 'Notion Builder',
+      meta_title: 'Notion Builder',
       slug: 'notion-builder',
       keyword: 'notion builder',
       meta_description: 'm',
@@ -100,7 +104,9 @@ vi.mock('@shared/db', () => {
       difficulty: 48,
       search_volume: 2400,
       status: 'published',
+      images_status: 'complete',
       created_at: now,
+      updated_at: now,
       published_at: now,
       video: null,
     },
@@ -110,6 +116,7 @@ vi.mock('@shared/db', () => {
       org_id: 'org_3',
       keyword_id: 'kw_9',
       title: 'Foreign Article',
+      meta_title: 'Foreign Article',
       slug: 'foreign-article',
       keyword: 'foreign',
       meta_description: 'm',
@@ -118,7 +125,9 @@ vi.mock('@shared/db', () => {
       difficulty: 10,
       search_volume: 50,
       status: 'generated',
+      images_status: 'pending',
       created_at: now,
+      updated_at: null,
       published_at: null,
       video: null,
     },
@@ -254,6 +263,12 @@ vi.mock('@shared/db', () => {
         async (orgId: string, status: string) =>
           articles.filter((a) => a.org_id === orgId && a.status === status).length,
       ),
+      updateContent: vi.fn(async (id: string, patch: Record<string, string>) => {
+        const article = articles.find((a) => a.id === id);
+        if (!article) return null;
+        Object.assign(article, patch, { updated_at: new Date() });
+        return article;
+      }),
     },
     GscConnectionRepo: {
       findByOrgId: vi.fn(async (orgId: string) => gscConnections.get(orgId) ?? null),
@@ -262,12 +277,22 @@ vi.mock('@shared/db', () => {
   };
 });
 
+import { ArticleRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import { encryptSecret } from '../src/lib/crypto';
 import { logger } from '../src/logger';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
+
+/** A body that passes every editor rule (meta_description inside 120-160). */
+const validArticleUpdate = {
+  title: 'Landing Pages, Revised',
+  slug: 'landing-pages-revised',
+  meta_title: 'Landing Pages Revised',
+  meta_description: 'A revised guide to landing pages. '.repeat(4),
+  content: '# revised body',
+};
 
 async function login(): Promise<string> {
   const res = await client.api.v0.core.login.$post({ json: { id_token: 'fake-google-token' } });
@@ -466,6 +491,87 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       opts,
     );
     expect(foreign.status).toBe(404);
+  });
+
+  test('GET /articles/:id exposes the editor fields', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.meta_title).toBe('Landing Pages Guide');
+      expect(body.keyword).toBe('landing pages');
+      expect(body.images_status).toBe('pending');
+      // Never edited since generation.
+      expect(body.updated_at).toBeNull();
+    }
+  });
+
+  test('PATCH /articles/:id saves the editable fields and stamps updated_at', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'art_1' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body).toMatchObject({
+        id: 'art_1',
+        title: validArticleUpdate.title,
+        slug: validArticleUpdate.slug,
+        meta_title: validArticleUpdate.meta_title,
+        meta_description: validArticleUpdate.meta_description,
+        content: validArticleUpdate.content,
+      });
+      // Same shape as GET, with the save reflected back as an ISO string.
+      expect(typeof body.updated_at).toBe('string');
+      expect(body.keyword).toBe('landing pages');
+      expect(body.images_status).toBe('pending');
+    }
+  });
+
+  test('PATCH /articles/:id 400s with per-field messages', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      {
+        param: { id: 'art_1' },
+        json: {
+          ...validArticleUpdate,
+          // Whitespace-only must fail like empty — the editor trims too.
+          title: '   ',
+          meta_title: 'x'.repeat(61),
+          meta_description: 'too short',
+        },
+      },
+      await auth(),
+    );
+    expect(res.status).toBe(400);
+    if (res.status === 400) {
+      const body = await res.json();
+      expect(body.error).toBe('Validation failed');
+      expect(Object.keys(body.fields).sort()).toEqual(['meta_description', 'meta_title', 'title']);
+      expect(body.fields.meta_title).toContain('60');
+      expect(body.fields.meta_description).toContain('120');
+    }
+  });
+
+  test('PATCH /articles/:id 404s for an unknown id', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'nope' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /articles/:id 404s for an article in another org', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'art_3' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+    // The foreign record must be untouched.
+    expect(ArticleRepo.updateContent).not.toHaveBeenCalledWith('art_3', expect.anything());
   });
 
   test('static /articles/best still resolves after adding /articles/:id', async () => {

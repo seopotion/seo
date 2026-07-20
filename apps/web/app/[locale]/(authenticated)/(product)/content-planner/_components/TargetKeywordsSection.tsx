@@ -1,15 +1,30 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, LoaderCircle, LockKeyhole, Search } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, LoaderCircle, LockKeyhole, Search, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { Badge, Button } from '@/components/ui';
+import { api } from '@/lib/api';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '../planner-utils';
-import type { TargetKeyword, TargetKeywordStatus } from '../types';
+import { formatNumber, getCandidateDeleteApiError } from '../planner-utils';
+import type { CandidateDeleteApiError, TargetKeyword, TargetKeywordStatus } from '../types';
 
 const KEYWORDS_PER_PAGE = 20;
+
+type DeleteError = Exclude<CandidateDeleteApiError, 'unauthorized'>;
+
+class CandidateDeleteError extends Error {
+  reason: CandidateDeleteApiError;
+
+  constructor(reason: CandidateDeleteApiError) {
+    super(reason);
+    this.name = 'CandidateDeleteError';
+    this.reason = reason;
+  }
+}
 
 type TargetKeywordsSectionProps = {
   canResearch: boolean;
@@ -17,6 +32,8 @@ type TargetKeywordsSectionProps = {
   loading: boolean;
   onResearch: () => void;
   onRetry: () => void;
+  onUnauthorized: () => void;
+  organizationId: string;
   researchAvailable: boolean;
   targetKeywords: TargetKeyword[];
 };
@@ -27,14 +44,80 @@ export function TargetKeywordsSection({
   loading,
   onResearch,
   onRetry,
+  onUnauthorized,
+  organizationId,
   researchAvailable,
   targetKeywords,
 }: TargetKeywordsSectionProps) {
   const locale = useLocale();
   const t = useTranslations('ContentPlannerPage.targetKeywords');
+  const queryClient = useQueryClient();
   const hasRows = targetKeywords.length > 0;
   const [page, setPage] = useState(1);
   const [renderedKeywords, setRenderedKeywords] = useState(targetKeywords);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deleteErrors, setDeleteErrors] = useState<Record<string, DeleteError>>({});
+
+  const deleteMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const response = await api.api.v0.keywords.candidates[':candidate_id'].$delete({
+        param: { candidate_id: candidateId },
+      });
+      const status = response.status as number;
+
+      if (status === 204) {
+        return;
+      }
+
+      const responseBody: unknown = status === 409 ? await response.json() : undefined;
+      const reason = getCandidateDeleteApiError(status, responseBody);
+
+      if (reason === 'unauthorized') {
+        onUnauthorized();
+      }
+
+      throw new CandidateDeleteError(reason);
+    },
+  });
+
+  const handleDelete = async (candidateId: string) => {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    // Two-click confirm: the first click arms the button, the second fires.
+    if (confirmingId !== candidateId) {
+      setConfirmingId(candidateId);
+      return;
+    }
+
+    setConfirmingId(null);
+    setDeleteErrors((current) => omitKey(current, candidateId));
+
+    try {
+      await deleteMutation.mutateAsync(candidateId);
+      await queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.candidatePool(organizationId),
+      });
+    } catch (error) {
+      if (error instanceof CandidateDeleteError && error.reason === 'unauthorized') {
+        return;
+      }
+
+      const reason: DeleteError =
+        error instanceof CandidateDeleteError && error.reason !== 'unauthorized'
+          ? error.reason
+          : 'generic';
+      setDeleteErrors((current) => ({ ...current, [candidateId]: reason }));
+
+      // A refused delete means the row is stale (already scheduled or gone).
+      if (reason === 'candidate_not_deletable' || reason === 'not_found') {
+        await queryClient.invalidateQueries({
+          queryKey: dashboardQueryKeys.candidatePool(organizationId),
+        });
+      }
+    }
+  };
 
   // The list is replaced wholesale (organization switch, research, retry, streamed pages),
   // so a stale page number would strand the reader outside the new list.
@@ -105,6 +188,9 @@ export function TargetKeywordsSection({
                   <TableHeading>{t('columns.intent')}</TableHeading>
                   <TableHeading>{t('columns.opportunityScore')}</TableHeading>
                   <TableHeading>{t('columns.status')}</TableHeading>
+                  <TableHeading className="w-32">
+                    <span className="sr-only">{t('columns.action')}</span>
+                  </TableHeading>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -123,6 +209,21 @@ export function TargetKeywordsSection({
                     <MetricCell value={targetKeyword.opportunityScore} locale={locale} t={t} />
                     <td className="px-4 py-3">
                       <TargetKeywordStatusBadge status={targetKeyword.status} t={t} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {targetKeyword.source === 'candidate' ? (
+                        <DeleteCandidateAction
+                          confirming={confirmingId === targetKeyword.id}
+                          error={deleteErrors[targetKeyword.id]}
+                          keyword={targetKeyword.keyword}
+                          onDelete={() => void handleDelete(targetKeyword.id)}
+                          pending={
+                            deleteMutation.isPending &&
+                            deleteMutation.variables === targetKeyword.id
+                          }
+                          t={t}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -164,6 +265,18 @@ export function TargetKeywordsSection({
                     value={formatMetric(targetKeyword.opportunityScore, locale, t)}
                   />
                 </dl>
+                {targetKeyword.source === 'candidate' ? (
+                  <DeleteCandidateAction
+                    confirming={confirmingId === targetKeyword.id}
+                    error={deleteErrors[targetKeyword.id]}
+                    keyword={targetKeyword.keyword}
+                    onDelete={() => void handleDelete(targetKeyword.id)}
+                    pending={
+                      deleteMutation.isPending && deleteMutation.variables === targetKeyword.id
+                    }
+                    t={t}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -257,6 +370,48 @@ function PaginationControls({
   );
 }
 
+function DeleteCandidateAction({
+  confirming,
+  error,
+  keyword,
+  onDelete,
+  pending,
+  t,
+}: {
+  confirming: boolean;
+  error?: DeleteError;
+  keyword: string;
+  onDelete: () => void;
+  pending: boolean;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
+}) {
+  return (
+    <div className="grid justify-items-start gap-1 md:justify-items-end">
+      <Button
+        type="button"
+        variant={confirming ? 'outline' : 'ghost'}
+        size={confirming ? 'sm' : 'icon'}
+        className={cn(confirming ? 'text-rose-700' : 'size-8 text-slate-500 hover:text-rose-700')}
+        aria-label={t(confirming ? 'actions.confirmDelete' : 'actions.delete', { keyword })}
+        disabled={pending}
+        onClick={onDelete}
+      >
+        {pending ? (
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Trash2 className="size-4" aria-hidden="true" />
+        )}
+        {confirming && !pending ? t('actions.confirmDeleteLabel') : null}
+      </Button>
+      {error ? (
+        <p role="alert" className="max-w-44 text-rose-700 text-xs">
+          {t(`deleteErrors.${error}`)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function TableHeading({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <th scope="col" className={cn('px-4 py-2 font-semibold text-xs', className)}>
@@ -341,4 +496,10 @@ function formatMetric(
   t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>,
 ) {
   return value === null ? t('notAvailable') : formatNumber(value, locale);
+}
+
+function omitKey<TValue>(record: Record<string, TValue>, key: string) {
+  const next = { ...record };
+  delete next[key];
+  return next;
 }

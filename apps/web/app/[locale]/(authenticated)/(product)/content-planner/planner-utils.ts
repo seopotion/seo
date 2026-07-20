@@ -1,6 +1,7 @@
 import type {
   CalendarDay,
   CandidateAddApiError,
+  CandidateDeleteApiError,
   CandidateKeywordResponse,
   CandidateScheduleError,
   KeywordMetric,
@@ -42,6 +43,27 @@ export function getCandidateAddApiError(status: number): CandidateAddApiError {
   if (status === 402) return 'upgrade';
   if (status === 403) return 'forbidden';
   if (status === 404) return 'not_found';
+  return 'generic';
+}
+
+export function getCandidateDeleteApiError(
+  status: number,
+  responseBody?: unknown,
+): CandidateDeleteApiError {
+  if (status === 401) return 'unauthorized';
+  if (status === 402) return 'upgrade';
+  if (status === 404) return 'not_found';
+
+  if (
+    status === 409 &&
+    typeof responseBody === 'object' &&
+    responseBody !== null &&
+    'error' in responseBody &&
+    responseBody.error === 'candidate_not_deletable'
+  ) {
+    return 'candidate_not_deletable';
+  }
+
   return 'generic';
 }
 

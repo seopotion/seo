@@ -57,4 +57,51 @@ describe('ArticleRepo (integration)', () => {
     expect(found?.id).toBe(articles[0]!.id);
     expect(await ArticleRepo.findById('not-an-objectid')).toBeNull();
   });
+
+  test('create leaves updated_at null until the first edit', async () => {
+    const created = await ArticleRepo.create(base({ slug: 'fresh' }));
+    expect(created.updated_at).toBeNull();
+  });
+
+  test('updateContent writes the editable fields and stamps updated_at', async () => {
+    const created = await ArticleRepo.create(base({ slug: 'editable' }));
+    const updated = await ArticleRepo.updateContent(created.id, {
+      title: 'New title',
+      slug: 'new-slug',
+      meta_title: 'New meta title',
+      meta_description: 'New meta description',
+      content: '# new body',
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated).toMatchObject({
+      id: created.id,
+      title: 'New title',
+      slug: 'new-slug',
+      meta_title: 'New meta title',
+      meta_description: 'New meta description',
+      content: '# new body',
+    });
+    expect(updated?.updated_at).toBeInstanceOf(Date);
+    // Untouched fields survive the $set.
+    expect(updated?.org_id).toBe(created.org_id);
+    expect(updated?.status).toBe(created.status);
+
+    // Persisted, not just echoed back.
+    const reread = await ArticleRepo.findById(created.id);
+    expect(reread?.title).toBe('New title');
+    expect(reread?.updated_at).toEqual(updated?.updated_at);
+  });
+
+  test('updateContent returns null for unknown/invalid id', async () => {
+    const patch = {
+      title: 'x',
+      slug: 'x',
+      meta_title: 'x',
+      meta_description: 'x',
+      content: 'x',
+    };
+    expect(await ArticleRepo.updateContent('not-an-objectid', patch)).toBeNull();
+    expect(await ArticleRepo.updateContent('ffffffffffffffffffffffff', patch)).toBeNull();
+  });
 });
