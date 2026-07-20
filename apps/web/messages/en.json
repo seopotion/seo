@@ -35,10 +35,17 @@
     "loadError": "Dashboard API is unavailable, so empty development data is shown.",
     "loading": "Loading home...",
     "recommended": {
-      "done": "done",
-      "integration": "Connect a publishing integration",
-      "keywords": "Add keywords to start generating",
-      "searchConsole": "Connect Google Search Console",
+      "actions": {
+        "addKeywords": "Add keywords to start generating",
+        "allCaughtUp": "You're all caught up — nothing needs your attention.",
+        "connectSearchConsole": "Connect Google Search Console to unlock performance data",
+        "generationFailed": "{count, plural, one {# article failed to generate — review it} other {# articles failed to generate — review them}}",
+        "overdue": "{count, plural, one {# scheduled article is overdue} other {# scheduled articles are overdue}}",
+        "planNext": "Nothing is scheduled — plan your next article",
+        "strategyFailed": "Your content strategy failed to build — try again",
+        "strategyPending": "Your content strategy is still being built",
+        "upgrade": "Upgrade to unlock keyword research"
+      },
       "title": "Recommended Actions"
     }
   },
@@ -114,8 +121,9 @@
         "close": "Close editor",
         "continueEditing": "Continue editing",
         "discard": "Discard changes",
-        "save": "Save session draft",
-        "saved": "Session draft saved"
+        "retry": "Try again",
+        "save": "Save",
+        "saved": "Saved"
       },
       "articleStatuses": {
         "deleted": "Deleted",
@@ -139,16 +147,6 @@
         "failed": "Image failed",
         "pending": "Image pending"
       },
-      "mock": {
-        "conclusion": "End by connecting {keyword} back to a clear reader decision and the next step this article should support.",
-        "conclusionHeading": "Next step",
-        "intent": "People searching for {keyword} need a direct answer first, then enough practical detail to trust the recommendation.",
-        "intentHeading": "Search intent",
-        "introduction": "Start with the core problem behind {keyword} and explain what the reader will learn before making a decision.",
-        "metaDescription": "A practical SEO article draft for {keyword}, covering search intent, reader questions, content structure, and next steps for publishing teams.",
-        "structure": "Use short sections, scannable headings, and examples that make the article easy to review before publication.",
-        "structureHeading": "Recommended structure"
-      },
       "preview": {
         "empty": "Nothing to preview yet."
       },
@@ -156,10 +154,17 @@
         "context": "Context"
       },
       "status": {
-        "localOnly": "Unsaved session draft",
+        "loadError": "We couldn't load this article. Check your connection and try again.",
+        "loading": "Loading article…",
+        "notFound": "This article no longer exists. It may have been deleted.",
         "notGenerated": "This article has not been generated yet.",
+        "saveError": "We couldn't save your changes. Check your connection and try again.",
+        "saveFailed": "Not saved",
+        "saveInvalid": "Some fields were rejected. Fix the highlighted fields and save again.",
+        "saveNotFound": "This article no longer exists, so your changes were not saved.",
+        "saving": "Saving…",
         "unsavedChanges": "Unsaved changes",
-        "updatedAt": "Session draft saved {date}"
+        "updatedAt": "Last updated {date}"
       },
       "tabs": {
         "editor": "Editor",
@@ -171,7 +176,8 @@
         "metaDescriptionRange": "Outside the 120-160 character target.",
         "metaDescriptionTarget": "Target: 120-160 characters.",
         "metaTitleTooLong": "Over the 60 character target.",
-        "required": "Required"
+        "required": "Required",
+        "serverRejected": "Rejected by the server."
       }
     },
     "modal": {
@@ -246,6 +252,8 @@
       "planned": "Planned"
     },
     "status": {
+      "failedHeading": "Your content plan could not be created",
+      "failedSupportingText": "Something went wrong while building the plan. Contact support if this keeps happening.",
       "loadError": "Could not load the content planner. Try again when the API is available.",
       "loading": "Loading content planner...",
       "noOrganization": "No completed organization was found for this workspace.",
@@ -255,18 +263,26 @@
     },
     "targetKeywords": {
       "actions": {
-        "loadMore": "Load more",
-        "loadingMore": "Loading...",
+        "confirmDelete": "Confirm removing {keyword} from the keyword pool",
+        "confirmDeleteLabel": "Confirm",
+        "delete": "Remove {keyword} from the keyword pool",
         "research": "Research Keywords",
         "retry": "Retry"
       },
       "columns": {
+        "action": "Actions",
         "difficulty": "Difficulty",
         "intent": "Intent",
         "keyword": "Keyword",
         "opportunityScore": "Opportunity score",
         "status": "Status",
         "volume": "Volume"
+      },
+      "deleteErrors": {
+        "candidate_not_deletable": "This keyword can no longer be removed. Refresh to see its current status.",
+        "generic": "Could not remove this keyword. Try again.",
+        "not_found": "This keyword is no longer in your pool.",
+        "upgrade": "Removing keywords is a paid feature."
       },
       "description": "Review available and scheduled keywords for your content plan.",
       "intents": {
@@ -277,6 +293,14 @@
       },
       "listLabel": "Target keywords list",
       "notAvailable": "—",
+      "pagination": {
+        "label": "Target keywords pagination",
+        "next": "Next",
+        "page": "Page {page} of {totalPages}",
+        "perPage": "{count} per page",
+        "previous": "Previous",
+        "range": "{start}-{end} of {total}"
+      },
       "researchPaidFeature": "Paid feature",
       "states": {
         "emptyDescription": "Available and scheduled keywords will appear here.",
@@ -489,10 +513,18 @@
     "testimonialsDescription": "Join others who've simplified their SEO.",
     "testimonialsTitle": "Loved by users",
     "useCases": [
-      { "name": "Indie Developers & Solopreneurs" },
-      { "name": "Startups" },
-      { "name": "Small Business Owners" },
-      { "name": "Anyone who wants to be visible on the web" }
+      {
+        "name": "Indie Developers & Solopreneurs"
+      },
+      {
+        "name": "Startups"
+      },
+      {
+        "name": "Small Business Owners"
+      },
+      {
+        "name": "Anyone who wants to be visible on the web"
+      }
     ],
     "useCasesTitle": "Perfect for"
   },
@@ -689,19 +721,71 @@
       "title": "Compare plans"
     },
     "comparisonRows": [
-      { "expert": "30", "growth": "30", "label": "Articles / month" },
-      { "expert": "Unlimited", "growth": "Unlimited", "label": "Users" },
-      { "expert": true, "growth": true, "label": "Automatic keyword research" },
-      { "expert": true, "growth": true, "label": "CMS publishing integrations" },
-      { "expert": true, "growth": true, "label": "AI images" },
-      { "expert": true, "growth": true, "label": "Relevant YouTube videos" },
-      { "expert": true, "growth": true, "label": "Unlimited AI rewrites" },
-      { "expert": true, "growth": false, "label": "Dedicated SEO expert" },
-      { "expert": true, "growth": false, "label": "SEO strategy and roadmap" },
-      { "expert": true, "growth": false, "label": "Manual content review" },
-      { "expert": true, "growth": false, "label": "On-page SEO recommendations" },
-      { "expert": true, "growth": false, "label": "Backlink opportunity review" },
-      { "expert": true, "growth": false, "label": "Monthly SEO reporting" }
+      {
+        "expert": "30",
+        "growth": "30",
+        "label": "Articles / month"
+      },
+      {
+        "expert": "Unlimited",
+        "growth": "Unlimited",
+        "label": "Users"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Automatic keyword research"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "CMS publishing integrations"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "AI images"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Relevant YouTube videos"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Unlimited AI rewrites"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Dedicated SEO expert"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "SEO strategy and roadmap"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Manual content review"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "On-page SEO recommendations"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Backlink opportunity review"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Monthly SEO reporting"
+      }
     ],
     "description": "Choose automated SEO content on autopilot, or add an expert to guide strategy, execution, and reporting.",
     "faq": [

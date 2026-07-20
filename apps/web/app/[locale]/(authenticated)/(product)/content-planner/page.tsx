@@ -1,7 +1,7 @@
 'use client';
 
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LoaderCircle } from 'lucide-react';
+import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -30,7 +30,7 @@ import {
   mapPlannerKeywords,
   startOfToday,
 } from './planner-utils';
-import type { ArticleEditorDraft, CalendarDay, PlannerArticle } from './types';
+import type { CalendarDay, PlannerArticle } from './types';
 
 const PLANNER_FIXTURES_ALLOWED = process.env.NODE_ENV !== 'production';
 const PLANNER_POLL_INTERVAL_MS = 30_000;
@@ -56,9 +56,6 @@ export default function ContentPlannerPage() {
     organizationId: string;
     status: StrategyStatus;
   } | null>(null);
-  const [articleDraftsById, setArticleDraftsById] = useState<Record<string, ArticleEditorDraft>>(
-    {},
-  );
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
   const [chooserDateKey, setChooserDateKey] = useState<string | null>(null);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
@@ -67,9 +64,6 @@ export default function ContentPlannerPage() {
   const [fixturesResolved, setFixturesResolved] = useState(!PLANNER_FIXTURES_ALLOWED);
   const [redirecting, setRedirecting] = useState(false);
   const modalOpen = Boolean(selectedArticle) || Boolean(chooserDateKey) || researchModalOpen;
-  const selectedSavedDraft = selectedArticle?.articleId
-    ? articleDraftsById[selectedArticle.articleId]
-    : undefined;
 
   const handleUnauthorized = useCallback(() => {
     setRedirecting(true);
@@ -79,12 +73,6 @@ export default function ContentPlannerPage() {
     router.replace('/');
   }, [queryClient, router]);
 
-  const handleSaveArticleDraft = useCallback((draftArticle: ArticleEditorDraft) => {
-    setArticleDraftsById((currentDrafts) => ({
-      ...currentDrafts,
-      [draftArticle.id]: draftArticle,
-    }));
-  }, []);
   const handleCloseArticle = useCallback(() => {
     setSelectedArticle(null);
   }, []);
@@ -116,7 +104,6 @@ export default function ContentPlannerPage() {
     }
 
     organizationIdRef.current = organization?.id;
-    setArticleDraftsById({});
     setSelectedArticle(null);
     setChooserDateKey(null);
     setResearchModalOpen(false);
@@ -244,6 +231,22 @@ export default function ContentPlannerPage() {
     staleTime: 60 * 60 * 1000,
   });
 
+  // Target Keywords paginates client-side, so the whole candidate pool has to be in hand.
+  useEffect(() => {
+    if (
+      candidateQuery.hasNextPage &&
+      !candidateQuery.isFetchingNextPage &&
+      !candidateQuery.isError
+    ) {
+      void candidateQuery.fetchNextPage();
+    }
+  }, [
+    candidateQuery.fetchNextPage,
+    candidateQuery.hasNextPage,
+    candidateQuery.isError,
+    candidateQuery.isFetchingNextPage,
+  ]);
+
   const today = useMemo(() => startOfToday(), []);
   const plannerArticles = useMemo(() => {
     if (pendingPreviewEnabled) return [];
@@ -323,21 +326,13 @@ export default function ContentPlannerPage() {
             heading={t('status.pendingHeading')}
             supportingText={t('status.pendingSupportingText')}
           />
+        ) : strategyStatus === 'failed' ? (
+          <FailedStrategyPanel
+            heading={t('status.failedHeading')}
+            supportingText={t('status.failedSupportingText')}
+          />
         ) : (
           <>
-            <TargetKeywordsSection
-              canResearch={canResearchKeywords}
-              hasMore={candidateQuery.hasNextPage}
-              loadError={targetKeywordsLoadError}
-              loading={targetKeywordsLoading}
-              loadingMore={candidateQuery.isFetchingNextPage}
-              onLoadMore={() => void candidateQuery.fetchNextPage()}
-              onResearch={handleOpenResearch}
-              onRetry={() => void candidateQuery.refetch()}
-              researchAvailable={researchAvailable}
-              targetKeywords={targetKeywords}
-            />
-
             <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <h2 className="font-semibold text-base text-slate-950">
                 {t('contentCalendar.title')}
@@ -389,15 +384,28 @@ export default function ContentPlannerPage() {
                 />
               ))}
             </section>
+
+            <TargetKeywordsSection
+              canResearch={canResearchKeywords}
+              loadError={targetKeywordsLoadError}
+              loading={targetKeywordsLoading || candidateQuery.isFetchingNextPage}
+              onResearch={handleOpenResearch}
+              onRetry={() => void candidateQuery.refetch()}
+              onUnauthorized={handleUnauthorized}
+              organizationId={organization?.id ?? ''}
+              researchAvailable={researchAvailable}
+              targetKeywords={targetKeywords}
+            />
           </>
         )}
       </div>
 
       <ArticleEditorModal
         article={selectedArticle}
+        fixturesEnabled={fixturesEnabled}
         onClose={handleCloseArticle}
-        onSaveDraft={handleSaveArticleDraft}
-        savedDraft={selectedSavedDraft}
+        onUnauthorized={handleUnauthorized}
+        organizationId={organization?.id ?? ''}
       />
       <ResearchKeywordsModal
         key={organization?.id ?? 'no-organization'}
@@ -445,6 +453,27 @@ function PendingStrategyPanel({
         <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
         <h2 className="font-semibold text-slate-950 text-base">{heading}</h2>
         <p className="text-slate-600 text-sm">{supportingText}</p>
+      </div>
+    </section>
+  );
+}
+
+function FailedStrategyPanel({
+  heading,
+  supportingText,
+}: {
+  heading: string;
+  supportingText: string;
+}) {
+  return (
+    <section
+      role="alert"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-12 text-center"
+    >
+      <div className="grid justify-items-center gap-2">
+        <AlertTriangle className="size-5 text-rose-600" aria-hidden="true" />
+        <h2 className="font-semibold text-base text-rose-950">{heading}</h2>
+        <p className="text-rose-800 text-sm">{supportingText}</p>
       </div>
     </section>
   );

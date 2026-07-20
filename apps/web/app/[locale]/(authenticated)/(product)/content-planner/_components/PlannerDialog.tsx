@@ -55,7 +55,7 @@ export function PlannerDialog({
         aria-labelledby={labelledBy}
         tabIndex={-1}
         className={cn(
-          'relative flex h-[100dvh] w-full flex-col bg-white shadow-lg sm:h-[min(90dvh,760px)] sm:max-w-5xl sm:rounded-lg sm:border sm:border-slate-200',
+          'relative flex h-dvh w-full flex-col bg-white shadow-lg sm:h-[min(90dvh,760px)] sm:max-w-5xl sm:rounded-lg sm:border sm:border-slate-200',
           className,
         )}
       >

@@ -1,7 +1,13 @@
-import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
 import { ArticleRepo, GscConnectionRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { domainRatingFromRank } from '@shared/providers';
-import { type Article, isGscConnected } from '@shared/schemas';
+import {
+  type Article,
+  isGscConnected,
+  META_DESCRIPTION_MAX,
+  META_DESCRIPTION_MIN,
+  META_TITLE_MAX,
+} from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
 import { decryptSecret } from '../lib/crypto';
@@ -33,16 +39,48 @@ function toArticleDetail(a: Article) {
   return {
     id: a.id,
     keyword_id: a.keyword_id,
+    keyword: a.keyword,
     title: a.title,
+    meta_title: a.meta_title,
     slug: a.slug,
     meta_description: a.meta_description,
     featured_image_url: a.featured_image_url,
     content: a.content,
     status: a.status,
+    images_status: a.images_status,
     created_at: a.created_at.toISOString(),
+    updated_at: a.updated_at ? a.updated_at.toISOString() : null,
     published_at: a.published_at ? a.published_at.toISOString() : null,
     video: a.video,
   };
+}
+
+/**
+ * Editor save rules (#74). Mirrors the modal's client-side checks — including
+ * trimming, so `"   "` fails on both sides rather than only one. Returns the
+ * offending fields; an empty object means valid.
+ */
+function validateArticleUpdate(
+  body: z.infer<typeof schemas.ArticleUpdateBody>,
+): Record<string, string> {
+  const fields: Record<string, string> = {};
+
+  if (!body.title.trim()) fields.title = 'Title is required';
+  if (!body.slug.trim()) fields.slug = 'Slug is required';
+  if (!body.content.trim()) fields.content = 'Content is required';
+
+  if (!body.meta_title.trim()) fields.meta_title = 'Meta title is required';
+  else if (body.meta_title.length > META_TITLE_MAX)
+    fields.meta_title = `Meta title must be ${META_TITLE_MAX} characters or fewer`;
+
+  if (!body.meta_description.trim()) fields.meta_description = 'Meta description is required';
+  else if (
+    body.meta_description.length < META_DESCRIPTION_MIN ||
+    body.meta_description.length > META_DESCRIPTION_MAX
+  )
+    fields.meta_description = `Meta description must be between ${META_DESCRIPTION_MIN} and ${META_DESCRIPTION_MAX} characters`;
+
+  return fields;
 }
 
 /** Search Analytics window: the trailing 28 days, as yyyy-mm-dd bounds. */
@@ -430,6 +468,54 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ error: 'Article not found' }, 404);
       }
       return c.json(toArticleDetail(article), 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'patch',
+      path: '/articles/{id}',
+      summary: 'Save editor changes to a generated article',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: {
+        params: schemas.ArticleParams,
+        body: { content: { 'application/json': { schema: schemas.ArticleUpdateBody } } },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.ArticleDetailResponse } },
+          description: 'The updated article record',
+        },
+        400: {
+          content: { 'application/json': { schema: schemas.ArticleValidationErrorResponse } },
+          description: 'One or more fields failed validation',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
+          description: 'No article with that id',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      // A missing article and one owned by another user both 404 — never leak
+      // existence across accounts (same rule as loadOwnedOrg).
+      if (!article || !(await loadOwnedOrg(article.org_id, userId))) {
+        return c.json({ error: 'Article not found' }, 404);
+      }
+
+      const fields = validateArticleUpdate(body);
+      if (Object.keys(fields).length > 0) {
+        return c.json({ error: 'Validation failed', fields }, 400);
+      }
+
+      const updated = await ArticleRepo.updateContent(id, body);
+      if (!updated) return c.json({ error: 'Article not found' }, 404);
+      return c.json(toArticleDetail(updated), 200);
     },
   )
   // --- Articles Settings (§2.3) ---
