@@ -63,17 +63,69 @@ export const CandidateRepo = {
     return docs.map((d, i) => toEntity({ _id: res.insertedIds[i]!, ...d }));
   },
 
+  /**
+   * Paginated candidate-pool read (#99). Stable ordering: opportunity_score
+   * desc (nulls last), created_at asc, _id asc as deterministic tie-breaker.
+   */
   async listByOrg(
     orgId: string,
-    opts: { status?: Candidate['status'] } = {},
-  ): Promise<Candidate[]> {
+    opts: { status?: Candidate['status']; limit?: number; offset?: number } = {},
+  ): Promise<{ candidates: Candidate[]; total: number }> {
     const query: Document = { org_id: orgId };
     if (opts.status) query.status = opts.status;
-    const docs = await (await collection())
+    const col = await collection();
+    const cursor = col
       .find(query)
-      .sort({ opportunity_score: -1, created_at: 1 })
-      .toArray();
-    return docs.map(toEntity);
+      .sort({ opportunity_score: -1, created_at: 1, _id: 1 })
+      .skip(opts.offset ?? 0);
+    if (opts.limit !== undefined) cursor.limit(opts.limit);
+    const [docs, total] = await Promise.all([cursor.toArray(), col.countDocuments(query)]);
+    return { candidates: docs.map(toEntity), total };
+  },
+
+  async findById(id: string): Promise<Candidate | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOne({ _id: new ObjectId(id) });
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
+   * Conditionally claim a candidate for scheduling: only a `candidate` may
+   * become `selected`, so concurrent claims have exactly one winner (#99).
+   */
+  async claimForScheduling(candidateId: string): Promise<Candidate | null> {
+    if (!ObjectId.isValid(candidateId)) return null;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(candidateId), status: 'candidate' },
+      { $set: { status: 'selected', updated_at: new Date() } },
+      { returnDocument: 'after' },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
+   * Conditionally reject a candidate: only a `candidate` may be rejected, so a
+   * scheduled/`selected` or already-rejected one is refused and concurrent
+   * rejections have exactly one winner.
+   */
+  async rejectIfCandidate(candidateId: string): Promise<boolean> {
+    if (!ObjectId.isValid(candidateId)) return false;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(candidateId), status: 'candidate' },
+      { $set: { status: 'rejected', updated_at: new Date() } },
+      { returnDocument: 'after' },
+    );
+    return doc !== null;
+  },
+
+  /** Return a `selected` candidate to the pool after unscheduling (#99). */
+  async releaseAfterUnschedule(candidateId: string): Promise<boolean> {
+    if (!ObjectId.isValid(candidateId)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(candidateId), status: 'selected' },
+      { $set: { status: 'candidate', updated_at: new Date() } },
+    );
+    return res.modifiedCount === 1;
   },
 
   async findByNormalized(orgId: string, normalized: string): Promise<Candidate | null> {

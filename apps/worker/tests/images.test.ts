@@ -87,11 +87,17 @@ const org = {
   website_url: 'https://x.com',
   presets: {
     business: { name: 'Acme', language: 'English', country: 'US', description: 'widgets' },
-    audience: { target: 'makers', competitors: [] },
+    audience: { target: ['makers'], competitors: [] },
     blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
     article_preferences: {
-      content_seo: { article_style: 'x', internal_links: false, llm_instructions: '' },
-      engagement: { image_style: 'flat illustration' },
+      content_seo: {
+        article_style: 'x',
+        internal_links_count: 0,
+        table_of_contents: true,
+        llm_instructions: '',
+      },
+      engagement: { image_style: 'flat illustration', youtube_videos: true },
+      publishing: { auto_publish: false },
     },
   },
 };

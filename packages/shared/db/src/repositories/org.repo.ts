@@ -82,14 +82,18 @@ export const OrgRepo = {
     return res.matchedCount > 0;
   },
 
-  /** Persist final presets and flip the org to `setup_complete` (single update). */
-  async finalize(id: string, presets: SetupPresets): Promise<void> {
+  /** Persist final presets (+ optional onboarding metadata) and flip the org to
+   * `setup_complete` in a single update. */
+  async finalize(
+    id: string,
+    presets: SetupPresets,
+    onboarding?: { referral_source?: string; integrations?: string[] },
+  ): Promise<void> {
     if (!ObjectId.isValid(id)) return;
     const data = SetupPresetsSchema.parse(presets); // validate on write
-    await (await collection()).updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { presets: data, setup_status: 'setup_complete' } },
-    );
+    const set: Record<string, unknown> = { presets: data, setup_status: 'setup_complete' };
+    if (onboarding) set.onboarding = onboarding;
+    await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: set });
   },
 
   /**
@@ -124,6 +128,15 @@ export const OrgRepo = {
     if (!ObjectId.isValid(id)) return false;
     const res = await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { plan } });
     return res.matchedCount === 1;
+  },
+
+  /** Store the latest Domain Rating (0–100) with its fetch timestamp (#12). */
+  async updateDomainRating(id: string, value: number): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { domain_rating: { value, checked_at: new Date() } } },
+    );
   },
 
   /** Delete the org (used by the `db reset-user` CLI). Returns true when a doc matched. */

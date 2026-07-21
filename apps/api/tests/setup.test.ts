@@ -16,15 +16,21 @@ const presetsFixture = {
     country: 'Global (English)',
     description: 'An example business.',
   },
-  audience: { target: 'Developers', competitors: ['acme.com'] },
+  audience: { target: ['Developers'], competitors: ['acme.com'] },
   blog: {
     sitemap_url: 'https://example.com/sitemap.xml',
     main_blog_url: 'https://example.com/blog',
     best_articles: ['https://example.com/blog/post-1'],
   },
   article_preferences: {
-    content_seo: { article_style: 'Conversational', internal_links: true, llm_instructions: '' },
-    engagement: { image_style: 'Minimal' },
+    content_seo: {
+      article_style: 'Conversational',
+      internal_links_count: 1,
+      table_of_contents: true,
+      llm_instructions: '',
+    },
+    engagement: { image_style: 'Minimal', youtube_videos: true },
+    publishing: { auto_publish: false },
   },
 };
 
@@ -278,6 +284,34 @@ describe('setup routes', () => {
     );
   });
 
+  test('PATCH /presets replaces the audience target array wholesale (no join)', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { audience: { target: ['Desalination plant operators', 'Utility managers'] } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const json = await res.json();
+    expect(json.presets.audience.target).toEqual([
+      'Desalination plant operators',
+      'Utility managers',
+    ]);
+    expect(OrgRepo.updatePresets).toHaveBeenCalledWith(
+      '6650f1a2b3c4d5e6f7a8b9c0',
+      expect.objectContaining({
+        audience: expect.objectContaining({
+          target: ['Desalination plant operators', 'Utility managers'],
+        }),
+      }),
+    );
+  });
+
   test('PATCH /presets returns 404 for an org owned by another user', async () => {
     const res = await client.api.v0.setup.presets.$patch(
       { json: { org_id: 'other_users_org', presets: { business: { name: 'Hijack' } } } },
@@ -353,6 +387,33 @@ describe('setup routes', () => {
       { headers: await authHeader() },
     );
     expect(res.status).toBe(409);
+  });
+
+  test('finalize persists referral_source + integrations onto onboarding', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          referral_source: 'LinkedIn',
+          integrations: ['wordpress'],
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    expect(OrgRepo.finalize).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', expect.any(Object), {
+      referral_source: 'LinkedIn',
+      integrations: ['wordpress'],
+    });
+  });
+
+  test('finalize rejects an unknown integration id', async () => {
+    const res = await client.api.v0.setup.finalize.$post(
+      // @ts-expect-error — 'wix' is not a valid ONBOARDING_INTEGRATIONS member
+      { json: { org_id: '6650f1a2b3c4d5e6f7a8b9c0', integrations: ['wix'] } },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(400);
   });
 
   test('GET /health returns OK', async () => {

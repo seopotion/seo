@@ -1,5 +1,13 @@
 import { z } from '@hono/zod-openapi';
-import { SetupPresetsSchema } from '@shared/schemas';
+import {
+  ARTICLE_TYPES,
+  ArticleVideoSchema,
+  GENERATION_STATUSES,
+  IMAGES_STATUSES,
+  PublishingPrefsSchema,
+  SEARCH_INTENTS,
+  SetupPresetsSchema,
+} from '@shared/schemas';
 import { STRATEGY_STATUSES } from '@shared/types';
 
 // Org-scoped read: the caller passes org_id; the handler checks ownership.
@@ -22,10 +30,10 @@ export const OrgNotFoundResponse = z
 
 const BestArticle = z
   .object({
-    id: z.string(),
-    title: z.string(),
     url: z.string(),
     clicks: z.number().int(),
+    // Matched against our published articles by slug; null for other site pages.
+    title: z.string().nullable(),
   })
   .openapi('BestArticle');
 
@@ -75,6 +83,25 @@ export const WordPressConnectionErrorResponse = z
   })
   .openapi('WordPressConnectionErrorResponse');
 
+export const SearchPerformanceResponse = z
+  .object({
+    // Gated until a healthy GSC connection exists; metrics are 28-day totals.
+    gated: z.boolean(),
+    clicks: z.number().nullable(),
+    impressions: z.number().nullable(),
+    ctr: z.number().nullable(),
+    position: z.number().nullable(),
+  })
+  .openapi('SearchPerformanceResponse');
+
+export const DomainRatingResponse = z
+  .object({
+    // 0–100 badge value; null when the org was never rated and the provider is
+    // unavailable.
+    rating: z.number().int().min(0).max(100).nullable(),
+  })
+  .openapi('DomainRatingResponse');
+
 /**
  * Content Planner schemas (design/product-flow.md §2.1). The monthly calendar
  * is a list of scheduled keywords; each card's affordance depends on whether an
@@ -85,12 +112,22 @@ export const WordPressConnectionErrorResponse = z
 const PlannerKeyword = z
   .object({
     id: z.string(),
+    // Source candidate linkage (#99); null for legacy records.
+    candidate_id: z.string().nullable(),
     keyword: z.string(),
     status: z.enum(['scheduled']),
     // ISO date (yyyy-mm-dd) the article is scheduled to generate/publish.
     scheduled_date: z.string(),
     search_volume: z.number().int(),
     difficulty: z.number().int(),
+    // Classification from the candidate/strategy pipeline; null for older entries.
+    article_type: z.enum(ARTICLE_TYPES).nullable(),
+    intent: z.enum(SEARCH_INTENTS).nullable(),
+    opportunity_score: z.number().nullable(),
+    // Generation lifecycle (#55): the keyword is the provisional display title
+    // until article_id is populated by the generation worker.
+    generation_status: z.enum(GENERATION_STATUSES),
+    generation_error: z.string().nullable(),
     // null until a keyword has been turned into an article by the (later) worker.
     article_id: z.string().nullable(),
   })
@@ -168,15 +205,23 @@ export const ArticleDetailResponse = z
   .object({
     id: z.string(),
     keyword_id: z.string(),
+    // Denormalized keyword + SERP <title>; both drive the editor modal (#74).
+    keyword: z.string(),
     title: z.string(),
+    meta_title: z.string(),
     slug: z.string(),
     meta_description: z.string(),
     featured_image_url: z.string(),
     content: z.string(),
     status: z.enum(ARTICLE_STATUSES),
     wordpress_post_id: z.number().int().positive().optional(),
+    images_status: z.enum(IMAGES_STATUSES),
     created_at: z.string(),
+    // Last editor save, ISO; null until the article is first edited (#74).
+    updated_at: z.string().nullable(),
     published_at: z.string().nullable(),
+    // Auto-sourced YouTube embed (#85); the iframe is also in `content`.
+    video: ArticleVideoSchema.nullable(),
   })
   .openapi('ArticleDetailResponse');
 
@@ -197,6 +242,28 @@ export const WordPressArticleResponse = z
 export const WordPressArticleErrorResponse = z
   .object({ error: z.string() })
   .openapi('WordPressArticleErrorResponse');
+
+// The editor's five editable fields. Deliberately permissive here: `apps/api`
+// has no `defaultHook`, so a Zod failure would return the library's error shape
+// instead of the { error, fields } contract. The handler validates and builds
+// that response itself (#74).
+export const ArticleUpdateBody = z
+  .object({
+    title: z.string(),
+    slug: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    content: z.string(),
+  })
+  .openapi('ArticleUpdate');
+
+export const ArticleValidationErrorResponse = z
+  .object({
+    error: z.string().openapi({ example: 'Validation failed' }),
+    // Field name -> message, for the offending fields only.
+    fields: z.record(z.string(), z.string()),
+  })
+  .openapi('ArticleValidationError');
 
 /**
  * Settings schemas (design/product-flow.md §2.3 + §2.6). Post-onboarding, the
@@ -231,6 +298,7 @@ export const ArticlesSettingsPatchBody = z
       .partial()
       .optional(),
     engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement.partial().optional(),
+    publishing: PublishingPrefsSchema.partial().optional(),
   })
   .openapi('ArticlesSettingsPatch');
 

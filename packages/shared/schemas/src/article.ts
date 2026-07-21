@@ -7,6 +7,12 @@ export const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
 export const ARTICLE_IMAGE_ROLES = ['cover', 'inline'] as const;
 export const IMAGES_STATUSES = ['pending', 'complete', 'failed'] as const;
 
+/** SEO meta length limits. Here (not @shared/generation) so `apps/web` can
+ * import them without pulling the LLM provider clients into the bundle. */
+export const META_TITLE_MAX = 60;
+export const META_DESCRIPTION_MIN = 120;
+export const META_DESCRIPTION_MAX = 160;
+
 /**
  * One planned/generated image slot. `url` is '' until the image is generated
  * and stored (then it's our CloudFront URL); slots are created once by the
@@ -24,6 +30,18 @@ export const ArticleImageSchema = z.object({
   generated_at: z.date().nullable(),
 });
 export type ArticleImage = z.infer<typeof ArticleImageSchema>;
+
+/**
+ * The auto-sourced YouTube embed (#85). Null means no video — toggle off, no
+ * relevant result, or the (non-fatal) video step failed.
+ */
+export const ArticleVideoSchema = z.object({
+  video_id: z.string(),
+  title: z.string(),
+  // Exact H2 text the iframe embed follows in `content`.
+  section_heading: z.string(),
+});
+export type ArticleVideo = z.infer<typeof ArticleVideoSchema>;
 
 /**
  * Article entity. `title` is the generated SEO title (distinct from `keyword`);
@@ -48,17 +66,24 @@ export const ArticleSchema = z.object({
   created_at: z.date(),
   published_at: z.date().nullable(),
   wordpress_post_id: z.number().int().positive().optional(),
+  // Last editor save (#74). Defaulted so pre-#74 docs still parse; null means
+  // never edited since generation.
+  updated_at: z.date().nullable().default(null),
   // Image pipeline (#51). Defaulted so pre-#51 docs still parse. The future
   // publisher must require images_status === 'complete' before publishing.
   images: z.array(ArticleImageSchema).default([]),
   images_status: z.enum(IMAGES_STATUSES).default('pending'),
+  // YouTube embed (#85). Defaulted so pre-#85 docs still parse.
+  video: ArticleVideoSchema.nullable().default(null),
 });
 export type Article = z.infer<typeof ArticleSchema>;
 
-/** Input for creating an article — the server assigns `id` and `created_at`. */
+/** Input for creating an article — the server assigns `id`, `created_at`,
+ * `updated_at`, and `wordpress_post_id`. */
 export const CreateArticleInput = ArticleSchema.omit({
   id: true,
   created_at: true,
+  updated_at: true,
   wordpress_post_id: true,
 });
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the

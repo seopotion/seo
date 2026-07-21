@@ -31,7 +31,7 @@ describe('generate', () => {
       seed: 123,
     });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe('https://fal.run/fal-ai/flux/dev');
+    expect(url).toBe('https://fal.run/fal-ai/flux-2');
     expect((init.headers as Record<string, string>).Authorization).toBe('Key fal-test');
     expect(JSON.parse(init.body as string)).toEqual({
       prompt: 'a cat',

@@ -9,7 +9,9 @@ import {
   closeDb,
   ensureIndexes,
   KeywordRepo,
+  type MigrationReport,
   OrgRepo,
+  runMigrations,
   UserRepo,
 } from '@shared/db';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
@@ -29,6 +31,22 @@ export async function initDb(): Promise<Result<DbInitData>> {
   } catch (e) {
     return fail(
       'DB_INIT_FAILED',
+      (e as Error).message,
+      'Is MongoDB running? Try `docker compose up -d mongo`.',
+    );
+  } finally {
+    await closeDb();
+  }
+}
+
+/** Run idempotent data migrations (#99) — always before `db init` on deploy. */
+export async function migrateDb(): Promise<Result<MigrationReport>> {
+  try {
+    const report = await runMigrations();
+    return ok(report);
+  } catch (e) {
+    return fail(
+      'DB_MIGRATE_FAILED',
       (e as Error).message,
       'Is MongoDB running? Try `docker compose up -d mongo`.',
     );
@@ -85,7 +103,36 @@ export async function setOrgPlan(input: {
 
     const matched = await OrgRepo.setPlan(orgId as string, plan);
     if (!matched) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
-    return ok({ org_id: orgId as string, plan });
+
+    // Flipping the plan alone doesn't start anything: the keyword/article
+    // pipeline is only ever bootstrapped by the strategy worker, which
+    // POST /setup/finalize enqueues for orgs paid *at finalize time*. Escalating
+    // to paid afterwards would otherwise leave the org permanently dormant, so
+    // kick off the strategy here the same way finalize does — claimStrategy keeps
+    // it to exactly one job across retries / a later re-finalize.
+    let strategyEnqueued = false;
+    if (plan === 'paid') {
+      const org = await OrgRepo.findById(orgId as string);
+      const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
+      if (finalized && (await OrgRepo.claimStrategy(orgId as string))) {
+        try {
+          const { enqueueStrategyTask } = await import('./sqs');
+          await enqueueStrategyTask({ org_id: orgId as string });
+          strategyEnqueued = true;
+        } catch (e) {
+          // The claim already flipped strategy_status to `pending`; revert it so
+          // a later re-run can reclaim, and surface the failure — the plan is set
+          // but the pipeline did not start.
+          await OrgRepo.setStrategyStatus(orgId as string, 'failed');
+          return fail(
+            'STRATEGY_ENQUEUE_FAILED',
+            `Plan set to paid, but enqueueing the strategy task failed: ${(e as Error).message}`,
+            'Is STRATEGY_QUEUE_URL set (and SQS reachable)? Re-run set-plan to retry.',
+          );
+        }
+      }
+    }
+    return ok({ org_id: orgId as string, plan, strategy_enqueued: strategyEnqueued });
   } finally {
     await closeDb();
   }

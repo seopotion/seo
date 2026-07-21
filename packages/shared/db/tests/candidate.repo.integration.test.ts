@@ -43,20 +43,87 @@ describe('CandidateRepo (integration)', () => {
     expect(await CandidateRepo.findByNormalized('other_org', 'notion seo')).toBeNull();
   });
 
-  test('listByOrg filters by status', async () => {
+  test('listByOrg filters by status and reports total', async () => {
     const all = await CandidateRepo.listByOrg('org_cand');
-    expect(all.length).toBe(3);
-    expect(await CandidateRepo.listByOrg('org_cand', { status: 'selected' })).toHaveLength(0);
+    expect(all.candidates.length).toBe(3);
+    expect(all.total).toBe(3);
+    const selected = await CandidateRepo.listByOrg('org_cand', { status: 'selected' });
+    expect(selected.candidates).toHaveLength(0);
+    expect(selected.total).toBe(0);
+  });
+
+  test('listByOrg paginates with stable ordering and total for the full filter', async () => {
+    const page1 = await CandidateRepo.listByOrg('org_cand', { limit: 2, offset: 0 });
+    const page2 = await CandidateRepo.listByOrg('org_cand', { limit: 2, offset: 2 });
+    expect(page1.candidates).toHaveLength(2);
+    expect(page2.candidates).toHaveLength(1);
+    expect(page1.total).toBe(3);
+    expect(page2.total).toBe(3);
+    const ids = [...page1.candidates, ...page2.candidates].map((c) => c.id);
+    expect(new Set(ids).size).toBe(3); // no overlap across pages
+  });
+
+  test('findById returns the candidate; null for unknown/invalid ids', async () => {
+    const { candidates } = await CandidateRepo.listByOrg('org_cand');
+    const found = await CandidateRepo.findById(candidates[0]!.id);
+    expect(found?.id).toBe(candidates[0]!.id);
+    expect(await CandidateRepo.findById('not-an-object-id')).toBeNull();
+    expect(await CandidateRepo.findById('ffffffffffffffffffffffff')).toBeNull();
+  });
+
+  test('claimForScheduling has exactly one winner; release restores the pool', async () => {
+    const { candidates } = await CandidateRepo.listByOrg('org_cand', { status: 'candidate' });
+    const target = candidates[0]!;
+
+    const [a, b] = await Promise.all([
+      CandidateRepo.claimForScheduling(target.id),
+      CandidateRepo.claimForScheduling(target.id),
+    ]);
+    expect([a, b].filter((r) => r !== null)).toHaveLength(1);
+    expect((a ?? b)!.status).toBe('selected');
+
+    expect(await CandidateRepo.releaseAfterUnschedule(target.id)).toBe(true);
+    // Releasing a non-selected candidate is a no-op.
+    expect(await CandidateRepo.releaseAfterUnschedule(target.id)).toBe(false);
+    const reloaded = await CandidateRepo.findById(target.id);
+    expect(reloaded!.status).toBe('candidate');
   });
 
   test('setStatus transitions and bumps updated_at', async () => {
-    const [first] = await CandidateRepo.listByOrg('org_cand');
+    const {
+      candidates: [first],
+    } = await CandidateRepo.listByOrg('org_cand');
     const before = first!.updated_at.getTime();
     await new Promise((r) => setTimeout(r, 5));
     await CandidateRepo.setStatus(first!.id, 'selected');
-    const selected = await CandidateRepo.listByOrg('org_cand', { status: 'selected' });
+    const { candidates: selected } = await CandidateRepo.listByOrg('org_cand', {
+      status: 'selected',
+    });
     expect(selected).toHaveLength(1);
     expect(selected[0]!.id).toBe(first!.id);
     expect(selected[0]!.updated_at.getTime()).toBeGreaterThan(before);
+  });
+
+  test('rejectIfCandidate has exactly one winner and refuses non-candidates', async () => {
+    const [target] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'seo reporting tools', source: 'manual' },
+    ]);
+
+    const [a, b] = await Promise.all([
+      CandidateRepo.rejectIfCandidate(target!.id),
+      CandidateRepo.rejectIfCandidate(target!.id),
+    ]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect((await CandidateRepo.findById(target!.id))!.status).toBe('rejected');
+
+    // A candidate claimed for scheduling is no longer deletable from the pool.
+    const [scheduled] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'seo dashboard', source: 'manual' },
+    ]);
+    await CandidateRepo.claimForScheduling(scheduled!.id);
+    expect(await CandidateRepo.rejectIfCandidate(scheduled!.id)).toBe(false);
+
+    expect(await CandidateRepo.rejectIfCandidate('not-an-object-id')).toBe(false);
+    expect(await CandidateRepo.rejectIfCandidate('ffffffffffffffffffffffff')).toBe(false);
   });
 });

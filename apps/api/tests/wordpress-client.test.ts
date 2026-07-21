@@ -24,9 +24,11 @@ const article: Article = {
   search_volume: 100,
   status: 'generated',
   created_at: new Date('2026-07-02T08:00:00.000Z'),
+  updated_at: null,
   published_at: null,
   images: [],
   images_status: 'complete',
+  video: null,
 };
 
 describe('WordPress client', () => {

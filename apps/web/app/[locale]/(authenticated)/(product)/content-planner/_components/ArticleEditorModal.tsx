@@ -1,27 +1,52 @@
 'use client';
 
-import { AlertTriangle, Check, Edit3, Eye, ImageIcon, Save, X } from 'lucide-react';
+import { META_DESCRIPTION_MAX, META_DESCRIPTION_MIN, META_TITLE_MAX } from '@shared/schemas';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, Check, Edit3, Eye, ImageIcon, Loader2, Save, X } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode, RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Input, Label, Separator, Textarea } from '@/components/ui';
+import { api } from '@/lib/api';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
 import {
-  formatDateFromKey,
-  formatDateTime,
-  formatNumber,
-  slugifyArticleTitle,
-} from '../planner-utils';
-import type { ArticleEditorDraft, PlannerArticle, PlannerArticleStatus } from '../types';
+  getArticleEditorValidation,
+  getArticleSaveApiError,
+  getServerInvalidFields,
+  hasEditableArticleChanges,
+  mapArticleDetail,
+  toArticleUpdateBody,
+} from '../article-editor-utils';
+import { createFixtureArticleDetail, saveFixtureArticleDetail } from '../fixtures';
+import { formatDateFromKey, formatDateTime, formatNumber } from '../planner-utils';
+import type {
+  ArticleDetailResponse,
+  ArticleEditorDraft,
+  ArticleSaveApiError,
+  EditableArticleField,
+  PlannerArticle,
+  PlannerArticleStatus,
+} from '../types';
 
 type ContentPlannerTranslations = ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 type ArticleEditorMode = 'editor' | 'preview';
-type EditableArticleField = 'content' | 'metaDescription' | 'metaTitle' | 'slug' | 'title';
+type ArticleSaveState = 'error' | 'idle' | 'saved' | 'saving';
 
-const META_TITLE_LIMIT = 60;
-const META_DESCRIPTION_TARGET_MIN = 120;
-const META_DESCRIPTION_TARGET_MAX = 160;
+/** Thrown by the save mutation so `onError` can localize by reason. */
+class ArticleSaveError extends Error {
+  reason: ArticleSaveApiError;
+  invalidFields: EditableArticleField[];
+
+  constructor(reason: ArticleSaveApiError, invalidFields: EditableArticleField[] = []) {
+    super(reason);
+    this.name = 'ArticleSaveError';
+    this.reason = reason;
+    this.invalidFields = invalidFields;
+  }
+}
+
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -33,49 +58,141 @@ const FOCUSABLE_SELECTOR = [
 
 export function ArticleEditorModal({
   article,
+  fixturesEnabled,
   onClose,
-  onSaveDraft,
-  savedDraft,
+  onUnauthorized,
+  organizationId,
 }: {
   article: PlannerArticle | null;
+  fixturesEnabled: boolean;
   onClose: () => void;
-  onSaveDraft: (draftArticle: ArticleEditorDraft) => void;
-  savedDraft?: ArticleEditorDraft;
+  onUnauthorized: () => void;
+  organizationId: string;
 }) {
   const t = useTranslations('ContentPlannerPage');
   const locale = useLocale();
+  const queryClient = useQueryClient();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousArticleKeyRef = useRef<string | null>(null);
   const [draftArticle, setDraftArticle] = useState<ArticleEditorDraft | null>(null);
   const [savedArticle, setSavedArticle] = useState<ArticleEditorDraft | null>(null);
   const [editorMode, setEditorMode] = useState<ArticleEditorMode>('editor');
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
-  const [savedLocally, setSavedLocally] = useState(false);
-  const articleKey = article?.articleId ?? article?.id ?? null;
+  const [saveState, setSaveState] = useState<ArticleSaveState>('idle');
+  const [saveError, setSaveError] = useState<ArticleSaveApiError | null>(null);
+  const [serverInvalidFields, setServerInvalidFields] = useState<EditableArticleField[]>([]);
+  const articleId = article?.articleId ?? null;
+  const articleKey = articleId ?? article?.id ?? null;
+
+  const articleQuery = useQuery({
+    queryKey: dashboardQueryKeys.articleDetail(organizationId, articleId ?? ''),
+    queryFn: async (): Promise<ArticleDetailResponse | null> => {
+      if (!articleId) return null;
+      if (fixturesEnabled) return createFixtureArticleDetail(articleId);
+
+      const response = await api.api.v0.dashboard.articles[':id'].$get({
+        param: { id: articleId },
+      });
+
+      if ((response.status as number) === 401) {
+        onUnauthorized();
+        return null;
+      }
+
+      // Null (not a throw) so the modal can tell "gone" from "broken".
+      if ((response.status as number) === 404) return null;
+      if (!response.ok) throw new Error('article_load_failed');
+
+      return response.json();
+    },
+    // Fixtures render without an organization, so only the real path needs one.
+    enabled: fixturesEnabled ? Boolean(articleId) : Boolean(organizationId && articleId),
+    // The editor must never render content a concurrent save has replaced.
+    staleTime: 0,
+  });
+
+  const loadedArticle = articleQuery.data ?? null;
 
   useEffect(() => {
-    if (previousArticleKeyRef.current === articleKey) {
+    const changedArticle = previousArticleKeyRef.current !== articleKey;
+
+    if (changedArticle) {
+      previousArticleKeyRef.current = articleKey;
+      setEditorMode('editor');
+      setShowCloseConfirmation(false);
+      setSaveState('idle');
+      setSaveError(null);
+      setServerInvalidFields([]);
+    }
+
+    if (!articleId || !loadedArticle) {
+      if (changedArticle) {
+        setDraftArticle(null);
+        setSavedArticle(null);
+      }
       return;
     }
 
-    previousArticleKeyRef.current = articleKey;
-    setEditorMode('editor');
-    setShowCloseConfirmation(false);
+    // Seed once the data arrives; an in-progress edit is never clobbered.
+    setDraftArticle((current) =>
+      changedArticle || !current ? mapArticleDetail(loadedArticle) : current,
+    );
+    setSavedArticle((current) =>
+      changedArticle || !current ? mapArticleDetail(loadedArticle) : current,
+    );
+  }, [articleId, articleKey, loadedArticle]);
 
-    if (!article?.articleId) {
-      setDraftArticle(null);
-      setSavedArticle(null);
-      setSavedLocally(false);
-      return;
-    }
+  const saveMutation = useMutation({
+    mutationFn: async (draft: ArticleEditorDraft): Promise<ArticleDetailResponse> => {
+      const body = toArticleUpdateBody(draft);
 
-    const existingDraft = savedDraft?.id === article.articleId ? savedDraft : undefined;
-    const nextDraft = existingDraft ?? createArticleEditorDraft(article, t);
+      if (fixturesEnabled) return saveFixtureArticleDetail(draft.id, body);
 
-    setDraftArticle(nextDraft);
-    setSavedArticle(nextDraft);
-    setSavedLocally(Boolean(existingDraft?.updatedAt));
-  }, [article, articleKey, savedDraft, t]);
+      const response = await api.api.v0.dashboard.articles[':id'].$patch({
+        param: { id: draft.id },
+        json: body,
+      });
+
+      if (!response.ok) {
+        const reason = getArticleSaveApiError(response.status as number);
+
+        if (reason === 'unauthorized') {
+          onUnauthorized();
+        }
+
+        // The 400 body names the offending fields; the modal localizes them.
+        const invalidFields =
+          reason === 'invalid'
+            ? getServerInvalidFields(await response.json().catch(() => null))
+            : [];
+
+        throw new ArticleSaveError(reason, invalidFields);
+      }
+
+      return response.json();
+    },
+    onSuccess: (updated) => {
+      // Reseed from the response so `updated_at` is the server's, not ours.
+      const nextArticle = mapArticleDetail(updated);
+      setDraftArticle(nextArticle);
+      setSavedArticle(nextArticle);
+      setSaveState('saved');
+      setSaveError(null);
+      setServerInvalidFields([]);
+      setShowCloseConfirmation(false);
+      queryClient.setQueryData(
+        dashboardQueryKeys.articleDetail(organizationId, updated.id),
+        updated,
+      );
+      // Content History lists the title/slug this save may have changed.
+      queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.articleLists(organizationId) });
+    },
+    onError: (error) => {
+      setSaveState('error');
+      setSaveError(error instanceof ArticleSaveError ? error.reason : 'generic');
+      setServerInvalidFields(error instanceof ArticleSaveError ? error.invalidFields : []);
+    },
+  });
 
   const dirty = useMemo(
     () =>
@@ -107,26 +224,21 @@ export function ArticleEditorModal({
     setDraftArticle((currentArticle) =>
       currentArticle ? { ...currentArticle, [field]: value } : currentArticle,
     );
-    setSavedLocally(false);
+    setSaveState('idle');
+    setSaveError(null);
+    // The server's verdict is stale the moment the user edits.
+    setServerInvalidFields((current) => (current.length ? [] : current));
     setShowCloseConfirmation(false);
   }, []);
 
-  const saveDraftLocally = useCallback(() => {
-    if (!draftArticle || !validation.isValid) {
+  const saveArticle = useCallback(() => {
+    if (!draftArticle || !validation.isValid || saveMutation.isPending) {
       return;
     }
 
-    const nextSavedArticle = {
-      ...draftArticle,
-      updatedAt: new Date().toISOString(),
-    };
-
-    setDraftArticle(nextSavedArticle);
-    setSavedArticle(nextSavedArticle);
-    setSavedLocally(true);
-    setShowCloseConfirmation(false);
-    onSaveDraft(nextSavedArticle);
-  }, [draftArticle, onSaveDraft, validation.isValid]);
+    setSaveState('saving');
+    saveMutation.mutate(draftArticle);
+  }, [draftArticle, saveMutation, validation.isValid]);
 
   const discardAndClose = useCallback(() => {
     if (savedArticle) {
@@ -146,12 +258,14 @@ export function ArticleEditorModal({
   }
 
   const isGeneratedArticle = Boolean(article.articleId);
+  // Only the full editor takes over the viewport; the message panels are cards.
+  const showsFullEditor = isGeneratedArticle && Boolean(draftArticle);
 
   return (
     <div
       className={cn(
         'fixed inset-0 z-50 grid bg-slate-950/40',
-        isGeneratedArticle
+        showsFullEditor
           ? 'place-items-stretch p-0 sm:place-items-center sm:p-4'
           : 'place-items-center p-4',
       )}
@@ -185,14 +299,38 @@ export function ArticleEditorModal({
           onContinueEditing={continueEditing}
           onDiscardAndClose={discardAndClose}
           onEditorModeChange={setEditorMode}
-          onSave={saveDraftLocally}
+          onSave={saveArticle}
           onUpdateDraftField={updateDraftField}
-          savedLocally={savedLocally}
+          saveError={saveError}
+          saveState={saveState}
+          serverInvalidFields={serverInvalidFields}
           showCloseConfirmation={showCloseConfirmation}
           t={t}
           validation={validation}
         />
-      ) : null}
+      ) : articleQuery.isPending ? (
+        <ArticleEditorMessage
+          dialogRef={dialogRef}
+          message={t('editor.status.loading')}
+          onClose={requestClose}
+          t={t}
+        />
+      ) : articleQuery.isError ? (
+        <ArticleEditorMessage
+          dialogRef={dialogRef}
+          message={t('editor.status.loadError')}
+          onClose={requestClose}
+          onRetry={() => articleQuery.refetch()}
+          t={t}
+        />
+      ) : (
+        <ArticleEditorMessage
+          dialogRef={dialogRef}
+          message={t('editor.status.notFound')}
+          onClose={requestClose}
+          t={t}
+        />
+      )}
     </div>
   );
 }
@@ -267,6 +405,67 @@ function PlannedArticleDetails({
   );
 }
 
+/** Loading / not-found / load-error panel — the editor has no draft to show. */
+function ArticleEditorMessage({
+  dialogRef,
+  message,
+  onClose,
+  onRetry,
+  t,
+}: {
+  dialogRef: RefObject<HTMLDivElement | null>;
+  message: string;
+  onClose: () => void;
+  onRetry?: () => void;
+  t: ContentPlannerTranslations;
+}) {
+  return (
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="planner-article-editor-message-title"
+      tabIndex={-1}
+      className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2
+            id="planner-article-editor-message-title"
+            className="font-semibold text-base text-slate-950"
+          >
+            {t('editor.title')}
+          </h2>
+          <p className="mt-2 text-slate-600 text-sm">{message}</p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t('editor.actions.close')}
+          className="size-8"
+          data-dialog-initial-focus={onRetry ? undefined : true}
+          onClick={onClose}
+        >
+          <X className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+
+      {onRetry ? (
+        <Button
+          type="button"
+          size="sm"
+          className="mt-4"
+          data-dialog-initial-focus
+          onClick={onRetry}
+        >
+          {t('editor.actions.retry')}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 function GeneratedArticleEditor({
   article,
   canSave,
@@ -281,7 +480,9 @@ function GeneratedArticleEditor({
   onEditorModeChange,
   onSave,
   onUpdateDraftField,
-  savedLocally,
+  saveError,
+  saveState,
+  serverInvalidFields,
   showCloseConfirmation,
   t,
   validation,
@@ -299,14 +500,20 @@ function GeneratedArticleEditor({
   onEditorModeChange: (mode: ArticleEditorMode) => void;
   onSave: () => void;
   onUpdateDraftField: (field: EditableArticleField, value: string) => void;
-  savedLocally: boolean;
+  saveError: ArticleSaveApiError | null;
+  saveState: ArticleSaveState;
+  serverInvalidFields: EditableArticleField[];
   showCloseConfirmation: boolean;
   t: ContentPlannerTranslations;
   validation: ReturnType<typeof getArticleEditorValidation>;
 }) {
   const metaDescriptionInTarget =
-    draftArticle.metaDescription.length >= META_DESCRIPTION_TARGET_MIN &&
-    draftArticle.metaDescription.length <= META_DESCRIPTION_TARGET_MAX;
+    draftArticle.metaDescription.length >= META_DESCRIPTION_MIN &&
+    draftArticle.metaDescription.length <= META_DESCRIPTION_MAX;
+  const saving = saveState === 'saving';
+  const invalidOnServer = (field: EditableArticleField) => serverInvalidFields.includes(field);
+  const serverFieldMessage = (field: EditableArticleField) =>
+    invalidOnServer(field) ? t('editor.validation.serverRejected') : undefined;
 
   return (
     <div
@@ -315,7 +522,7 @@ function GeneratedArticleEditor({
       aria-modal="true"
       aria-labelledby="planner-article-editor-title"
       tabIndex={-1}
-      className="relative flex h-[100dvh] w-full flex-col bg-white shadow-lg sm:h-[min(92dvh,900px)] sm:max-w-6xl sm:rounded-lg sm:border sm:border-slate-200"
+      className="relative flex h-dvh w-full flex-col bg-white shadow-lg sm:h-[min(92dvh,900px)] sm:max-w-6xl sm:rounded-lg sm:border sm:border-slate-200"
     >
       <header className="flex shrink-0 flex-col gap-3 border-slate-200 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="min-w-0">
@@ -332,18 +539,28 @@ function GeneratedArticleEditor({
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-          {dirty ? (
+          {saving ? (
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-700 text-xs">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              {t('editor.status.saving')}
+            </span>
+          ) : saveState === 'error' ? (
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1 font-medium text-red-700 text-xs">
+              <AlertTriangle className="size-3.5" aria-hidden="true" />
+              {t('editor.status.saveFailed')}
+            </span>
+          ) : dirty ? (
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 font-medium text-amber-700 text-xs">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {t('editor.status.unsavedChanges')}
             </span>
-          ) : savedLocally ? (
+          ) : saveState === 'saved' ? (
             <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 text-xs">
               <Check className="size-3.5" aria-hidden="true" />
               {t('editor.actions.saved')}
             </span>
           ) : null}
-          <Button type="button" size="sm" disabled={!canSave} onClick={onSave}>
+          <Button type="button" size="sm" disabled={!canSave || saving} onClick={onSave}>
             <Save className="size-4" aria-hidden="true" />
             {t('editor.actions.save')}
           </Button>
@@ -366,13 +583,17 @@ function GeneratedArticleEditor({
             <EditorField
               id="article-editor-title-input"
               label={t('editor.fields.title')}
-              message={validation.titleMissing ? t('editor.validation.required') : undefined}
-              invalid={validation.titleMissing}
+              message={
+                validation.titleMissing
+                  ? t('editor.validation.required')
+                  : serverFieldMessage('title')
+              }
+              invalid={validation.titleMissing || invalidOnServer('title')}
             >
               <Input
                 id="article-editor-title-input"
                 value={draftArticle.title}
-                aria-invalid={validation.titleMissing}
+                aria-invalid={validation.titleMissing || invalidOnServer('title')}
                 data-dialog-initial-focus
                 onChange={(event) => onUpdateDraftField('title', event.target.value)}
               />
@@ -381,13 +602,17 @@ function GeneratedArticleEditor({
             <EditorField
               id="article-editor-slug-input"
               label={t('editor.fields.slug')}
-              message={validation.slugMissing ? t('editor.validation.required') : undefined}
-              invalid={validation.slugMissing}
+              message={
+                validation.slugMissing
+                  ? t('editor.validation.required')
+                  : serverFieldMessage('slug')
+              }
+              invalid={validation.slugMissing || invalidOnServer('slug')}
             >
               <Input
                 id="article-editor-slug-input"
                 value={draftArticle.slug}
-                aria-invalid={validation.slugMissing}
+                aria-invalid={validation.slugMissing || invalidOnServer('slug')}
                 onChange={(event) => onUpdateDraftField('slug', event.target.value)}
               />
             </EditorField>
@@ -402,13 +627,17 @@ function GeneratedArticleEditor({
                   ? t('editor.validation.required')
                   : validation.metaTitleTooLong
                     ? t('editor.validation.metaTitleTooLong')
-                    : undefined
+                    : serverFieldMessage('metaTitle')
               }
-              invalid={validation.metaTitleMissing || validation.metaTitleTooLong}
+              invalid={
+                validation.metaTitleMissing ||
+                validation.metaTitleTooLong ||
+                invalidOnServer('metaTitle')
+              }
               meta={
                 <Counter
                   current={draftArticle.metaTitle.length}
-                  max={META_TITLE_LIMIT}
+                  max={META_TITLE_MAX}
                   warning={validation.metaTitleTooLong}
                 />
               }
@@ -416,7 +645,11 @@ function GeneratedArticleEditor({
               <Input
                 id="article-editor-meta-title-input"
                 value={draftArticle.metaTitle}
-                aria-invalid={validation.metaTitleMissing || validation.metaTitleTooLong}
+                aria-invalid={
+                  validation.metaTitleMissing ||
+                  validation.metaTitleTooLong ||
+                  invalidOnServer('metaTitle')
+                }
                 onChange={(event) => onUpdateDraftField('metaTitle', event.target.value)}
               />
             </EditorField>
@@ -429,14 +662,18 @@ function GeneratedArticleEditor({
                   ? t('editor.validation.required')
                   : validation.metaDescriptionOutsideTarget
                     ? t('editor.validation.metaDescriptionRange')
-                    : undefined
+                    : serverFieldMessage('metaDescription')
               }
-              invalid={validation.metaDescriptionMissing || validation.metaDescriptionOutsideTarget}
+              invalid={
+                validation.metaDescriptionMissing ||
+                validation.metaDescriptionOutsideTarget ||
+                invalidOnServer('metaDescription')
+              }
               hint={t('editor.validation.metaDescriptionTarget')}
               meta={
                 <Counter
                   current={draftArticle.metaDescription.length}
-                  max={META_DESCRIPTION_TARGET_MAX}
+                  max={META_DESCRIPTION_MAX}
                   warning={!metaDescriptionInTarget}
                 />
               }
@@ -445,7 +682,9 @@ function GeneratedArticleEditor({
                 id="article-editor-meta-description-input"
                 value={draftArticle.metaDescription}
                 aria-invalid={
-                  validation.metaDescriptionMissing || validation.metaDescriptionOutsideTarget
+                  validation.metaDescriptionMissing ||
+                  validation.metaDescriptionOutsideTarget ||
+                  invalidOnServer('metaDescription')
                 }
                 className="min-h-24 resize-y"
                 onChange={(event) => onUpdateDraftField('metaDescription', event.target.value)}
@@ -460,6 +699,10 @@ function GeneratedArticleEditor({
                   <Label htmlFor="article-editor-content-input">{t('editor.fields.content')}</Label>
                   {validation.contentMissing ? (
                     <FieldMessage tone="error">{t('editor.validation.required')}</FieldMessage>
+                  ) : invalidOnServer('content') ? (
+                    <FieldMessage tone="error">
+                      {t('editor.validation.serverRejected')}
+                    </FieldMessage>
                   ) : null}
                 </div>
               </div>
@@ -485,12 +728,12 @@ function GeneratedArticleEditor({
               <Textarea
                 id="article-editor-content-input"
                 value={draftArticle.content}
-                aria-invalid={validation.contentMissing}
-                className="min-h-[360px] resize-y font-mono text-sm leading-6 lg:min-h-[430px]"
+                aria-invalid={validation.contentMissing || invalidOnServer('content')}
+                className="min-h-90 resize-y font-mono text-sm leading-6 lg:min-h-107"
                 onChange={(event) => onUpdateDraftField('content', event.target.value)}
               />
             ) : (
-              <div className="min-h-[360px] rounded-md border border-slate-200 bg-white p-4 lg:min-h-[430px]">
+              <div className="min-h-90 rounded-md border border-slate-200 bg-white p-4 lg:min-h-107">
                 {draftArticle.content.trim() ? (
                   <ArticleContentPreview content={draftArticle.content} />
                 ) : (
@@ -532,9 +775,7 @@ function GeneratedArticleEditor({
               <h3 className="truncate font-semibold text-slate-950 text-sm">
                 {t('editor.fields.featuredImage')}
               </h3>
-              {draftArticle.imagesStatus ? (
-                <ImageStatusBadge status={draftArticle.imagesStatus} t={t} />
-              ) : null}
+              <ImageStatusBadge status={draftArticle.imagesStatus} t={t} />
             </div>
 
             {draftArticle.featuredImageUrl ? (
@@ -544,10 +785,10 @@ function GeneratedArticleEditor({
                 width={640}
                 height={360}
                 unoptimized
-                className="aspect-[16/9] w-full rounded-md border border-slate-200 object-cover"
+                className="aspect-video w-full rounded-md border border-slate-200 object-cover"
               />
             ) : (
-              <div className="grid aspect-[16/9] place-items-center rounded-md border border-dashed border-slate-300 bg-white text-center text-slate-500 text-sm">
+              <div className="grid aspect-video place-items-center rounded-md border border-dashed border-slate-300 bg-white text-center text-slate-500 text-sm">
                 <div className="grid justify-items-center gap-2 px-4">
                   <ImageIcon className="size-6 text-slate-400" aria-hidden="true" />
                   <span>{t('editor.fields.featuredImagePlaceholder')}</span>
@@ -559,6 +800,18 @@ function GeneratedArticleEditor({
       </div>
 
       <footer className="shrink-0 border-slate-200 border-t bg-white">
+        {saveError ? (
+          <div className="border-red-200 border-b bg-red-50 px-4 py-3 sm:px-5">
+            <p className="text-red-800 text-sm">
+              {saveError === 'invalid'
+                ? t('editor.status.saveInvalid')
+                : saveError === 'not_found'
+                  ? t('editor.status.saveNotFound')
+                  : t('editor.status.saveError')}
+            </p>
+          </div>
+        ) : null}
+
         {showCloseConfirmation ? (
           <div className="flex flex-col gap-3 border-amber-200 border-b bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <p className="text-amber-800 text-sm">{t('editor.closeConfirmation.description')}</p>
@@ -576,11 +829,9 @@ function GeneratedArticleEditor({
         <div className="flex flex-col gap-2 px-4 py-3 text-slate-500 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <span className="truncate">{draftArticle.id}</span>
           <span className="truncate">
-            {draftArticle.updatedAt
-              ? t('editor.status.updatedAt', {
-                  date: formatDateTime(draftArticle.updatedAt, locale),
-                })
-              : t('editor.status.localOnly')}
+            {t('editor.status.updatedAt', {
+              date: formatDateTime(draftArticle.updatedAt ?? draftArticle.createdAt, locale),
+            })}
           </span>
         </div>
       </footer>
@@ -628,7 +879,12 @@ function EditorField({
 
 function FieldMessage({ children, tone }: { children: ReactNode; tone: 'error' | 'warning' }) {
   return (
-    <p className={cn('break-words text-xs', tone === 'error' ? 'text-red-600' : 'text-amber-700')}>
+    <p
+      className={cn(
+        'wrap-break-word text-xs',
+        tone === 'error' ? 'text-red-600' : 'text-amber-700',
+      )}
+    >
       {children}
     </p>
   );
@@ -650,7 +906,7 @@ function ArticleContentPreview({ content }: { content: string }) {
     .filter(Boolean);
 
   return (
-    <article className="grid gap-4 break-words text-slate-800">
+    <article className="grid gap-4 wrap-break-word text-slate-800">
       {blocks.map((block, index) => {
         const heading = getMarkdownHeading(block);
         const key = `${index}-${block}`;
@@ -801,7 +1057,7 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1">
       <dt className="text-slate-500">{label}</dt>
-      <dd className="min-w-0 break-words font-medium text-slate-950">{value}</dd>
+      <dd className="min-w-0 wrap-break-word font-medium text-slate-950">{value}</dd>
     </div>
   );
 }
@@ -926,79 +1182,4 @@ function isElementFocusable(element: HTMLElement) {
     element.tabIndex !== -1 &&
     element.getClientRects().length > 0
   );
-}
-
-function getArticleEditorValidation(article: ArticleEditorDraft | null) {
-  const titleMissing = !article?.title.trim();
-  const slugMissing = !article?.slug.trim();
-  const metaTitleMissing = !article?.metaTitle.trim();
-  const metaDescriptionMissing = !article?.metaDescription.trim();
-  const contentMissing = !article?.content.trim();
-  const metaTitleTooLong = article ? article.metaTitle.length > META_TITLE_LIMIT : false;
-  const metaDescriptionOutsideTarget = article
-    ? !metaDescriptionMissing &&
-      (article.metaDescription.length < META_DESCRIPTION_TARGET_MIN ||
-        article.metaDescription.length > META_DESCRIPTION_TARGET_MAX)
-    : false;
-  const requiredFieldsValid =
-    !titleMissing &&
-    !slugMissing &&
-    !metaTitleMissing &&
-    !metaDescriptionMissing &&
-    !contentMissing;
-
-  return {
-    contentMissing,
-    isValid: requiredFieldsValid && !metaTitleTooLong && !metaDescriptionOutsideTarget,
-    metaDescriptionMissing,
-    metaDescriptionOutsideTarget,
-    metaTitleMissing,
-    metaTitleTooLong,
-    slugMissing,
-    titleMissing,
-  };
-}
-
-function hasEditableArticleChanges(
-  savedArticle: ArticleEditorDraft,
-  draftArticle: ArticleEditorDraft,
-) {
-  return (
-    savedArticle.title !== draftArticle.title ||
-    savedArticle.slug !== draftArticle.slug ||
-    savedArticle.metaTitle !== draftArticle.metaTitle ||
-    savedArticle.metaDescription !== draftArticle.metaDescription ||
-    savedArticle.content !== draftArticle.content
-  );
-}
-
-function createArticleEditorDraft(
-  article: PlannerArticle,
-  t: ContentPlannerTranslations,
-): ArticleEditorDraft {
-  const title = article.title || article.keyword;
-
-  return {
-    content: [
-      `# ${title}`,
-      t('editor.mock.introduction', { keyword: article.keyword }),
-      `## ${t('editor.mock.intentHeading')}`,
-      t('editor.mock.intent', { keyword: article.keyword }),
-      `## ${t('editor.mock.structureHeading')}`,
-      t('editor.mock.structure'),
-      `## ${t('editor.mock.conclusionHeading')}`,
-      t('editor.mock.conclusion', { keyword: article.keyword }),
-    ].join('\n\n'),
-    createdAt: new Date().toISOString(),
-    featuredImageUrl: '',
-    id: article.articleId ?? article.id,
-    imagesStatus: 'pending',
-    keyword: article.keyword,
-    metaDescription: t('editor.mock.metaDescription', { keyword: article.keyword }),
-    metaTitle: title,
-    publishedAt: null,
-    slug: slugifyArticleTitle(title),
-    status: 'generated',
-    title,
-  };
 }

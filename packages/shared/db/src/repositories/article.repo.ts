@@ -60,6 +60,20 @@ export const ArticleRepo = {
     return res.matchedCount > 0;
   },
 
+  /** Save the editor's five editable fields, stamping `updated_at` (#74). */
+  async updateContent(
+    id: string,
+    patch: Pick<Article, 'title' | 'slug' | 'meta_title' | 'meta_description' | 'content'>,
+  ): Promise<Article | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: { ...patch, updated_at: new Date() } },
+      { returnDocument: 'after' },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
   /** Persist the image plan once (set-if-absent) — a retry never re-plans (#51). */
   async setImagePlan(id: string, images: ArticleImage[]): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;

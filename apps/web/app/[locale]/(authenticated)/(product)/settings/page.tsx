@@ -1,5 +1,7 @@
 'use client';
 
+import type { SetupPresets } from '@shared/schemas';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -16,13 +18,19 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { TextEntryList } from '../../onboarding/components/TextEntryList';
-import { countries, languages } from '../../onboarding/constants';
+import { countries, languages, MAX_TARGET_AUDIENCES } from '../../onboarding/constants';
 import type { TextEntry } from '../../onboarding/types';
-import { createEntryId, isValidHttpUrl } from '../../onboarding/utils';
+import {
+  createEntryId,
+  isValidHttpUrl,
+  stringsToTextEntries,
+  textEntriesToStrings,
+} from '../../onboarding/utils';
 
 const settingsTabs = [
   'business',
@@ -39,26 +47,20 @@ type SettingsForm = {
   competitors: TextEntry[];
   country: string;
   language: string;
-  targetAudience: string;
+  targetAudience: TextEntry[];
 };
 
 type IntegrationLoadState = 'error' | 'idle' | 'loading' | 'ready';
-type SettingsLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsSaveState = 'error' | 'idle' | 'saved';
 type WordPressActionState = 'error' | 'idle' | 'loading' | 'success';
 type WordPressError = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 
-type GeneralSettingsResponse = {
-  audience: {
-    competitors: string[];
-    target: string;
-  };
-  business: {
-    country: string;
-    description: string;
-    language: string;
-    name: string;
-  };
+type GeneralSettingsResponse = Pick<SetupPresets, 'audience' | 'business'>;
+
+type GeneralSettingsMutationVariables = {
+  organizationId: string;
+  saveRevision: number;
+  settings: SettingsForm;
 };
 
 const initialSettings: SettingsForm = {
@@ -67,15 +69,8 @@ const initialSettings: SettingsForm = {
   competitors: [],
   country: countries[0].value,
   language: languages[0].value,
-  targetAudience: '',
+  targetAudience: [],
 };
-
-function toTextEntries(prefix: string, values: string[]): TextEntry[] {
-  return values
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => ({ id: createEntryId(prefix), value }));
-}
 
 function mergeGeneralSettings(
   data: GeneralSettingsResponse,
@@ -85,10 +80,10 @@ function mergeGeneralSettings(
     ...currentSettings,
     businessDescription: data.business.description,
     businessName: data.business.name,
-    competitors: toTextEntries('competitor', data.audience.competitors),
+    competitors: stringsToTextEntries(data.audience.competitors, 'competitor'),
     country: data.business.country,
     language: data.business.language,
-    targetAudience: data.audience.target,
+    targetAudience: stringsToTextEntries(data.audience.target, 'audience'),
   };
 }
 
@@ -96,7 +91,7 @@ function buildGeneralSettingsPatch(settings: SettingsForm) {
   return {
     audience: {
       competitors: settings.competitors.map((entry) => entry.value.trim()).filter(Boolean),
-      target: settings.targetAudience.trim(),
+      target: textEntriesToStrings(settings.targetAudience),
     },
     business: {
       country: settings.country,
@@ -119,14 +114,17 @@ export default function SettingsPage() {
     loading: organizationLoading,
     organization,
   } = useActiveOrganization();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SettingsTab>('business');
   const [settings, setSettings] = useState<SettingsForm>(initialSettings);
+  const [audienceDraft, setAudienceDraft] = useState('');
+  const [audienceError, setAudienceError] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [competitorError, setCompetitorError] = useState('');
-  const [integrationLoadState, setIntegrationLoadState] = useState<IntegrationLoadState>('idle');
-  const [loadState, setLoadState] = useState<SettingsLoadState>('idle');
+  const [initializedOrganizationId, setInitializedOrganizationId] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
   const [saveState, setSaveState] = useState<SettingsSaveState>('idle');
-  const [saving, setSaving] = useState(false);
+  const [integrationLoadState, setIntegrationLoadState] = useState<IntegrationLoadState>('idle');
   const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
   const [wordpressConnected, setWordpressConnected] = useState(false);
   const [wordpressError, setWordpressError] = useState<WordPressError>('connectFailed');
@@ -134,56 +132,103 @@ export default function SettingsPage() {
   const editRevisionRef = useRef(0);
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
+
+  const settingsQuery = useQuery({
+    queryKey: dashboardQueryKeys.generalSettings(organization?.id ?? ''),
+    queryFn: async () => {
+      if (!organization) {
+        throw new Error('organization_required');
+      }
+
+      const response = await api.api.v0.dashboard.settings.general.$get({
+        query: { org_id: organization.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) {
+        throw new Error('settings_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: !redirecting && !organizationLoading && Boolean(organization),
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 60 * 1000,
+  });
 
   useEffect(() => {
-    if (organizationLoading) return;
+    if (!organization || !settingsQuery.data) return;
 
-    if (!organization) {
-      setLoadState('idle');
-      return;
+    const isNewOrganization = initializedOrganizationId !== organization.id;
+
+    if (!isNewOrganization && editRevisionRef.current !== 0) return;
+
+    if (isNewOrganization) {
+      editRevisionRef.current = 0;
+      setSaveState('idle');
     }
 
-    let cancelled = false;
+    setSettings((currentSettings) =>
+      mergeGeneralSettings(
+        settingsQuery.data,
+        isNewOrganization ? initialSettings : currentSettings,
+      ),
+    );
+    setInitializedOrganizationId(organization.id);
+  }, [initializedOrganizationId, organization, settingsQuery.data]);
 
-    setLoadState('loading');
-    setSaveState('idle');
+  const saveSettingsMutation = useMutation({
+    mutationFn: async ({
+      organizationId,
+      settings: settingsToSave,
+    }: GeneralSettingsMutationVariables) => {
+      const response = await api.api.v0.dashboard.settings.general.$patch({
+        json: {
+          org_id: organizationId,
+          ...buildGeneralSettingsPatch(settingsToSave),
+        },
+      });
 
-    void (async () => {
-      try {
-        const response = await api.api.v0.dashboard.settings.general.$get({
-          query: { org_id: organization.id },
-        });
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('settings_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
-          setLoadState('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadState('error');
-        }
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationLoading]);
+      if (!response.ok) {
+        throw new Error('settings_save_failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, { organizationId, saveRevision }) => {
+      queryClient.setQueryData<GeneralSettingsResponse>(
+        dashboardQueryKeys.generalSettings(organizationId),
+        data,
+      );
+
+      if (editRevisionRef.current === saveRevision) {
+        setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
+        setSaveState('saved');
+      }
+    },
+    onError: (error, { saveRevision }) => {
+      if (error instanceof Error && error.message === 'unauthorized') return;
+
+      if (editRevisionRef.current === saveRevision) {
+        setSaveState('error');
+      }
+    },
+  });
 
   useEffect(() => {
     if (organizationLoading) return;
@@ -252,45 +297,18 @@ export default function SettingsPage() {
     markEdited();
   }
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+  function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!organization || saving) return;
+    if (!organization || saveSettingsMutation.isPending) return;
 
-    setSaving(true);
     setSaveState('idle');
 
-    const saveRevision = editRevisionRef.current;
-
-    try {
-      const response = await api.api.v0.dashboard.settings.general.$patch({
-        json: {
-          org_id: organization.id,
-          ...buildGeneralSettingsPatch(settings),
-        },
-      });
-
-      if ((response.status as number) === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('settings_save_failed');
-      }
-
-      const data = await response.json();
-      if (editRevisionRef.current === saveRevision) {
-        setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
-        setSaveState('saved');
-      }
-    } catch {
-      if (editRevisionRef.current === saveRevision) {
-        setSaveState('error');
-      }
-    } finally {
-      setSaving(false);
-    }
+    saveSettingsMutation.mutate({
+      organizationId: organization.id,
+      saveRevision: editRevisionRef.current,
+      settings,
+    });
   }
 
   function addCompetitorEntry() {
@@ -310,6 +328,41 @@ export default function SettingsPage() {
     markEdited();
     setCompetitorDraft('');
     setCompetitorError('');
+  }
+
+  function updateAudienceDraft(value: string) {
+    setAudienceDraft(value);
+    setAudienceError('');
+  }
+
+  function addAudienceEntry() {
+    const value = audienceDraft.trim();
+
+    if (!value) return;
+
+    if (settings.targetAudience.length >= MAX_TARGET_AUDIENCES) {
+      setAudienceError(validationT('targetAudienceMax', { max: MAX_TARGET_AUDIENCES }));
+      return;
+    }
+
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      targetAudience: [...currentSettings.targetAudience, { id: createEntryId('audience'), value }],
+    }));
+    markEdited();
+    setAudienceDraft('');
+    setAudienceError('');
+  }
+
+  function removeAudienceEntry(id: string) {
+    if (!settings.targetAudience.some((audience) => audience.id === id)) return;
+
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      targetAudience: currentSettings.targetAudience.filter((audience) => audience.id !== id),
+    }));
+    markEdited();
+    setAudienceError('');
   }
 
   function removeCompetitorEntry(id: string) {
@@ -373,10 +426,11 @@ export default function SettingsPage() {
   }
 
   if (
+    redirecting ||
     organizationLoading ||
     organizationError === 'unauthorized' ||
-    loadState === 'loading' ||
-    (organization && loadState === 'idle')
+    (organization && settingsQuery.isPending) ||
+    (organization && Boolean(settingsQuery.data) && initializedOrganizationId !== organization.id)
   ) {
     return <StatusPanel>{t('status.loading')}</StatusPanel>;
   }
@@ -389,7 +443,7 @@ export default function SettingsPage() {
     return <StatusPanel tone="error">{t('status.organizationError')}</StatusPanel>;
   }
 
-  if (loadState === 'error') {
+  if (settingsQuery.isError) {
     return <StatusPanel tone="error">{t('status.loadError')}</StatusPanel>;
   }
 
@@ -503,14 +557,17 @@ export default function SettingsPage() {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <FieldPanel>
-            <Label htmlFor="target-audience">{audienceT('targetAudience')}</Label>
-            <Textarea
-              className="mt-2"
-              id="target-audience"
-              value={settings.targetAudience}
-              onChange={(event) => updateSetting('targetAudience', event.target.value)}
+            <TextEntryList
+              ariaInvalid={Boolean(audienceError)}
+              draft={audienceDraft}
+              entries={settings.targetAudience}
+              errors={audienceError ? [audienceError] : undefined}
+              inputId="target-audience"
+              label={audienceT('targetAudience')}
+              onAdd={addAudienceEntry}
+              onDraftChange={updateAudienceDraft}
+              onRemove={removeAudienceEntry}
               placeholder={audienceT('targetAudiencePlaceholder')}
-              rows={5}
             />
           </FieldPanel>
 
@@ -637,8 +694,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={saving || !organization}>
-          {saving ? t('actions.saving') : t('actions.save')}
+        <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
+          {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
         </Button>
       </div>
     </form>

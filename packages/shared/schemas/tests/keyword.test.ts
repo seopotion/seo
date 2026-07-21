@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { KeywordSchema } from '../src/keyword';
+import { CreateKeywordInput, KeywordSchema } from '../src/keyword';
 
 const base = {
   id: '1',
@@ -32,5 +32,17 @@ describe('KeywordSchema brief fields', () => {
     });
     expect(k.article_type).toBe('how_to_guide');
     expect(k.serp_competitors).toEqual(['a.com', 'b.com']);
+  });
+});
+
+describe('KeywordSchema candidate linkage (#99)', () => {
+  test('candidate_id defaults to null for legacy documents', () => {
+    expect(KeywordSchema.parse(base).candidate_id).toBeNull();
+  });
+
+  test('candidate_id round-trips when present and may be omitted on create', () => {
+    expect(KeywordSchema.parse({ ...base, candidate_id: 'c1' }).candidate_id).toBe('c1');
+    const { id: _id, created_at: _c, ...createBase } = base;
+    expect(CreateKeywordInput.parse(createBase).candidate_id).toBeNull();
   });
 });

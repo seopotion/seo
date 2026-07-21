@@ -52,3 +52,8 @@ export interface SerpParams {
   languageName?: string;
   depth?: number;
 }
+
+/** Normalized backlinks summary — currently only the domain rank (0–1000). */
+export interface BacklinksSummary {
+  rank: number | null;
+}

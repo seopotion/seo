@@ -12,13 +12,25 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
 
 1. **Two Atlas clusters** (staging, prod) → two connection strings.
 2. **SSM SecureStrings** (values never enter CloudFormation). Generate each
-   JWT secret with `openssl rand -base64 32`:
+   JWT secret and GSC token key with `openssl rand -base64 32`:
 
    ```sh
    aws ssm put-parameter --name /seo/staging/mongo-uri  --type SecureString --value '<staging-conn-str>'
    aws ssm put-parameter --name /seo/staging/jwt-secret --type SecureString --value "$(openssl rand -base64 32)"
    aws ssm put-parameter --name /seo/prod/mongo-uri     --type SecureString --value '<prod-conn-str>'
    aws ssm put-parameter --name /seo/prod/jwt-secret    --type SecureString --value "$(openssl rand -base64 32)"
+   ```
+
+   GSC integration (#12) needs two more SecureStrings per stage: the Google
+   OAuth client's **client secret** (paired with `GOOGLE_CLIENT_ID_<STAGE>`
+   below — used to exchange the GSC OAuth code server-side) and a symmetric
+   **token key** used to encrypt stored GSC refresh tokens at rest:
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/google-client-secret --type SecureString --value '<staging-oauth-client-secret>'
+   aws ssm put-parameter --name /seo/staging/gsc-token-key        --type SecureString --value "$(openssl rand -base64 32)"
+   aws ssm put-parameter --name /seo/prod/google-client-secret    --type SecureString --value '<prod-oauth-client-secret>'
+   aws ssm put-parameter --name /seo/prod/gsc-token-key           --type SecureString --value "$(openssl rand -base64 32)"
    ```
 
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
@@ -30,6 +42,22 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    gh variable set GOOGLE_CLIENT_ID_STAGING --repo seopotion/seo --body '<staging-client-id>'
    gh variable set GOOGLE_CLIENT_ID_PROD    --repo seopotion/seo --body '<prod-client-id>'
    ```
+
+   GSC integration (#12) also needs the web app's origin per stage — it's the
+   base of the GSC OAuth redirect URI, baked into the Lambda env at synth time
+   (`infra/lib/config.ts`'s `webOrigin`; an unset var silently falls back to an
+   empty string, which bakes a broken redirect URI into the Lambda). Set
+   `WEB_ORIGIN_STAGING` / `WEB_ORIGIN_PROD` as GitHub Actions repo variables
+   the same way:
+
+   ```sh
+   gh variable set WEB_ORIGIN_STAGING --repo seopotion/seo --body 'https://app-staging.seopotion.co'
+   gh variable set WEB_ORIGIN_PROD    --repo seopotion/seo --body 'https://app.seopotion.co'
+   ```
+
+   The resulting `<web origin>/dashboard/gsc/callback` redirect URI must also
+   be registered as an **Authorized redirect URI** on the same stage's Google
+   OAuth client (see [Google OAuth clients](#google-oauth-clients) below).
 
 4. **GitHub OIDC provider + deploy role** — see [GitHub OIDC deploy
    role](#github-oidc-deploy-role) below. Store its ARN and the account id as
@@ -44,15 +72,17 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
 
 Login is the Google Identity Services **ID-token** flow (`google.accounts.id` →
 `id_token` → `POST /core/login`), so the OAuth client needs **Authorized
-JavaScript origins only** — leave **Authorized redirect URIs empty** (the flow
-never redirects). Create one **Web application** client per environment
-(`console.cloud.google.com` → APIs & Services → Credentials):
+JavaScript origins** for that flow (it never redirects). GSC integration (#12)
+reuses the same client for a server-side **authorization-code** flow, which
+does redirect — so it also needs an **Authorized redirect URI** of
+`<web origin>/dashboard/gsc/callback`. Create one **Web application** client
+per environment (`console.cloud.google.com` → APIs & Services → Credentials):
 
 | Field                        | Staging                                            |
 | ---------------------------- | -------------------------------------------------- |
 | Name (internal)              | `SEO Potion — staging (web)`                        |
 | Authorized JS origins        | `http://localhost:3000`, `https://app-staging.seopotion.co` |
-| Authorized redirect URIs     | *(none)*                                            |
+| Authorized redirect URIs     | `http://localhost:3000/dashboard/gsc/callback`, `https://app-staging.seopotion.co/dashboard/gsc/callback` |
 
 - Origins are `scheme://host[:port]` — **no trailing slash, no path**; HTTPS
   except `localhost`. Add the generated CloudFront origin once the frontend
@@ -61,6 +91,9 @@ never redirects). Create one **Web application** client per environment
 - If the **OAuth consent screen** is in *Testing* mode, only listed test users
   can sign in — add your test accounts or publish the app.
 - The same client id is also the frontend's `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (#21).
+- The client's **secret** (needed for the GSC code exchange) is stored in SSM as
+  `google-client-secret` — see [prerequisites](#one-time-prerequisites-per-account)
+  above.
 
 ## GitHub OIDC deploy role
 
@@ -132,17 +165,19 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 
 ## Verify prerequisites (preflight)
 
-Before deploying, confirm the four out-of-band items for a stage are actually in
-place. The preflight checks that both SSM SecureStrings exist (presence only — it
-does not decrypt them) and that `GOOGLE_CLIENT_ID_<STAGE>` is set — the same names
-the stack reads at synth/runtime — so a missing or mis-pathed secret is caught
-before it ships as broken Lambda config.
+Before deploying, confirm the out-of-band items for a stage are actually in
+place. The preflight checks that all four SSM SecureStrings exist (jwt-secret,
+mongo-uri, google-client-secret, gsc-token-key — presence only, it does not
+decrypt them) and that `GOOGLE_CLIENT_ID_<STAGE>` and `WEB_ORIGIN_<STAGE>` are
+set — the same names the stack reads at synth/runtime — so a missing or
+mis-pathed prerequisite is caught before it ships as broken Lambda config.
 
-Run it with AWS credentials for the target account and the client id in the env
+Run it with AWS credentials for the target account and both env vars set
 (this is the same check the deploy CI runs before `cdk deploy`):
 
 ```sh
 GOOGLE_CLIENT_ID_STAGING=<staging-oauth-client-id> \
+WEB_ORIGIN_STAGING=<staging-web-origin> \
   npm run cli -- infra preflight --stage staging
 ```
 

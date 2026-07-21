@@ -15,7 +15,7 @@ import { completeOnboarding, OnboardingApiError, scanWebsiteForOnboarding } from
 import { ErrorMessage } from './components/ErrorMessage';
 import { ProgressSteps } from './components/ProgressSteps';
 import { StepNavigation } from './components/StepNavigation';
-import { initialForm, steps } from './constants';
+import { initialForm, MAX_TARGET_AUDIENCES, steps } from './constants';
 import { ArticleSettingsStep } from './steps/ArticleSettingsStep';
 import { AudienceCompetitorsStep } from './steps/AudienceCompetitorsStep';
 import { BlogInfoStep } from './steps/BlogInfoStep';
@@ -164,15 +164,23 @@ export default function OnboardingPage() {
 
     if (!audienceValue && !competitorValue) return;
 
-    setForm((currentForm) => ({
-      ...currentForm,
-      targetAudience: audienceValue
-        ? [...currentForm.targetAudience, { id: createEntryId('audience'), value: audienceValue }]
-        : currentForm.targetAudience,
-      competitors: competitorValue
-        ? [...currentForm.competitors, { id: createEntryId('competitor'), value: competitorValue }]
-        : currentForm.competitors,
-    }));
+    setForm((currentForm) => {
+      const canAddAudience =
+        audienceValue && currentForm.targetAudience.length < MAX_TARGET_AUDIENCES;
+
+      return {
+        ...currentForm,
+        targetAudience: canAddAudience
+          ? [...currentForm.targetAudience, { id: createEntryId('audience'), value: audienceValue }]
+          : currentForm.targetAudience,
+        competitors: competitorValue
+          ? [
+              ...currentForm.competitors,
+              { id: createEntryId('competitor'), value: competitorValue },
+            ]
+          : currentForm.competitors,
+      };
+    });
     setAudienceDraft('');
     setCompetitorDraft('');
   }
@@ -310,6 +318,14 @@ export default function OnboardingPage() {
 
     if (!value) return;
 
+    if (form.targetAudience.length >= MAX_TARGET_AUDIENCES) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        targetAudience: validationT('targetAudienceMax', { max: MAX_TARGET_AUDIENCES }),
+      }));
+      return;
+    }
+
     setForm((currentForm) => ({
       ...currentForm,
       targetAudience: [...currentForm.targetAudience, { id: createEntryId('audience'), value }],
@@ -344,6 +360,7 @@ export default function OnboardingPage() {
       ...currentForm,
       targetAudience: currentForm.targetAudience.filter((audience) => audience.id !== id),
     }));
+    clearErrors('targetAudience');
   }
 
   function removeCompetitorEntry(id: string) {

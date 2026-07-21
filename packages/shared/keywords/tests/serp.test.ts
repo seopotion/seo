@@ -15,11 +15,17 @@ const config = {
 };
 const presets = {
   business: { name: 'Acme', language: 'English', country: 'United States', description: 'd' },
-  audience: { target: 't', competitors: [] },
+  audience: { target: ['t'], competitors: [] },
   blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
   article_preferences: {
-    content_seo: { article_style: '', internal_links: false, llm_instructions: '' },
-    engagement: { image_style: '' },
+    content_seo: {
+      article_style: '',
+      internal_links_count: 0,
+      table_of_contents: true,
+      llm_instructions: '',
+    },
+    engagement: { image_style: '', youtube_videos: true },
+    publishing: { auto_publish: false },
   },
 } satisfies SetupPresets;
 

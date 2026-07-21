@@ -2,6 +2,7 @@ import type { SearchIntent } from '@shared/schemas';
 import { SEARCH_INTENTS } from '@shared/schemas';
 import { categorizeApiStatus, categorizeHttpStatus, DataForSeoError, isRetryable } from './errors';
 import type {
+  BacklinksSummary,
   DataForSeoConfig,
   KeywordMetric,
   SeedKeywordsParams,
@@ -25,6 +26,15 @@ function toSearchIntent(raw: unknown): SearchIntent | null {
 
 function num(raw: unknown): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+}
+
+/**
+ * Labs site endpoints require `target` as a bare domain ("without https:// and
+ * www."), but org/competitor URLs arrive as full URLs — strip scheme, www, and path.
+ */
+function bareDomain(target: string): string {
+  const host = target.includes('://') ? new URL(target).hostname : (target.split('/')[0] as string);
+  return host.replace(/^www\./, '');
 }
 
 /** Normalize one Labs `items[]` entry into a KeywordMetric. */
@@ -56,12 +66,22 @@ function toSerpResult(item: Record<string, unknown>): SerpResult {
   };
 }
 
+/**
+ * DataForSEO's backlink rank is 0–1000; the dashboard badge shows a 0–100
+ * DR-style score (#12). Clamped so provider drift can't break the schema.
+ */
+export function domainRatingFromRank(rank: number | null): number | null {
+  if (rank === null) return null;
+  return Math.max(0, Math.min(100, Math.round(rank / 10)));
+}
+
 export type DataForSeoClient = {
   keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
   bulkKeywordDifficulty(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
   serpGoogleOrganic(params: SerpParams): Promise<SerpResult[]>;
+  backlinksSummary(target: string): Promise<BacklinksSummary>;
 };
 
 export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClient {
@@ -114,18 +134,29 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
 
     const body = (await res.json()) as {
       status_code?: number;
-      tasks?: Array<{ status_code?: number; result?: unknown[] }>;
+      status_message?: string;
+      tasks?: Array<{ status_code?: number; status_message?: string; result?: unknown[] }>;
     };
+
+    // status_message is the provider's own text (never credentials) — keep it so
+    // logs name the rejected field instead of a bare category.
+    const detail = (msg?: string) => (msg ? `: ${msg}` : '');
 
     if (typeof body.status_code === 'number' && body.status_code >= 30000) {
       const category = categorizeApiStatus(body.status_code);
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})`);
+      throw new DataForSeoError(
+        category,
+        `DataForSEO request failed (${category})${detail(body.status_message)}`,
+      );
     }
 
     const taskResult = body.tasks?.[0];
     if (taskResult?.status_code && taskResult.status_code >= 30000) {
       const category = categorizeApiStatus(taskResult.status_code);
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})`);
+      throw new DataForSeoError(
+        category,
+        `DataForSEO request failed (${category})${detail(taskResult.status_message)}`,
+      );
     }
 
     return taskResult?.result ?? [];
@@ -141,7 +172,7 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
 
   return {
     async keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
-      const task: Record<string, unknown> = { target: params.target };
+      const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
       if (params.limit) task.limit = params.limit;
@@ -150,7 +181,7 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     },
 
     async rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
-      const task: Record<string, unknown> = { target: params.target };
+      const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
       if (params.limit) task.limit = params.limit;
@@ -184,6 +215,12 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       return itemsOf(result)
         .filter((item) => item.type === 'organic')
         .map(toSerpResult);
+    },
+
+    async backlinksSummary(target: string): Promise<BacklinksSummary> {
+      const result = await request('/backlinks/summary/live', { target });
+      const first = (result[0] ?? {}) as Record<string, unknown>;
+      return { rank: num(first.rank) };
     },
   };
 }

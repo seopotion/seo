@@ -1,7 +1,9 @@
 import { OrgRepo } from '@shared/db';
+import { domainRatingFromRank } from '@shared/providers';
 import { ScanTask } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
+import { getScanClients } from './providers';
 import { scanWebsite } from './scanner';
 
 /**
@@ -18,8 +20,22 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       logger.appendKeys({ org_id });
       logger.info('scanning website', { website_url });
 
-      const presets = await scanWebsite(website_url);
+      const clients = getScanClients();
+      const presets = await scanWebsite(website_url, clients);
       await OrgRepo.completeScan(org_id, presets);
+
+      // Domain Rating is best-effort (#12): a provider failure must never fail
+      // the scan — the stale-refresh path on GET /dashboard/domain-rating
+      // recovers later.
+      try {
+        const domain = new URL(website_url).hostname.replace(/^www\./, '');
+        const { rank } = await clients.dataForSeo.backlinksSummary(domain);
+        const rating = domainRatingFromRank(rank);
+        if (rating !== null) await OrgRepo.updateDomainRating(org_id, rating);
+        logger.info('domain rating stamped', { rating });
+      } catch (drErr) {
+        logger.warn('domain rating fetch failed', { error: drErr as Error });
+      }
 
       logger.info('scan completed');
     } catch (err) {

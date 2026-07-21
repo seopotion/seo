@@ -25,6 +25,30 @@ vi.mock('../src/clients/wordpress', () => ({
   testWordPressIntegration,
 }));
 
+const { backlinksSummary } = vi.hoisted(() => ({
+  backlinksSummary: vi.fn(async (_target: string) => ({ rank: 730 })),
+}));
+vi.mock('../src/clients/providers', () => ({
+  getDataForSeoClient: () => ({ backlinksSummary }),
+}));
+
+const { querySearchAnalytics, GscAuthRevokedError } = vi.hoisted(() => {
+  class GscAuthRevokedError extends Error {}
+  return { querySearchAnalytics: vi.fn(), GscAuthRevokedError };
+});
+vi.mock('../src/clients/gsc', () => ({ querySearchAnalytics, GscAuthRevokedError }));
+
+const gscKey = vi.hoisted(() => Buffer.alloc(32, 7));
+vi.mock('../src/lib/secrets', () => ({ getGscTokenKey: vi.fn(async () => gscKey) }));
+
+const { gscConnections, markRefreshFailed } = vi.hoisted(() => ({
+  gscConnections: new Map<string, Record<string, unknown>>(),
+  markRefreshFailed: vi.fn(async (orgId: string) => {
+    const c = gscConnections.get(orgId);
+    if (c) c.last_refresh_failed_at = new Date();
+  }),
+}));
+
 vi.mock('@shared/db', () => {
   // org_1 (owned by user_1) has data; org_2 (also user_1) is empty.
   const now = new Date('2026-07-02T08:00:00.000Z');
@@ -32,22 +56,35 @@ vi.mock('@shared/db', () => {
     {
       id: 'kw_1',
       org_id: 'org_1',
+      // Legacy entry: no candidate linkage/classification (#99 nullable fields).
+      candidate_id: null,
       keyword: 'landing pages',
       status: 'scheduled',
       scheduled_date: '2026-07-02',
       search_volume: 170,
       difficulty: 36,
+      article_type: null,
+      intent: null,
+      opportunity_score: null,
+      generation_status: 'generated',
+      generation_error: null,
       article_id: 'art_1',
       created_at: now,
     },
     {
       id: 'kw_2',
       org_id: 'org_1',
+      candidate_id: 'cand_2',
       keyword: 'notion builder',
       status: 'scheduled',
       scheduled_date: '2026-07-03',
       search_volume: 2400,
       difficulty: 48,
+      article_type: 'how_to_guide',
+      intent: 'informational',
+      opportunity_score: 0.7,
+      generation_status: 'pending',
+      generation_error: null,
       article_id: null,
       created_at: now,
     },
@@ -58,6 +95,7 @@ vi.mock('@shared/db', () => {
       org_id: 'org_1',
       keyword_id: 'kw_1',
       title: 'Landing Pages',
+      meta_title: 'Landing Pages Guide',
       slug: 'landing-pages',
       keyword: 'landing pages',
       meta_description: 'm',
@@ -66,15 +104,18 @@ vi.mock('@shared/db', () => {
       difficulty: 36,
       search_volume: 170,
       status: 'generated',
-      created_at: now,
-      published_at: null,
       images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      video: { video_id: 'v1', title: 'Widget basics', section_heading: 'Intro' },
     },
     {
       id: 'art_2',
       org_id: 'org_1',
       keyword_id: 'kw_2',
       title: 'Notion Builder',
+      meta_title: 'Notion Builder',
       slug: 'notion-builder',
       keyword: 'notion builder',
       meta_description: 'm',
@@ -83,10 +124,12 @@ vi.mock('@shared/db', () => {
       difficulty: 48,
       search_volume: 2400,
       status: 'published',
-      created_at: now,
-      published_at: now,
       images_status: 'complete',
+      created_at: now,
+      updated_at: now,
+      published_at: now,
       wordpress_post_id: 222,
+      video: null,
     },
     // Owned by org_3 (user_2) — never visible to user_1 via detail reads.
     {
@@ -94,6 +137,7 @@ vi.mock('@shared/db', () => {
       org_id: 'org_3',
       keyword_id: 'kw_9',
       title: 'Foreign Article',
+      meta_title: 'Foreign Article',
       slug: 'foreign-article',
       keyword: 'foreign',
       meta_description: 'm',
@@ -102,9 +146,11 @@ vi.mock('@shared/db', () => {
       difficulty: 10,
       search_volume: 50,
       status: 'generated',
+      images_status: 'pending',
       created_at: now,
+      updated_at: null,
       published_at: null,
-      images_status: 'complete',
+      video: null,
     },
     {
       id: 'art_4',
@@ -119,9 +165,11 @@ vi.mock('@shared/db', () => {
       difficulty: 10,
       search_volume: 50,
       status: 'generated',
-      created_at: now,
-      published_at: null,
       images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      video: null,
     },
     {
       id: 'art_5',
@@ -136,9 +184,11 @@ vi.mock('@shared/db', () => {
       difficulty: 10,
       search_volume: 50,
       status: 'generated',
-      created_at: now,
-      published_at: null,
       images_status: 'pending',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      video: null,
     },
     // Already submitted to WordPress (has a post ID) but images regressed to
     // pending — exercises the update-readiness guard.
@@ -155,10 +205,12 @@ vi.mock('@shared/db', () => {
       difficulty: 10,
       search_volume: 50,
       status: 'generated',
-      created_at: now,
-      published_at: null,
       images_status: 'pending',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
       wordpress_post_id: 555,
+      video: null,
     },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
@@ -179,7 +231,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',
@@ -188,12 +240,15 @@ vi.mock('@shared/db', () => {
           article_preferences: {
             content_seo: {
               article_style: 'Informative',
-              internal_links: true,
+              internal_links_count: 1,
+              table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch' },
+            engagement: { image_style: 'Sketch', youtube_videos: true },
+            publishing: { auto_publish: false },
           },
         },
+        domain_rating: { value: 41, checked_at: new Date() },
         created_at: now,
       },
     ],
@@ -211,7 +266,7 @@ vi.mock('@shared/db', () => {
             country: 'Global (English)',
             description: 'desc',
           },
-          audience: { target: 'creators', competitors: ['super.so', 'potion.so'] },
+          audience: { target: ['creators'], competitors: ['super.so', 'potion.so'] },
           blog: {
             sitemap_url: 'https://x/sitemap.xml',
             main_blog_url: 'https://x/blog',
@@ -220,10 +275,12 @@ vi.mock('@shared/db', () => {
           article_preferences: {
             content_seo: {
               article_style: 'Informative',
-              internal_links: true,
+              internal_links_count: 1,
+              table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch' },
+            engagement: { image_style: 'Sketch', youtube_videos: true },
+            publishing: { auto_publish: false },
           },
         },
         created_at: now,
@@ -233,6 +290,17 @@ vi.mock('@shared/db', () => {
     [
       'org_3',
       { id: 'org_3', user_id: 'user_2', website_url: 'https://other.com', created_at: now },
+    ],
+    [
+      'org_stale',
+      {
+        id: 'org_stale',
+        user_id: 'user_1',
+        website_url: 'https://www.stale.com',
+        setup_status: 'setup_complete',
+        domain_rating: { value: 12, checked_at: new Date('2026-01-01T00:00:00Z') },
+        created_at: now,
+      },
     ],
   ]);
   saveWordPressConnection.mockImplementation(
@@ -266,6 +334,10 @@ vi.mock('@shared/db', () => {
         const o = orgs.get(id);
         if (o) o.presets = presets;
       }),
+      updateDomainRating: vi.fn(async (id: string, value: number) => {
+        const o = orgs.get(id);
+        if (o) o.domain_rating = { value, checked_at: new Date() };
+      }),
     },
     KeywordRepo: {
       listByOrg: vi.fn(async (orgId: string) =>
@@ -295,12 +367,24 @@ vi.mock('@shared/db', () => {
           articles.filter((a) => a.org_id === orgId && a.status === status).length,
       ),
       setWordPressPostId,
+      updateContent: vi.fn(async (id: string, patch: Record<string, string>) => {
+        const article = articles.find((a) => a.id === id);
+        if (!article) return null;
+        Object.assign(article, patch, { updated_at: new Date() });
+        return article;
+      }),
+    },
+    GscConnectionRepo: {
+      findByOrgId: vi.fn(async (orgId: string) => gscConnections.get(orgId) ?? null),
+      markRefreshFailed,
     },
   };
 });
 
 import { ArticleRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
+import { encryptSecret } from '../src/lib/crypto';
+import { logger } from '../src/logger';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
@@ -323,6 +407,15 @@ beforeEach(async () => {
   const seededCreateArticle = await ArticleRepo.findById('art_1');
   if (seededCreateArticle) delete seededCreateArticle.wordpress_post_id;
 });
+
+/** A body that passes every editor rule (meta_description inside 120-160). */
+const validArticleUpdate = {
+  title: 'Landing Pages, Revised',
+  slug: 'landing-pages-revised',
+  meta_title: 'Landing Pages Revised',
+  meta_description: 'A revised guide to landing pages. '.repeat(4),
+  content: '# revised body',
+};
 
 async function login(): Promise<string> {
   const res = await client.api.v0.core.login.$post({ json: { id_token: 'fake-google-token' } });
@@ -387,13 +480,16 @@ describe('dashboard home routes', () => {
 
   test('GET /articles/best is empty and gated until Google data is connected', async () => {
     const token = await login();
-    const res = await client.api.v0.dashboard.articles.best.$get(undefined, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.articles).toHaveLength(0);
-    expect(json.gated).toBe(true);
+    if (res.status === 200) {
+      const json = await res.json();
+      expect(json.articles).toHaveLength(0);
+      expect(json.gated).toBe(true);
+    }
   });
 
   test('GET /integrations/connected is empty for a fresh org', async () => {
@@ -757,6 +853,22 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(keywords[0]?.article_id).toBe('art_1');
       expect(keywords[1]?.article_id).toBeNull();
       expect(strategy_status).toBe('completed');
+      // #99: candidate linkage, classification, and generation state exposed.
+      expect(keywords[0]).toMatchObject({
+        candidate_id: null,
+        article_type: null,
+        intent: null,
+        opportunity_score: null,
+        generation_status: 'generated',
+        generation_error: null,
+      });
+      expect(keywords[1]).toMatchObject({
+        candidate_id: 'cand_2',
+        article_type: 'how_to_guide',
+        intent: 'informational',
+        opportunity_score: 0.7,
+        generation_status: 'pending',
+      });
     }
   });
 
@@ -813,6 +925,11 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(body.id).toBe('art_1');
       // Date entity fields are serialized to ISO strings in the response.
       expect(typeof body.created_at).toBe('string');
+      expect(body.video).toEqual({
+        video_id: 'v1',
+        title: 'Widget basics',
+        section_heading: 'Intro',
+      });
     }
 
     const missing = await client.api.v0.dashboard.articles[':id'].$get(
@@ -829,12 +946,98 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     expect(foreign.status).toBe(404);
   });
 
-  test('static /articles/best still resolves after adding /articles/:id', async () => {
-    const res = await client.api.v0.dashboard.articles.best.$get(undefined, await auth());
+  test('GET /articles/:id exposes the editor fields', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.articles).toHaveLength(0);
-    expect(json.gated).toBe(true);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.meta_title).toBe('Landing Pages Guide');
+      expect(body.keyword).toBe('landing pages');
+      expect(body.images_status).toBe('complete');
+      // Never edited since generation.
+      expect(body.updated_at).toBeNull();
+    }
+  });
+
+  test('PATCH /articles/:id saves the editable fields and stamps updated_at', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'art_1' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body).toMatchObject({
+        id: 'art_1',
+        title: validArticleUpdate.title,
+        slug: validArticleUpdate.slug,
+        meta_title: validArticleUpdate.meta_title,
+        meta_description: validArticleUpdate.meta_description,
+        content: validArticleUpdate.content,
+      });
+      // Same shape as GET, with the save reflected back as an ISO string.
+      expect(typeof body.updated_at).toBe('string');
+      expect(body.keyword).toBe('landing pages');
+      expect(body.images_status).toBe('complete');
+    }
+  });
+
+  test('PATCH /articles/:id 400s with per-field messages', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      {
+        param: { id: 'art_1' },
+        json: {
+          ...validArticleUpdate,
+          // Whitespace-only must fail like empty — the editor trims too.
+          title: '   ',
+          meta_title: 'x'.repeat(61),
+          meta_description: 'too short',
+        },
+      },
+      await auth(),
+    );
+    expect(res.status).toBe(400);
+    if (res.status === 400) {
+      const body = await res.json();
+      expect(body.error).toBe('Validation failed');
+      expect(Object.keys(body.fields).sort()).toEqual(['meta_description', 'meta_title', 'title']);
+      expect(body.fields.meta_title).toContain('60');
+      expect(body.fields.meta_description).toContain('120');
+    }
+  });
+
+  test('PATCH /articles/:id 404s for an unknown id', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'nope' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /articles/:id 404s for an article in another org', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].$patch(
+      { param: { id: 'art_3' }, json: validArticleUpdate },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+    // The foreign record must be untouched.
+    expect(ArticleRepo.updateContent).not.toHaveBeenCalledWith('art_3', expect.anything());
+  });
+
+  test('static /articles/best still resolves after adding /articles/:id', async () => {
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const json = await res.json();
+      expect(json.articles).toHaveLength(0);
+      expect(json.gated).toBe(true);
+    }
   });
 });
 
@@ -894,11 +1097,295 @@ describe('dashboard settings persistence', () => {
     }
   });
 
+  test('PATCH /settings/general audience target array survives edit + reads', async () => {
+    const opts = await auth();
+    const patched = await client.api.v0.dashboard.settings.general.$patch(
+      { json: { org_id: 'org_1', audience: { target: ['makers', 'founders'] } } },
+      opts,
+    );
+    expect(patched.status).toBe(200);
+    if (patched.status === 200) {
+      expect((await patched.json()).audience.target).toEqual(['makers', 'founders']);
+    }
+
+    const get = await client.api.v0.dashboard.settings.general.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(get.status).toBe(200);
+    if (get.status === 200) {
+      // Still an array (never joined into a string) after persistence.
+      expect((await get.json()).audience.target).toEqual(['makers', 'founders']);
+    }
+  });
+
   test('settings 404 for an org the caller does not own', async () => {
     const opts = await auth();
     const res = await client.api.v0.dashboard.settings.articles.$get(
       { query: { org_id: 'unknown' } },
       opts,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('PATCH /settings/articles updates publishing + content_seo counts', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.settings.articles.$patch(
+      {
+        json: {
+          org_id: 'org_1',
+          content_seo: { internal_links_count: 2, table_of_contents: false },
+          publishing: { auto_publish: true },
+        },
+      },
+      opts,
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.article_preferences.content_seo.internal_links_count).toBe(2);
+      expect(body.article_preferences.content_seo.table_of_contents).toBe(false);
+      expect(body.article_preferences.publishing.auto_publish).toBe(true);
+    }
+  });
+});
+
+describe('GSC-gated home cards', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  function connectOrg1() {
+    gscConnections.set('org_1', {
+      id: 'c1',
+      org_id: 'org_1',
+      refresh_token_enc: encryptSecret('rt-live', Buffer.alloc(32, 7)),
+      site_url: 'sc-domain:clewas.com',
+      google_email: 'o@x.com',
+      connected_at: new Date(),
+      last_refresh_failed_at: null,
+    });
+  }
+
+  beforeEach(() => {
+    gscConnections.clear();
+    querySearchAnalytics.mockReset();
+    markRefreshFailed.mockClear();
+  });
+
+  test('best stays gated without a connection', async () => {
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.gated).toBe(true);
+      expect(body.articles).toHaveLength(0);
+    }
+  });
+
+  test('best returns top pages with slug-matched titles when connected', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockResolvedValueOnce([
+      {
+        keys: ['https://clewas.com/blog/notion-builder'],
+        clicks: 41.2,
+        impressions: 900,
+        ctr: 0.04,
+        position: 7,
+      },
+      {
+        keys: ['https://clewas.com/pricing'],
+        clicks: 12,
+        impressions: 300,
+        ctr: 0.04,
+        position: 9,
+      },
+    ]);
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.gated).toBe(false);
+      expect(body.articles).toEqual([
+        { url: 'https://clewas.com/blog/notion-builder', clicks: 41, title: 'Notion Builder' },
+        { url: 'https://clewas.com/pricing', clicks: 12, title: null },
+      ]);
+    }
+    // The stored token decrypts back to the raw refresh token for the query.
+    expect(querySearchAnalytics).toHaveBeenCalledWith(
+      'rt-live',
+      'sc-domain:clewas.com',
+      expect.objectContaining({ dimensions: ['page'], rowLimit: 10 }),
+    );
+  });
+
+  test('revoked access re-gates and stamps the failure', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new GscAuthRevokedError('revoked'));
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).toHaveBeenCalledWith('org_1');
+  });
+
+  test('transient (non-revoked) errors re-gate without stamping and log a warning', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new Error('GSC 503'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'GSC read failed for /articles/best',
+      expect.objectContaining({ org_id: 'org_1', error: expect.any(Error) }),
+    );
+    warnSpy.mockRestore();
+  });
+
+  test('best 404s for an org the caller does not own', async () => {
+    const res = await client.api.v0.dashboard.articles.best.$get(
+      { query: { org_id: 'org_3' } },
+      await auth(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('search-performance is gated without a connection, live with one', async () => {
+    const gated = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(gated.status).toBe(200);
+    if (gated.status === 200) {
+      expect(await gated.json()).toEqual({
+        gated: true,
+        clicks: null,
+        impressions: null,
+        ctr: null,
+        position: null,
+      });
+    }
+
+    connectOrg1();
+    querySearchAnalytics.mockResolvedValueOnce([
+      { keys: [], clicks: 120, impressions: 4000, ctr: 0.03, position: 12.4 },
+    ]);
+    const live = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(live.status).toBe(200);
+    if (live.status === 200) {
+      expect(await live.json()).toEqual({
+        gated: false,
+        clicks: 120,
+        impressions: 4000,
+        ctr: 0.03,
+        position: 12.4,
+      });
+    }
+  });
+
+  test('search-performance: transient (non-revoked) errors re-gate and log a warning', async () => {
+    connectOrg1();
+    querySearchAnalytics.mockRejectedValueOnce(new Error('network blip'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const res = await client.api.v0.dashboard['search-performance'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'GSC read failed for /search-performance',
+      expect.objectContaining({ org_id: 'org_1', error: expect.any(Error) }),
+    );
+    warnSpy.mockRestore();
+  });
+});
+
+describe('GET /dashboard/domain-rating', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  beforeEach(() => {
+    backlinksSummary.mockClear();
+    backlinksSummary.mockResolvedValue({ rank: 730 });
+  });
+
+  test('rejects requests without a token', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get({
+      query: { org_id: 'org_1' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('returns the stored value without a provider call when fresh', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(41);
+    expect(backlinksSummary).not.toHaveBeenCalled();
+  });
+
+  test('re-fetches and persists when stale', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_stale' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(73);
+    expect(backlinksSummary).toHaveBeenCalledWith('stale.com');
+  });
+
+  test('falls back to the stale value when the provider fails', async () => {
+    backlinksSummary.mockRejectedValueOnce(new Error('down'));
+    // org_stale was refreshed by the previous test's mock store write; use a
+    // fresh failure path org: org_2 has no rating at all.
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_2' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBeNull();
+  });
+
+  test('fetches for an org that has no rating yet', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_2' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).rating).toBe(73);
+  });
+
+  test('404s for an org the caller does not own', async () => {
+    const res = await client.api.v0.dashboard['domain-rating'].$get(
+      { query: { org_id: 'org_3' } },
+      await auth(),
     );
     expect(res.status).toBe(404);
   });

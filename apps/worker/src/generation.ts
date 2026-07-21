@@ -1,5 +1,15 @@
 import { ArticleRepo, KeywordRepo, OrgRepo } from '@shared/db';
-import { buildContext, generateArticle } from '@shared/generation';
+import {
+  buildContext,
+  buildVideoEmbed,
+  buildVideoPickPrompt,
+  extractH2s,
+  generateArticle,
+  injectBlockAfterHeading,
+  languageCodeFromName,
+  parseVideoPick,
+} from '@shared/generation';
+import type { ArticleVideo } from '@shared/schemas';
 import { GenerateTask, isPaid } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
@@ -48,7 +58,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       }
 
       const ctx = buildContext(org, keyword);
-      const { llm } = getGenerationClients();
+      const { llm, youtube } = getGenerationClients();
       const result = await generateArticle({ ctx, llm });
 
       if (!result.ok) {
@@ -56,6 +66,49 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         logger.warn('generation validation failed', { failures: result.failures });
         await KeywordRepo.failGeneration(keywordId, `validation: ${codes}`);
         continue;
+      }
+
+      // YouTube embed (#85): best-effort — any failure logs and the article
+      // ships without a video; never fail or delay generation over this.
+      let content = result.article.content;
+      let video: ArticleVideo | null = null;
+      if (org.presets.article_preferences.engagement.youtube_videos) {
+        try {
+          const headings = extractH2s(content);
+          const candidates =
+            headings.length > 0
+              ? await youtube.searchVideos(keyword.keyword, {
+                  relevanceLanguage: languageCodeFromName(org.presets.business.language),
+                })
+              : [];
+          if (candidates.length > 0) {
+            const res = await llm.complete({
+              messages: buildVideoPickPrompt({
+                articleTitle: result.article.title,
+                metaDescription: result.article.meta_description,
+                headings,
+                candidates,
+              }),
+              responseFormat: 'json',
+            });
+            const pick = parseVideoPick(res.text, candidates.length, headings);
+            if (pick) {
+              const chosen = candidates[pick.video_index]!;
+              content = injectBlockAfterHeading(
+                content,
+                pick.section_heading,
+                buildVideoEmbed(chosen.video_id, chosen.title),
+              );
+              video = {
+                video_id: chosen.video_id,
+                title: chosen.title,
+                section_heading: pick.section_heading,
+              };
+            }
+          }
+        } catch (err) {
+          logger.warn('video step failed; article ships without video', { error: err as Error });
+        }
       }
 
       const article = await ArticleRepo.create({
@@ -67,7 +120,8 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         keyword: keyword.keyword,
         meta_description: result.article.meta_description,
         featured_image_url: '', // populated by the images worker (#51)
-        content: result.article.content,
+        content,
+        video,
         difficulty: keyword.difficulty,
         search_volume: keyword.search_volume,
         status: 'generated',

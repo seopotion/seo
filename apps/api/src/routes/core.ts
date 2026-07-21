@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { OrgRepo, UserRepo } from '@shared/db';
+import { isPaid } from '@shared/schemas';
 import { signToken } from '../auth/jwt';
 import { verifyGoogleIdToken } from '../clients/google';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
@@ -62,6 +63,10 @@ const core = new OpenAPIHono<AuthEnv>()
           website_url: o.website_url,
           setup_status: o.setup_status,
           name: o.name,
+          capabilities: {
+            keyword_research: isPaid(o),
+            keyword_scheduling: isPaid(o),
+          },
         })),
       });
     },

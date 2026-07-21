@@ -25,16 +25,20 @@ const paramValue = (value: string) => ({ Parameter: { Value: value } });
 beforeEach(() => {
   process.env.GOOGLE_CLIENT_ID_STAGING = 'staging-client.apps.googleusercontent.com';
   process.env.GOOGLE_CLIENT_ID_PROD = 'prod-client.apps.googleusercontent.com';
+  process.env.WEB_ORIGIN_STAGING = 'https://app-staging.seopotion.co';
+  process.env.WEB_ORIGIN_PROD = 'https://app.seopotion.co';
 });
 
 afterEach(() => {
   vi.clearAllMocks();
   delete process.env.GOOGLE_CLIENT_ID_STAGING;
   delete process.env.GOOGLE_CLIENT_ID_PROD;
+  delete process.env.WEB_ORIGIN_STAGING;
+  delete process.env.WEB_ORIGIN_PROD;
 });
 
 describe('preflight', () => {
-  test('ready when both SSM params resolve non-empty and the google client id is set', async () => {
+  test('ready when all SSM params resolve non-empty and the env vars are set', async () => {
     ssmSend.mockResolvedValue(paramValue('present'));
 
     const res = await preflight('staging');
@@ -44,11 +48,14 @@ describe('preflight', () => {
     expect(res.data.checks.every((c) => c.present)).toBe(true);
     // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
     expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
-    // jwt-secret, mongo-uri, and the google client id env var.
+    // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, and the two env vars.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/staging/google-client-secret',
+      '/seo/staging/gsc-token-key',
       '/seo/staging/jwt-secret',
       '/seo/staging/mongo-uri',
       'GOOGLE_CLIENT_ID_STAGING',
+      'WEB_ORIGIN_STAGING',
     ]);
   });
 
@@ -58,9 +65,12 @@ describe('preflight', () => {
     const res = await preflight('prod');
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/prod/google-client-secret',
+      '/seo/prod/gsc-token-key',
       '/seo/prod/jwt-secret',
       '/seo/prod/mongo-uri',
       'GOOGLE_CLIENT_ID_PROD',
+      'WEB_ORIGIN_PROD',
     ]);
   });
 
@@ -96,6 +106,34 @@ describe('preflight', () => {
     expect(res.data.checks.find((c) => c.name === 'GOOGLE_CLIENT_ID_STAGING')).toMatchObject({
       present: false,
       kind: 'env',
+    });
+  });
+
+  test('not ready when the web origin env var is unset or empty', async () => {
+    process.env.WEB_ORIGIN_STAGING = '';
+    ssmSend.mockResolvedValue(paramValue('present'));
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === 'WEB_ORIGIN_STAGING')).toMatchObject({
+      present: false,
+      kind: 'env',
+    });
+  });
+
+  test('not ready when a new GSC SSM param is missing', async () => {
+    ssmSend.mockImplementation(async (cmd: { Name: string }) =>
+      cmd.Name === '/seo/staging/gsc-token-key'
+        ? Promise.reject(Object.assign(new Error('not found'), { name: 'ParameterNotFound' }))
+        : paramValue('present'),
+    );
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === '/seo/staging/gsc-token-key')).toMatchObject({
+      present: false,
     });
   });
 });

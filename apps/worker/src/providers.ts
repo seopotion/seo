@@ -1,4 +1,9 @@
-import { createDataForSeoClient, createFalClient, createOpenRouterClient } from '@shared/providers';
+import {
+  createDataForSeoClient,
+  createFalClient,
+  createOpenRouterClient,
+  createYouTubeClient,
+} from '@shared/providers';
 
 /** Build the DataForSEO + LLM clients the strategy pipeline needs, from env. */
 export function getStrategyClients() {
@@ -11,10 +16,11 @@ export function getStrategyClients() {
   };
 }
 
-/** Build the LLM client the generation worker needs, from env (#55). */
+/** Build the LLM + YouTube clients the generation worker needs, from env (#55/#85). */
 export function getGenerationClients() {
   return {
     llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    youtube: createYouTubeClient({ apiKey: process.env.YOUTUBE_API_KEY ?? '' }),
   };
 }
 
@@ -23,5 +29,16 @@ export function getImageClients() {
   return {
     llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
     image: createFalClient({ apiKey: process.env.FAL_KEY ?? '' }),
+  };
+}
+
+/** Build the LLM + DataForSEO clients the scanner worker needs, from env. */
+export function getScanClients() {
+  return {
+    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    dataForSeo: createDataForSeoClient({
+      login: process.env.DATAFORSEO_LOGIN ?? '',
+      password: process.env.DATAFORSEO_PASSWORD ?? '',
+    }),
   };
 }

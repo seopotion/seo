@@ -28,7 +28,13 @@ vi.mock('@shared/generation', async (orig) => ({
   generateArticle,
 }));
 
-vi.mock('../src/providers', () => ({ getGenerationClients: () => ({ llm: {} }) }));
+const { llmComplete, searchVideos } = vi.hoisted(() => ({
+  llmComplete: vi.fn(),
+  searchVideos: vi.fn(async () => [] as unknown[]),
+}));
+vi.mock('../src/providers', () => ({
+  getGenerationClients: () => ({ llm: { complete: llmComplete }, youtube: { searchVideos } }),
+}));
 
 const { enqueueImageTask } = vi.hoisted(() => ({ enqueueImageTask: vi.fn(async () => {}) }));
 vi.mock('../src/queue', () => ({ enqueueImageTask }));
@@ -59,11 +65,17 @@ const org = {
   website_url: 'https://x.com',
   presets: {
     business: { name: 'Acme', language: 'English', country: 'US', description: 'widgets' },
-    audience: { target: 'makers', competitors: [] },
+    audience: { target: ['makers'], competitors: [] },
     blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
     article_preferences: {
-      content_seo: { article_style: 'x', internal_links: false, llm_instructions: '' },
-      engagement: { image_style: '' },
+      content_seo: {
+        article_style: 'x',
+        internal_links_count: 0,
+        table_of_contents: true,
+        llm_instructions: '',
+      },
+      engagement: { image_style: '', youtube_videos: true },
+      publishing: { auto_publish: false },
     },
   },
 };
@@ -86,6 +98,21 @@ const okArticle = {
     usage: { totalTokens: 1, costUsd: 0.01 },
   },
 };
+
+const okArticleWithSection = {
+  ok: true,
+  article: {
+    ...okArticle.article,
+    content: '# body\n\n## Section One\n\ntext',
+  },
+};
+
+const candidate = { video_id: 'v1', title: 'Widget basics', description: 'd', channel: 'c' };
+const pickJson = (text: string) => ({
+  text,
+  model: 'm',
+  usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+});
 
 describe('generation worker', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -161,5 +188,77 @@ describe('generation worker', () => {
       handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {}),
     ).rejects.toThrow('rate limited');
     expect(failGeneration).toHaveBeenCalledWith('k1', 'rate limited');
+  });
+
+  test('embeds a picked YouTube video: iframe in content + structured video field', async () => {
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticleWithSection);
+    searchVideos.mockResolvedValueOnce([candidate]);
+    llmComplete.mockResolvedValueOnce(
+      pickJson('{"video_index": 0, "section_heading": "Section One"}'),
+    );
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(searchVideos).toHaveBeenCalledWith('best widgets', expect.anything());
+    const created = createArticle.mock.calls[0]![0] as {
+      content: string;
+      video: { video_id: string; section_heading: string };
+    };
+    expect(created.content).toContain('youtube-nocookie.com/embed/v1');
+    expect(created.video).toEqual({
+      video_id: 'v1',
+      title: 'Widget basics',
+      section_heading: 'Section One',
+    });
+  });
+
+  test('toggle off: no search call, video null', async () => {
+    findOrgById.mockResolvedValue({
+      ...org,
+      presets: {
+        ...org.presets,
+        article_preferences: {
+          ...org.presets.article_preferences,
+          engagement: { image_style: '', youtube_videos: false },
+        },
+      },
+    });
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticleWithSection);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(searchVideos).not.toHaveBeenCalled();
+    expect((createArticle.mock.calls[0]![0] as { video: unknown }).video).toBeNull();
+  });
+
+  test('video step failure is non-fatal: article persists with video null', async () => {
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticleWithSection);
+    searchVideos.mockRejectedValueOnce(new Error('quota exceeded'));
+
+    await expect(
+      handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {}),
+    ).resolves.toBeUndefined();
+
+    expect((createArticle.mock.calls[0]![0] as { video: unknown }).video).toBeNull();
+    expect(failGeneration).not.toHaveBeenCalled();
+  });
+
+  test('LLM picking no video leaves content untouched', async () => {
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticleWithSection);
+    searchVideos.mockResolvedValueOnce([candidate]);
+    llmComplete.mockResolvedValueOnce(pickJson('{"video_index": null, "section_heading": null}'));
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const created = createArticle.mock.calls[0]![0] as { content: string; video: unknown };
+    expect(created.content).not.toContain('iframe');
+    expect(created.video).toBeNull();
   });
 });

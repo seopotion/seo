@@ -1,5 +1,6 @@
 'use client';
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -27,20 +29,25 @@ type ArticleSettingsForm = {
   tableOfContents: boolean;
 };
 
-type ArticleSettingsLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type ArticleSettingsSaveState = 'error' | 'idle' | 'saved';
 
 type ArticleSettingsResponse = {
   article_preferences: {
     content_seo: {
       article_style: string;
-      internal_links: boolean;
+      internal_links_count: number;
       llm_instructions: string;
     };
     engagement: {
       image_style: string;
     };
   };
+};
+
+type ArticleSettingsMutationVariables = {
+  organizationId: string;
+  saveRevision: number;
+  settings: ArticleSettingsForm;
 };
 
 const initialArticleSettings: ArticleSettingsForm = {
@@ -57,7 +64,7 @@ function mergeArticleSettings(
   return {
     ...currentSettings,
     articleStyle: data.article_preferences.content_seo.article_style,
-    internalLinksCount: data.article_preferences.content_seo.internal_links ? '1' : '0',
+    internalLinksCount: String(data.article_preferences.content_seo.internal_links_count),
   };
 }
 
@@ -65,7 +72,7 @@ function buildArticleSettingsPatch(settings: ArticleSettingsForm) {
   return {
     content_seo: {
       article_style: settings.articleStyle,
-      internal_links: Number.parseInt(settings.internalLinksCount, 10) > 0,
+      internal_links_count: Number.parseInt(settings.internalLinksCount, 10),
     },
   };
 }
@@ -79,63 +86,111 @@ export default function ArticleSettingsPage() {
     loading: organizationLoading,
     organization,
   } = useActiveOrganization();
+  const queryClient = useQueryClient();
   const [settings, setSettings] = useState<ArticleSettingsForm>(initialArticleSettings);
-  const [loadState, setLoadState] = useState<ArticleSettingsLoadState>('idle');
+  const [initializedOrganizationId, setInitializedOrganizationId] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
   const [saveState, setSaveState] = useState<ArticleSettingsSaveState>('idle');
-  const [saving, setSaving] = useState(false);
   const editRevisionRef = useRef(0);
 
   const handleUnauthorized = useCallback(() => {
+    setRedirecting(true);
     clearToken();
     clearWorkspaceStatusCache();
+    queryClient.clear();
     router.replace('/');
-  }, [router]);
+  }, [queryClient, router]);
+
+  const settingsQuery = useQuery({
+    queryKey: dashboardQueryKeys.articleSettings(organization?.id ?? ''),
+    queryFn: async () => {
+      if (!organization) {
+        throw new Error('organization_required');
+      }
+
+      const response = await api.api.v0.dashboard.settings.articles.$get({
+        query: { org_id: organization.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) {
+        throw new Error('article_settings_load_failed');
+      }
+
+      return response.json();
+    },
+    enabled: !redirecting && !organizationLoading && Boolean(organization),
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 60 * 1000,
+  });
 
   useEffect(() => {
-    if (organizationLoading) return;
+    if (!organization || !settingsQuery.data) return;
 
-    if (!organization) {
-      setLoadState('idle');
-      return;
+    const isNewOrganization = initializedOrganizationId !== organization.id;
+
+    if (!isNewOrganization && editRevisionRef.current !== 0) return;
+
+    if (isNewOrganization) {
+      editRevisionRef.current = 0;
+      setSaveState('idle');
     }
 
-    let cancelled = false;
+    setSettings((currentSettings) =>
+      mergeArticleSettings(
+        settingsQuery.data,
+        isNewOrganization ? initialArticleSettings : currentSettings,
+      ),
+    );
+    setInitializedOrganizationId(organization.id);
+  }, [initializedOrganizationId, organization, settingsQuery.data]);
 
-    setLoadState('loading');
-    setSaveState('idle');
+  const saveSettingsMutation = useMutation({
+    mutationFn: async ({
+      organizationId,
+      settings: settingsToSave,
+    }: ArticleSettingsMutationVariables) => {
+      const response = await api.api.v0.dashboard.settings.articles.$patch({
+        json: {
+          org_id: organizationId,
+          ...buildArticleSettingsPatch(settingsToSave),
+        },
+      });
 
-    void (async () => {
-      try {
-        const response = await api.api.v0.dashboard.settings.articles.$get({
-          query: { org_id: organization.id },
-        });
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('article_settings_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setSettings((currentSettings) => mergeArticleSettings(data, currentSettings));
-          setLoadState('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setLoadState('error');
-        }
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        throw new Error('unauthorized');
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationLoading]);
+      if (!response.ok) {
+        throw new Error('article_settings_save_failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data, { organizationId, saveRevision }) => {
+      queryClient.setQueryData<ArticleSettingsResponse>(
+        dashboardQueryKeys.articleSettings(organizationId),
+        data,
+      );
+
+      if (editRevisionRef.current === saveRevision) {
+        setSettings((currentSettings) => mergeArticleSettings(data, currentSettings));
+        setSaveState('saved');
+      }
+    },
+    onError: (error, { saveRevision }) => {
+      if (error instanceof Error && error.message === 'unauthorized') return;
+
+      if (editRevisionRef.current === saveRevision) {
+        setSaveState('error');
+      }
+    },
+  });
 
   function markEdited() {
     editRevisionRef.current += 1;
@@ -153,52 +208,26 @@ export default function ArticleSettingsPage() {
     markEdited();
   }
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+  function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!organization || saving) return;
+    if (!organization || saveSettingsMutation.isPending) return;
 
-    setSaving(true);
     setSaveState('idle');
 
-    const saveRevision = editRevisionRef.current;
-
-    try {
-      const response = await api.api.v0.dashboard.settings.articles.$patch({
-        json: {
-          org_id: organization.id,
-          ...buildArticleSettingsPatch(settings),
-        },
-      });
-
-      if ((response.status as number) === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('article_settings_save_failed');
-      }
-
-      const data = await response.json();
-      if (editRevisionRef.current === saveRevision) {
-        setSettings((currentSettings) => mergeArticleSettings(data, currentSettings));
-        setSaveState('saved');
-      }
-    } catch {
-      if (editRevisionRef.current === saveRevision) {
-        setSaveState('error');
-      }
-    } finally {
-      setSaving(false);
-    }
+    saveSettingsMutation.mutate({
+      organizationId: organization.id,
+      saveRevision: editRevisionRef.current,
+      settings,
+    });
   }
 
   if (
+    redirecting ||
     organizationLoading ||
     organizationError === 'unauthorized' ||
-    loadState === 'loading' ||
-    (organization && loadState === 'idle')
+    (organization && settingsQuery.isPending) ||
+    (organization && Boolean(settingsQuery.data) && initializedOrganizationId !== organization.id)
   ) {
     return <StatusPanel>{t('status.loading')}</StatusPanel>;
   }
@@ -211,7 +240,7 @@ export default function ArticleSettingsPage() {
     return <StatusPanel tone="error">{t('status.organizationError')}</StatusPanel>;
   }
 
-  if (loadState === 'error') {
+  if (settingsQuery.isError) {
     return <StatusPanel tone="error">{t('status.loadError')}</StatusPanel>;
   }
 
@@ -268,8 +297,8 @@ export default function ArticleSettingsPage() {
       />
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={saving || !organization}>
-          {saving ? t('actions.saving') : t('actions.save')}
+        <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
+          {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
         </Button>
       </div>
     </form>

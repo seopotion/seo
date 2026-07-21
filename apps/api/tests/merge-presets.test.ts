@@ -3,15 +3,21 @@ import { mergePresets } from '../src/lib/merge-presets';
 
 const base = {
   business: { name: 'Old Co', language: 'English', country: 'US', description: 'Old.' },
-  audience: { target: 'Devs', competitors: ['a.com', 'b.com'] },
+  audience: { target: ['Devs'], competitors: ['a.com', 'b.com'] },
   blog: {
     sitemap_url: 'https://x.com/sitemap.xml',
     main_blog_url: 'https://x.com/blog',
     best_articles: ['https://x.com/1'],
   },
   article_preferences: {
-    content_seo: { article_style: 'Formal', internal_links: false, llm_instructions: 'old' },
-    engagement: { image_style: 'Minimal' },
+    content_seo: {
+      article_style: 'Formal',
+      internal_links_count: 0,
+      table_of_contents: true,
+      llm_instructions: 'old',
+    },
+    engagement: { image_style: 'Minimal', youtube_videos: true },
+    publishing: { auto_publish: false },
   },
 };
 
@@ -32,14 +38,14 @@ describe('mergePresets', () => {
   test('replaces array fields wholesale rather than concatenating', () => {
     const result = mergePresets(base, { audience: { competitors: ['c.com'] } });
     expect(result.audience.competitors).toEqual(['c.com']);
-    expect(result.audience.target).toBe('Devs');
+    expect(result.audience.target).toEqual(['Devs']);
   });
 
   test('merges the two-level nest under article_preferences', () => {
     const result = mergePresets(base, {
-      article_preferences: { content_seo: { internal_links: true } },
+      article_preferences: { content_seo: { internal_links_count: 3 } },
     });
-    expect(result.article_preferences.content_seo.internal_links).toBe(true);
+    expect(result.article_preferences.content_seo.internal_links_count).toBe(3);
     expect(result.article_preferences.content_seo.article_style).toBe('Formal');
     expect(result.article_preferences.engagement.image_style).toBe('Minimal');
   });

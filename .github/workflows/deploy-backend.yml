@@ -47,6 +47,7 @@ jobs:
         env:
           AWS_REGION: us-east-1
           GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+          WEB_ORIGIN_STAGING: ${{ vars.WEB_ORIGIN_STAGING }}
         run: npm run cli -- infra preflight --stage staging --output json
 
       - name: Install infra deps
@@ -57,10 +58,14 @@ jobs:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
           CDK_DEFAULT_REGION: us-east-1
           GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+          # GSC OAuth redirect URI base, baked into the API Lambda at synth time
+          # (infra/lib/config.ts webOrigin; preflight above verifies it's set).
+          WEB_ORIGIN_STAGING: ${{ vars.WEB_ORIGIN_STAGING }}
           # Provider secrets baked into the worker Lambdas at synth time
           # (infra/lib/api-stack.ts providerEnv; SSM provisioning deferred — #9/#43).
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
           DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
         run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never
