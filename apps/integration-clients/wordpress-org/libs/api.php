@@ -522,7 +522,7 @@ function seo_potion_test_integration($request) {
         ], 403);
     }
 
-    // 4. Create test post with dummy data
+    // 4. Create test post with dummy data ($wp_error = true surfaces failures)
     $test_post_id = wp_insert_post([
         'post_title'    => 'Test Post - SEO Potion Integration',
         'post_content'  => 'This is a test post to verify SEO Potion integration is working correctly.',
@@ -530,12 +530,12 @@ function seo_potion_test_integration($request) {
         'post_type'     => 'post',
         'post_name'     => 'seo-potion-test-post-' . time(),
         'post_author'   => 1, // Admin user
-    ]);
-    
-    // 5. Check if creation was successful
-    if (is_wp_error($test_post_id)) {
+    ], true);
+
+    // 5. Check if creation was successful (0 or WP_Error both mean failure)
+    if (is_wp_error($test_post_id) || !$test_post_id) {
         return new WP_REST_Response([
-            'success' => false, 
+            'success' => false,
             'error_code' => 'post_creation_failed'
         ], 500);
     }
@@ -872,11 +872,15 @@ function seo_potion_create_post_with_images($args) {
     // Remove ALL kses filters (handles both admin and cron contexts)
     kses_remove_filters();
 
-    $post_id = wp_insert_post($args);
+    // Pass $wp_error = true so a failed insert returns a WP_Error instead of 0;
+    // guard against a non-positive ID either way so callers never treat 0 as success.
+    $post_id = wp_insert_post($args, true);
 
-    if (is_wp_error($post_id)) {
+    if (is_wp_error($post_id) || !$post_id) {
         kses_init_filters();
-        return $post_id;
+        return is_wp_error($post_id)
+            ? $post_id
+            : new WP_Error('seo_potion_insert_failed', 'wp_insert_post returned an invalid post ID');
     }
 
     $updated_content = seo_potion_download_content_images($args['post_content'], $post_id);

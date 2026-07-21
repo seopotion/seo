@@ -57,4 +57,16 @@ describe('ArticleRepo (integration)', () => {
     expect(found?.id).toBe(articles[0]!.id);
     expect(await ArticleRepo.findById('not-an-objectid')).toBeNull();
   });
+
+  test('setWordPressPostId reports whether a document matched', async () => {
+    const { articles } = await ArticleRepo.listByOrg('org_art', { limit: 1, offset: 0 });
+    const id = articles[0]!.id;
+
+    expect(await ArticleRepo.setWordPressPostId(id, 42)).toBe(true);
+    expect((await ArticleRepo.findById(id))?.wordpress_post_id).toBe(42);
+
+    // Valid ObjectId that matches no document, and a malformed id -> false.
+    expect(await ArticleRepo.setWordPressPostId('ffffffffffffffffffffffff', 7)).toBe(false);
+    expect(await ArticleRepo.setWordPressPostId('not-an-objectid', 7)).toBe(false);
+  });
 });

@@ -140,6 +140,26 @@ vi.mock('@shared/db', () => {
       published_at: null,
       images_status: 'pending',
     },
+    // Already submitted to WordPress (has a post ID) but images regressed to
+    // pending — exercises the update-readiness guard.
+    {
+      id: 'art_6',
+      org_id: 'org_1',
+      keyword_id: 'kw_6',
+      title: 'Submitted Images Pending',
+      slug: 'submitted-images-pending',
+      keyword: 'submitted images pending',
+      meta_description: 'm',
+      featured_image_url: '',
+      content: '# f',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      created_at: now,
+      published_at: null,
+      images_status: 'pending',
+      wordpress_post_id: 555,
+    },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
     [
@@ -218,15 +238,17 @@ vi.mock('@shared/db', () => {
   saveWordPressConnection.mockImplementation(
     async (id: string, token: string, connectedAt: Date) => {
       const org = orgs.get(id);
-      if (org) {
-        org.wordpress_token = token;
-        org.wordpress_connected_at = connectedAt;
-      }
+      if (!org) return false;
+      org.wordpress_token = token;
+      org.wordpress_connected_at = connectedAt;
+      return true;
     },
   );
   setWordPressPostId.mockImplementation(async (id: string, postId: number) => {
     const article = articles.find((candidate) => candidate.id === id);
-    if (article) Object.assign(article, { wordpress_post_id: postId });
+    if (!article) return false;
+    Object.assign(article, { wordpress_post_id: postId });
+    return true;
   });
   return {
     UserRepo: {
@@ -277,12 +299,13 @@ vi.mock('@shared/db', () => {
   };
 });
 
+import { ArticleRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
 
-beforeEach(() => {
+beforeEach(async () => {
   editWordPressArticle.mockReset();
   editWordPressArticle.mockResolvedValue({ status: 200, body: { success: true, post_id: 222 } });
   saveWordPressConnection.mockClear();
@@ -294,6 +317,11 @@ beforeEach(() => {
   });
   testWordPressIntegration.mockReset();
   testWordPressIntegration.mockResolvedValue({ success: true });
+  // The setWordPressPostId mock persists onto the shared article fixture, so
+  // clear the one field create tests mutate to keep each test isolated (the
+  // create dup-guard rejects an article that already has a WordPress post ID).
+  const seededCreateArticle = await ArticleRepo.findById('art_1');
+  if (seededCreateArticle) delete seededCreateArticle.wordpress_post_id;
 });
 
 async function login(): Promise<string> {
@@ -462,6 +490,18 @@ describe('dashboard WordPress integration', () => {
     expect(saveWordPressConnection).not.toHaveBeenCalled();
   });
 
+  test('404s when the connection cannot be persisted after a successful test', async () => {
+    saveWordPressConnection.mockResolvedValueOnce(false);
+
+    const res = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'secret-token' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(testWordPressIntegration).toHaveBeenCalled();
+  });
+
   test('lists the saved WordPress connection without exposing the token', async () => {
     const opts = await auth();
     await client.api.v0.dashboard.integrations.wordpress.$post(
@@ -569,6 +609,34 @@ describe('dashboard WordPress article routes', () => {
     expect(submitWordPressArticle).not.toHaveBeenCalled();
   });
 
+  test('rejects create when the article already has a WordPress post ID', async () => {
+    // art_2 already carries wordpress_post_id 222 — a retry must not remap it.
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_2' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Article is already published to WordPress' });
+    expect(submitWordPressArticle).not.toHaveBeenCalled();
+    expect(setWordPressPostId).not.toHaveBeenCalled();
+  });
+
+  test('reports a 500 when the created post ID cannot be persisted', async () => {
+    setWordPressPostId.mockResolvedValueOnce(false);
+
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      error: 'WordPress post created but its ID could not be saved',
+    });
+    expect(submitWordPressArticle).toHaveBeenCalled();
+  });
+
   test.each([
     'art_3',
     'missing-article',
@@ -609,6 +677,18 @@ describe('dashboard WordPress article routes', () => {
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'Article has not been submitted to WordPress' });
+    expect(editWordPressArticle).not.toHaveBeenCalled();
+  });
+
+  test('rejects update until article images are complete', async () => {
+    // art_6 has a stored post ID but images regressed to pending.
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$put(
+      { param: { id: 'art_6' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'Article images are not complete' });
     expect(editWordPressArticle).not.toHaveBeenCalled();
   });
 

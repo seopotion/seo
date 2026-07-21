@@ -181,7 +181,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ success: false as const, error_code: 'wordpress_request_failed' }, 502);
       }
 
-      await OrgRepo.saveWordPressConnection(org.id, token, new Date());
+      const saved = await OrgRepo.saveWordPressConnection(org.id, token, new Date());
+      if (!saved) return c.json({ error: 'Not found' }, 404);
       return c.json({ success: true as const }, 200);
     },
   )
@@ -382,6 +383,10 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       if (!org.wordpress_token || !org.wordpress_connected_at) {
         return c.json({ error: 'WordPress is not connected' }, 409);
       }
+      // Dup-guard: a sequential retry must not create and remap a second post.
+      if (article.wordpress_post_id) {
+        return c.json({ error: 'Article is already published to WordPress' }, 409);
+      }
       if (article.images_status !== 'complete') {
         return c.json({ error: 'Article images are not complete' }, 409);
       }
@@ -389,7 +394,10 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       try {
         const result = await submitWordPressArticle(org.website_url, org.wordpress_token, article);
         if (result.status === 200) {
-          await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
+          const persisted = await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
+          if (!persisted) {
+            return c.json({ error: 'WordPress post created but its ID could not be saved' }, 500);
+          }
           return c.json(result.body, 200);
         }
         if (result.status === 400) return c.json(result.body, 400);
@@ -453,6 +461,9 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       }
       if (!article.wordpress_post_id) {
         return c.json({ error: 'Article has not been submitted to WordPress' }, 409);
+      }
+      if (article.images_status !== 'complete') {
+        return c.json({ error: 'Article images are not complete' }, 409);
       }
 
       try {

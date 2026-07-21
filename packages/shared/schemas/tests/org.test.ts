@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { isPaid, OrgSchema } from '../src/org';
+import { CreateOrgInput, isPaid, OrgSchema } from '../src/org';
 
 const base = {
   id: '1',
@@ -31,5 +31,14 @@ describe('OrgSchema entitlement', () => {
     });
     expect(org.wordpress_token).toBe('wordpress-token');
     expect(org.wordpress_connected_at).toEqual(connectedAt);
+  });
+
+  test('CreateOrgInput omits server-owned fields', () => {
+    expect('id' in CreateOrgInput.shape).toBe(false);
+    expect('created_at' in CreateOrgInput.shape).toBe(false);
+    expect('presets' in CreateOrgInput.shape).toBe(false);
+    expect('wordpress_token' in CreateOrgInput.shape).toBe(false);
+    expect('wordpress_connected_at' in CreateOrgInput.shape).toBe(false);
+    expect('user_id' in CreateOrgInput.shape).toBe(true);
   });
 });

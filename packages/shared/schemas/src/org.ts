@@ -25,8 +25,18 @@ export const OrgSchema = z.object({
 });
 export type Org = z.infer<typeof OrgSchema>;
 
-/** Input for creating an org — the server assigns `id` and `created_at`. */
-export const CreateOrgInput = OrgSchema.omit({ id: true, created_at: true, presets: true });
+/**
+ * Input for creating an org — the server assigns `id` and `created_at`, and the
+ * WordPress connection fields are server-owned (written only by
+ * `saveWordPressConnection` after a successful integration test).
+ */
+export const CreateOrgInput = OrgSchema.omit({
+  id: true,
+  created_at: true,
+  presets: true,
+  wordpress_token: true,
+  wordpress_connected_at: true,
+});
 // z.input (not z.infer): `plan`/`strategy_status` have defaults, so callers may omit them.
 export type CreateOrgInput = z.input<typeof CreateOrgInput>;
 

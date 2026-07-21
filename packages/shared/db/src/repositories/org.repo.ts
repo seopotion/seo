@@ -73,12 +73,13 @@ export const OrgRepo = {
     await (await collection()).updateOne({ _id: new ObjectId(id) }, { $set: { presets: data } });
   },
 
-  async saveWordPressConnection(id: string, token: string, connectedAt: Date): Promise<void> {
-    if (!ObjectId.isValid(id)) return;
-    await (await collection()).updateOne(
+  async saveWordPressConnection(id: string, token: string, connectedAt: Date): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
       { _id: new ObjectId(id) },
       { $set: { wordpress_token: token, wordpress_connected_at: connectedAt } },
     );
+    return res.matchedCount > 0;
   },
 
   /** Persist final presets and flip the org to `setup_complete` (single update). */
