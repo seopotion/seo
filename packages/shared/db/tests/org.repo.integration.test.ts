@@ -43,6 +43,21 @@ describe('OrgRepo (integration)', () => {
     expect(found?.setup_status).toBe('setup_scan_completed');
   });
 
+  test('saveWordPressConnection stores the token and timestamp on the org', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_1',
+      website_url: 'https://wordpress.com',
+      setup_status: 'setup_complete',
+    });
+    const connectedAt = new Date('2026-07-14T10:00:00.000Z');
+
+    await OrgRepo.saveWordPressConnection(org.id, 'wordpress-token', connectedAt);
+
+    const found = await OrgRepo.findById(org.id);
+    expect(found?.wordpress_token).toBe('wordpress-token');
+    expect(found?.wordpress_connected_at).toEqual(connectedAt);
+  });
+
   test('findById returns null for an invalid id', async () => {
     expect(await OrgRepo.findById('not-an-objectid')).toBeNull();
   });

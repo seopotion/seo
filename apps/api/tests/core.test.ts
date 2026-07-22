@@ -23,6 +23,8 @@ vi.mock('@shared/db', () => ({
               user_id: 'user_1',
               website_url: 'https://example.com',
               setup_status: 'setup_complete',
+              wordpress_token: 'never-return-this-token',
+              wordpress_connected_at: new Date('2026-07-14T10:00:00.000Z'),
               created_at: new Date(),
             },
           ]
@@ -74,6 +76,8 @@ describe('core auth routes', () => {
     const json = await res.json();
     expect(json.organizations).toHaveLength(1);
     expect(json.organizations[0]?.id).toBe('org_1');
+    expect(JSON.stringify(json)).not.toContain('never-return-this-token');
+    expect(json.organizations[0]).not.toHaveProperty('wordpress_token');
     // Free/legacy org (no plan): capabilities are computed server-side as false.
     expect(json.organizations[0]?.capabilities).toEqual({
       keyword_research: false,

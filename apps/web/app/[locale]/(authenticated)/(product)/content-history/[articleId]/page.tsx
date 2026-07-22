@@ -4,12 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { Badge, Button, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
+import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -27,9 +28,11 @@ type ArticleDetail = {
   slug: string;
   status: ArticleStatus;
   title: string;
+  wordpress_post_id?: number;
 };
 
 type ArticleLoadState = 'error' | 'loading' | 'not_found' | 'ready';
+type WordPressActionState = 'error' | 'idle' | 'loading' | 'published' | 'updated';
 
 export default function ArticleDetailPage() {
   const t = useTranslations('ArticleDetailPage');
@@ -44,6 +47,9 @@ export default function ArticleDetailPage() {
   } = useActiveOrganization();
   const [redirecting, setRedirecting] = useState(false);
   const queryClient = useQueryClient();
+  const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
+  const [wordpressError, setWordpressError] = useState<string | null>(null);
+  const [wordpressWarnings, setWordpressWarnings] = useState<string[]>([]);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
@@ -86,6 +92,16 @@ export default function ArticleDetailPage() {
     staleTime: 60 * 60 * 1000,
   });
 
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+    enabled: !redirecting && !organizationLoading,
+    onUnauthorized: handleUnauthorized,
+  });
+  const wordpressConnected = connectedIntegrationsQuery.data
+    ? connectedIntegrationsQuery.data.integrations.some(
+        (integration) => integration.provider === 'wordpress',
+      )
+    : undefined;
+
   const article = articleQuery.data ?? null;
   const loadState: ArticleLoadState = !articleId
     ? 'not_found'
@@ -100,6 +116,51 @@ export default function ArticleDetailPage() {
             : article
               ? 'ready'
               : 'not_found';
+
+  async function syncWordPressArticle() {
+    if (!article || wordpressActionState === 'loading') return;
+
+    const isUpdate = Boolean(article.wordpress_post_id);
+
+    setWordpressActionState('loading');
+    setWordpressError(null);
+    setWordpressWarnings([]);
+
+    try {
+      const endpoint = api.api.v0.dashboard.articles[':id'].wordpress;
+      const response = isUpdate
+        ? await endpoint.$put({ param: { id: article.id } })
+        : await endpoint.$post({ param: { id: article.id } });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setWordpressError('error' in data ? data.error : null);
+        setWordpressActionState('error');
+        return;
+      }
+
+      if (!('post_id' in data)) {
+        throw new Error('wordpress_response_invalid');
+      }
+
+      queryClient.setQueryData<ArticleDetail | null>(
+        dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
+        (currentArticle) =>
+          currentArticle ? { ...currentArticle, wordpress_post_id: data.post_id } : currentArticle,
+      );
+      setWordpressWarnings(data.warnings ?? []);
+      setWordpressActionState(isUpdate ? 'updated' : 'published');
+    } catch {
+      setWordpressError(null);
+      setWordpressActionState('error');
+    }
+  }
 
   const statusMessage =
     loadState === 'loading'
@@ -125,13 +186,75 @@ export default function ArticleDetailPage() {
             <p className="mt-1 max-w-3xl text-slate-600 text-sm">{article.meta_description}</p>
           ) : null}
         </div>
-        {article ? <ArticleStatusBadge status={article.status} t={t} /> : null}
+        {article ? (
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="flex flex-wrap items-center gap-2">
+              <ArticleStatusBadge status={article.status} t={t} />
+              {article.wordpress_post_id ? (
+                <Badge variant="secondary" className="w-fit border-transparent">
+                  {t('wordpress.sentBadge', { id: article.wordpress_post_id })}
+                </Badge>
+              ) : null}
+            </div>
+            <Button
+              onClick={syncWordPressArticle}
+              disabled={wordpressActionState === 'loading' || wordpressConnected === false}
+            >
+              {wordpressActionState === 'loading'
+                ? t(
+                    article.wordpress_post_id
+                      ? 'actions.updatingWordPress'
+                      : 'actions.publishingWordPress',
+                  )
+                : t(
+                    article.wordpress_post_id
+                      ? 'actions.updateWordPress'
+                      : 'actions.publishWordPress',
+                  )}
+            </Button>
+            {wordpressConnected === false ? (
+              <p className="text-slate-500 text-xs">
+                {t.rich('wordpress.connectFirst', {
+                  link: (chunks) => (
+                    <Link className="underline" href="/settings?tab=integrations">
+                      {chunks}
+                    </Link>
+                  ),
+                })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {statusMessage ? (
         <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center text-slate-600 text-sm">
           {statusMessage}
         </div>
+      ) : null}
+
+      {wordpressActionState === 'published' ? (
+        <WordPressStatus tone="success">{t('wordpress.published')}</WordPressStatus>
+      ) : null}
+      {wordpressActionState === 'updated' ? (
+        <WordPressStatus tone="success">{t('wordpress.updated')}</WordPressStatus>
+      ) : null}
+      {wordpressActionState === 'error' ? (
+        <WordPressStatus tone="error">
+          {wordpressError
+            ? t('wordpress.pluginError', { error: wordpressError })
+            : t('wordpress.requestError')}
+        </WordPressStatus>
+      ) : null}
+      {wordpressWarnings.length > 0 ? (
+        <WordPressStatus tone="warning">
+          <p className="font-medium">{t('wordpress.warnings')}</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {wordpressWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </WordPressStatus>
       ) : null}
 
       {article ? (
@@ -160,6 +283,28 @@ export default function ArticleDetailPage() {
           </article>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function WordPressStatus({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: 'error' | 'success' | 'warning';
+}) {
+  return (
+    <div
+      aria-live="polite"
+      className={cn(
+        'rounded-md border px-4 py-3 text-sm',
+        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
+        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
+      )}
+    >
+      {children}
     </div>
   );
 }

@@ -63,7 +63,9 @@ export default function DashboardPage() {
           activeOrg
             ? api.api.v0.dashboard['search-performance'].$get({ query: { org_id: activeOrg.id } })
             : null,
-          api.api.v0.dashboard.integrations.connected.$get(),
+          activeOrg
+            ? api.api.v0.dashboard.integrations.connected.$get({ query: { org_id: activeOrg.id } })
+            : null,
           activeOrg
             ? api.api.v0.dashboard['domain-rating'].$get({ query: { org_id: activeOrg.id } })
             : null,
@@ -84,7 +86,7 @@ export default function DashboardPage() {
             ? await bestRes.json()
             : { gated: true, articles: [] },
         perf: perfRes?.ok && perfRes.status === 200 ? await perfRes.json() : gatedPerf,
-        integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
+        integrations: integrationsRes?.ok ? (await integrationsRes.json()).integrations.length : 0,
         domainRating: domainRatingRes?.ok ? (await domainRatingRes.json()).rating : null,
       });
       setLoading(false);

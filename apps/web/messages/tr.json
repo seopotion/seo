@@ -359,7 +359,11 @@
   },
   "ArticleDetailPage": {
     "actions": {
-      "back": "İçerik geçmişine dön"
+      "back": "İçerik geçmişine dön",
+      "publishWordPress": "WordPress'e gönder",
+      "publishingWordPress": "WordPress'e gönderiliyor...",
+      "updateWordPress": "WordPress'i güncelle",
+      "updatingWordPress": "WordPress güncelleniyor..."
     },
     "labels": {
       "createdAt": "Oluşturulma",
@@ -378,7 +382,16 @@
       "generated": "Oluşturuldu",
       "published": "Yayınlandı"
     },
-    "title": "Makale"
+    "title": "Makale",
+    "wordpress": {
+      "connectFirst": "Bu yazıyı göndermek için <link>Ayarlar'dan WordPress'i bağlayın</link>.",
+      "pluginError": "WordPress isteği tamamlayamadı: {error}",
+      "published": "WordPress'e gönderildi.",
+      "requestError": "WordPress'e ulaşılamadı. Tekrar deneyin.",
+      "sentBadge": "WordPress'e gönderildi · #{id}",
+      "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
+      "warnings": "WordPress isteği uyarılarla tamamladı:"
+    }
   },
   "ArticleSettingsPage": {
     "actions": {
@@ -428,7 +441,6 @@
       "competitorUrl": "https://rakip.com"
     },
     "status": {
-      "integrationsUnsupported": "Entegrasyon seçimleri henüz kaydedilmiyor çünkü canlı entegrasyon API'si hazır değil.",
       "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "Ayarlar yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
@@ -442,6 +454,46 @@
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
       "label": "Ayar bölümleri"
+    },
+    "wordpress": {
+      "badges": {
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil"
+      },
+      "cancel": "İptal",
+      "comingSoon": "Çok yakında",
+      "connectAndTest": "Bağlan ve test et",
+      "connectedOn": "{date} tarihinde bağlandı",
+      "connectedSuccess": "WordPress bağlantısı başarıyla kuruldu ve test edildi.",
+      "connecting": "Bağlanıyor...",
+      "downloadPlugin": "Eklentiyi indir (.zip)",
+      "errors": {
+        "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
+        "invalidToken": "Bu token, WordPress eklentinizde kayıtlı olanla eşleşmiyor. 2. adımı kontrol edip aynı token'ı yapıştırın.",
+        "pluginNotConfigured": "Eklentide henüz kayıtlı bir token yok. Önce WordPress yönetim panelinizde 2. adımı tamamlayın.",
+        "requestFailed": "Sitenizdeki SEO Potion eklentisine ulaşamadık. Eklentinin kurulu ve etkin olduğundan emin olun (1. adım) ve tekrar deneyin."
+      },
+      "gallery": "Yayınlama entegrasyonları",
+      "loadError": "Kayıtlı WordPress bağlantı durumu yüklenemedi.",
+      "loading": "WordPress bağlantısı kontrol ediliyor...",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress",
+        "wordpressCom": "WordPress.com"
+      },
+      "replaceNote": "Yeniden bağlanmak yeni token'ı sitenizde test eder ve kayıtlı token'ın yerine geçer.",
+      "replaceToken": "Token'ı değiştir",
+      "setupTitle": "WordPress sitenizi bağlayın",
+      "step1Action": "Eklenti yükleme sayfasını aç",
+      "step1Body": "SEO Potion eklentisini indirin, ardından WordPress yönetim panelinizden yükleyip etkinleştirin.",
+      "step1Title": "SEO Potion eklentisini kurun",
+      "step2Action": "Eklenti ayarlarını aç",
+      "step2Body": "WordPress'te SEO Potion → Manage sayfasını açın. Güçlü bir token seçin, gönderilen yazıların taslak olarak mı kaydedileceğini yoksa doğrudan mı yayınlanacağını belirleyin ve kaydedin.",
+      "step2Title": "Entegrasyon token'ınızı oluşturun",
+      "step3Body": "Aynı token'ı buraya yapıştırın. Kaydetmeden önce sitenizde test ederiz — kayıtlı token'lar bir daha gösterilmez.",
+      "step3Title": "SEO Potion'ı bağlayın",
+      "token": "Entegrasyon token'ı",
+      "tokenPlaceholder": "WordPress'te kaydettiğiniz token'ı yapıştırın"
     }
   },
   "LandingPage": {
@@ -620,6 +672,11 @@
     "integrations": {
       "availableIntegrations": "Mevcut entegrasyonlar",
       "comingSoon": "Yakında",
+      "connectWordPressLater": "WordPress'i daha sonra Ayarlar'dan bağlayabilirsiniz.",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress"
+      },
       "referralSource": "Bizi nereden duydunuz?",
       "selectOption": "Bir seçenek seç",
       "settingsNotice": "Onboarding tamamlandığında entegrasyonlarınızı kontrol panelinizdeki Ayarlar bölümünden bağlayabilir ve yönetebilirsiniz.",

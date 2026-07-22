@@ -359,7 +359,11 @@
   },
   "ArticleDetailPage": {
     "actions": {
-      "back": "Back to content history"
+      "back": "Back to content history",
+      "publishWordPress": "Send to WordPress",
+      "publishingWordPress": "Sending to WordPress...",
+      "updateWordPress": "Update WordPress",
+      "updatingWordPress": "Updating WordPress..."
     },
     "labels": {
       "createdAt": "Created",
@@ -378,7 +382,16 @@
       "generated": "Generated",
       "published": "Published"
     },
-    "title": "Article"
+    "title": "Article",
+    "wordpress": {
+      "connectFirst": "<link>Connect WordPress in Settings</link> to send this article.",
+      "pluginError": "WordPress could not complete the request: {error}",
+      "published": "Sent to WordPress.",
+      "requestError": "WordPress could not be reached. Try again.",
+      "sentBadge": "Sent to WordPress · #{id}",
+      "updated": "The WordPress post was updated from the stored article.",
+      "warnings": "WordPress completed the request with warnings:"
+    }
   },
   "ArticleSettingsPage": {
     "actions": {
@@ -428,7 +441,6 @@
       "competitorUrl": "https://competitor.com"
     },
     "status": {
-      "integrationsUnsupported": "Integration choices are not saved yet because the live integrations API is not available.",
       "loadError": "Could not load settings. Try again when the API is available.",
       "loading": "Loading settings...",
       "noOrganization": "No completed organization was found for this workspace.",
@@ -442,6 +454,46 @@
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",
       "label": "Settings sections"
+    },
+    "wordpress": {
+      "badges": {
+        "connected": "Connected",
+        "notConnected": "Not connected"
+      },
+      "cancel": "Cancel",
+      "comingSoon": "Coming soon",
+      "connectAndTest": "Connect & test",
+      "connectedOn": "Connected on {date}",
+      "connectedSuccess": "WordPress connected and tested successfully.",
+      "connecting": "Connecting...",
+      "downloadPlugin": "Download plugin (.zip)",
+      "errors": {
+        "connectFailed": "WordPress could not be connected. Check the token and try again.",
+        "invalidToken": "This token doesn't match the one saved in your WordPress plugin. Re-check step 2 and paste the exact same token.",
+        "pluginNotConfigured": "The plugin doesn't have a saved token yet. Complete step 2 in your WordPress admin, then try again.",
+        "requestFailed": "We couldn't reach the SEO Potion plugin on your site. Make sure the plugin is installed and active (step 1), then try again."
+      },
+      "gallery": "Publishing integrations",
+      "loadError": "Could not load the saved WordPress connection state.",
+      "loading": "Checking the WordPress connection...",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Self-hosted WordPress",
+        "wordpressCom": "WordPress.com"
+      },
+      "replaceNote": "Connecting again tests the new token against your site and replaces the saved one.",
+      "replaceToken": "Replace token",
+      "setupTitle": "Connect your WordPress site",
+      "step1Action": "Open Upload Plugin page",
+      "step1Body": "Download the SEO Potion plugin, then upload and activate it from your WordPress admin.",
+      "step1Title": "Install the SEO Potion plugin",
+      "step2Action": "Open plugin settings",
+      "step2Body": "In WordPress, open SEO Potion → Manage. Choose a strong token, pick whether sent articles are saved as drafts or published directly, and save.",
+      "step2Title": "Create your integration token",
+      "step3Body": "Paste the same token here. We test it against your site before saving — saved tokens are never shown again.",
+      "step3Title": "Connect SEO Potion",
+      "token": "Integration token",
+      "tokenPlaceholder": "Paste the token you saved in WordPress"
     }
   },
   "LandingPage": {
@@ -620,6 +672,11 @@
     "integrations": {
       "availableIntegrations": "Available integrations",
       "comingSoon": "Coming soon",
+      "connectWordPressLater": "You can connect WordPress later from Settings.",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Self-hosted WordPress"
+      },
       "referralSource": "How did you hear about us?",
       "selectOption": "Select an option",
       "settingsNotice": "Once onboarding is complete, you can connect and manage integrations from Settings in your dashboard.",
