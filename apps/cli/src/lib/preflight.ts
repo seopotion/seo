@@ -5,10 +5,11 @@
  * out-of-band (see `infra/ENVIRONMENTS.md`): six SSM SecureStrings per stage
  * (jwt-secret, mongo-uri, google-client-secret, gsc-token-key,
  * lemonsqueezy-api-key, lemonsqueezy-webhook-secret) resolved at Lambda
- * runtime, and two public values baked into the Lambda env at synth
- * time — `GOOGLE_CLIENT_ID_<STAGE>` and `WEB_ORIGIN_<STAGE>` (the GSC OAuth
- * redirect base). If any is missing the stack still deploys but ships broken
- * config. This verifies they are present before `cdk deploy`.
+ * runtime, and public values baked into the Lambda env at synth time —
+ * `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>` (the GSC OAuth redirect
+ * base), and the LemonSqueezy store id + paid/expert variant ids. If any is
+ * missing the stack still deploys but ships broken config. This verifies they
+ * are present before `cdk deploy`.
  *
  * The names below mirror `infra/lib/config.ts` `STAGE_CONFIG` — `infra` is a
  * standalone package we can't import from the workspace, but the SSM naming is a

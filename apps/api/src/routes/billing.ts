@@ -30,7 +30,7 @@ const billing = new OpenAPIHono<AuthEnv>()
           description: 'Checkout URL',
         },
         403: { description: 'Org not found or not owned by the caller' },
-        409: { description: 'Already subscribed at this tier' },
+        409: { description: 'Already subscribed at this tier or higher' },
       },
     }),
     async (c) => {
@@ -62,7 +62,7 @@ const billing = new OpenAPIHono<AuthEnv>()
           description: 'Portal URL',
         },
         403: { description: 'Org not found or not owned by the caller' },
-        404: { description: 'No active subscription for this org' },
+        404: { description: 'No subscription for this org' },
       },
     }),
     async (c) => {
