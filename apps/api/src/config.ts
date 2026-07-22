@@ -26,6 +26,20 @@ export const config = {
   GSC_TOKEN_KEY: process.env.GSC_TOKEN_KEY ?? '',
   /** Web app origin — builds the GSC OAuth redirect URI (<origin>/dashboard/gsc/callback). */
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  /** Name of the SSM SecureString holding the LemonSqueezy API key (deployed).
+   * Unset locally — LEMONSQUEEZY_API_KEY below is used directly. */
+  LEMONSQUEEZY_API_KEY_PARAM: process.env.LEMONSQUEEZY_API_KEY_PARAM ?? '',
+  /** Local-dev LemonSqueezy API key (#13). */
+  LEMONSQUEEZY_API_KEY: process.env.LEMONSQUEEZY_API_KEY ?? '',
+  /** Name of the SSM SecureString holding the LemonSqueezy webhook signing secret. */
+  LEMONSQUEEZY_WEBHOOK_SECRET_PARAM: process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PARAM ?? '',
+  /** Local-dev LemonSqueezy webhook signing secret (#13). */
+  LEMONSQUEEZY_WEBHOOK_SECRET: process.env.LEMONSQUEEZY_WEBHOOK_SECRET ?? '',
+  /** LemonSqueezy store id (public, per-env). */
+  LEMONSQUEEZY_STORE_ID: process.env.LEMONSQUEEZY_STORE_ID ?? '',
+  /** LemonSqueezy variant ids per paid tier (public, per-env). */
+  LEMONSQUEEZY_VARIANT_PAID: process.env.LEMONSQUEEZY_VARIANT_PAID ?? '',
+  LEMONSQUEEZY_VARIANT_EXPERT: process.env.LEMONSQUEEZY_VARIANT_EXPERT ?? '',
   /** Session token lifetime. */
   JWT_TTL_SECONDS: 60 * 60 * 24 * 7,
 };
