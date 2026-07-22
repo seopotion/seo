@@ -9,6 +9,11 @@ interface StageConfig {
   googleClientSecretParam: string; // SSM SecureString NAME (not value)
   gscTokenKeyParam: string; // SSM SecureString NAME (not value)
   webOrigin: string; // web app origin — GSC OAuth redirect URI base
+  lemonSqueezyApiKeyParam: string; // SSM SecureString NAME
+  lemonSqueezyWebhookSecretParam: string; // SSM SecureString NAME
+  lemonSqueezyStoreId: string; // public
+  lemonSqueezyVariantPaid: string; // public
+  lemonSqueezyVariantExpert: string; // public
 }
 
 export const STAGE_CONFIG: Record<Stage, StageConfig> = {
@@ -21,6 +26,11 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     googleClientSecretParam: '/seo/staging/google-client-secret',
     gscTokenKeyParam: '/seo/staging/gsc-token-key',
     webOrigin: process.env.WEB_ORIGIN_STAGING ?? '',
+    lemonSqueezyApiKeyParam: '/seo/staging/lemonsqueezy-api-key',
+    lemonSqueezyWebhookSecretParam: '/seo/staging/lemonsqueezy-webhook-secret',
+    lemonSqueezyStoreId: process.env.LEMONSQUEEZY_STORE_ID_STAGING ?? '',
+    lemonSqueezyVariantPaid: process.env.LEMONSQUEEZY_VARIANT_PAID_STAGING ?? '',
+    lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_STAGING ?? '',
   },
   prod: {
     mongoDb: 'seo_prod',
@@ -31,5 +41,10 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     googleClientSecretParam: '/seo/prod/google-client-secret',
     gscTokenKeyParam: '/seo/prod/gsc-token-key',
     webOrigin: process.env.WEB_ORIGIN_PROD ?? '',
+    lemonSqueezyApiKeyParam: '/seo/prod/lemonsqueezy-api-key',
+    lemonSqueezyWebhookSecretParam: '/seo/prod/lemonsqueezy-webhook-secret',
+    lemonSqueezyStoreId: process.env.LEMONSQUEEZY_STORE_ID_PROD ?? '',
+    lemonSqueezyVariantPaid: process.env.LEMONSQUEEZY_VARIANT_PAID_PROD ?? '',
+    lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD ?? '',
   },
 };
