@@ -55,4 +55,14 @@ describe('SubscriptionRepo (integration)', () => {
       }),
     ).toBeNull();
   });
+
+  test('findLatestByOrg returns the most recent subscription regardless of status', async () => {
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o2', provider_subscription_id: 'sub_2', status: 'cancelled' }),
+    );
+    expect(await SubscriptionRepo.findActiveByOrg('o2')).toBeNull();
+    const latest = await SubscriptionRepo.findLatestByOrg('o2');
+    expect(latest?.provider_subscription_id).toBe('sub_2');
+    expect(latest?.status).toBe('cancelled');
+  });
 });

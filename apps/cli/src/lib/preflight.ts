@@ -39,6 +39,20 @@ function webOriginVar(stage: Stage): string {
   return stage === 'prod' ? 'WEB_ORIGIN_PROD' : 'WEB_ORIGIN_STAGING';
 }
 
+function lemonSqueezyStoreIdVar(stage: Stage): string {
+  return stage === 'prod' ? 'LEMONSQUEEZY_STORE_ID_PROD' : 'LEMONSQUEEZY_STORE_ID_STAGING';
+}
+
+function lemonSqueezyVariantPaidVar(stage: Stage): string {
+  return stage === 'prod' ? 'LEMONSQUEEZY_VARIANT_PAID_PROD' : 'LEMONSQUEEZY_VARIANT_PAID_STAGING';
+}
+
+function lemonSqueezyVariantExpertVar(stage: Stage): string {
+  return stage === 'prod'
+    ? 'LEMONSQUEEZY_VARIANT_EXPERT_PROD'
+    : 'LEMONSQUEEZY_VARIANT_EXPERT_STAGING';
+}
+
 async function checkSsmParam(client: SSMClient, name: string): Promise<PrereqCheck> {
   try {
     // Presence-only: don't decrypt. A SecureString returns its (non-empty)
@@ -73,6 +87,9 @@ export async function preflight(stage: Stage): Promise<Result<PreflightResult>> 
       ...ssmChecks,
       checkEnvVar(googleClientIdVar(stage)),
       checkEnvVar(webOriginVar(stage)),
+      checkEnvVar(lemonSqueezyStoreIdVar(stage)),
+      checkEnvVar(lemonSqueezyVariantPaidVar(stage)),
+      checkEnvVar(lemonSqueezyVariantExpertVar(stage)),
     ];
     return ok({ stage, ready: checks.every((c) => c.present), checks });
   } finally {

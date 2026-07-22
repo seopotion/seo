@@ -9,8 +9,8 @@ vi.mock('../src/lib/load-owned-org', () => ({ loadOwnedOrg }));
 const { applyBillingEvent } = vi.hoisted(() => ({ applyBillingEvent: vi.fn() }));
 vi.mock('../src/lib/billing/apply-event', () => ({ applyBillingEvent }));
 
-const { findActiveByOrg } = vi.hoisted(() => ({ findActiveByOrg: vi.fn() }));
-vi.mock('@shared/db', () => ({ SubscriptionRepo: { findActiveByOrg } }));
+const { findLatestByOrg } = vi.hoisted(() => ({ findLatestByOrg: vi.fn() }));
+vi.mock('@shared/db', () => ({ SubscriptionRepo: { findLatestByOrg } }));
 
 const { createCheckout, verifyWebhook, parseWebhookEvent, getCustomerPortalUrl } = vi.hoisted(
   () => ({
@@ -58,6 +58,24 @@ describe('POST /checkout', () => {
     expect(res.status).toBe(409);
   });
 
+  test('409 when an expert org requests paid (already entitled at a higher tier)', async () => {
+    loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'expert' });
+    const res = await testClient(app).checkout.$post({ json: { org_id: 'o1', tier: 'paid' } });
+    expect(res.status).toBe(409);
+  });
+
+  test('200 when a paid org requests expert (a real upgrade)', async () => {
+    loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'paid' });
+    createCheckout.mockResolvedValueOnce({ url: 'https://ls/checkout/upgrade' });
+    const res = await testClient(app).checkout.$post({ json: { org_id: 'o1', tier: 'expert' } });
+    expect(res.status).toBe(200);
+    expect(createCheckout).toHaveBeenCalledWith({
+      tier: 'expert',
+      orgId: 'o1',
+      userEmail: 'u1@example.com',
+    });
+  });
+
   test('200 returns the checkout url', async () => {
     loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'free' });
     createCheckout.mockResolvedValueOnce({ url: 'https://ls/checkout/abc' });
@@ -77,14 +95,14 @@ describe('POST /portal', () => {
 
   test('404 when there is no subscription', async () => {
     loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'paid' });
-    findActiveByOrg.mockResolvedValueOnce(null);
+    findLatestByOrg.mockResolvedValueOnce(null);
     const res = await testClient(app).portal.$post({ json: { org_id: 'o1' } });
     expect(res.status).toBe(404);
   });
 
   test('200 returns the portal url', async () => {
     loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'paid' });
-    findActiveByOrg.mockResolvedValueOnce({ provider_customer_id: 'c1' });
+    findLatestByOrg.mockResolvedValueOnce({ provider_customer_id: 'c1' });
     getCustomerPortalUrl.mockResolvedValueOnce({ url: 'https://ls/billing' });
     const res = await testClient(app).portal.$post({ json: { org_id: 'o1' } });
     expect(res.status).toBe(200);

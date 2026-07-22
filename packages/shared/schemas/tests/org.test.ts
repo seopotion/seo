@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { CreateOrgInput, hasExpert, isPaid, ONBOARDING_INTEGRATIONS, OrgSchema } from '../src/org';
+import {
+  CreateOrgInput,
+  hasExpert,
+  isPaid,
+  ONBOARDING_INTEGRATIONS,
+  OrgSchema,
+  planRank,
+} from '../src/org';
 
 const base = {
   id: '1',
@@ -26,6 +33,14 @@ describe('OrgSchema entitlement', () => {
     expect(hasExpert(OrgSchema.parse({ ...base, plan: 'expert' }))).toBe(true);
     expect(hasExpert(OrgSchema.parse({ ...base, plan: 'paid' }))).toBe(false);
     expect(hasExpert(OrgSchema.parse(base))).toBe(false);
+  });
+
+  test('planRank orders free < paid < expert', () => {
+    expect(planRank('free')).toBe(0);
+    expect(planRank('paid')).toBe(1);
+    expect(planRank('expert')).toBe(2);
+    expect(planRank('expert')).toBeGreaterThan(planRank('paid'));
+    expect(planRank('paid')).toBeGreaterThan(planRank('free'));
   });
 
   test('accepts optional WordPress connection fields', () => {

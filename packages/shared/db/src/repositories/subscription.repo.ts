@@ -31,6 +31,16 @@ export const SubscriptionRepo = {
   },
 
   /**
+   * The org's most recent subscription regardless of status. Used by the
+   * portal route: past_due (dunning) and cancelled (access-until-expiry) orgs
+   * still need to reach the billing portal, not only active ones.
+   */
+  async findLatestByOrg(org_id: string): Promise<Subscription | null> {
+    const doc = await (await collection()).findOne({ org_id }, { sort: { created_at: -1 } });
+    return doc ? toEntity(doc) : null;
+  },
+
+  /**
    * Idempotent upsert keyed on `provider_subscription_id`. Sets `created_at`
    * only on insert; always bumps `updated_at`. Webhooks are at-least-once, so
    * replays converge to the same doc. Returns the resulting entity.

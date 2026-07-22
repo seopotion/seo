@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { SubscriptionRepo } from '@shared/db';
-import { isPaid } from '@shared/schemas';
+import { isPaid, planRank } from '@shared/schemas';
 import { getBillingProvider } from '../clients/billing';
 import { applyBillingEvent } from '../lib/billing/apply-event';
 import { loadOwnedOrg } from '../lib/load-owned-org';
@@ -38,8 +38,8 @@ const billing = new OpenAPIHono<AuthEnv>()
       const { userId, email } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.body(null, 403);
-      // Already entitled and buying the same tier -> send them to the portal instead.
-      if (isPaid(org) && org.plan === tier) return c.body(null, 409);
+      // Already entitled at an equal-or-higher tier -> send them to the portal instead.
+      if (isPaid(org) && planRank(org.plan) >= planRank(tier)) return c.body(null, 409);
       const provider = await getBillingProvider();
       const { url } = await provider.createCheckout({ tier, orgId: org.id, userEmail: email });
       return c.json({ url }, 200);
@@ -70,7 +70,7 @@ const billing = new OpenAPIHono<AuthEnv>()
       const { userId } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.body(null, 403);
-      const sub = await SubscriptionRepo.findActiveByOrg(org.id);
+      const sub = await SubscriptionRepo.findLatestByOrg(org.id);
       if (!sub) return c.body(null, 404);
       const provider = await getBillingProvider();
       const { url } = await provider.getCustomerPortalUrl(sub.provider_customer_id);

@@ -89,4 +89,18 @@ describe('applyBillingEvent', () => {
     ).resolves.toBeUndefined();
     expect(setPlan).not.toHaveBeenCalled();
   });
+
+  test('lookup miss on updated: no throw, no setPlan', async () => {
+    updateFromEvent.mockResolvedValueOnce(null);
+    await expect(
+      applyBillingEvent({
+        type: 'subscription_updated',
+        providerSubscriptionId: 'ghost',
+        tier: 'paid',
+        status: 'active',
+        currentPeriodEnd: periodEnd,
+      }),
+    ).resolves.toBeUndefined();
+    expect(setPlan).not.toHaveBeenCalled();
+  });
 });

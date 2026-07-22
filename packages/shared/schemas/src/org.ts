@@ -1,4 +1,9 @@
-import { ENTITLEMENT_PLANS, SETUP_STATUSES, STRATEGY_STATUSES } from '@shared/types';
+import {
+  ENTITLEMENT_PLANS,
+  type EntitlementPlan,
+  SETUP_STATUSES,
+  STRATEGY_STATUSES,
+} from '@shared/types';
 import { z } from 'zod';
 import { SetupPresetsSchema } from './presets';
 
@@ -65,4 +70,12 @@ export function isPaid(org: Org): boolean {
 /** True when the org is on the expert tier (human-operator assistance + extras). */
 export function hasExpert(org: Org): boolean {
   return org.plan === 'expert';
+}
+
+/**
+ * Numeric rank of an entitlement tier (free < paid < expert), for comparing
+ * "already entitled at an equal-or-higher tier than X" (#13).
+ */
+export function planRank(plan: EntitlementPlan): number {
+  return ENTITLEMENT_PLANS.indexOf(plan);
 }
