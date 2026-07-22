@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { CreateOrgInput, isPaid, ONBOARDING_INTEGRATIONS, OrgSchema } from '../src/org';
+import { CreateOrgInput, hasExpert, isPaid, ONBOARDING_INTEGRATIONS, OrgSchema } from '../src/org';
 
 const base = {
   id: '1',
@@ -16,10 +16,16 @@ describe('OrgSchema entitlement', () => {
     expect(org.strategy_status).toBe('none');
   });
 
-  test('isPaid is true only for the paid plan', () => {
+  test('isPaid is true for paid and expert, false for free', () => {
     expect(isPaid(OrgSchema.parse({ ...base, plan: 'paid' }))).toBe(true);
-    expect(isPaid(OrgSchema.parse({ ...base, plan: 'trial' }))).toBe(false);
+    expect(isPaid(OrgSchema.parse({ ...base, plan: 'expert' }))).toBe(true);
     expect(isPaid(OrgSchema.parse(base))).toBe(false);
+  });
+
+  test('hasExpert is true only for the expert plan', () => {
+    expect(hasExpert(OrgSchema.parse({ ...base, plan: 'expert' }))).toBe(true);
+    expect(hasExpert(OrgSchema.parse({ ...base, plan: 'paid' }))).toBe(false);
+    expect(hasExpert(OrgSchema.parse(base))).toBe(false);
   });
 
   test('accepts optional WordPress connection fields', () => {

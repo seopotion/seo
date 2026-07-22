@@ -56,7 +56,13 @@ export const CreateOrgInput = OrgSchema.omit({
 // z.input (not z.infer): `plan`/`strategy_status` have defaults, so callers may omit them.
 export type CreateOrgInput = z.input<typeof CreateOrgInput>;
 
-/** True when the org has an active paid entitlement. #13 later backs this with Stripe. */
+/** True when the org has an active paid entitlement (paid or expert). Backed by
+ * billing webhooks (#13); the `db set-plan` CLI can also flip it. */
 export function isPaid(org: Org): boolean {
-  return org.plan === 'paid';
+  return org.plan === 'paid' || org.plan === 'expert';
+}
+
+/** True when the org is on the expert tier (human-operator assistance + extras). */
+export function hasExpert(org: Org): boolean {
+  return org.plan === 'expert';
 }
