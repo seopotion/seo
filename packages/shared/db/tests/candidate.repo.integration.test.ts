@@ -103,4 +103,27 @@ describe('CandidateRepo (integration)', () => {
     expect(selected[0]!.id).toBe(first!.id);
     expect(selected[0]!.updated_at.getTime()).toBeGreaterThan(before);
   });
+
+  test('rejectIfCandidate has exactly one winner and refuses non-candidates', async () => {
+    const [target] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'seo reporting tools', source: 'manual' },
+    ]);
+
+    const [a, b] = await Promise.all([
+      CandidateRepo.rejectIfCandidate(target!.id),
+      CandidateRepo.rejectIfCandidate(target!.id),
+    ]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect((await CandidateRepo.findById(target!.id))!.status).toBe('rejected');
+
+    // A candidate claimed for scheduling is no longer deletable from the pool.
+    const [scheduled] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'seo dashboard', source: 'manual' },
+    ]);
+    await CandidateRepo.claimForScheduling(scheduled!.id);
+    expect(await CandidateRepo.rejectIfCandidate(scheduled!.id)).toBe(false);
+
+    expect(await CandidateRepo.rejectIfCandidate('not-an-object-id')).toBe(false);
+    expect(await CandidateRepo.rejectIfCandidate('ffffffffffffffffffffffff')).toBe(false);
+  });
 });

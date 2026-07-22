@@ -1,28 +1,34 @@
 'use client';
 
+import type { StrategyStatus } from '@shared/schemas';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
+import { startOfToday, toDateKey } from '../content-planner/planner-utils';
+import type { PlannerKeywordResponse } from '../content-planner/types';
+import { type RecommendedAction, recommendedActions } from './home-utils';
 
 type HomeData = {
   published: number;
   planned: number;
   bestGated: boolean;
-  integrations: number;
+  strategyStatus: StrategyStatus;
+  keywords: PlannerKeywordResponse[];
 };
 
 const emptyHomeData: HomeData = {
   published: 0,
   planned: 0,
   bestGated: true,
-  integrations: 0,
+  strategyStatus: 'none',
+  keywords: [],
 };
 
 export default function HomePage() {
@@ -49,7 +55,7 @@ export default function HomePage() {
     queryFn: async (): Promise<HomeData> => {
       if (!organization) return emptyHomeData;
 
-      const [publishedRes, plannedRes, bestRes, integrationsRes] = await Promise.all([
+      const [publishedRes, plannedRes, bestRes, plannerRes] = await Promise.all([
         api.api.v0.dashboard.articles.published.$get({
           query: { org_id: organization.id },
         }),
@@ -59,11 +65,13 @@ export default function HomePage() {
         api.api.v0.dashboard.articles.best.$get({
           query: { org_id: organization.id },
         }),
-        api.api.v0.dashboard.integrations.connected.$get(),
+        api.api.v0.dashboard.planner.$get({
+          query: { org_id: organization.id },
+        }),
       ]);
 
       if (
-        [publishedRes, plannedRes, bestRes, integrationsRes].some(
+        [publishedRes, plannedRes, bestRes, plannerRes].some(
           (response) => (response.status as number) === 401,
         )
       ) {
@@ -71,11 +79,14 @@ export default function HomePage() {
         return emptyHomeData;
       }
 
+      const planner = plannerRes.ok ? await plannerRes.json() : null;
+
       return {
         published: publishedRes.ok ? (await publishedRes.json()).count : 0,
         planned: plannedRes.ok ? (await plannedRes.json()).count : 0,
         bestGated: bestRes.ok ? (await bestRes.json()).gated : true,
-        integrations: integrationsRes.ok ? (await integrationsRes.json()).integrations.length : 0,
+        strategyStatus: planner?.strategy_status ?? 'none',
+        keywords: planner?.keywords ?? [],
       };
     },
     enabled: !organizationLoading && Boolean(organization),
@@ -92,6 +103,17 @@ export default function HomePage() {
       </div>
     );
   }
+
+  const actions = recommendedActions({
+    bestGated: data.bestGated,
+    // Default to "entitled" so a missing org never shows a spurious upgrade nudge.
+    keywordResearch: organization?.capabilities.keyword_research ?? true,
+    keywords: data.keywords,
+    planned: data.planned,
+    published: data.published,
+    strategyStatus: data.strategyStatus,
+    today: toDateKey(startOfToday()),
+  });
 
   return (
     <div>
@@ -139,12 +161,11 @@ export default function HomePage() {
           </CardHeader>
           <CardContent>
             <ul className="grid gap-2 text-slate-600 text-sm">
-              <li>
-                {t('recommended.integration')}
-                {data?.integrations ? ` ${t('recommended.done')}` : ''}
-              </li>
-              <li>{t('recommended.keywords')}</li>
-              <li>{t('recommended.searchConsole')}</li>
+              {actions.map((action) => (
+                <li key={action.key}>
+                  <ActionLabel action={action} />
+                </li>
+              ))}
             </ul>
           </CardContent>
         </Card>
@@ -163,6 +184,21 @@ export default function HomePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function ActionLabel({ action }: { action: RecommendedAction }) {
+  const t = useTranslations('HomePage.recommended.actions');
+  const label = t(action.key, { count: action.count ?? 0 });
+
+  if (!action.href) {
+    return <>{label}</>;
+  }
+
+  return (
+    <Link className="text-emerald-700 hover:underline" href={action.href}>
+      {label}
+    </Link>
   );
 }
 

@@ -22,6 +22,7 @@ const { addCandidates, scheduleCandidate, CandidateRepo, KeywordRepo, isDuplicat
     CandidateRepo: {
       findById: vi.fn(),
       listByOrg: vi.fn(),
+      rejectIfCandidate: vi.fn(),
       releaseAfterUnschedule: vi.fn(),
     },
     KeywordRepo: {
@@ -444,6 +445,56 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
       expect(res.status).toBe(400);
     }
     expect(CandidateRepo.findById).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /candidates/{candidate_id}', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const del = (candidateId = 'c1') =>
+    testClient(app).candidates[':candidate_id'].$delete({ param: { candidate_id: candidateId } });
+
+  test('204 rejects a pooled candidate', async () => {
+    CandidateRepo.findById.mockResolvedValueOnce(candidate);
+    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    CandidateRepo.rejectIfCandidate.mockResolvedValueOnce(true);
+
+    const res = await del();
+    expect(res.status).toBe(204);
+    expect(CandidateRepo.rejectIfCandidate).toHaveBeenCalledWith('c1');
+  });
+
+  test('409 candidate_not_deletable when the conditional update refuses', async () => {
+    CandidateRepo.findById.mockResolvedValueOnce({ ...candidate, status: 'selected' });
+    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    CandidateRepo.rejectIfCandidate.mockResolvedValueOnce(false);
+
+    const res = await del();
+    expect(res.status).toBe(409);
+    if (res.status !== 409) throw new Error('expected 409');
+    expect(await res.json()).toEqual({ error: 'candidate_not_deletable' });
+  });
+
+  test('402 for a free org, without touching the pool', async () => {
+    CandidateRepo.findById.mockResolvedValueOnce(candidate);
+    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    const res = await del();
+    expect(res.status).toBe(402);
+    if (res.status !== 402) throw new Error('expected 402');
+    expect(await res.json()).toEqual({ error: 'not_paid' });
+    expect(CandidateRepo.rejectIfCandidate).not.toHaveBeenCalled();
+  });
+
+  test('404 for a missing candidate or unowned org', async () => {
+    CandidateRepo.findById.mockResolvedValueOnce(null);
+    expect((await del('nope')).status).toBe(404);
+
+    CandidateRepo.findById.mockResolvedValueOnce(candidate);
+    loadOwnedOrg.mockResolvedValueOnce(null);
+    expect((await del()).status).toBe(404);
+    expect(CandidateRepo.rejectIfCandidate).not.toHaveBeenCalled();
   });
 });
 

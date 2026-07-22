@@ -3,6 +3,8 @@ import {
   ARTICLE_TYPES,
   ArticleVideoSchema,
   GENERATION_STATUSES,
+  IMAGES_STATUSES,
+  PublishingPrefsSchema,
   SEARCH_INTENTS,
   SetupPresetsSchema,
 } from '@shared/schemas';
@@ -185,13 +187,19 @@ export const ArticleDetailResponse = z
   .object({
     id: z.string(),
     keyword_id: z.string(),
+    // Denormalized keyword + SERP <title>; both drive the editor modal (#74).
+    keyword: z.string(),
     title: z.string(),
+    meta_title: z.string(),
     slug: z.string(),
     meta_description: z.string(),
     featured_image_url: z.string(),
     content: z.string(),
     status: z.enum(ARTICLE_STATUSES),
+    images_status: z.enum(IMAGES_STATUSES),
     created_at: z.string(),
+    // Last editor save, ISO; null until the article is first edited (#74).
+    updated_at: z.string().nullable(),
     published_at: z.string().nullable(),
     // Auto-sourced YouTube embed (#85); the iframe is also in `content`.
     video: ArticleVideoSchema.nullable(),
@@ -203,6 +211,28 @@ export const ArticleNotFoundResponse = z
     error: z.string().openapi({ example: 'Article not found' }),
   })
   .openapi('ArticleNotFoundResponse');
+
+// The editor's five editable fields. Deliberately permissive here: `apps/api`
+// has no `defaultHook`, so a Zod failure would return the library's error shape
+// instead of the { error, fields } contract. The handler validates and builds
+// that response itself (#74).
+export const ArticleUpdateBody = z
+  .object({
+    title: z.string(),
+    slug: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    content: z.string(),
+  })
+  .openapi('ArticleUpdate');
+
+export const ArticleValidationErrorResponse = z
+  .object({
+    error: z.string().openapi({ example: 'Validation failed' }),
+    // Field name -> message, for the offending fields only.
+    fields: z.record(z.string(), z.string()),
+  })
+  .openapi('ArticleValidationError');
 
 /**
  * Settings schemas (design/product-flow.md §2.3 + §2.6). Post-onboarding, the
@@ -237,6 +267,7 @@ export const ArticlesSettingsPatchBody = z
       .partial()
       .optional(),
     engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement.partial().optional(),
+    publishing: PublishingPrefsSchema.partial().optional(),
   })
   .openapi('ArticlesSettingsPatch');
 

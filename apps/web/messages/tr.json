@@ -35,10 +35,17 @@
     "loadError": "Dashboard API kullanılamıyor, bu yüzden boş geliştirme verisi gösteriliyor.",
     "loading": "Ana sayfa yükleniyor...",
     "recommended": {
-      "done": "tamamlandı",
-      "integration": "Bir yayınlama entegrasyonu bağla",
-      "keywords": "Üretimi başlatmak için anahtar kelime ekle",
-      "searchConsole": "Google Search Console'u bağla",
+      "actions": {
+        "addKeywords": "Üretimi başlatmak için anahtar kelime ekle",
+        "allCaughtUp": "Her şey yolunda — şu an ilgilenmen gereken bir şey yok.",
+        "connectSearchConsole": "Performans verisi için Google Search Console'u bağla",
+        "generationFailed": "{count, plural, one {# makale üretilemedi — incele} other {# makale üretilemedi — incele}}",
+        "overdue": "{count, plural, one {# planlanmış makalenin tarihi geçti} other {# planlanmış makalenin tarihi geçti}}",
+        "planNext": "Planlanmış içerik yok — bir sonraki makaleni planla",
+        "strategyFailed": "İçerik stratejin oluşturulamadı — tekrar dene",
+        "strategyPending": "İçerik stratejin hâlâ oluşturuluyor",
+        "upgrade": "Anahtar kelime araştırmasını açmak için yükselt"
+      },
       "title": "Önerilen Aksiyonlar"
     }
   },
@@ -114,8 +121,9 @@
         "close": "Editörü kapat",
         "continueEditing": "Düzenlemeye devam et",
         "discard": "Değişiklikleri at",
-        "save": "Oturum taslağını kaydet",
-        "saved": "Oturum taslağı kaydedildi"
+        "retry": "Yeniden dene",
+        "save": "Kaydet",
+        "saved": "Kaydedildi"
       },
       "articleStatuses": {
         "deleted": "Silindi",
@@ -139,16 +147,6 @@
         "failed": "Görsel başarısız",
         "pending": "Görsel bekliyor"
       },
-      "mock": {
-        "conclusion": "{keyword} konusunu net bir okuyucu kararıyla ve bu makalenin desteklemesi gereken sonraki adımla bağlayarak bitirin.",
-        "conclusionHeading": "Sonraki adım",
-        "intent": "{keyword} arayan kişiler önce doğrudan bir cevap, ardından öneriye güvenmek için yeterli pratik detay ister.",
-        "intentHeading": "Arama niyeti",
-        "introduction": "{keyword} konusunun arkasındaki temel problemle başlayın ve okuyucunun karar vermeden önce ne öğreneceğini açıklayın.",
-        "metaDescription": "{keyword} için arama niyeti, okuyucu soruları, içerik yapısı ve yayın ekipleri için sonraki adımları kapsayan pratik SEO makale taslağı.",
-        "structure": "Yayından önce incelemeyi kolaylaştıran kısa bölümler, taranabilir başlıklar ve örnekler kullanın.",
-        "structureHeading": "Önerilen yapı"
-      },
       "preview": {
         "empty": "Önizlenecek içerik yok."
       },
@@ -156,10 +154,17 @@
         "context": "Bağlam"
       },
       "status": {
-        "localOnly": "Kaydedilmemiş oturum taslağı",
+        "loadError": "Bu makale yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+        "loading": "Makale yükleniyor…",
+        "notFound": "Bu makale artık mevcut değil. Silinmiş olabilir.",
         "notGenerated": "Bu makale henüz oluşturulmadı.",
+        "saveError": "Değişiklikleriniz kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+        "saveFailed": "Kaydedilmedi",
+        "saveInvalid": "Bazı alanlar reddedildi. İşaretlenen alanları düzeltip yeniden kaydedin.",
+        "saveNotFound": "Bu makale artık mevcut olmadığı için değişiklikleriniz kaydedilmedi.",
+        "saving": "Kaydediliyor…",
         "unsavedChanges": "Kaydedilmemiş değişiklikler",
-        "updatedAt": "Oturum taslağı kaydedildi {date}"
+        "updatedAt": "Son güncelleme {date}"
       },
       "tabs": {
         "editor": "Editör",
@@ -171,7 +176,8 @@
         "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
         "metaDescriptionTarget": "Hedef: 120-160 karakter.",
         "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
-        "required": "Zorunlu"
+        "required": "Zorunlu",
+        "serverRejected": "Sunucu tarafından reddedildi."
       }
     },
     "modal": {
@@ -246,6 +252,8 @@
       "planned": "Planlandı"
     },
     "status": {
+      "failedHeading": "İçerik planınız oluşturulamadı",
+      "failedSupportingText": "Plan hazırlanırken bir sorun oluştu. Bu durum devam ederse destek ekibiyle iletişime geçin.",
       "loadError": "İçerik planlayıcı yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "İçerik planlayıcı yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
@@ -255,18 +263,26 @@
     },
     "targetKeywords": {
       "actions": {
-        "loadMore": "Daha fazla yükle",
-        "loadingMore": "Yükleniyor...",
+        "confirmDelete": "{keyword} kelimesini havuzdan kaldırmayı onaylayın",
+        "confirmDeleteLabel": "Onayla",
+        "delete": "{keyword} kelimesini havuzdan kaldır",
         "research": "Anahtar Kelime Araştır",
         "retry": "Tekrar dene"
       },
       "columns": {
+        "action": "İşlemler",
         "difficulty": "Zorluk",
         "intent": "Arama niyeti",
         "keyword": "Anahtar kelime",
         "opportunityScore": "Fırsat puanı",
         "status": "Durum",
         "volume": "Hacim"
+      },
+      "deleteErrors": {
+        "candidate_not_deletable": "Bu anahtar kelime artık kaldırılamıyor. Güncel durumu için sayfayı yenileyin.",
+        "generic": "Bu anahtar kelime kaldırılamadı. Tekrar deneyin.",
+        "not_found": "Bu anahtar kelime artık havuzunuzda değil.",
+        "upgrade": "Anahtar kelime kaldırma ücretli bir özelliktir."
       },
       "description": "İçerik planınız için kullanılabilir ve planlanmış anahtar kelimeleri inceleyin.",
       "intents": {
@@ -277,6 +293,14 @@
       },
       "listLabel": "Hedef anahtar kelimeler listesi",
       "notAvailable": "—",
+      "pagination": {
+        "label": "Hedef anahtar kelimeler sayfalaması",
+        "next": "Sonraki",
+        "page": "Sayfa {page} / {totalPages}",
+        "perPage": "Sayfa başına {count}",
+        "previous": "Önceki",
+        "range": "{start}-{end} / {total}"
+      },
       "researchPaidFeature": "Ücretli özellik",
       "states": {
         "emptyDescription": "Kullanılabilir ve planlanmış anahtar kelimeler burada görünecek.",
@@ -489,10 +513,18 @@
     "testimonialsDescription": "SEO'sunu sadeleştiren diğer ekiplere katılın.",
     "testimonialsTitle": "Kullanıcılar seviyor",
     "useCases": [
-      { "name": "Bağımsız geliştiriciler ve tek kişilik girişimler" },
-      { "name": "Startup'lar" },
-      { "name": "Küçük işletme sahipleri" },
-      { "name": "Web'de görünür olmak isteyen herkes" }
+      {
+        "name": "Bağımsız geliştiriciler ve tek kişilik girişimler"
+      },
+      {
+        "name": "Startup'lar"
+      },
+      {
+        "name": "Küçük işletme sahipleri"
+      },
+      {
+        "name": "Web'de görünür olmak isteyen herkes"
+      }
     ],
     "useCasesTitle": "Kimler için ideal?"
   },
@@ -689,19 +721,71 @@
       "title": "Planları karşılaştır"
     },
     "comparisonRows": [
-      { "expert": "30", "growth": "30", "label": "Makale / ay" },
-      { "expert": "Sınırsız", "growth": "Sınırsız", "label": "Kullanıcılar" },
-      { "expert": true, "growth": true, "label": "Otomatik anahtar kelime araştırması" },
-      { "expert": true, "growth": true, "label": "CMS yayın entegrasyonları" },
-      { "expert": true, "growth": true, "label": "AI görselleri" },
-      { "expert": true, "growth": true, "label": "İlgili YouTube videoları" },
-      { "expert": true, "growth": true, "label": "Sınırsız AI yeniden yazım" },
-      { "expert": true, "growth": false, "label": "Özel SEO uzmanı" },
-      { "expert": true, "growth": false, "label": "SEO stratejisi ve yol haritası" },
-      { "expert": true, "growth": false, "label": "Manuel içerik incelemesi" },
-      { "expert": true, "growth": false, "label": "Sayfa içi SEO önerileri" },
-      { "expert": true, "growth": false, "label": "Backlink fırsatı incelemesi" },
-      { "expert": true, "growth": false, "label": "Aylık SEO raporu" }
+      {
+        "expert": "30",
+        "growth": "30",
+        "label": "Makale / ay"
+      },
+      {
+        "expert": "Sınırsız",
+        "growth": "Sınırsız",
+        "label": "Kullanıcılar"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Otomatik anahtar kelime araştırması"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "CMS yayın entegrasyonları"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "AI görselleri"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "İlgili YouTube videoları"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Sınırsız AI yeniden yazım"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Özel SEO uzmanı"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "SEO stratejisi ve yol haritası"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Manuel içerik incelemesi"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Sayfa içi SEO önerileri"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Backlink fırsatı incelemesi"
+      },
+      {
+        "expert": true,
+        "growth": false,
+        "label": "Aylık SEO raporu"
+      }
     ],
     "description": "Otomatik SEO içeriğini seçin ya da strateji, uygulama ve raporlama için bir uzman ekleyin.",
     "faq": [

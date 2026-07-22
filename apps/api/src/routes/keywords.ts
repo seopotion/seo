@@ -405,6 +405,50 @@ const keywords = new OpenAPIHono<AuthEnv>()
       }
       return c.body(null, 204);
     },
+  )
+  .openapi(
+    createRoute({
+      tags: ['keywords'],
+      method: 'delete',
+      path: '/candidates/{candidate_id}',
+      summary: 'Reject a candidate, removing it from the pool (paid)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.CandidateParams },
+      responses: {
+        204: { description: 'Candidate rejected and gone from the pool' },
+        401: { description: 'Missing or invalid bearer token' },
+        402: {
+          content: { 'application/json': { schema: schemas.ErrorResponse } },
+          description: 'Active paid entitlement required',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.ErrorResponse } },
+          description: 'Candidate/org not found or not owned by the caller',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.ErrorResponse } },
+          description: 'candidate_not_deletable',
+        },
+      },
+    }),
+    async (c) => {
+      const { candidate_id } = c.req.valid('param');
+      const { userId } = c.get('auth');
+
+      // Org is derived from the candidate; a missing candidate and one in an
+      // unowned org both 404 so existence never leaks across accounts.
+      const candidate = await CandidateRepo.findById(candidate_id);
+      const org = candidate && (await loadOwnedOrg(candidate.org_id, userId));
+      if (!candidate || !org) return c.json({ error: 'not_found' }, 404);
+      if (!isPaid(org)) return c.json({ error: 'not_paid' }, 402);
+
+      const rejected = await CandidateRepo.rejectIfCandidate(candidate_id);
+      // Conditional update misses when the candidate was scheduled or rejected
+      // meanwhile — only a pooled `candidate` may be deleted.
+      if (!rejected) return c.json({ error: 'candidate_not_deletable' }, 409);
+      return c.body(null, 204);
+    },
   );
 
 export default keywords;

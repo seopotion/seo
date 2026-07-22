@@ -1,41 +1,138 @@
 'use client';
 
-import { LoaderCircle, LockKeyhole, Search } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, LoaderCircle, LockKeyhole, Search, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge, Button } from '@/components/ui';
+import { api } from '@/lib/api';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
-import { formatNumber } from '../planner-utils';
-import type { TargetKeyword, TargetKeywordStatus } from '../types';
+import { formatNumber, getCandidateDeleteApiError } from '../planner-utils';
+import type { CandidateDeleteApiError, TargetKeyword, TargetKeywordStatus } from '../types';
+
+const KEYWORDS_PER_PAGE = 20;
+
+type DeleteError = Exclude<CandidateDeleteApiError, 'unauthorized'>;
+
+class CandidateDeleteError extends Error {
+  reason: CandidateDeleteApiError;
+
+  constructor(reason: CandidateDeleteApiError) {
+    super(reason);
+    this.name = 'CandidateDeleteError';
+    this.reason = reason;
+  }
+}
 
 type TargetKeywordsSectionProps = {
   canResearch: boolean;
-  hasMore: boolean;
   loadError: boolean;
   loading: boolean;
-  loadingMore: boolean;
-  onLoadMore: () => void;
   onResearch: () => void;
   onRetry: () => void;
+  onUnauthorized: () => void;
+  organizationId: string;
   researchAvailable: boolean;
   targetKeywords: TargetKeyword[];
 };
 
 export function TargetKeywordsSection({
   canResearch,
-  hasMore,
   loadError,
   loading,
-  loadingMore,
-  onLoadMore,
   onResearch,
   onRetry,
+  onUnauthorized,
+  organizationId,
   researchAvailable,
   targetKeywords,
 }: TargetKeywordsSectionProps) {
   const locale = useLocale();
   const t = useTranslations('ContentPlannerPage.targetKeywords');
+  const queryClient = useQueryClient();
   const hasRows = targetKeywords.length > 0;
+  const [page, setPage] = useState(1);
+  const [renderedKeywords, setRenderedKeywords] = useState(targetKeywords);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deleteErrors, setDeleteErrors] = useState<Record<string, DeleteError>>({});
+
+  const deleteMutation = useMutation({
+    mutationFn: async (candidateId: string) => {
+      const response = await api.api.v0.keywords.candidates[':candidate_id'].$delete({
+        param: { candidate_id: candidateId },
+      });
+      const status = response.status as number;
+
+      if (status === 204) {
+        return;
+      }
+
+      const responseBody: unknown = status === 409 ? await response.json() : undefined;
+      const reason = getCandidateDeleteApiError(status, responseBody);
+
+      if (reason === 'unauthorized') {
+        onUnauthorized();
+      }
+
+      throw new CandidateDeleteError(reason);
+    },
+  });
+
+  const handleDelete = async (candidateId: string) => {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    // Two-click confirm: the first click arms the button, the second fires.
+    if (confirmingId !== candidateId) {
+      setConfirmingId(candidateId);
+      return;
+    }
+
+    setConfirmingId(null);
+    setDeleteErrors((current) => omitKey(current, candidateId));
+
+    try {
+      await deleteMutation.mutateAsync(candidateId);
+      await queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.candidatePool(organizationId),
+      });
+    } catch (error) {
+      if (error instanceof CandidateDeleteError && error.reason === 'unauthorized') {
+        return;
+      }
+
+      const reason: DeleteError =
+        error instanceof CandidateDeleteError && error.reason !== 'unauthorized'
+          ? error.reason
+          : 'generic';
+      setDeleteErrors((current) => ({ ...current, [candidateId]: reason }));
+
+      // A refused delete means the row is stale (already scheduled or gone).
+      if (reason === 'candidate_not_deletable' || reason === 'not_found') {
+        await queryClient.invalidateQueries({
+          queryKey: dashboardQueryKeys.candidatePool(organizationId),
+        });
+      }
+    }
+  };
+
+  // The list is replaced wholesale (organization switch, research, retry, streamed pages),
+  // so a stale page number would strand the reader outside the new list.
+  if (renderedKeywords !== targetKeywords) {
+    setRenderedKeywords(targetKeywords);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(targetKeywords.length / KEYWORDS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * KEYWORDS_PER_PAGE;
+  const visibleKeywords = useMemo(
+    () => targetKeywords.slice(startIndex, startIndex + KEYWORDS_PER_PAGE),
+    [startIndex, targetKeywords],
+  );
 
   return (
     <section aria-labelledby="target-keywords-heading" className="grid gap-3">
@@ -91,10 +188,13 @@ export function TargetKeywordsSection({
                   <TableHeading>{t('columns.intent')}</TableHeading>
                   <TableHeading>{t('columns.opportunityScore')}</TableHeading>
                   <TableHeading>{t('columns.status')}</TableHeading>
+                  <TableHeading className="w-32">
+                    <span className="sr-only">{t('columns.action')}</span>
+                  </TableHeading>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {targetKeywords.map((targetKeyword) => (
+                {visibleKeywords.map((targetKeyword) => (
                   <tr key={`${targetKeyword.source}-${targetKeyword.id}`}>
                     <td className="truncate px-4 py-3 font-medium text-slate-950">
                       {targetKeyword.keyword}
@@ -110,6 +210,21 @@ export function TargetKeywordsSection({
                     <td className="px-4 py-3">
                       <TargetKeywordStatusBadge status={targetKeyword.status} t={t} />
                     </td>
+                    <td className="px-4 py-3">
+                      {targetKeyword.source === 'candidate' ? (
+                        <DeleteCandidateAction
+                          confirming={confirmingId === targetKeyword.id}
+                          error={deleteErrors[targetKeyword.id]}
+                          keyword={targetKeyword.keyword}
+                          onDelete={() => void handleDelete(targetKeyword.id)}
+                          pending={
+                            deleteMutation.isPending &&
+                            deleteMutation.variables === targetKeyword.id
+                          }
+                          t={t}
+                        />
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -117,7 +232,7 @@ export function TargetKeywordsSection({
           </div>
 
           <ul aria-label={t('listLabel')} className="grid list-none gap-2 md:hidden">
-            {targetKeywords.map((targetKeyword) => (
+            {visibleKeywords.map((targetKeyword) => (
               <li
                 key={`${targetKeyword.source}-${targetKeyword.id}`}
                 className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
@@ -150,6 +265,18 @@ export function TargetKeywordsSection({
                     value={formatMetric(targetKeyword.opportunityScore, locale, t)}
                   />
                 </dl>
+                {targetKeyword.source === 'candidate' ? (
+                  <DeleteCandidateAction
+                    confirming={confirmingId === targetKeyword.id}
+                    error={deleteErrors[targetKeyword.id]}
+                    keyword={targetKeyword.keyword}
+                    onDelete={() => void handleDelete(targetKeyword.id)}
+                    pending={
+                      deleteMutation.isPending && deleteMutation.variables === targetKeyword.id
+                    }
+                    t={t}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -170,23 +297,118 @@ export function TargetKeywordsSection({
         </div>
       ) : null}
 
-      {hasRows && hasMore ? (
-        <div className="flex justify-center">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={loadingMore}
-            onClick={onLoadMore}
-          >
-            {loadingMore ? (
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-            ) : null}
-            {loadingMore ? t('actions.loadingMore') : t('actions.loadMore')}
-          </Button>
-        </div>
+      {hasRows && totalPages > 1 ? (
+        <PaginationControls
+          currentPage={currentPage}
+          rangeLabel={t('pagination.range', {
+            end: startIndex + visibleKeywords.length,
+            start: startIndex + 1,
+            total: targetKeywords.length,
+          })}
+          setPage={setPage}
+          totalPages={totalPages}
+          t={t}
+        />
       ) : null}
     </section>
+  );
+}
+
+function PaginationControls({
+  currentPage,
+  rangeLabel,
+  setPage,
+  totalPages,
+  t,
+}: {
+  currentPage: number;
+  rangeLabel: string;
+  setPage: (updater: (page: number) => number) => void;
+  totalPages: number;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
+}) {
+  return (
+    <nav
+      aria-label={t('pagination.label')}
+      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-slate-700 text-sm">{rangeLabel}</p>
+        <p className="mt-0.5 truncate text-slate-500 text-xs">
+          {t('pagination.perPage', { count: KEYWORDS_PER_PAGE })}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:flex">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full min-w-0 sm:w-auto sm:min-w-28"
+          disabled={currentPage === 1}
+          onClick={() => setPage((previousPage) => Math.max(1, previousPage - 1))}
+        >
+          <ChevronLeft className="size-4" aria-hidden="true" />
+          {t('pagination.previous')}
+        </Button>
+        <span className="min-w-20 text-center font-medium text-slate-600 text-sm">
+          {t('pagination.page', { page: currentPage, totalPages })}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full min-w-0 sm:w-auto sm:min-w-28"
+          disabled={currentPage === totalPages}
+          onClick={() => setPage((previousPage) => Math.min(totalPages, previousPage + 1))}
+        >
+          {t('pagination.next')}
+          <ChevronRight className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </nav>
+  );
+}
+
+function DeleteCandidateAction({
+  confirming,
+  error,
+  keyword,
+  onDelete,
+  pending,
+  t,
+}: {
+  confirming: boolean;
+  error?: DeleteError;
+  keyword: string;
+  onDelete: () => void;
+  pending: boolean;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
+}) {
+  return (
+    <div className="grid justify-items-start gap-1 md:justify-items-end">
+      <Button
+        type="button"
+        variant={confirming ? 'outline' : 'ghost'}
+        size={confirming ? 'sm' : 'icon'}
+        className={cn(confirming ? 'text-rose-700' : 'size-8 text-slate-500 hover:text-rose-700')}
+        aria-label={t(confirming ? 'actions.confirmDelete' : 'actions.delete', { keyword })}
+        disabled={pending}
+        onClick={onDelete}
+      >
+        {pending ? (
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Trash2 className="size-4" aria-hidden="true" />
+        )}
+        {confirming && !pending ? t('actions.confirmDeleteLabel') : null}
+      </Button>
+      {error ? (
+        <p role="alert" className="max-w-44 text-rose-700 text-xs">
+          {t(`deleteErrors.${error}`)}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -274,4 +496,10 @@ function formatMetric(
   t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>,
 ) {
   return value === null ? t('notAvailable') : formatNumber(value, locale);
+}
+
+function omitKey<TValue>(record: Record<string, TValue>, key: string) {
+  const next = { ...record };
+  delete next[key];
+  return next;
 }

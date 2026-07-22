@@ -7,6 +7,12 @@ export const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
 export const ARTICLE_IMAGE_ROLES = ['cover', 'inline'] as const;
 export const IMAGES_STATUSES = ['pending', 'complete', 'failed'] as const;
 
+/** SEO meta length limits. Here (not @shared/generation) so `apps/web` can
+ * import them without pulling the LLM provider clients into the bundle. */
+export const META_TITLE_MAX = 60;
+export const META_DESCRIPTION_MIN = 120;
+export const META_DESCRIPTION_MAX = 160;
+
 /**
  * One planned/generated image slot. `url` is '' until the image is generated
  * and stored (then it's our CloudFront URL); slots are created once by the
@@ -59,6 +65,9 @@ export const ArticleSchema = z.object({
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),
   published_at: z.date().nullable(),
+  // Last editor save (#74). Defaulted so pre-#74 docs still parse; null means
+  // never edited since generation.
+  updated_at: z.date().nullable().default(null),
   // Image pipeline (#51). Defaulted so pre-#51 docs still parse. The future
   // publisher must require images_status === 'complete' before publishing.
   images: z.array(ArticleImageSchema).default([]),
@@ -68,8 +77,12 @@ export const ArticleSchema = z.object({
 });
 export type Article = z.infer<typeof ArticleSchema>;
 
-/** Input for creating an article — the server assigns `id` and `created_at`. */
-export const CreateArticleInput = ArticleSchema.omit({ id: true, created_at: true });
+/** Input for creating an article — the server assigns `id`, `created_at`, `updated_at`. */
+export const CreateArticleInput = ArticleSchema.omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the
 // type, matching the runtime contract — same rationale as `CreateKeywordInput`.
 export type CreateArticleInput = z.input<typeof CreateArticleInput>;
