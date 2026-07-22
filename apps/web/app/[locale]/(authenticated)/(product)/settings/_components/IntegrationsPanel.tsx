@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
+import { Download, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useMemo, useState } from 'react';
@@ -171,15 +171,23 @@ export function IntegrationsPanel({
                     {organization?.website_url ? (
                       <p className="truncate text-slate-500 text-xs">{organization.website_url}</p>
                     ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-fit"
-                      onClick={startReplace}
-                    >
-                      {t('replaceToken')}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm" className="w-fit">
+                        <a download href="/downloads/seo-potion.zip">
+                          <Download aria-hidden="true" className="size-4" />
+                          {t('downloadPlugin')}
+                        </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit"
+                        onClick={startReplace}
+                      >
+                        {t('replaceToken')}
+                      </Button>
+                    </div>
                   </>
                 ) : null}
               </>
@@ -216,14 +224,30 @@ export function IntegrationsPanel({
           ) : null}
 
           <ol className="grid gap-4">
-            <SetupStep
-              actionHref={`${siteUrl}/wp-admin/plugin-install.php`}
-              actionLabel={t('step1Action')}
-              body={t('step1Body')}
-              failed={connectError?.step === 1}
-              index={1}
-              title={t('step1Title')}
-            />
+            <li className="grid gap-2">
+              <StepHeading failed={connectError?.step === 1} index={1} title={t('step1Title')} />
+              <p className="pl-9 text-slate-500 text-sm">{t('step1Body')}</p>
+              <div className="flex flex-wrap items-center gap-2 pl-9">
+                <Button asChild size="sm">
+                  <a download href="/downloads/seo-potion.zip">
+                    <Download aria-hidden="true" className="size-4" />
+                    {t('downloadPlugin')}
+                  </a>
+                </Button>
+                {/* Once the plugin ships on the WordPress.org directory, this can point at the
+                    directory-search page and the self-hosted zip becomes a fallback. */}
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`${siteUrl}/wp-admin/plugin-install.php?tab=upload`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <ExternalLink aria-hidden="true" className="size-4" />
+                    {t('step1Action')}
+                  </a>
+                </Button>
+              </div>
+            </li>
             <SetupStep
               actionHref={`${siteUrl}/wp-admin/admin.php?page=seo-potion-manage`}
               actionLabel={t('step2Action')}

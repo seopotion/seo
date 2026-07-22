@@ -2,6 +2,7 @@ node_modules/
 dist/
 .next/
 cdk.out/
+apps/web/public/downloads/
 *.tsbuildinfo
 .DS_Store
 .env

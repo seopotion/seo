@@ -466,6 +466,7 @@
       "connectedOn": "Connected on {date}",
       "connectedSuccess": "WordPress connected and tested successfully.",
       "connecting": "Connecting...",
+      "downloadPlugin": "Download plugin (.zip)",
       "errors": {
         "connectFailed": "WordPress could not be connected. Check the token and try again.",
         "invalidToken": "This token doesn't match the one saved in your WordPress plugin. Re-check step 2 and paste the exact same token.",
@@ -483,8 +484,8 @@
       "replaceNote": "Connecting again tests the new token against your site and replaces the saved one.",
       "replaceToken": "Replace token",
       "setupTitle": "Connect your WordPress site",
-      "step1Action": "Open WordPress plugins",
-      "step1Body": "In your WordPress admin, upload and activate the SEO Potion plugin.",
+      "step1Action": "Open Upload Plugin page",
+      "step1Body": "Download the SEO Potion plugin, then upload and activate it from your WordPress admin.",
       "step1Title": "Install the SEO Potion plugin",
       "step2Action": "Open plugin settings",
       "step2Body": "In WordPress, open SEO Potion → Manage. Choose a strong token, pick whether sent articles are saved as drafts or published directly, and save.",
