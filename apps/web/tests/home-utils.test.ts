@@ -89,9 +89,9 @@ describe('recommendedActions rules', () => {
     ]);
   });
 
-  test('asks to connect Search Console while gated, with no destination', () => {
+  test('asks to connect Search Console while gated, linking to settings', () => {
     expect(recommendedActions(input({ bestGated: true }))).toEqual([
-      { key: 'connectSearchConsole' },
+      { href: '/settings?tab=googleSearchConsole', key: 'connectSearchConsole' },
     ]);
   });
 
