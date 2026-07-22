@@ -1,3 +1,4 @@
+export { createLemonSqueezyProvider, type LemonSqueezyConfig } from './billing/lemonsqueezy';
 export type * from './billing/types';
 export * from './dataforseo/client';
 export * from './dataforseo/errors';
