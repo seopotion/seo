@@ -384,9 +384,11 @@
     },
     "title": "Makale",
     "wordpress": {
+      "connectFirst": "Bu yazıyı göndermek için <link>Ayarlar'dan WordPress'i bağlayın</link>.",
       "pluginError": "WordPress isteği tamamlayamadı: {error}",
       "published": "WordPress'e gönderildi.",
       "requestError": "WordPress'e ulaşılamadı. Tekrar deneyin.",
+      "sentBadge": "WordPress'e gönderildi · #{id}",
       "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
       "warnings": "WordPress isteği uyarılarla tamamladı:"
     }
@@ -454,23 +456,43 @@
       "label": "Ayar bölümleri"
     },
     "wordpress": {
+      "badges": {
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil"
+      },
+      "cancel": "İptal",
+      "comingSoon": "Çok yakında",
       "connectAndTest": "Bağlan ve test et",
-      "connected": "WordPress bağlı.",
+      "connectedOn": "{date} tarihinde bağlandı",
       "connectedSuccess": "WordPress bağlantısı başarıyla kuruldu ve test edildi.",
       "connecting": "Bağlanıyor...",
-      "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
-      "description": "Kendi sunucunuzdaki WordPress sitesinde SEO Potion eklentisine bağlanın.",
-      "invalidToken": "Entegrasyon token'ı reddedildi.",
+      "errors": {
+        "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
+        "invalidToken": "Bu token, WordPress eklentinizde kayıtlı olanla eşleşmiyor. 2. adımı kontrol edip aynı token'ı yapıştırın.",
+        "pluginNotConfigured": "Eklentide henüz kayıtlı bir token yok. Önce WordPress yönetim panelinizde 2. adımı tamamlayın.",
+        "requestFailed": "Sitenizdeki SEO Potion eklentisine ulaşamadık. Eklentinin kurulu ve etkin olduğundan emin olun (1. adım) ve tekrar deneyin."
+      },
+      "gallery": "Yayınlama entegrasyonları",
       "loadError": "Kayıtlı WordPress bağlantı durumu yüklenemedi.",
       "loading": "WordPress bağlantısı kontrol ediliyor...",
-      "notConnected": "WordPress bağlı değil.",
-      "pluginNotConfigured": "SEO Potion eklentisi bu WordPress sitesinde yapılandırılmamış.",
-      "requestFailed": "WordPress sitesine ulaşılamadı. Siteyi kontrol edip tekrar deneyin.",
-      "siteUrl": "Site URL'si",
-      "title": "Kendi sunucunuzdaki WordPress",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress",
+        "wordpressCom": "WordPress.com"
+      },
+      "replaceNote": "Yeniden bağlanmak yeni token'ı sitenizde test eder ve kayıtlı token'ın yerine geçer.",
+      "replaceToken": "Token'ı değiştir",
+      "setupTitle": "WordPress sitenizi bağlayın",
+      "step1Action": "WordPress eklentilerini aç",
+      "step1Body": "WordPress yönetim panelinizde SEO Potion eklentisini yükleyip etkinleştirin.",
+      "step1Title": "SEO Potion eklentisini kurun",
+      "step2Action": "Eklenti ayarlarını aç",
+      "step2Body": "WordPress'te SEO Potion → Manage sayfasını açın. Güçlü bir token seçin, gönderilen yazıların taslak olarak mı kaydedileceğini yoksa doğrudan mı yayınlanacağını belirleyin ve kaydedin.",
+      "step2Title": "Entegrasyon token'ınızı oluşturun",
+      "step3Body": "Aynı token'ı buraya yapıştırın. Kaydetmeden önce sitenizde test ederiz — kayıtlı token'lar bir daha gösterilmez.",
+      "step3Title": "SEO Potion'ı bağlayın",
       "token": "Entegrasyon token'ı",
-      "tokenHelp": "WordPress'te SEO Potion → Manage sayfasını açın, güçlü bir entegrasyon token'ı seçip kaydedin ve aynı token'ı buraya yapıştırın. Kayıtlı token'lar hiçbir zaman gösterilmez.",
-      "tokenPlaceholder": "Eklenti entegrasyon token'ını girin"
+      "tokenPlaceholder": "WordPress'te kaydettiğiniz token'ı yapıştırın"
     }
   },
   "LandingPage": {

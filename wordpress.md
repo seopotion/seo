@@ -499,3 +499,39 @@ and should be tracked explicitly rather than assumed fixed.
 The repository CI order remains `npm run lint`, `npm run check:all`, then `npm test`. Backend staging
 deploys only after the repository's `dev` branch is merged to `master`; a push to `dev` alone does
 not deploy the API.
+
+## Frontend UX redesign — 2026-07-22
+
+The "readiness-aware controls" and setup-flow gaps from the handoff are now implemented. No backend
+changes; everything runs on the existing four dashboard routes.
+
+### Setup flow (Settings → Integrations)
+
+The tab is an integration gallery (WordPress self-hosted active; WordPress.com and Framer "coming
+soon", mirroring onboarding) plus a guided three-step setup shown whenever WordPress is not
+connected, in `settings/_components/IntegrationsPanel.tsx`:
+
+1. Install the plugin — deep link to `{website_url}/wp-admin/plugin-install.php`.
+2. Create the token in SEO Potion → Manage (and pick the draft/publish Post Mode) — deep link to
+   `{website_url}/wp-admin/admin.php?page=seo-potion-manage`.
+3. Paste the token and Connect & test.
+
+Connect errors map back to the step that likely failed and highlight it:
+`wordpress_request_failed` → step 1, `integration_not_configured`/`invalid_integration_key` →
+step 2. Connected state shows a badge, connection date, and a "Replace token" action that reopens
+the setup (reconnect = same POST; disconnect remains deferred with the backend).
+
+### Readiness-aware article page
+
+Connected-integrations state is a shared react-query hook (`lib/integrations.ts`, key in
+`lib/dashboard-query-keys.ts`) used by both pages. The article Send button disables only on a
+definite "not connected" (loading/error keeps it enabled; the backend still enforces), with a hint
+linking to `/settings?tab=integrations` (tab deep-linking added). Articles with a stored
+`wordpress_post_id` show a persistent "Sent to WordPress · #id" badge.
+
+Still deferred (backend contract changes needed): disconnect, live health check / re-test with the
+stored token, and WordPress post URL/status display.
+
+An editable `website_url` (Settings → Business) was implemented on 2026-07-22 and then reverted the
+same day at the owner's request; `website_url` remains create-only. The open product decision about
+orgs whose WordPress base URL differs from `website_url` stands.

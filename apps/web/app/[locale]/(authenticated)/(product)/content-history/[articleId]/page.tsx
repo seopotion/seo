@@ -10,6 +10,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
+import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,16 @@ export default function ArticleDetailPage() {
     enabled: !redirecting && !organizationLoading && Boolean(organization && articleId),
     staleTime: 60 * 60 * 1000,
   });
+
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+    enabled: !redirecting && !organizationLoading,
+    onUnauthorized: handleUnauthorized,
+  });
+  const wordpressConnected = connectedIntegrationsQuery.data
+    ? connectedIntegrationsQuery.data.integrations.some(
+        (integration) => integration.provider === 'wordpress',
+      )
+    : undefined;
 
   const article = articleQuery.data ?? null;
   const loadState: ArticleLoadState = !articleId
@@ -177,8 +188,18 @@ export default function ArticleDetailPage() {
         </div>
         {article ? (
           <div className="flex flex-col items-start gap-2 sm:items-end">
-            <ArticleStatusBadge status={article.status} t={t} />
-            <Button onClick={syncWordPressArticle} disabled={wordpressActionState === 'loading'}>
+            <div className="flex flex-wrap items-center gap-2">
+              <ArticleStatusBadge status={article.status} t={t} />
+              {article.wordpress_post_id ? (
+                <Badge variant="secondary" className="w-fit border-transparent">
+                  {t('wordpress.sentBadge', { id: article.wordpress_post_id })}
+                </Badge>
+              ) : null}
+            </div>
+            <Button
+              onClick={syncWordPressArticle}
+              disabled={wordpressActionState === 'loading' || wordpressConnected === false}
+            >
               {wordpressActionState === 'loading'
                 ? t(
                     article.wordpress_post_id
@@ -191,6 +212,17 @@ export default function ArticleDetailPage() {
                       : 'actions.publishWordPress',
                   )}
             </Button>
+            {wordpressConnected === false ? (
+              <p className="text-slate-500 text-xs">
+                {t.rich('wordpress.connectFirst', {
+                  link: (chunks) => (
+                    <Link className="underline" href="/settings?tab=integrations">
+                      {chunks}
+                    </Link>
+                  ),
+                })}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

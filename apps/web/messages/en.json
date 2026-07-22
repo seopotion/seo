@@ -384,9 +384,11 @@
     },
     "title": "Article",
     "wordpress": {
+      "connectFirst": "<link>Connect WordPress in Settings</link> to send this article.",
       "pluginError": "WordPress could not complete the request: {error}",
       "published": "Sent to WordPress.",
       "requestError": "WordPress could not be reached. Try again.",
+      "sentBadge": "Sent to WordPress · #{id}",
       "updated": "The WordPress post was updated from the stored article.",
       "warnings": "WordPress completed the request with warnings:"
     }
@@ -454,23 +456,43 @@
       "label": "Settings sections"
     },
     "wordpress": {
+      "badges": {
+        "connected": "Connected",
+        "notConnected": "Not connected"
+      },
+      "cancel": "Cancel",
+      "comingSoon": "Coming soon",
       "connectAndTest": "Connect & test",
-      "connected": "WordPress is connected.",
+      "connectedOn": "Connected on {date}",
       "connectedSuccess": "WordPress connected and tested successfully.",
       "connecting": "Connecting...",
-      "connectFailed": "WordPress could not be connected. Check the token and try again.",
-      "description": "Connect the SEO Potion plugin on your self-hosted WordPress site.",
-      "invalidToken": "The integration token was rejected.",
+      "errors": {
+        "connectFailed": "WordPress could not be connected. Check the token and try again.",
+        "invalidToken": "This token doesn't match the one saved in your WordPress plugin. Re-check step 2 and paste the exact same token.",
+        "pluginNotConfigured": "The plugin doesn't have a saved token yet. Complete step 2 in your WordPress admin, then try again.",
+        "requestFailed": "We couldn't reach the SEO Potion plugin on your site. Make sure the plugin is installed and active (step 1), then try again."
+      },
+      "gallery": "Publishing integrations",
       "loadError": "Could not load the saved WordPress connection state.",
       "loading": "Checking the WordPress connection...",
-      "notConnected": "WordPress is not connected.",
-      "pluginNotConfigured": "The SEO Potion plugin is not configured on this WordPress site.",
-      "requestFailed": "The WordPress site could not be reached. Check the site and try again.",
-      "siteUrl": "Site URL",
-      "title": "Self-hosted WordPress",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Self-hosted WordPress",
+        "wordpressCom": "WordPress.com"
+      },
+      "replaceNote": "Connecting again tests the new token against your site and replaces the saved one.",
+      "replaceToken": "Replace token",
+      "setupTitle": "Connect your WordPress site",
+      "step1Action": "Open WordPress plugins",
+      "step1Body": "In your WordPress admin, upload and activate the SEO Potion plugin.",
+      "step1Title": "Install the SEO Potion plugin",
+      "step2Action": "Open plugin settings",
+      "step2Body": "In WordPress, open SEO Potion → Manage. Choose a strong token, pick whether sent articles are saved as drafts or published directly, and save.",
+      "step2Title": "Create your integration token",
+      "step3Body": "Paste the same token here. We test it against your site before saving — saved tokens are never shown again.",
+      "step3Title": "Connect SEO Potion",
       "token": "Integration token",
-      "tokenHelp": "In WordPress, open SEO Potion → Manage, choose and save a strong integration token, then paste the same token here. Saved tokens are never shown.",
-      "tokenPlaceholder": "Enter the plugin integration token"
+      "tokenPlaceholder": "Paste the token you saved in WordPress"
     }
   },
   "LandingPage": {

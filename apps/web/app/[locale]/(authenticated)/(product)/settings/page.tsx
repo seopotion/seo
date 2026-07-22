@@ -31,6 +31,7 @@ import {
   stringsToTextEntries,
   textEntriesToStrings,
 } from '../../onboarding/utils';
+import { IntegrationsPanel } from './_components/IntegrationsPanel';
 
 const settingsTabs = [
   'business',
@@ -50,10 +51,7 @@ type SettingsForm = {
   targetAudience: TextEntry[];
 };
 
-type IntegrationLoadState = 'error' | 'idle' | 'loading' | 'ready';
 type SettingsSaveState = 'error' | 'idle' | 'saved';
-type WordPressActionState = 'error' | 'idle' | 'loading' | 'success';
-type WordPressError = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 
 type GeneralSettingsResponse = Pick<SetupPresets, 'audience' | 'business'>;
 
@@ -124,11 +122,6 @@ export default function SettingsPage() {
   const [initializedOrganizationId, setInitializedOrganizationId] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [saveState, setSaveState] = useState<SettingsSaveState>('idle');
-  const [integrationLoadState, setIntegrationLoadState] = useState<IntegrationLoadState>('idle');
-  const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
-  const [wordpressConnected, setWordpressConnected] = useState(false);
-  const [wordpressError, setWordpressError] = useState<WordPressError>('connectFailed');
-  const [wordpressToken, setWordpressToken] = useState('');
   const editRevisionRef = useRef(0);
 
   const handleUnauthorized = useCallback(() => {
@@ -231,55 +224,13 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (organizationLoading) return;
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    const matchedTab = settingsTabs.find((tab) => tab === tabParam);
 
-    if (!organization) {
-      setIntegrationLoadState('idle');
-      setWordpressConnected(false);
-      setWordpressToken('');
-      return;
+    if (matchedTab) {
+      setActiveTab(matchedTab);
     }
-
-    let cancelled = false;
-
-    setIntegrationLoadState('loading');
-    setWordpressActionState('idle');
-    setWordpressToken('');
-
-    void (async () => {
-      try {
-        const response = await api.api.v0.dashboard.integrations.connected.$get({
-          query: { org_id: organization.id },
-        });
-
-        if ((response.status as number) === 401) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error('integrations_load_failed');
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setWordpressConnected(
-            data.integrations.some((integration) => integration.provider === 'wordpress'),
-          );
-          setIntegrationLoadState('ready');
-        }
-      } catch {
-        if (!cancelled) {
-          setIntegrationLoadState('error');
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [handleUnauthorized, organization, organizationLoading]);
+  }, []);
 
   function markEdited() {
     editRevisionRef.current += 1;
@@ -372,57 +323,6 @@ export default function SettingsPage() {
     }));
     markEdited();
     setCompetitorError('');
-  }
-
-  async function connectWordPress() {
-    const token = wordpressToken.trim();
-
-    if (
-      !organization ||
-      !token ||
-      integrationLoadState === 'loading' ||
-      wordpressActionState === 'loading'
-    ) {
-      return;
-    }
-
-    setWordpressActionState('loading');
-
-    try {
-      const response = await api.api.v0.dashboard.integrations.wordpress.$post({
-        json: { org_id: organization.id, token },
-      });
-
-      if ((response.status as number) === 401) {
-        handleUnauthorized();
-        return;
-      }
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errorCode = 'error_code' in data ? data.error_code : '';
-        setWordpressError(
-          errorCode === 'invalid_integration_key'
-            ? 'invalidToken'
-            : errorCode === 'integration_not_configured'
-              ? 'pluginNotConfigured'
-              : errorCode === 'wordpress_request_failed'
-                ? 'requestFailed'
-                : 'connectFailed',
-        );
-        setWordpressActionState('error');
-        return;
-      }
-
-      setIntegrationLoadState('ready');
-      setWordpressConnected(true);
-      setWordpressToken('');
-      setWordpressActionState('success');
-    } catch {
-      setWordpressError('requestFailed');
-      setWordpressActionState('error');
-    }
   }
 
   if (
@@ -595,83 +495,7 @@ export default function SettingsPage() {
         aria-labelledby="settings-tab-integrations"
         hidden={activeTab !== 'integrations'}
       >
-        <FieldPanel>
-          <div>
-            <p className="font-medium text-sm leading-none">{t('wordpress.title')}</p>
-            <p className="mt-1 text-slate-500 text-sm">{t('wordpress.description')}</p>
-          </div>
-
-          {integrationLoadState === 'loading' ? (
-            <StatusPanel>{t('wordpress.loading')}</StatusPanel>
-          ) : null}
-          {integrationLoadState === 'error' ? (
-            <StatusPanel tone="error">{t('wordpress.loadError')}</StatusPanel>
-          ) : null}
-          {integrationLoadState === 'ready' && wordpressActionState !== 'success' ? (
-            <StatusPanel tone={wordpressConnected ? 'success' : 'neutral'}>
-              {t(wordpressConnected ? 'wordpress.connected' : 'wordpress.notConnected')}
-            </StatusPanel>
-          ) : null}
-          {wordpressActionState === 'success' ? (
-            <StatusPanel tone="success">{t('wordpress.connectedSuccess')}</StatusPanel>
-          ) : null}
-          {wordpressActionState === 'error' ? (
-            <StatusPanel tone="error">{t(`wordpress.${wordpressError}`)}</StatusPanel>
-          ) : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="wordpress-site-url">{t('wordpress.siteUrl')}</Label>
-              <Input
-                className="mt-2"
-                id="wordpress-site-url"
-                type="url"
-                value={organization?.website_url ?? ''}
-                readOnly
-              />
-            </div>
-            <div>
-              <Label htmlFor="wordpress-token">{t('wordpress.token')}</Label>
-              <Input
-                autoComplete="off"
-                className="mt-2"
-                id="wordpress-token"
-                type="password"
-                value={wordpressToken}
-                placeholder={t('wordpress.tokenPlaceholder')}
-                spellCheck={false}
-                onChange={(event) => {
-                  setWordpressToken(event.target.value);
-                  setWordpressActionState('idle');
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-
-                  event.preventDefault();
-                  void connectWordPress();
-                }}
-              />
-              <p className="mt-1 text-slate-500 text-xs">{t('wordpress.tokenHelp')}</p>
-            </div>
-          </div>
-
-          <div>
-            <Button
-              type="button"
-              onClick={connectWordPress}
-              disabled={
-                !organization ||
-                !wordpressToken.trim() ||
-                integrationLoadState === 'loading' ||
-                wordpressActionState === 'loading'
-              }
-            >
-              {wordpressActionState === 'loading'
-                ? t('wordpress.connecting')
-                : t('wordpress.connectAndTest')}
-            </Button>
-          </div>
-        </FieldPanel>
+        <IntegrationsPanel organization={organization} onUnauthorized={handleUnauthorized} />
       </div>
 
       <div
