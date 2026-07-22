@@ -48,11 +48,13 @@ describe('preflight', () => {
     expect(res.data.checks.every((c) => c.present)).toBe(true);
     // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
     expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
-    // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, and the two env vars.
+    // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key, lemonsqueezy-webhook-secret, and the two env vars.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
       '/seo/staging/google-client-secret',
       '/seo/staging/gsc-token-key',
       '/seo/staging/jwt-secret',
+      '/seo/staging/lemonsqueezy-api-key',
+      '/seo/staging/lemonsqueezy-webhook-secret',
       '/seo/staging/mongo-uri',
       'GOOGLE_CLIENT_ID_STAGING',
       'WEB_ORIGIN_STAGING',
@@ -68,6 +70,8 @@ describe('preflight', () => {
       '/seo/prod/google-client-secret',
       '/seo/prod/gsc-token-key',
       '/seo/prod/jwt-secret',
+      '/seo/prod/lemonsqueezy-api-key',
+      '/seo/prod/lemonsqueezy-webhook-secret',
       '/seo/prod/mongo-uri',
       'GOOGLE_CLIENT_ID_PROD',
       'WEB_ORIGIN_PROD',
