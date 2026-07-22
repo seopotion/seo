@@ -31,6 +31,7 @@ import {
   stringsToTextEntries,
   textEntriesToStrings,
 } from '../../onboarding/utils';
+import { BillingPanel } from './_components/BillingPanel';
 import { IntegrationsPanel } from './_components/IntegrationsPanel';
 
 const settingsTabs = [
@@ -38,6 +39,7 @@ const settingsTabs = [
   'audienceCompetitors',
   'integrations',
   'googleSearchConsole',
+  'billing',
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number];
@@ -515,6 +517,15 @@ export default function SettingsPage() {
             {t('googleSearchConsole.connect')}
           </Button>
         </div>
+      </div>
+
+      <div
+        id="settings-panel-billing"
+        role="tabpanel"
+        aria-labelledby="settings-tab-billing"
+        hidden={activeTab !== 'billing'}
+      >
+        <BillingPanel onUnauthorized={handleUnauthorized} organization={organization} />
       </div>
 
       <div className="flex justify-end">

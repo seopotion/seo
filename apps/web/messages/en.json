@@ -5,6 +5,39 @@
     "retry": "Retry",
     "workspaceError": "Could not check your workspace. Try again."
   },
+  "BillingPage": {
+    "activating": {
+      "continue": "Continue to dashboard",
+      "error": "Could not check your subscription status. Try again.",
+      "message": "Activating your subscription…",
+      "retry": "Retry",
+      "timeout": "This is taking longer than expected. You can continue to your dashboard — the upgrade will apply as soon as it's confirmed."
+    },
+    "description": "Unlock keyword research and scheduling by upgrading your plan.",
+    "errors": {
+      "already_subscribed": "You're already subscribed to this plan. Manage your billing from Settings instead.",
+      "generic": "Could not start checkout. Try again."
+    },
+    "redirecting": "Redirecting…",
+    "status": {
+      "loading": "Loading your organization...",
+      "noOrganization": "No completed organization was found for this workspace.",
+      "organizationError": "Could not load your organization. Try again."
+    },
+    "tiers": {
+      "expert": {
+        "cta": "Paid + Expert",
+        "description": "Everything in Paid, plus hands-on expert support for your content strategy.",
+        "name": "Paid + Expert"
+      },
+      "paid": {
+        "cta": "Upgrade to Paid",
+        "description": "Unlock keyword research, keyword scheduling, and your content calendar.",
+        "name": "Paid"
+      }
+    },
+    "title": "Choose your plan"
+  },
   "GoogleJoinButton": {
     "checkingWorkspace": "Checking workspace...",
     "label": "Join with Google",
@@ -108,6 +141,7 @@
       "tableLabel": "Available target keywords",
       "title": "Choose a keyword for {date}",
       "upgrade": {
+        "cta": "Upgrade",
         "description": "Upgrade to a paid plan to schedule target keywords on your content calendar.",
         "title": "Keyword scheduling is a paid feature"
       }
@@ -242,6 +276,7 @@
       },
       "title": "Research Keywords",
       "upgrade": {
+        "cta": "Upgrade",
         "description": "Upgrade to a paid plan to research keywords and add them to your content plan.",
         "title": "Keyword research is a paid feature"
       }
@@ -432,6 +467,14 @@
       "save": "Save",
       "saving": "Saving..."
     },
+    "billing": {
+      "description": "You have an active paid subscription. Manage your payment method or cancel from the billing portal.",
+      "freeDescription": "Upgrade to unlock keyword research and scheduling.",
+      "manage": "Manage billing",
+      "manageError": "Could not open the billing portal. Try again.",
+      "opening": "Opening...",
+      "upgradeCta": "View plans"
+    },
     "googleSearchConsole": {
       "comingSoon": "Coming soon",
       "connect": "Connect",
@@ -450,6 +493,7 @@
     },
     "tabs": {
       "audienceCompetitors": "Audience & Competitors",
+      "billing": "Billing",
       "business": "Business",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",

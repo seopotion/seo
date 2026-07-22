@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import type { FormEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Input, Label } from '@/components/ui';
+import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
@@ -269,6 +270,9 @@ export function ResearchKeywordsModal({
           <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 px-5 py-6 text-center">
             <h3 className="font-semibold text-amber-950">{t('upgrade.title')}</h3>
             <p className="mt-2 text-amber-800 text-sm">{t('upgrade.description')}</p>
+            <Button asChild className="mt-4" size="sm">
+              <Link href="/billing">{t('upgrade.cta')}</Link>
+            </Button>
           </div>
         </div>
       ) : (
