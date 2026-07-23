@@ -34,7 +34,7 @@ export default function OnboardingPage() {
   const locale = useLocale();
   const t = useTranslations('Onboarding');
   const validationT = useTranslations('Onboarding.validation') as ValidationTranslator;
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(2);
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [orgId, setOrgId] = useState<string | null>(null);

@@ -721,7 +721,7 @@
     "audience": {
       "competitorUrls": "Rakip web sitesi URL'leri",
       "targetAudience": "Hedef kitle",
-      "targetAudiencePlaceholder": "SaaS kurucuları",
+      "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
     },
     "blog": {
@@ -844,7 +844,7 @@
     },
     "websiteScan": {
       "completeMessage": "Tarama tamamlandı. Oluşturulan kurulum detayları sonraki adımlara eklendi.",
-      "description": "Seopotion'ın öğrenmesini istediğiniz siteyle başlayın.",
+      "description": "İşletme web sitenizi tarayarak başlayalım",
       "orgStatus": "Org {orgId}",
       "scanButton": "Web sitesini tara",
       "scanningButton": "Taranıyor...",

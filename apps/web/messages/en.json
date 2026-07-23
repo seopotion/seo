@@ -721,7 +721,7 @@
     "audience": {
       "competitorUrls": "Competitor website URLs",
       "targetAudience": "Target audience",
-      "targetAudiencePlaceholder": "SaaS founders",
+      "targetAudiencePlaceholder": "",
       "title": "Target Audience And Competitors"
     },
     "blog": {
@@ -844,7 +844,7 @@
     },
     "websiteScan": {
       "completeMessage": "Scan complete. Generated setup details have been added to the next steps.",
-      "description": "Start with the site Seopotion should learn from.",
+      "description": "Let's start with scanning your business website",
       "orgStatus": "Org {orgId}",
       "scanButton": "Scan website",
       "scanningButton": "Scanning...",
