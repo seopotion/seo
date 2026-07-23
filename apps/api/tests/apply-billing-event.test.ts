@@ -15,12 +15,15 @@ vi.mock('@shared/db', () => ({
   OrgRepo: { setPlan },
 }));
 
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+vi.mock('../src/logger', () => ({ logger: { warn } }));
+
 import { applyBillingEvent } from '../src/lib/billing/apply-event';
 
 const periodEnd = new Date('2026-08-22T00:00:00Z');
 
 const cancelSubscription = vi.fn();
-const provider = { cancelSubscription } as unknown as BillingProvider;
+const provider = { name: 'lemonsqueezy', cancelSubscription } as unknown as BillingProvider;
 
 const activated = {
   type: 'subscription_activated',
@@ -132,7 +135,7 @@ describe('applyBillingEvent', () => {
     expect(setPlan).not.toHaveBeenCalledWith('o1', 'free');
   });
 
-  test('lookup miss on expired: no throw, no setPlan', async () => {
+  test('lookup miss on expired: no throw, no setPlan, logged', async () => {
     updateFromEvent.mockResolvedValueOnce(null);
     await expect(
       applyBillingEvent(
@@ -141,6 +144,10 @@ describe('applyBillingEvent', () => {
       ),
     ).resolves.toBeUndefined();
     expect(setPlan).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ provider_subscription_id: 'ghost' }),
+    );
   });
 
   test('lookup miss on updated: no throw, no setPlan', async () => {

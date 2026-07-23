@@ -13,20 +13,19 @@ async function resolveSecret(paramName: string, fallback: string): Promise<strin
   return value;
 }
 
-let cached: BillingProvider | undefined;
-
 /**
- * Module-scoped LemonSqueezy provider (warm-reuse across Lambda invocations).
- * Secrets resolve via SSM in deployed envs, plain env vars locally. API Lambda
- * only — the worker is never granted these params.
+ * LemonSqueezy provider with secrets resolved via SSM in deployed envs, plain
+ * env vars locally. Built per call (construction is cheap) so a rotated
+ * SecureString takes effect once Powertools' ~1h cache expires — do NOT cache
+ * the provider itself; it closes over the secrets. API Lambda only — the
+ * worker is never granted these params.
  */
 export async function getBillingProvider(): Promise<BillingProvider> {
-  if (cached) return cached;
   const [apiKey, webhookSecret] = await Promise.all([
     resolveSecret(config.LEMONSQUEEZY_API_KEY_PARAM, config.LEMONSQUEEZY_API_KEY),
     resolveSecret(config.LEMONSQUEEZY_WEBHOOK_SECRET_PARAM, config.LEMONSQUEEZY_WEBHOOK_SECRET),
   ]);
-  cached = createLemonSqueezyProvider({
+  return createLemonSqueezyProvider({
     apiKey,
     webhookSecret,
     storeId: config.LEMONSQUEEZY_STORE_ID,
@@ -34,6 +33,7 @@ export async function getBillingProvider(): Promise<BillingProvider> {
       paid: config.LEMONSQUEEZY_VARIANT_PAID,
       expert: config.LEMONSQUEEZY_VARIANT_EXPERT,
     },
+    // The page that polls entitlement after checkout — see apps/web /billing.
+    redirectUrl: `${config.WEB_ORIGIN}/billing?checkout=success`,
   });
-  return cached;
 }

@@ -10,6 +10,16 @@ export interface LemonSqueezyConfig {
   webhookSecret: string;
   storeId: string;
   variantByTier: Record<PaidTier, string>;
+  /** Where checkout sends the buyer afterwards (the app's activation page). */
+  redirectUrl: string;
+}
+
+/** LS date fields can be null (e.g. `renews_at` after cancellation) — never
+ * let those become epoch/Invalid Dates. */
+function parseDate(value: unknown): Date | undefined {
+  if (typeof value !== 'string') return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 /** Map a LemonSqueezy subscription status to our neutral status. */
@@ -53,6 +63,7 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
             type: 'checkouts',
             attributes: {
               checkout_data: { email: userEmail, custom: { org_id: orgId } },
+              product_options: { redirect_url: cfg.redirectUrl },
             },
             relationships: {
               store: { data: { type: 'stores', id: cfg.storeId } },
@@ -76,34 +87,44 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
     },
 
     parseWebhookEvent(rawBody) {
-      const payload = JSON.parse(rawBody) as {
-        meta: { event_name: string; custom_data?: { org_id?: string } };
-        data: {
-          id: string;
-          attributes: {
-            customer_id: number;
-            variant_id: number;
-            status: string;
-            renews_at: string;
+      // The signature only proves the sender; the shape is still untrusted.
+      // Anything malformed is an ignore (null), never a throw — a throw would
+      // 500 and put the provider into a pointless retry loop.
+      let payload: {
+        meta?: { event_name?: unknown; custom_data?: { org_id?: string } };
+        data?: {
+          id?: unknown;
+          attributes?: {
+            customer_id?: unknown;
+            variant_id?: unknown;
+            status?: unknown;
+            renews_at?: unknown;
           };
         };
-      };
-      const event = payload.meta.event_name;
-      const subId = payload.data.id;
-      const attrs = payload.data.attributes;
+      } | null;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        return null;
+      }
+      const event = payload?.meta?.event_name;
+      const subId = payload?.data?.id;
+      const attrs = payload?.data?.attributes;
+      if (typeof event !== 'string' || typeof subId !== 'string' || !attrs) return null;
 
       switch (event) {
         case 'subscription_created': {
           const tier = tierByVariant.get(String(attrs.variant_id));
-          const orgId = payload.meta.custom_data?.org_id;
-          if (!tier || !orgId) return null;
+          const orgId = payload?.meta?.custom_data?.org_id;
+          const currentPeriodEnd = parseDate(attrs.renews_at);
+          if (!tier || !orgId || !currentPeriodEnd) return null;
           return {
             type: 'subscription_activated',
             orgId,
             providerCustomerId: String(attrs.customer_id),
             providerSubscriptionId: subId,
             tier,
-            currentPeriodEnd: new Date(attrs.renews_at),
+            currentPeriodEnd,
           };
         }
         case 'subscription_updated': {
@@ -113,8 +134,8 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
             type: 'subscription_updated',
             providerSubscriptionId: subId,
             tier,
-            status: mapStatus(attrs.status),
-            currentPeriodEnd: new Date(attrs.renews_at),
+            status: mapStatus(String(attrs.status)),
+            currentPeriodEnd: parseDate(attrs.renews_at),
           };
         }
         case 'subscription_cancelled':

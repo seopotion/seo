@@ -47,6 +47,41 @@ describe('SubscriptionRepo (integration)', () => {
     expect(await SubscriptionRepo.findActiveByOrg('o1')).toBeNull();
   });
 
+  test('updateFromEvent never moves a sub out of expired (late/retried events)', async () => {
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o5', provider_subscription_id: 'sub_5', status: 'active' }),
+    );
+    await SubscriptionRepo.updateFromEvent({
+      provider_subscription_id: 'sub_5',
+      status: 'expired',
+    });
+    // A delayed `updated (active)` retry delivered after expiry must not
+    // resurrect the sub (it would re-grant a free entitlement).
+    expect(
+      await SubscriptionRepo.updateFromEvent({
+        provider_subscription_id: 'sub_5',
+        status: 'active',
+      }),
+    ).toBeNull();
+    expect(
+      await SubscriptionRepo.updateFromEvent({
+        provider_subscription_id: 'sub_5',
+        status: 'cancelled',
+      }),
+    ).toBeNull();
+    expect((await SubscriptionRepo.findByProviderSubscriptionId('sub_5'))?.status).toBe('expired');
+    // Re-setting expired (an at-least-once replay) still matches, so the
+    // applier's downgrade path stays idempotent.
+    expect(
+      (
+        await SubscriptionRepo.updateFromEvent({
+          provider_subscription_id: 'sub_5',
+          status: 'expired',
+        })
+      )?.status,
+    ).toBe('expired');
+  });
+
   test('updateFromEvent returns null for an unknown subscription', async () => {
     expect(
       await SubscriptionRepo.updateFromEvent({

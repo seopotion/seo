@@ -7,6 +7,7 @@ const cfg = {
   webhookSecret: 'whsec_test',
   storeId: '111',
   variantByTier: { paid: '201', expert: '202' } as const,
+  redirectUrl: 'https://app.example.com/billing?checkout=success',
 };
 const provider = createLemonSqueezyProvider(cfg);
 
@@ -20,6 +21,7 @@ const wh = (over: {
   orgId?: string;
   subId?: string;
   customerId?: number;
+  renewsAt?: string | null;
 }) =>
   JSON.stringify({
     meta: {
@@ -32,7 +34,7 @@ const wh = (over: {
         customer_id: over.customerId ?? 55,
         variant_id: Number(over.variantId ?? '201'),
         status: over.status ?? 'active',
-        renews_at: '2026-08-22T00:00:00.000000Z',
+        renews_at: over.renewsAt === undefined ? '2026-08-22T00:00:00.000000Z' : over.renewsAt,
       },
     },
   });
@@ -102,6 +104,31 @@ describe('lemonsqueezy parseWebhookEvent', () => {
   test('unhandled event name -> null', () => {
     expect(provider.parseWebhookEvent(wh({ event: 'order_created' }))).toBeNull();
   });
+  test('malformed payloads -> null, never a throw', () => {
+    expect(provider.parseWebhookEvent('not json at all')).toBeNull();
+    expect(provider.parseWebhookEvent('{}')).toBeNull();
+    expect(provider.parseWebhookEvent('{"meta":{},"data":{}}')).toBeNull();
+    expect(provider.parseWebhookEvent('null')).toBeNull();
+  });
+  test('null renews_at on updated (e.g. cancelled) -> event without currentPeriodEnd', () => {
+    const e = provider.parseWebhookEvent(
+      wh({ event: 'subscription_updated', status: 'cancelled', subId: 'sub_9', renewsAt: null }),
+    );
+    expect(e).toEqual({
+      type: 'subscription_updated',
+      providerSubscriptionId: 'sub_9',
+      tier: 'paid',
+      status: 'cancelled',
+      currentPeriodEnd: undefined,
+    });
+  });
+  test('missing/invalid renews_at on created -> null (never store a garbage period end)', () => {
+    expect(
+      provider.parseWebhookEvent(
+        wh({ event: 'subscription_created', orgId: 'o1', renewsAt: null }),
+      ),
+    ).toBeNull();
+  });
 });
 
 describe('lemonsqueezy cancelSubscription', () => {
@@ -141,6 +168,7 @@ describe('lemonsqueezy createCheckout', () => {
     const sent = JSON.parse(String(init?.body));
     expect(sent.data.attributes.checkout_data.custom).toEqual({ org_id: 'o1' });
     expect(sent.data.attributes.checkout_data.email).toBe('u@e.com');
+    expect(sent.data.attributes.product_options.redirect_url).toBe(cfg.redirectUrl);
     expect(sent.data.relationships.variant.data.id).toBe('201');
   });
 });

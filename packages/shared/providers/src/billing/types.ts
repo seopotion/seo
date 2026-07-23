@@ -23,7 +23,9 @@ export type BillingEvent =
       providerSubscriptionId: string;
       tier: PaidTier;
       status: SubscriptionStatus;
-      currentPeriodEnd: Date;
+      /** Absent when the provider carries no (valid) renewal date — e.g.
+       * LemonSqueezy nulls `renews_at` once a subscription is cancelled. */
+      currentPeriodEnd?: Date;
     }
   | { type: 'subscription_cancelled'; providerSubscriptionId: string }
   | { type: 'subscription_expired'; providerSubscriptionId: string };

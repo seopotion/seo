@@ -86,6 +86,10 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    gh variable set LEMONSQUEEZY_VARIANT_EXPERT_PROD    --repo seopotion/seo --body '<prod-expert-variant-id>'
    ```
 
+   The post-checkout redirect URL needs no store-level configuration: the API
+   sets it per checkout to `<WEB_ORIGIN>/billing?checkout=success`, so it is
+   stage-aware automatically.
+
 4. **GitHub OIDC provider + deploy role** — see [GitHub OIDC deploy
    role](#github-oidc-deploy-role) below. Store its ARN and the account id as
    secrets:
@@ -196,9 +200,11 @@ Before deploying, confirm the out-of-band items for a stage are actually in
 place. The preflight checks that all six SSM SecureStrings exist (jwt-secret,
 mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
 lemonsqueezy-webhook-secret — presence only, it does not decrypt them) and
-that `GOOGLE_CLIENT_ID_<STAGE>` and `WEB_ORIGIN_<STAGE>` are set — the same
-names the stack reads at synth/runtime — so a missing or mis-pathed
-prerequisite is caught before it ships as broken Lambda config.
+that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
+`LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
+`LEMONSQUEEZY_VARIANT_EXPERT_<STAGE>` are set — the same names the stack reads
+at synth/runtime — so a missing or mis-pathed prerequisite is caught before it
+ships as broken Lambda config.
 
 Run it with AWS credentials for the target account and both env vars set
 (this is the same check the deploy CI runs before `cdk deploy`):

@@ -17,6 +17,28 @@ function toEntity(doc: WithId<Document>): Subscription {
 
 type UpsertInput = Omit<CreateSubscriptionInput, 'created_at' | 'updated_at'>;
 
+async function upsertOnce(input: UpsertInput): Promise<Subscription> {
+  const now = new Date();
+  const res = await (await collection()).findOneAndUpdate(
+    { provider_subscription_id: input.provider_subscription_id },
+    {
+      $set: {
+        org_id: input.org_id,
+        provider: input.provider,
+        provider_customer_id: input.provider_customer_id,
+        tier: input.tier,
+        status: input.status,
+        current_period_end: input.current_period_end,
+        updated_at: now,
+      },
+      $setOnInsert: { created_at: now },
+    },
+    { upsert: true, returnDocument: 'after' },
+  );
+  if (!res) throw new Error('upsertFromEvent: no document returned');
+  return toEntity(res);
+}
+
 export const SubscriptionRepo = {
   async findByProviderSubscriptionId(providerSubscriptionId: string): Promise<Subscription | null> {
     const doc = await (await collection()).findOne({
@@ -54,25 +76,15 @@ export const SubscriptionRepo = {
    * replays converge to the same doc. Returns the resulting entity.
    */
   async upsertFromEvent(input: UpsertInput): Promise<Subscription> {
-    const now = new Date();
-    const res = await (await collection()).findOneAndUpdate(
-      { provider_subscription_id: input.provider_subscription_id },
-      {
-        $set: {
-          org_id: input.org_id,
-          provider: input.provider,
-          provider_customer_id: input.provider_customer_id,
-          tier: input.tier,
-          status: input.status,
-          current_period_end: input.current_period_end,
-          updated_at: now,
-        },
-        $setOnInsert: { created_at: now },
-      },
-      { upsert: true, returnDocument: 'after' },
-    );
-    if (!res) throw new Error('upsertFromEvent: no document returned');
-    return toEntity(res);
+    try {
+      return await upsertOnce(input);
+    } catch (err) {
+      // Two concurrent first deliveries can race the upsert into a
+      // duplicate-key error on the unique provider_subscription_id index; the
+      // retry finds the now-existing doc and updates it in place.
+      if ((err as { code?: number }).code !== 11000) throw err;
+      return await upsertOnce(input);
+    }
   },
 
   /**
@@ -89,8 +101,16 @@ export const SubscriptionRepo = {
     const set: Record<string, unknown> = { status: input.status, updated_at: new Date() };
     if (input.tier) set.tier = input.tier;
     if (input.current_period_end) set.current_period_end = input.current_period_end;
+    // `expired` is terminal: webhooks are at-least-once and unordered, so a
+    // late/retried non-expired event must not resurrect an expired sub (it
+    // would re-grant entitlement for free). Re-setting `expired` still matches
+    // so the applier's downgrade stays idempotent under replays.
+    const filter: Record<string, unknown> = {
+      provider_subscription_id: input.provider_subscription_id,
+    };
+    if (input.status !== 'expired') filter.status = { $ne: 'expired' };
     const res = await (await collection()).findOneAndUpdate(
-      { provider_subscription_id: input.provider_subscription_id },
+      filter,
       { $set: set },
       { returnDocument: 'after' },
     );

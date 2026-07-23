@@ -1,5 +1,16 @@
 import { OrgRepo, SubscriptionRepo } from '@shared/db';
 import type { BillingEvent, BillingProvider } from '@shared/providers';
+import { logger } from '../../logger';
+
+/** Non-activation events can reference a sub we never stored (e.g. one created
+ * outside our checkout flow, or events racing ahead of `created`). Ignored, but
+ * loudly — if it recurs, someone is paying without getting entitled. */
+function warnUnknownSub(type: BillingEvent['type'], providerSubscriptionId: string): void {
+  logger.warn('billing event ignored: unknown subscription', {
+    type,
+    provider_subscription_id: providerSubscriptionId,
+  });
+}
 
 /**
  * Apply a provider-neutral billing event: the sole writer of both the
@@ -20,7 +31,7 @@ export async function applyBillingEvent(
     case 'subscription_activated': {
       await SubscriptionRepo.upsertFromEvent({
         org_id: event.orgId,
-        provider: 'lemonsqueezy',
+        provider: provider.name,
         provider_customer_id: event.providerCustomerId,
         provider_subscription_id: event.providerSubscriptionId,
         tier: event.tier,
@@ -48,7 +59,7 @@ export async function applyBillingEvent(
         status: event.status,
         current_period_end: event.currentPeriodEnd,
       });
-      if (!sub) return; // never-seen subscription: logged no-op
+      if (!sub) return warnUnknownSub(event.type, event.providerSubscriptionId);
       // active or past_due (dunning) keep access; cancelled/expired arrive via
       // their own events, so we don't downgrade here.
       if (event.status === 'active' || event.status === 'past_due') {
@@ -58,10 +69,11 @@ export async function applyBillingEvent(
     }
     case 'subscription_cancelled': {
       // Status change only — access lasts until `expired`.
-      await SubscriptionRepo.updateFromEvent({
+      const sub = await SubscriptionRepo.updateFromEvent({
         provider_subscription_id: event.providerSubscriptionId,
         status: 'cancelled',
       });
+      if (!sub) warnUnknownSub(event.type, event.providerSubscriptionId);
       return;
     }
     case 'subscription_expired': {
@@ -69,7 +81,7 @@ export async function applyBillingEvent(
         provider_subscription_id: event.providerSubscriptionId,
         status: 'expired',
       });
-      if (!sub) return;
+      if (!sub) return warnUnknownSub(event.type, event.providerSubscriptionId);
       // Only downgrade when nothing else is active — a superseded sub expiring
       // after an upgrade must not drop an org that is paying for another tier.
       const active = await SubscriptionRepo.findActiveByOrg(sub.org_id);
