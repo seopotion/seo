@@ -5,6 +5,39 @@
     "retry": "Tekrar dene",
     "workspaceError": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin."
   },
+  "BillingPage": {
+    "activating": {
+      "continue": "Panele devam et",
+      "error": "Abonelik durumunuz kontrol edilemedi. Tekrar deneyin.",
+      "message": "Aboneliğiniz etkinleştiriliyor…",
+      "retry": "Tekrar dene",
+      "timeout": "Bu beklenenden uzun sürüyor. Panelinize devam edebilirsiniz — yükseltme onaylanır onaylanmaz uygulanacaktır."
+    },
+    "description": "Planınızı yükselterek anahtar kelime araştırması ve planlamasının kilidini açın.",
+    "errors": {
+      "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
+      "generic": "Ödeme başlatılamadı. Tekrar deneyin."
+    },
+    "redirecting": "Yönlendiriliyor…",
+    "status": {
+      "loading": "Organizasyonunuz yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+    },
+    "tiers": {
+      "expert": {
+        "cta": "Expert-led Growth planına yükselt",
+        "description": "Growth planındaki her şeye ek olarak, içerik stratejiniz için uzman desteği.",
+        "name": "Expert-led Growth"
+      },
+      "paid": {
+        "cta": "Growth planına yükselt",
+        "description": "Anahtar kelime araştırması, planlaması ve içerik takviminizin kilidini açın.",
+        "name": "Growth"
+      }
+    },
+    "title": "Planınızı seçin"
+  },
   "GoogleJoinButton": {
     "checkingWorkspace": "Çalışma alanı kontrol ediliyor...",
     "label": "Google ile katıl",
@@ -138,6 +171,7 @@
       "tableLabel": "Kullanılabilir hedef anahtar kelimeler",
       "title": "{date} için bir anahtar kelime seç",
       "upgrade": {
+        "cta": "Yükselt",
         "description": "Hedef anahtar kelimeleri içerik takviminizde planlamak için ücretli bir plana yükseltin.",
         "title": "Anahtar kelime planlama ücretli bir özelliktir"
       }
@@ -272,6 +306,7 @@
       },
       "title": "Anahtar Kelime Araştır",
       "upgrade": {
+        "cta": "Yükselt",
         "description": "Anahtar kelime araştırmak ve içerik planınıza eklemek için ücretli bir plana yükseltin.",
         "title": "Anahtar kelime araştırması ücretli bir özelliktir"
       }
@@ -462,6 +497,14 @@
       "save": "Kaydet",
       "saving": "Kaydediliyor..."
     },
+    "billing": {
+      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
+      "freeDescription": "Anahtar kelime araştırması ve planlamasının kilidini açmak için yükseltin.",
+      "manage": "Faturalandırmayı yönet",
+      "manageError": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
+      "opening": "Açılıyor...",
+      "upgradeCta": "Planları görüntüle"
+    },
     "googleSearchConsole": {
       "badges": { "connected": "Bağlı", "notConnected": "Bağlı değil" },
       "benefit1": "Son 28 günün tıklama, gösterim, TO ve ortalama konum verileri",
@@ -500,6 +543,7 @@
     },
     "tabs": {
       "audienceCompetitors": "Hedef Kitle ve Rakipler",
+      "billing": "Faturalandırma",
       "business": "İşletme",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",

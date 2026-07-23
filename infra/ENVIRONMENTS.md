@@ -33,6 +33,17 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    aws ssm put-parameter --name /seo/prod/gsc-token-key           --type SecureString --value "$(openssl rand -base64 32)"
    ```
 
+   Billing (#13) needs two more SecureStrings per stage: the LemonSqueezy
+   **API key** (used server-side for checkout/portal calls) and the
+   **webhook signing secret** (used to verify incoming LemonSqueezy webhooks):
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/lemonsqueezy-api-key         --type SecureString --value '<ls_api_key>'
+   aws ssm put-parameter --name /seo/staging/lemonsqueezy-webhook-secret  --type SecureString --value '<ls_webhook_secret>'
+   aws ssm put-parameter --name /seo/prod/lemonsqueezy-api-key            --type SecureString --value '<ls_api_key>'
+   aws ssm put-parameter --name /seo/prod/lemonsqueezy-webhook-secret     --type SecureString --value '<ls_webhook_secret>'
+   ```
+
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
    clients](#google-oauth-clients) below. Set each as a GitHub Actions repo
    **variable** `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` (public, not
@@ -58,6 +69,26 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    The resulting `<web origin>/dashboard/gsc/callback` redirect URI must also
    be registered as an **Authorized redirect URI** on the same stage's Google
    OAuth client (see [Google OAuth clients](#google-oauth-clients) below).
+
+   Billing (#13) also needs three public LemonSqueezy values per stage — the
+   store id and the two subscription variant ids (paid, expert) — baked into
+   the Lambda env at synth time (`infra/lib/config.ts`'s `lemonSqueezyStoreId`
+   / `lemonSqueezyVariantPaid` / `lemonSqueezyVariantExpert`; an unset var
+   silently falls back to an empty string). Set them as GitHub Actions repo
+   variables the same way:
+
+   ```sh
+   gh variable set LEMONSQUEEZY_STORE_ID_STAGING      --repo seopotion/seo --body '<staging-store-id>'
+   gh variable set LEMONSQUEEZY_VARIANT_PAID_STAGING  --repo seopotion/seo --body '<staging-paid-variant-id>'
+   gh variable set LEMONSQUEEZY_VARIANT_EXPERT_STAGING --repo seopotion/seo --body '<staging-expert-variant-id>'
+   gh variable set LEMONSQUEEZY_STORE_ID_PROD         --repo seopotion/seo --body '<prod-store-id>'
+   gh variable set LEMONSQUEEZY_VARIANT_PAID_PROD     --repo seopotion/seo --body '<prod-paid-variant-id>'
+   gh variable set LEMONSQUEEZY_VARIANT_EXPERT_PROD    --repo seopotion/seo --body '<prod-expert-variant-id>'
+   ```
+
+   The post-checkout redirect URL needs no store-level configuration: the API
+   sets it per checkout to `<WEB_ORIGIN>/billing?checkout=success`, so it is
+   stage-aware automatically.
 
 4. **GitHub OIDC provider + deploy role** — see [GitHub OIDC deploy
    role](#github-oidc-deploy-role) below. Store its ARN and the account id as
@@ -166,11 +197,14 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the out-of-band items for a stage are actually in
-place. The preflight checks that all four SSM SecureStrings exist (jwt-secret,
-mongo-uri, google-client-secret, gsc-token-key — presence only, it does not
-decrypt them) and that `GOOGLE_CLIENT_ID_<STAGE>` and `WEB_ORIGIN_<STAGE>` are
-set — the same names the stack reads at synth/runtime — so a missing or
-mis-pathed prerequisite is caught before it ships as broken Lambda config.
+place. The preflight checks that all six SSM SecureStrings exist (jwt-secret,
+mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
+lemonsqueezy-webhook-secret — presence only, it does not decrypt them) and
+that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
+`LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
+`LEMONSQUEEZY_VARIANT_EXPERT_<STAGE>` are set — the same names the stack reads
+at synth/runtime — so a missing or mis-pathed prerequisite is caught before it
+ships as broken Lambda config.
 
 Run it with AWS credentials for the target account and both env vars set
 (this is the same check the deploy CI runs before `cdk deploy`):

@@ -27,6 +27,12 @@ beforeEach(() => {
   process.env.GOOGLE_CLIENT_ID_PROD = 'prod-client.apps.googleusercontent.com';
   process.env.WEB_ORIGIN_STAGING = 'https://app-staging.seopotion.co';
   process.env.WEB_ORIGIN_PROD = 'https://app.seopotion.co';
+  process.env.LEMONSQUEEZY_STORE_ID_STAGING = 'store_staging';
+  process.env.LEMONSQUEEZY_STORE_ID_PROD = 'store_prod';
+  process.env.LEMONSQUEEZY_VARIANT_PAID_STAGING = 'variant_paid_staging';
+  process.env.LEMONSQUEEZY_VARIANT_PAID_PROD = 'variant_paid_prod';
+  process.env.LEMONSQUEEZY_VARIANT_EXPERT_STAGING = 'variant_expert_staging';
+  process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD = 'variant_expert_prod';
 });
 
 afterEach(() => {
@@ -35,6 +41,12 @@ afterEach(() => {
   delete process.env.GOOGLE_CLIENT_ID_PROD;
   delete process.env.WEB_ORIGIN_STAGING;
   delete process.env.WEB_ORIGIN_PROD;
+  delete process.env.LEMONSQUEEZY_STORE_ID_STAGING;
+  delete process.env.LEMONSQUEEZY_STORE_ID_PROD;
+  delete process.env.LEMONSQUEEZY_VARIANT_PAID_STAGING;
+  delete process.env.LEMONSQUEEZY_VARIANT_PAID_PROD;
+  delete process.env.LEMONSQUEEZY_VARIANT_EXPERT_STAGING;
+  delete process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD;
 });
 
 describe('preflight', () => {
@@ -48,13 +60,19 @@ describe('preflight', () => {
     expect(res.data.checks.every((c) => c.present)).toBe(true);
     // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
     expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
-    // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, and the two env vars.
+    // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
+    // lemonsqueezy-webhook-secret, and the five public env vars.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
       '/seo/staging/google-client-secret',
       '/seo/staging/gsc-token-key',
       '/seo/staging/jwt-secret',
+      '/seo/staging/lemonsqueezy-api-key',
+      '/seo/staging/lemonsqueezy-webhook-secret',
       '/seo/staging/mongo-uri',
       'GOOGLE_CLIENT_ID_STAGING',
+      'LEMONSQUEEZY_STORE_ID_STAGING',
+      'LEMONSQUEEZY_VARIANT_EXPERT_STAGING',
+      'LEMONSQUEEZY_VARIANT_PAID_STAGING',
       'WEB_ORIGIN_STAGING',
     ]);
   });
@@ -68,8 +86,13 @@ describe('preflight', () => {
       '/seo/prod/google-client-secret',
       '/seo/prod/gsc-token-key',
       '/seo/prod/jwt-secret',
+      '/seo/prod/lemonsqueezy-api-key',
+      '/seo/prod/lemonsqueezy-webhook-secret',
       '/seo/prod/mongo-uri',
       'GOOGLE_CLIENT_ID_PROD',
+      'LEMONSQUEEZY_STORE_ID_PROD',
+      'LEMONSQUEEZY_VARIANT_EXPERT_PROD',
+      'LEMONSQUEEZY_VARIANT_PAID_PROD',
       'WEB_ORIGIN_PROD',
     ]);
   });
