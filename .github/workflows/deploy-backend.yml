@@ -48,6 +48,9 @@ jobs:
           AWS_REGION: us-east-1
           GOOGLE_CLIENT_ID_STAGING: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
           WEB_ORIGIN_STAGING: ${{ vars.WEB_ORIGIN_STAGING }}
+          LEMONSQUEEZY_STORE_ID_STAGING: ${{ vars.LEMONSQUEEZY_STORE_ID_STAGING }}
+          LEMONSQUEEZY_VARIANT_PAID_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_STAGING }}
+          LEMONSQUEEZY_VARIANT_EXPERT_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_STAGING }}
         run: npm run cli -- infra preflight --stage staging --output json
 
       - name: Install infra deps
@@ -61,6 +64,11 @@ jobs:
           # GSC OAuth redirect URI base, baked into the API Lambda at synth time
           # (infra/lib/config.ts webOrigin; preflight above verifies it's set).
           WEB_ORIGIN_STAGING: ${{ vars.WEB_ORIGIN_STAGING }}
+          # LemonSqueezy public config (#13), baked into the API Lambda at synth
+          # time (infra/lib/config.ts; preflight above verifies they're set).
+          LEMONSQUEEZY_STORE_ID_STAGING: ${{ vars.LEMONSQUEEZY_STORE_ID_STAGING }}
+          LEMONSQUEEZY_VARIANT_PAID_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_STAGING }}
+          LEMONSQUEEZY_VARIANT_EXPERT_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_STAGING }}
           # Provider secrets baked into the worker Lambdas at synth time
           # (infra/lib/api-stack.ts providerEnv; SSM provisioning deferred — #9/#43).
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
