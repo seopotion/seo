@@ -35,6 +35,12 @@ describe('resolveConfig', () => {
     expect(c.locationName).toBe('United States');
   });
 
+  it('SERP-validates more than a full 30-day plan by default', () => {
+    // The strategy worker schedules 30 entries (PLAN_DAYS); every one of them
+    // should come from the SERP-validated top-N, with buffer for rejections.
+    expect(DEFAULT_CONFIG.serpTopN).toBeGreaterThanOrEqual(40);
+  });
+
   it('caller overrides win and merge deeply', () => {
     const c = resolveConfig(presets, { serpTopN: 5, weights: { volume: 0.9 } as never });
     expect(c.serpTopN).toBe(5);

@@ -167,6 +167,38 @@ describe('keywordsForSite', () => {
       { target: 'clewas.com' },
     ]);
   });
+
+  // Real depleted-account response observed 2026-07-23: HTTP 402 with a normal
+  // envelope whose task carries 40200 "Payment Required." — the task message
+  // must survive into the error, and the call must not be retried.
+  test('HTTP 402 reads the body task error: payment_required, message kept, no retry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status_code: 20000,
+          status_message: 'Ok.',
+          tasks: [{ status_code: 40200, status_message: 'Payment Required.' }],
+        }),
+        { status: 402 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(client().keywordsForSite({ target: 'x' })).rejects.toMatchObject({
+      name: 'DataForSeoError',
+      category: 'payment_required',
+      message: expect.stringContaining('Payment Required.'),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('HTTP 402 without a parseable body still maps to payment_required', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('nope', { status: 402 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(client().keywordsForSite({ target: 'x' })).rejects.toMatchObject({
+      category: 'payment_required',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 function serpResponse(items: unknown[]) {

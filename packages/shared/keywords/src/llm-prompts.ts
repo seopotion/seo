@@ -24,7 +24,11 @@ function tryParse(text: string): unknown {
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
 // ---- seeds ----
-export function buildSeedPrompt(presets: SetupPresets): LlmMessage[] {
+export function buildSeedPrompt(presets: SetupPresets, competitorWins: string[]): LlmMessage[] {
+  const wins =
+    competitorWins.length > 0
+      ? `\n\nKeywords competitors already rank for:\n${JSON.stringify(competitorWins)}`
+      : '';
   return [
     {
       role: 'system',
@@ -32,7 +36,7 @@ export function buildSeedPrompt(presets: SetupPresets): LlmMessage[] {
         'You generate SEO seed keywords. Respond ONLY with JSON: {"seeds": string[]}. ' +
         'Return 10-20 short, generic topic seeds relevant to the business. No brand names.',
     },
-    { role: 'user', content: businessContext(presets) },
+    { role: 'user', content: `${businessContext(presets)}${wins}` },
   ];
 }
 

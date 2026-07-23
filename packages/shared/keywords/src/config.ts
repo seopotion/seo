@@ -4,7 +4,9 @@ import type { PipelineConfig, ResolvedConfig } from './types';
 /** Defaults for everything except location/language, which come from presets. */
 export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName'> = {
   difficultyCeiling: 45,
-  serpTopN: 20,
+  // Must exceed the worker's 30-day plan so every scheduled entry is
+  // SERP-validated + classified, with buffer for SERP rejections.
+  serpTopN: 40,
   serpDepth: 20,
   serpTopK: 10,
   volumeCap: 10_000,

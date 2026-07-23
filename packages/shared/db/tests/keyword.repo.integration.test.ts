@@ -160,7 +160,9 @@ describe('KeywordRepo (integration)', () => {
         intent: 'commercial',
         article_type: 'comparison',
         opportunity_score: 0.9,
-        serp_competitors: ['a.com'],
+        serp_competitors: [
+          { rank: 1, url: 'https://a.com/crm', domain: 'a.com', title: 'Best CRMs' },
+        ],
       },
     ]);
 
@@ -175,7 +177,9 @@ describe('KeywordRepo (integration)', () => {
     expect(kw.article_type).toBe('comparison');
     expect(kw.intent).toBe('commercial');
     expect(kw.opportunity_score).toBe(0.9);
-    expect(kw.serp_competitors).toEqual(['a.com']);
+    expect(kw.serp_competitors).toEqual([
+      { rank: 1, url: 'https://a.com/crm', domain: 'a.com', title: 'Best CRMs' },
+    ]);
     expect(kw.article_id).toBeNull();
     expect(kw.generation_status).toBe('pending');
 

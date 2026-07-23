@@ -5,6 +5,7 @@ import type {
   CandidateStatus,
   RejectionReason,
   SearchIntent,
+  SerpCompetitor,
   SetupPresets,
 } from '@shared/schemas';
 
@@ -25,7 +26,7 @@ export interface WorkingCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
-  serp_competitors: string[] | null;
+  serp_competitors: SerpCompetitor[] | null;
 }
 
 /** Pipeline output — assignable to `CreateCandidateInput` (repo derives normalized_keyword). */
@@ -45,7 +46,7 @@ export interface EnrichedCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
-  serp_competitors: string[] | null;
+  serp_competitors: SerpCompetitor[] | null;
 }
 
 export interface ScoreWeights {

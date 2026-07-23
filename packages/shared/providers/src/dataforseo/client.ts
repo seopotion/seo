@@ -128,8 +128,22 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     }
 
     if (!res.ok) {
-      const category = categorizeHttpStatus(res.status);
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})`);
+      // DataForSEO mirrors body/task errors in the HTTP status (e.g. 402 for a
+      // 40200 "Payment Required." task) — read the body when it's JSON so the
+      // error keeps the provider's precise category and status_message.
+      const errBody = (await res.json().catch(() => null)) as {
+        status_code?: number;
+        status_message?: string;
+        tasks?: Array<{ status_code?: number; status_message?: string }>;
+      } | null;
+      const src = [errBody?.tasks?.[0], errBody].find(
+        (s) => typeof s?.status_code === 'number' && s.status_code >= 30000,
+      );
+      const category = src?.status_code
+        ? categorizeApiStatus(src.status_code)
+        : categorizeHttpStatus(res.status);
+      const suffix = src?.status_message ? `: ${src.status_message}` : '';
+      throw new DataForSeoError(category, `DataForSEO request failed (${category})${suffix}`);
     }
 
     const body = (await res.json()) as {
