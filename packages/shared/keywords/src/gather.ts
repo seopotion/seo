@@ -4,6 +4,9 @@ import { buildSeedPrompt, parseSeeds } from './llm-prompts';
 import { toWorking } from './normalize';
 import type { ResolvedConfig, WorkingCandidate } from './types';
 
+// Top competitor-ranked keywords fed to the seed prompt as extra context.
+const SEED_COMPETITOR_WINS = 30;
+
 interface GatherInput {
   websiteUrl: string;
   competitors: string[];
@@ -26,17 +29,25 @@ export async function gatherCandidates(
   });
   for (const m of site) out.push(toWorking(m, 'keywords_for_site', input.websiteUrl));
 
+  const competitorWins: { keyword: string; search_volume: number | null }[] = [];
   for (const competitor of input.competitors) {
     const ranked = await dataForSeo.rankedKeywords({
       target: competitor,
       limit: config.endpointLimits.rankedKeywords,
       ...geo,
     });
-    for (const m of ranked) out.push(toWorking(m, 'ranked_keywords', competitor));
+    for (const m of ranked) {
+      out.push(toWorking(m, 'ranked_keywords', competitor));
+      competitorWins.push({ keyword: m.keyword, search_volume: m.search_volume });
+    }
   }
+  const topWins = competitorWins
+    .sort((a, b) => (b.search_volume ?? -1) - (a.search_volume ?? -1))
+    .slice(0, SEED_COMPETITOR_WINS)
+    .map((w) => w.keyword);
 
   const seedRes = await llm.complete({
-    messages: buildSeedPrompt(input.presets),
+    messages: buildSeedPrompt(input.presets, topWins),
     temperature: 0,
     responseFormat: 'json',
   });
