@@ -198,4 +198,21 @@ describe('strategy worker', () => {
     );
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'failed');
   });
+
+  test('aborts before the Lambda deadline, marking the org failed', async () => {
+    vi.useFakeTimers();
+    try {
+      findById.mockResolvedValue(org);
+      runKeywordPipeline.mockReturnValue(new Promise(() => {})); // never resolves (hangs)
+      // 25s remaining - 20s buffer = 5s budget before the graceful abort fires.
+      const ctx = { getRemainingTimeInMillis: () => 25_000 } as never;
+      const p = handler(event({ org_id: 'o1' }), ctx, () => {});
+      const assertion = expect(p).rejects.toThrow(/approaching Lambda timeout/);
+      await vi.advanceTimersByTimeAsync(6_000);
+      await assertion;
+      expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'failed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

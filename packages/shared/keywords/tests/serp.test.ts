@@ -109,6 +109,35 @@ it('uses the LLM to reject unsuitable intent', async () => {
   expect(rejected[0]!.rejection_reason).toBe('serp_intent');
 });
 
+it('fetches SERPs concurrently, but preserves order and dedup semantics', async () => {
+  let inFlight = 0;
+  let maxInFlight = 0;
+  const shared = serp(['a.com', 'b.com', 'c.com', 'd.com']);
+  const dataForSeo = {
+    // Distinct SERP per keyword except 'dup', which mirrors 'first' so it trips
+    // the sequential duplicate check — proving Phase 2 stays ordered.
+    serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return keyword === 'first' || keyword === 'dup' ? shared : serp([`${keyword}.com`]);
+    }),
+  } as unknown as DataForSeoClient;
+
+  const cands = ['first', 'k2', 'k3', 'dup'].map(cand);
+  const { accepted, rejected } = await validateSerp(cands, {
+    dataForSeo,
+    llm: okLlm(),
+    presets,
+    config,
+  });
+
+  expect(maxInFlight).toBeGreaterThan(1); // ran in parallel
+  expect(accepted.map((c) => c.keyword)).toEqual(['first', 'k2', 'k3']);
+  expect(rejected.map((c) => c.rejection_reason)).toEqual(['serp_duplicate']);
+});
+
 it('accepts a clean SERP', async () => {
   const dataForSeo = {
     serpGoogleOrganic: vi
