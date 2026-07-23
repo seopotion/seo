@@ -48,6 +48,23 @@
     "signingIn": "Oturum açılıyor...",
     "workspaceError": "Çalışma alanınız kontrol edilemedi."
   },
+  "GscCallback": {
+    "backToSettings": "Ayarlara dön",
+    "confirm": "Bu mülkü kullan",
+    "errors": {
+      "cancelled": "Google bağlantısı iptal edildi veya başarısız oldu.",
+      "exchangeFailed": "Google bağlantısı tamamlanamadı. Lütfen Ayarlar'dan tekrar deneyin.",
+      "siteFailed": "Bu mülk kaydedilemedi. Lütfen tekrar deneyin."
+    },
+    "exchanging": "Google bağlantısı tamamlanıyor...",
+    "noSites": "Bu Google hesabında Search Console mülkü yok. Sitenizi Search Console'a ekleyin ve yeniden bağlanmayı deneyin.",
+    "openGsc": "Google Search Console'u aç",
+    "pickBody": "Web sitenize karşılık gelen mülkü seçin.",
+    "pickTitle": "Sitenizin mülkünü seçin",
+    "recommended": "Önerilen",
+    "saving": "Kaydediliyor...",
+    "title": "Google Search Console'u Bağla"
+  },
   "HomePage": {
     "articles": {
       "cta": "İçerik planlayıcıya git / Anahtar kelime ekle",
@@ -61,8 +78,11 @@
       "upgrade": "Kilidi açmak için yükselt"
     },
     "bestArticles": {
+      "clicks": "{count, plural, other {# tıklama}}",
       "empty": "Henüz makale performans verisi yok.",
       "gated": "Bu alanı açmak için Google Search Console'u bağlayın.",
+      "gatedCta": "Search Console'u bağla",
+      "subtitle": "Tıklamaya göre en iyi sayfalar — son 28 gün",
       "title": "En İyi Makaleler"
     },
     "loadError": "Dashboard API kullanılamıyor, bu yüzden boş geliştirme verisi gösteriliyor.",
@@ -80,6 +100,16 @@
         "upgrade": "Anahtar kelime araştırmasını açmak için yükselt"
       },
       "title": "Önerilen Aksiyonlar"
+    },
+    "searchPerformance": {
+      "clicks": "Tıklamalar",
+      "ctr": "TO",
+      "gated": "Arama performansınızı görmek için Google Search Console'u bağlayın.",
+      "gatedCta": "Search Console'u bağla",
+      "impressions": "Gösterimler",
+      "position": "Ort. konum",
+      "subtitle": "Son 28 gün",
+      "title": "Arama Performansı"
     }
   },
   "ContentPlannerPage": {
@@ -476,9 +506,29 @@
       "upgradeCta": "Planları görüntüle"
     },
     "googleSearchConsole": {
-      "comingSoon": "Yakında",
-      "connect": "Bağlan",
-      "description": "Google Search Console bağlantı ayarları burada görünecek."
+      "badges": { "connected": "Bağlı", "notConnected": "Bağlı değil" },
+      "benefit1": "Son 28 günün tıklama, gösterim, TO ve ortalama konum verileri",
+      "benefit2": "Gerçek Google Arama tıklamalarına göre en iyi performans gösteren makaleleriniz",
+      "changeConnection": "Hesabı veya mülkü değiştir",
+      "connect": "Google ile bağlan",
+      "connectError": "Google bağlantısı başlatılamadı. Lütfen tekrar deneyin.",
+      "connectedAccount": "Google hesabı",
+      "connectedOn": "{date} tarihinde bağlandı",
+      "connectedSuccess": "Google Search Console bağlandı. Arama verileriniz artık Ana Sayfa'da.",
+      "connecting": "Google açılıyor...",
+      "description": "Sitenizin Google Arama'daki performansını — tıklamaları, gösterimleri ve en iyi makalelerinizi — doğrudan Ana Sayfa panelinizde görün.",
+      "disconnect": "Bağlantıyı kes",
+      "disconnectCancel": "Vazgeç",
+      "disconnectConfirm": "Search Console bağlantısı kesilsin mi? Ana Sayfa'daki performans kartları yeniden kilitlenecek.",
+      "disconnectConfirmYes": "Evet, bağlantıyı kes",
+      "disconnectError": "Bağlantı kesilemedi. Lütfen tekrar deneyin.",
+      "property": "Mülk",
+      "readOnlyNote": "SEO Potion, Search Console verilerinizi yalnızca okur. Google hesabınızda hiçbir şeyi değiştirmez.",
+      "reconnect": "Yeniden bağlan",
+      "reconnectNeeded": "Search Console erişimi iptal edilmiş veya süresi dolmuş. Arama verilerinizin akmaya devam etmesi için yeniden bağlanın.",
+      "statusError": "Search Console bağlantı durumu yüklenemedi.",
+      "statusLoading": "Search Console bağlantısı kontrol ediliyor...",
+      "title": "Google Search Console"
     },
     "placeholders": {
       "competitorUrl": "https://rakip.com"

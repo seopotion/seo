@@ -4,6 +4,7 @@ import type { PlannerKeywordResponse } from '../content-planner/types';
 export const MAX_RECOMMENDED_ACTIONS = 3;
 
 const PLANNER_HREF = '/content-planner';
+const SETTINGS_GSC_HREF = '/settings?tab=googleSearchConsole';
 
 export type RecommendedActionKey =
   | 'addKeywords'
@@ -74,7 +75,7 @@ export function recommendedActions(input: RecommendedActionsInput): RecommendedA
   }
 
   if (input.bestGated) {
-    actions.push({ key: 'connectSearchConsole' });
+    actions.push({ href: SETTINGS_GSC_HREF, key: 'connectSearchConsole' });
   }
 
   if (input.planned === 0 && input.published > 0) {

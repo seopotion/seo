@@ -39,3 +39,13 @@ export const GscSiteBody = z
   .openapi('GscSiteBody');
 
 export const GscOkResponse = z.object({ ok: z.boolean() }).openapi('GscOkResponse');
+
+export const GscStatusResponse = z
+  .object({
+    connected: z.boolean(),
+    google_email: z.string().nullable(),
+    site_url: z.string().nullable(),
+    connected_at: z.string().nullable(),
+    needs_reconnect: z.boolean(),
+  })
+  .openapi('GscStatusResponse');

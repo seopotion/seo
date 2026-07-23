@@ -32,6 +32,7 @@ import {
   textEntriesToStrings,
 } from '../../onboarding/utils';
 import { BillingPanel } from './_components/BillingPanel';
+import { GoogleSearchConsolePanel } from './_components/GoogleSearchConsolePanel';
 import { IntegrationsPanel } from './_components/IntegrationsPanel';
 
 const settingsTabs = [
@@ -506,17 +507,7 @@ export default function SettingsPage() {
         aria-labelledby="settings-tab-googleSearchConsole"
         hidden={activeTab !== 'googleSearchConsole'}
       >
-        <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="font-medium text-slate-950 text-sm">
-              {t('googleSearchConsole.comingSoon')}
-            </p>
-            <p className="mt-1 text-slate-500 text-sm">{t('googleSearchConsole.description')}</p>
-          </div>
-          <Button type="button" disabled>
-            {t('googleSearchConsole.connect')}
-          </Button>
-        </div>
+        <GoogleSearchConsolePanel organization={organization} onUnauthorized={handleUnauthorized} />
       </div>
 
       <div

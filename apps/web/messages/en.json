@@ -48,6 +48,23 @@
     "signingIn": "Signing in...",
     "workspaceError": "Could not check your workspace."
   },
+  "GscCallback": {
+    "backToSettings": "Back to settings",
+    "confirm": "Use this property",
+    "errors": {
+      "cancelled": "The Google connection was cancelled or failed.",
+      "exchangeFailed": "We couldn't complete the Google connection. Please try again from Settings.",
+      "siteFailed": "We couldn't save that property. Please try again."
+    },
+    "exchanging": "Completing the Google connection...",
+    "noSites": "This Google account has no Search Console properties. Add your site to Search Console, then try connecting again.",
+    "openGsc": "Open Google Search Console",
+    "pickBody": "Pick the property that matches your website.",
+    "pickTitle": "Choose your website's property",
+    "recommended": "Recommended",
+    "saving": "Saving...",
+    "title": "Connect Google Search Console"
+  },
   "HomePage": {
     "articles": {
       "cta": "Visit content planner / Add keywords",
@@ -61,8 +78,11 @@
       "upgrade": "Upgrade to unlock"
     },
     "bestArticles": {
+      "clicks": "{count, plural, one {# click} other {# clicks}}",
       "empty": "No article performance data yet.",
       "gated": "Connect Google Search Console to unlock this block.",
+      "gatedCta": "Connect Search Console",
+      "subtitle": "Top pages by clicks — last 28 days",
       "title": "Best Articles"
     },
     "loadError": "Dashboard API is unavailable, so empty development data is shown.",
@@ -80,6 +100,16 @@
         "upgrade": "Upgrade to unlock keyword research"
       },
       "title": "Recommended Actions"
+    },
+    "searchPerformance": {
+      "clicks": "Clicks",
+      "ctr": "CTR",
+      "gated": "Connect Google Search Console to see your search performance.",
+      "gatedCta": "Connect Search Console",
+      "impressions": "Impressions",
+      "position": "Avg. position",
+      "subtitle": "Last 28 days",
+      "title": "Search Performance"
     }
   },
   "ContentPlannerPage": {
@@ -476,9 +506,29 @@
       "upgradeCta": "View plans"
     },
     "googleSearchConsole": {
-      "comingSoon": "Coming soon",
-      "connect": "Connect",
-      "description": "Google Search Console connection settings will appear here."
+      "badges": { "connected": "Connected", "notConnected": "Not connected" },
+      "benefit1": "Clicks, impressions, CTR and average position for the last 28 days",
+      "benefit2": "Your best-performing articles, ranked by real Google Search clicks",
+      "changeConnection": "Change account or property",
+      "connect": "Connect with Google",
+      "connectError": "Could not start the Google connection. Please try again.",
+      "connectedAccount": "Google account",
+      "connectedOn": "Connected on {date}",
+      "connectedSuccess": "Google Search Console connected. Your search data is now live on Home.",
+      "connecting": "Opening Google...",
+      "description": "See how your site performs in Google Search — clicks, impressions and your best articles — right on your Home dashboard.",
+      "disconnect": "Disconnect",
+      "disconnectCancel": "Cancel",
+      "disconnectConfirm": "Disconnect Search Console? The performance cards on Home will lock again.",
+      "disconnectConfirmYes": "Yes, disconnect",
+      "disconnectError": "Could not disconnect. Please try again.",
+      "property": "Property",
+      "readOnlyNote": "SEO Potion only reads your Search Console data. It never changes anything in your Google account.",
+      "reconnect": "Reconnect",
+      "reconnectNeeded": "Access to Search Console was revoked or expired. Reconnect to keep your search data flowing.",
+      "statusError": "Could not load the Search Console connection state.",
+      "statusLoading": "Checking the Search Console connection...",
+      "title": "Google Search Console"
     },
     "placeholders": {
       "competitorUrl": "https://competitor.com"
