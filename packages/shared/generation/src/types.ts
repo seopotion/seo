@@ -1,3 +1,5 @@
+import type { SerpCompetitor } from '@shared/schemas';
+
 export interface GenerationContext {
   businessName: string;
   businessDescription: string;
@@ -11,7 +13,7 @@ export interface GenerationContext {
   keyword: string;
   articleType: string | null;
   intent: string | null;
-  serpCompetitors: string[];
+  serpCompetitors: SerpCompetitor[];
 }
 
 export interface Outline {

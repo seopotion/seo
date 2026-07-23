@@ -15,7 +15,9 @@ const ctx: GenerationContext = {
   keyword: 'best widgets',
   articleType: 'listicle',
   intent: 'commercial',
-  serpCompetitors: ['a.com'],
+  serpCompetitors: [
+    { rank: 1, url: 'https://a.com/best-widgets', domain: 'a.com', title: 'Top 10 Widgets' },
+  ],
 };
 
 describe('outline', () => {
@@ -26,6 +28,25 @@ describe('outline', () => {
     expect(joined).toContain('best widgets');
     expect(joined).toContain('English');
     expect(joined.toLowerCase()).toContain('json');
+  });
+
+  test('buildOutlinePrompt lists ranking SERP articles with title and url (#144)', () => {
+    const joined = buildOutlinePrompt(ctx)
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).toContain('Top 10 Widgets');
+    expect(joined).toContain('https://a.com/best-widgets');
+  });
+
+  test('buildOutlinePrompt falls back to domain for legacy entries without title (#144)', () => {
+    const legacy = {
+      ...ctx,
+      serpCompetitors: [{ rank: null, url: null, domain: 'a.com', title: null }],
+    };
+    const joined = buildOutlinePrompt(legacy)
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).toContain('a.com');
   });
 
   test('parseOutline parses fenced JSON and applies defaults', () => {

@@ -37,6 +37,11 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     ctx.competitors.length
       ? `Competitors to differentiate from (never promote them): ${ctx.competitors.join(', ')}`
       : '',
+    ctx.serpCompetitors.length
+      ? `Articles currently ranking for this keyword (differentiate the angle and craft a stronger title; never copy them):\n${ctx.serpCompetitors
+          .map((r) => `${r.rank ?? '-'}. ${r.title ?? r.domain}${r.url ? ` (${r.url})` : ''}`)
+          .join('\n')}`
+      : '',
     ctx.llmInstructions ? `Extra instructions: ${ctx.llmInstructions}` : '',
     `Write all text in ${ctx.language}.`,
   ]
