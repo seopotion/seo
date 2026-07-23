@@ -155,12 +155,12 @@ export class ApiStack extends Stack {
       retentionPeriod: Duration.days(14),
     });
 
-    // Strategy task queue. Visibility timeout >= worker timeout so an
-    // in-flight message isn't redelivered while the worker is still
-    // processing it. After maxReceiveCount failed deliveries the message
-    // moves to the DLQ.
+    // Strategy task queue. Visibility timeout > worker timeout (below: 15 min,
+    // the Lambda max) so an in-flight message isn't redelivered while the worker
+    // is still processing it. After maxReceiveCount failed deliveries the
+    // message moves to the DLQ.
     const strategyQueue = new Queue(this, 'StrategyQueue', {
-      visibilityTimeout: Duration.minutes(15),
+      visibilityTimeout: Duration.minutes(16),
       deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
     });
 
@@ -225,7 +225,7 @@ export class ApiStack extends Stack {
       depsLockFilePath,
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
-      timeout: Duration.minutes(10),
+      timeout: Duration.minutes(15),
       memorySize: 512,
       environment: {
         ...mongoEnv,
