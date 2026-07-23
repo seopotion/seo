@@ -23,15 +23,24 @@ describe('KeywordSchema brief fields', () => {
   });
 
   test('brief fields round-trip when present', () => {
+    const entry = { rank: 1, url: 'https://a.com/x', domain: 'a.com', title: 'A post' };
     const k = KeywordSchema.parse({
       ...base,
       article_type: 'how_to_guide',
       intent: 'informational',
       opportunity_score: 0.8,
-      serp_competitors: ['a.com', 'b.com'],
+      serp_competitors: [entry],
     });
     expect(k.article_type).toBe('how_to_guide');
-    expect(k.serp_competitors).toEqual(['a.com', 'b.com']);
+    expect(k.serp_competitors).toEqual([entry]);
+  });
+
+  test('legacy domain-only serp_competitors normalize to entries (#144)', () => {
+    const k = KeywordSchema.parse({ ...base, serp_competitors: ['a.com', 'b.com'] });
+    expect(k.serp_competitors).toEqual([
+      { rank: null, url: null, domain: 'a.com', title: null },
+      { rank: null, url: null, domain: 'b.com', title: null },
+    ]);
   });
 });
 

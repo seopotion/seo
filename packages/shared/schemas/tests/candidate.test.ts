@@ -59,6 +59,32 @@ describe('CreateCandidateInput', () => {
   });
 });
 
+describe('serp_competitors entries (#144)', () => {
+  const base = {
+    id: 'c1',
+    org_id: 'o1',
+    keyword: 'best dog food',
+    normalized_keyword: 'best dog food',
+    source: 'keyword_ideas' as const,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
+  test('round-trips full structured entries', () => {
+    const entry = { rank: 1, url: 'https://a.com/x', domain: 'a.com', title: 'A post' };
+    const c = CandidateSchema.parse({ ...base, serp_competitors: [entry] });
+    expect(c.serp_competitors).toEqual([entry]);
+  });
+
+  test('normalizes legacy domain strings into domain-only entries', () => {
+    const c = CandidateSchema.parse({ ...base, serp_competitors: ['a.com', 'b.com'] });
+    expect(c.serp_competitors).toEqual([
+      { rank: null, url: null, domain: 'a.com', title: null },
+      { rank: null, url: null, domain: 'b.com', title: null },
+    ]);
+  });
+});
+
 describe('candidate #54 fields', () => {
   const base = {
     id: 'c1',

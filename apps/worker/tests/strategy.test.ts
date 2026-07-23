@@ -100,7 +100,7 @@ function candidate(kw: string, score: number) {
     article_type: 'how_to_guide',
     rejection_reason: null,
     status: 'candidate',
-    serp_competitors: ['a.com'],
+    serp_competitors: [{ rank: 1, url: 'https://a.com/1', domain: 'a.com', title: 'A' }],
   };
 }
 

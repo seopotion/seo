@@ -48,6 +48,31 @@ export const REJECTION_REASONS = [
 ] as const;
 export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
+/**
+ * One organic SERP competitor captured during SERP validation (#144). Legacy
+ * docs stored bare domains, so rank/url/title are null for pre-#144 entries.
+ */
+export const SerpCompetitorSchema = z.object({
+  rank: z.number().int().nullable().default(null),
+  url: z.string().nullable().default(null),
+  domain: z.string(),
+  title: z.string().nullable().default(null),
+});
+export type SerpCompetitor = z.infer<typeof SerpCompetitorSchema>;
+
+/** Tolerates legacy domain-only values by lifting each into a domain-only entry. */
+export const SerpCompetitorsField = z
+  .array(
+    z.union([
+      SerpCompetitorSchema,
+      z
+        .string()
+        .transform((domain): SerpCompetitor => ({ rank: null, url: null, domain, title: null })),
+    ]),
+  )
+  .nullable()
+  .default(null);
+
 /** Canonical dedup key: lowercased, trimmed, whitespace-collapsed. */
 export function normalizeKeyword(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -73,8 +98,8 @@ export const CandidateSchema = z.object({
   competition: z.number().nullable().default(null),
   trend: z.number().nullable().default(null),
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
-  // Top-K organic domains captured during SERP validation (#47); null otherwise.
-  serp_competitors: z.array(z.string()).nullable().default(null),
+  // Top-K organic results captured during SERP validation (#47/#144); null otherwise.
+  serp_competitors: SerpCompetitorsField,
   relevance_score: z.number().nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
   article_type: z.enum(ARTICLE_TYPES).nullable().default(null),
