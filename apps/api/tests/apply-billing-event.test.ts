@@ -1,19 +1,32 @@
 import type { BillingProvider } from '@shared/providers';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { upsertFromEvent, updateFromEvent, findActiveByOrg, listActiveByOrg, setPlan } = vi.hoisted(
-  () => ({
-    upsertFromEvent: vi.fn(),
-    updateFromEvent: vi.fn(),
-    findActiveByOrg: vi.fn(),
-    listActiveByOrg: vi.fn(),
-    setPlan: vi.fn(),
-  }),
-);
+const {
+  upsertFromEvent,
+  updateFromEvent,
+  findActiveByOrg,
+  listActiveByOrg,
+  setPlan,
+  findById,
+  claimStrategy,
+  setStrategyStatus,
+} = vi.hoisted(() => ({
+  upsertFromEvent: vi.fn(),
+  updateFromEvent: vi.fn(),
+  findActiveByOrg: vi.fn(),
+  listActiveByOrg: vi.fn(),
+  setPlan: vi.fn(),
+  findById: vi.fn(),
+  claimStrategy: vi.fn(),
+  setStrategyStatus: vi.fn(),
+}));
 vi.mock('@shared/db', () => ({
   SubscriptionRepo: { upsertFromEvent, updateFromEvent, findActiveByOrg, listActiveByOrg },
-  OrgRepo: { setPlan },
+  OrgRepo: { setPlan, findById, claimStrategy, setStrategyStatus },
 }));
+
+const { enqueueStrategyTask } = vi.hoisted(() => ({ enqueueStrategyTask: vi.fn() }));
+vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask }));
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 vi.mock('../src/logger', () => ({ logger: { warn } }));
@@ -34,11 +47,16 @@ const activated = {
   currentPeriodEnd: periodEnd,
 } as const;
 
+const finalizedOrg = { id: 'o1', setup_status: 'setup_complete', presets: { some: 'presets' } };
+
 describe('applyBillingEvent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     listActiveByOrg.mockResolvedValue([]);
     findActiveByOrg.mockResolvedValue(null);
+    // Default: org exists but hasn't finalized onboarding — no strategy kickoff.
+    findById.mockResolvedValue({ id: 'o1', setup_status: 'setup_scan_completed', presets: null });
+    claimStrategy.mockResolvedValue(true);
   });
 
   test('activated: upserts active sub and sets plan to the tier', async () => {
@@ -66,6 +84,37 @@ describe('applyBillingEvent', () => {
     await applyBillingEvent(activated, provider);
     expect(cancelSubscription).toHaveBeenCalledTimes(1);
     expect(cancelSubscription).toHaveBeenCalledWith('sub_0');
+  });
+
+  test('activated on a finalized org: claims + enqueues the 30-day strategy', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    findById.mockResolvedValue(finalizedOrg);
+    await applyBillingEvent(activated, provider);
+    expect(claimStrategy).toHaveBeenCalledWith('o1');
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'o1' });
+  });
+
+  test('activated on an unfinalized org: no strategy kickoff (finalize will do it)', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    await applyBillingEvent(activated, provider);
+    expect(claimStrategy).not.toHaveBeenCalled();
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+  });
+
+  test('activated replay: strategy already claimed -> no second enqueue', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    findById.mockResolvedValue(finalizedOrg);
+    claimStrategy.mockResolvedValue(false);
+    await applyBillingEvent(activated, provider);
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+  });
+
+  test('activated: strategy enqueue failure reverts the claim and rethrows (webhook retries)', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    findById.mockResolvedValue(finalizedOrg);
+    enqueueStrategyTask.mockRejectedValueOnce(new Error('no queue'));
+    await expect(applyBillingEvent(activated, provider)).rejects.toThrow('no queue');
+    expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'failed');
   });
 
   test('updated active: keeps plan on the tier', async () => {

@@ -132,6 +132,16 @@ describe('setOrgPlan', () => {
     expect(res.ok).toBe(true);
   });
 
+  test('kicks off strategy for the expert tier too', async () => {
+    const res = await setOrgPlan({ org: 'org_1', plan: 'expert' });
+    expect(setPlan).toHaveBeenCalledWith('org_1', 'expert');
+    expect(claimStrategy).toHaveBeenCalledWith('org_1');
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'org_1' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'expert', strategy_enqueued: true });
+  });
+
   test('does not enqueue strategy when setting a non-paid plan', async () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'free' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'free');
