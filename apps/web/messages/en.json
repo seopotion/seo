@@ -26,14 +26,14 @@
     },
     "tiers": {
       "expert": {
-        "cta": "Paid + Expert",
-        "description": "Everything in Paid, plus hands-on expert support for your content strategy.",
-        "name": "Paid + Expert"
+        "cta": "Upgrade to Expert-led Growth",
+        "description": "Everything in Growth, plus hands-on expert support for your content strategy.",
+        "name": "Expert-led Growth"
       },
       "paid": {
-        "cta": "Upgrade to Paid",
+        "cta": "Upgrade to Growth",
         "description": "Unlock keyword research, keyword scheduling, and your content calendar.",
-        "name": "Paid"
+        "name": "Growth"
       }
     },
     "title": "Choose your plan"

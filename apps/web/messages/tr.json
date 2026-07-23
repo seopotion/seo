@@ -26,14 +26,14 @@
     },
     "tiers": {
       "expert": {
-        "cta": "Ücretli + Uzman",
-        "description": "Ücretli plandaki her şeye ek olarak, içerik stratejiniz için uzman desteği.",
-        "name": "Ücretli + Uzman"
+        "cta": "Expert-led Growth planına yükselt",
+        "description": "Growth planındaki her şeye ek olarak, içerik stratejiniz için uzman desteği.",
+        "name": "Expert-led Growth"
       },
       "paid": {
-        "cta": "Ücretli Plana Yükselt",
+        "cta": "Growth planına yükselt",
         "description": "Anahtar kelime araştırması, planlaması ve içerik takviminizin kilidini açın.",
-        "name": "Ücretli"
+        "name": "Growth"
       }
     },
     "title": "Planınızı seçin"
