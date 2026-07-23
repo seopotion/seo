@@ -1,5 +1,6 @@
 import { OrgRepo, SubscriptionRepo } from '@shared/db';
 import type { BillingEvent, BillingProvider } from '@shared/providers';
+import { enqueueStrategyTask } from '../../clients/sqs';
 import { logger } from '../../logger';
 
 /** Non-activation events can reference a sub we never stored (e.g. one created
@@ -39,6 +40,26 @@ export async function applyBillingEvent(
         current_period_end: event.currentPeriodEnd,
       });
       await OrgRepo.setPlan(event.orgId, event.tier);
+      // Paying after onboarding must bootstrap the keyword/article pipeline the
+      // same way /setup/finalize does for orgs paid at finalize time — flipping
+      // the plan alone leaves the org permanently dormant (#47). claimStrategy
+      // keeps it to exactly one job across webhook replays; unfinalized orgs
+      // are skipped because finalize runs its own kickoff.
+      const org = await OrgRepo.findById(event.orgId);
+      if (
+        org?.setup_status === 'setup_complete' &&
+        org.presets &&
+        (await OrgRepo.claimStrategy(org.id))
+      ) {
+        try {
+          await enqueueStrategyTask({ org_id: org.id });
+        } catch (err) {
+          // Revert the claim so the provider's retry of this (idempotent)
+          // event can reclaim and start the pipeline.
+          await OrgRepo.setStrategyStatus(org.id, 'failed');
+          throw err;
+        }
+      }
       // One live subscription per org: cancel any superseded still-active sub
       // so the user isn't double-billed after an upgrade. The provider's
       // cancelled/expired webhooks then update our records as usual. A failure
