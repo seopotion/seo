@@ -1064,13 +1064,5 @@
       }
     },
     "organizationFallback": "Organizasyonunuz"
-  },
-  "WishlistForm": {
-    "emailPlaceholder": "E-posta adresinizi girin",
-    "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
-    "honeypotLabel": "Web sitesi",
-    "joining": "Katılınıyor...",
-    "submit": "Bekleme listesine katıl",
-    "success": "SEO Potion bekleme listesine eklendiniz. Erken erişim açıldığında size haber vereceğiz."
   }
 }

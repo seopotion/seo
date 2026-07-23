@@ -1064,13 +1064,5 @@
       }
     },
     "organizationFallback": "Your organization"
-  },
-  "WishlistForm": {
-    "emailPlaceholder": "Enter your email",
-    "error": "Something went wrong. Please try again.",
-    "honeypotLabel": "Website",
-    "joining": "Joining...",
-    "submit": "Join the wishlist",
-    "success": "You're on the SEO Potion wishlist. We'll let you know when early access opens."
   }
 }
