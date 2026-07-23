@@ -2,6 +2,7 @@ import type { SetupPresets } from '@shared/schemas';
 import { describe, expect, it } from 'vitest';
 import {
   buildRelevancePrompt,
+  buildSeedPrompt,
   parseClassification,
   parseRelevance,
   parseSeeds,
@@ -28,6 +29,19 @@ const presets = {
     publishing: { auto_publish: false },
   },
 } satisfies SetupPresets;
+
+describe('buildSeedPrompt', () => {
+  it('includes competitor wins in the user message when provided', () => {
+    const [, user] = buildSeedPrompt(presets, ['grain free dog food', 'raw diet for puppies']);
+    expect(user!.content).toContain('grain free dog food');
+    expect(user!.content).toContain('raw diet for puppies');
+  });
+
+  it('omits the competitor-wins section when there are none', () => {
+    const [, user] = buildSeedPrompt(presets, []);
+    expect(user!.content).not.toContain('competitors');
+  });
+});
 
 describe('parseSeeds', () => {
   it('reads a seeds array', () => {
