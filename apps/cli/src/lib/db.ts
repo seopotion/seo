@@ -111,7 +111,7 @@ export async function setOrgPlan(input: {
     // kick off the strategy here the same way finalize does — claimStrategy keeps
     // it to exactly one job across retries / a later re-finalize.
     let strategyEnqueued = false;
-    if (plan === 'paid') {
+    if (plan === 'paid' || plan === 'expert') {
       const org = await OrgRepo.findById(orgId as string);
       const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
       if (finalized && (await OrgRepo.claimStrategy(orgId as string))) {
