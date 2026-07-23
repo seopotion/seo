@@ -8,15 +8,19 @@ import {
   CandidateRepo,
   closeDb,
   ensureIndexes,
+  GscConnectionRepo,
   KeywordRepo,
   type MigrationReport,
   OrgRepo,
   runMigrations,
+  SubscriptionRepo,
   UserRepo,
 } from '@shared/db';
+import { createLemonSqueezyProvider } from '@shared/providers';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
 import {
   type DbInitData,
+  type DeleteUserData,
   fail,
   ok,
   type ResetUserData,
@@ -111,7 +115,7 @@ export async function setOrgPlan(input: {
     // kick off the strategy here the same way finalize does — claimStrategy keeps
     // it to exactly one job across retries / a later re-finalize.
     let strategyEnqueued = false;
-    if (plan === 'paid') {
+    if (plan === 'paid' || plan === 'expert') {
       const org = await OrgRepo.findById(orgId as string);
       const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
       if (finalized && (await OrgRepo.claimStrategy(orgId as string))) {
@@ -139,29 +143,105 @@ export async function setOrgPlan(input: {
 }
 
 /**
- * Delete a user's orgs and all org-scoped data (keywords, candidates,
- * articles) so the next login re-runs onboarding. The user document stays —
- * login recreates session state and the onboarding gate is org-presence.
- * Idempotent: a user with no orgs is a success with zero counts. Operates
- * against whatever `MONGODB_URI` is configured.
+ * Cancel every active provider subscription for the given orgs BEFORE any data
+ * is deleted — wiping local records must not leave the user being billed for a
+ * product that no longer exists. Throws when a sub exists but the LemonSqueezy
+ * API key is unset or the cancel call fails.
  */
-export async function resetUser(input: { user?: string }): Promise<Result<ResetUserData>> {
-  const { user } = input;
+async function cancelActiveSubscriptions(orgIds: string[]): Promise<number> {
+  const active = (
+    await Promise.all(orgIds.map((id) => SubscriptionRepo.listActiveByOrg(id)))
+  ).flat();
+  if (active.length === 0) return 0;
+
+  const apiKey = process.env.LEMONSQUEEZY_API_KEY ?? '';
+  if (!apiKey) {
+    throw new Error(
+      `${active.length} active subscription(s) exist but LEMONSQUEEZY_API_KEY is unset.`,
+    );
+  }
+  // Only cancelSubscription is used — the other config fields are irrelevant here.
+  const provider = createLemonSqueezyProvider({
+    apiKey,
+    webhookSecret: '',
+    storeId: '',
+    variantByTier: { paid: '', expert: '' },
+    redirectUrl: '',
+  });
+  for (const sub of active) {
+    await provider.cancelSubscription(sub.provider_subscription_id);
+  }
+  return active.length;
+}
+
+async function wipeUser(user: string | undefined, alsoDeleteUser: boolean) {
   if (!user) return fail('BAD_TARGET', 'Provide --user <email>.');
 
-  try {
-    const found = await UserRepo.findByEmail(user);
-    if (!found) return fail('USER_NOT_FOUND', `No user with email "${user}".`);
+  const found = await UserRepo.findByEmail(user);
+  if (!found) return fail('USER_NOT_FOUND', `No user with email "${user}".`);
 
-    const orgs = await OrgRepo.findByUserId(found.id);
-    const deleted = { orgs: 0, keywords: 0, candidates: 0, articles: 0 };
-    for (const org of orgs) {
-      deleted.keywords += await KeywordRepo.deleteByOrgId(org.id);
-      deleted.candidates += await CandidateRepo.deleteByOrgId(org.id);
-      deleted.articles += await ArticleRepo.deleteByOrgId(org.id);
-      if (await OrgRepo.deleteById(org.id)) deleted.orgs += 1;
-    }
-    return ok({ user_id: found.id, org_ids: orgs.map((o) => o.id), deleted });
+  const orgs = await OrgRepo.findByUserId(found.id);
+  const orgIds = orgs.map((o) => o.id);
+
+  let cancelled: number;
+  try {
+    cancelled = await cancelActiveSubscriptions(orgIds);
+  } catch (e) {
+    return fail(
+      'SUB_CANCEL_FAILED',
+      `Nothing was deleted: ${(e as Error).message}`,
+      'Set LEMONSQUEEZY_API_KEY (matching the targeted env), or cancel the subscription in the LemonSqueezy dashboard first.',
+    );
+  }
+
+  const deleted = {
+    orgs: 0,
+    keywords: 0,
+    candidates: 0,
+    articles: 0,
+    gsc_connections: 0,
+    subscriptions: 0,
+  };
+  for (const org of orgs) {
+    deleted.keywords += await KeywordRepo.deleteByOrgId(org.id);
+    deleted.candidates += await CandidateRepo.deleteByOrgId(org.id);
+    deleted.articles += await ArticleRepo.deleteByOrgId(org.id);
+    if (await GscConnectionRepo.deleteByOrgId(org.id)) deleted.gsc_connections += 1;
+    deleted.subscriptions += await SubscriptionRepo.deleteByOrgId(org.id);
+    if (await OrgRepo.deleteById(org.id)) deleted.orgs += 1;
+  }
+
+  const base: ResetUserData = {
+    user_id: found.id,
+    org_ids: orgIds,
+    cancelled_subscriptions: cancelled,
+    deleted,
+  };
+  if (!alsoDeleteUser) return ok(base);
+  const user_deleted = await UserRepo.deleteById(found.id);
+  return ok({ ...base, user_deleted });
+}
+
+/**
+ * Delete a user's orgs and all org-scoped data (keywords, candidates, articles,
+ * GSC connections, subscriptions — cancelling active provider subs first) so
+ * the next login re-runs onboarding. The user document stays — login recreates
+ * session state and the onboarding gate is org-presence. Idempotent: a user
+ * with no orgs is a success with zero counts. Operates against whatever
+ * `MONGODB_URI` is configured.
+ */
+export async function resetUser(input: { user?: string }): Promise<Result<ResetUserData>> {
+  try {
+    return (await wipeUser(input.user, false)) as Result<ResetUserData>;
+  } finally {
+    await closeDb();
+  }
+}
+
+/** Like resetUser, but also removes the user document itself — a full nuke. */
+export async function deleteUser(input: { user?: string }): Promise<Result<DeleteUserData>> {
+  try {
+    return (await wipeUser(input.user, true)) as Result<DeleteUserData>;
   } finally {
     await closeDb();
   }

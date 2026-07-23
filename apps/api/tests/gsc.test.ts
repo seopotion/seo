@@ -179,3 +179,71 @@ describe('DELETE /', () => {
     expect(connections.has('org_1')).toBe(false);
   });
 });
+
+describe('GET /status', () => {
+  async function connect() {
+    const state = await signGscState({ org_id: 'org_1', user_id: 'u1' });
+    await client.connect.$post({ json: { code: 'auth-code', state } });
+  }
+
+  test('reports a clean not-connected state when no row exists', async () => {
+    const res = await client.status.$get({ query: { org_id: 'org_1' } });
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      expect(await res.json()).toEqual({
+        connected: false,
+        google_email: null,
+        site_url: null,
+        connected_at: null,
+        needs_reconnect: false,
+      });
+    }
+  });
+
+  test('after /connect is pending: account email set, property still null', async () => {
+    await connect();
+    const res = await client.status.$get({ query: { org_id: 'org_1' } });
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.connected).toBe(false);
+      expect(body.google_email).toBe('owner@x.com');
+      expect(body.site_url).toBeNull();
+      expect(body.needs_reconnect).toBe(false);
+      expect(typeof body.connected_at).toBe('string');
+      expect(Number.isNaN(Date.parse(body.connected_at as string))).toBe(false);
+    }
+  });
+
+  test('after /site is chosen: connected with the property set', async () => {
+    await connect();
+    await client.site.$post({ json: { org_id: 'org_1', site_url: 'sc-domain:clewas.com' } });
+    const res = await client.status.$get({ query: { org_id: 'org_1' } });
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.connected).toBe(true);
+      expect(body.site_url).toBe('sc-domain:clewas.com');
+      expect(body.needs_reconnect).toBe(false);
+    }
+  });
+
+  test('flags needs_reconnect when the last refresh failed', async () => {
+    await connect();
+    await client.site.$post({ json: { org_id: 'org_1', site_url: 'sc-domain:clewas.com' } });
+    // Simulate Google revoking the grant — the API stamps this on a failed read.
+    connections.get('org_1')!.last_refresh_failed_at = new Date();
+    const res = await client.status.$get({ query: { org_id: 'org_1' } });
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.connected).toBe(false);
+      expect(body.needs_reconnect).toBe(true);
+    }
+  });
+
+  test('404s for an org the caller does not own', async () => {
+    const res = await client.status.$get({ query: { org_id: 'org_3' } });
+    expect(res.status).toBe(404);
+  });
+});

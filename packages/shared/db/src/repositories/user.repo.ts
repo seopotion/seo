@@ -4,7 +4,7 @@ import {
   type User,
   UserSchema,
 } from '@shared/schemas';
-import type { Document, WithId } from 'mongodb';
+import { type Document, ObjectId, type WithId } from 'mongodb';
 import { getDb } from '../client';
 
 const collection = async () => (await getDb()).collection('users');
@@ -35,5 +35,12 @@ export const UserRepo = {
     const created_at = new Date();
     const res = await col.insertOne({ ...data, created_at });
     return toEntity({ _id: res.insertedId, ...data, created_at });
+  },
+
+  /** Delete the user document (CLI delete-user). Org data is deleted separately. */
+  async deleteById(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).deleteOne({ _id: new ObjectId(id) });
+    return res.deletedCount === 1;
   },
 };

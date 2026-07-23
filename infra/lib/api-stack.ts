@@ -80,6 +80,21 @@ export class ApiStack extends Stack {
       { parameterName: cfg.gscTokenKeyParam },
     );
 
+    // LemonSqueezy billing secrets (#13): API key (checkout/portal calls) +
+    // webhook signing secret. Same out-of-band SecureString pattern:
+    //   aws ssm put-parameter --name /seo/<stage>/lemonsqueezy-api-key --type SecureString --value <ls_api_key>
+    //   aws ssm put-parameter --name /seo/<stage>/lemonsqueezy-webhook-secret --type SecureString --value <ls_webhook_secret>
+    const lemonSqueezyApiKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'LemonSqueezyApiKeyParam',
+      { parameterName: cfg.lemonSqueezyApiKeyParam },
+    );
+    const lemonSqueezyWebhookSecretParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'LemonSqueezyWebhookSecretParam',
+      { parameterName: cfg.lemonSqueezyWebhookSecretParam },
+    );
+
     // Mongo connection string SecureString — read by every Lambda that talks to
     // Mongo (API + worker + db-init). Resolved at runtime, cached ~1h.
     const mongoUriParam = StringParameter.fromSecureStringParameterAttributes(
@@ -97,6 +112,11 @@ export class ApiStack extends Stack {
       GOOGLE_CLIENT_SECRET_PARAM: cfg.googleClientSecretParam,
       GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
       WEB_ORIGIN: cfg.webOrigin,
+      LEMONSQUEEZY_API_KEY_PARAM: cfg.lemonSqueezyApiKeyParam,
+      LEMONSQUEEZY_WEBHOOK_SECRET_PARAM: cfg.lemonSqueezyWebhookSecretParam,
+      LEMONSQUEEZY_STORE_ID: cfg.lemonSqueezyStoreId,
+      LEMONSQUEEZY_VARIANT_PAID: cfg.lemonSqueezyVariantPaid,
+      LEMONSQUEEZY_VARIANT_EXPERT: cfg.lemonSqueezyVariantExpert,
     };
 
     // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
@@ -176,6 +196,8 @@ export class ApiStack extends Stack {
     googleClientSecretParam.grantRead(apiFn);
     gscTokenKeyParam.grantRead(apiFn);
     mongoUriParam.grantRead(apiFn);
+    lemonSqueezyApiKeyParam.grantRead(apiFn);
+    lemonSqueezyWebhookSecretParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {

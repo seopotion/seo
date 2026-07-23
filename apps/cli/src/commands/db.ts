@@ -66,7 +66,7 @@ export const dbCommand = defineCommand({
       args: {
         org: { type: 'string', description: 'Org id to update' },
         user: { type: 'string', description: "Owner's email; resolves to their single org" },
-        plan: { type: 'string', description: 'free | trial | paid', default: 'paid' },
+        plan: { type: 'string', description: 'free | paid | expert', default: 'paid' },
         ...outputOption,
         ...verboseOption,
       },
@@ -84,6 +84,35 @@ export const dbCommand = defineCommand({
             plan: args.plan as string,
           });
           emitter.step('db:set-plan', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'delete-user': defineCommand({
+      meta: {
+        name: 'delete-user',
+        description:
+          'Nuke a user entirely: cancel active LemonSqueezy subs, delete all org data AND the user document',
+      },
+      args: {
+        user: { type: 'string', description: "User's email; deletes them and every org they own" },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { deleteUser } = await import('../lib/db');
+
+          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.step('db:delete-user', 'start');
+
+          const result = await deleteUser({ user: args.user as string | undefined });
+          emitter.step('db:delete-user', result.ok ? 'done' : 'fail');
           emitter.result(result);
 
           process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);

@@ -33,7 +33,7 @@ export const integrationOptions = [
     logoSrc: '/integrations/framer.svg',
     comingSoon: true,
   },
-];
+] as const;
 
 export function IntegrationsStep({
   form,
@@ -82,6 +82,7 @@ export function IntegrationsStep({
             );
           })}
         </div>
+        <p className="mt-2 text-gray-500 text-sm">{t('connectWordPressLater')}</p>
       </div>
 
       <div className="mt-6">

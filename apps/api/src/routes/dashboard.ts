@@ -10,6 +10,11 @@ import {
 } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
+import {
+  editWordPressArticle,
+  submitWordPressArticle,
+  testWordPressIntegration,
+} from '../clients/wordpress';
 import { decryptSecret } from '../lib/crypto';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
@@ -47,6 +52,7 @@ function toArticleDetail(a: Article) {
     featured_image_url: a.featured_image_url,
     content: a.content,
     status: a.status,
+    ...(a.wordpress_post_id ? { wordpress_post_id: a.wordpress_post_id } : {}),
     images_status: a.images_status,
     created_at: a.created_at.toISOString(),
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,
@@ -299,19 +305,103 @@ const dashboard = new OpenAPIHono<AuthEnv>()
   .openapi(
     createRoute({
       tags: ['dashboard'],
+      method: 'post',
+      path: '/integrations/wordpress',
+      summary: 'Connect the SEO Potion WordPress plugin',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: {
+        body: {
+          content: { 'application/json': { schema: schemas.WordPressConnectionBody } },
+          required: true,
+        },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.WordPressConnectionResponse } },
+          description: 'WordPress integration connected',
+        },
+        403: {
+          content: { 'application/json': { schema: schemas.WordPressConnectionErrorResponse } },
+          description: 'WordPress integration key rejected or not configured',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.WordPressConnectionErrorResponse } },
+          description: 'WordPress plugin or network failure',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id, token } = c.req.valid('json');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+
+      try {
+        const result = await testWordPressIntegration(org.website_url, token);
+        if (!result.success) {
+          if (
+            result.error_code === 'invalid_integration_key' ||
+            result.error_code === 'integration_not_configured'
+          ) {
+            return c.json(result, 403);
+          }
+          return c.json(result, 502);
+        }
+      } catch {
+        return c.json({ success: false as const, error_code: 'wordpress_request_failed' }, 502);
+      }
+
+      const saved = await OrgRepo.saveWordPressConnection(org.id, token, new Date());
+      if (!saved) return c.json({ error: 'Not found' }, 404);
+      return c.json({ success: true as const }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
       method: 'get',
       path: '/integrations/connected',
       summary: 'Connected publishing integrations',
       security: [{ Bearer: [] }],
       middleware: [authMiddleware] as const,
+      request: { query: schemas.OrgQuery },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.ConnectedIntegrationsResponse } },
           description: 'Connected integrations (empty for a fresh org)',
         },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
+        },
       },
     }),
-    (c) => c.json({ integrations: [] }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      if (!org.wordpress_token || !org.wordpress_connected_at) {
+        return c.json({ integrations: [] }, 200);
+      }
+      return c.json(
+        {
+          integrations: [
+            {
+              id: 'wordpress',
+              provider: 'wordpress' as const,
+              connected_at: org.wordpress_connected_at.toISOString(),
+            },
+          ],
+        },
+        200,
+      );
+    },
   )
   .openapi(
     createRoute({
@@ -468,6 +558,156 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ error: 'Article not found' }, 404);
       }
       return c.json(toArticleDetail(article), 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'post',
+      path: '/articles/{id}/wordpress',
+      summary: 'Create an article through the connected SEO Potion WordPress plugin',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.ArticleParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.WordPressArticleResponse } },
+          description: 'Inherited WordPress plugin response',
+        },
+        400: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin rejected the payload',
+        },
+        403: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin rejected the site secret',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'Article not found or not owned by the caller',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'Article is not ready or the WordPress connection is missing',
+        },
+        500: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin failed to create the post',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin response or network failure',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      if (!article || !org) return c.json({ error: 'Article not found' }, 404);
+      if (!org.wordpress_token || !org.wordpress_connected_at) {
+        return c.json({ error: 'WordPress is not connected' }, 409);
+      }
+      // Dup-guard: a sequential retry must not create and remap a second post.
+      if (article.wordpress_post_id) {
+        return c.json({ error: 'Article is already published to WordPress' }, 409);
+      }
+      if (article.images_status !== 'complete') {
+        return c.json({ error: 'Article images are not complete' }, 409);
+      }
+
+      try {
+        const result = await submitWordPressArticle(org.website_url, org.wordpress_token, article);
+        if (result.status === 200) {
+          const persisted = await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
+          if (!persisted) {
+            return c.json({ error: 'WordPress post created but its ID could not be saved' }, 500);
+          }
+          return c.json(result.body, 200);
+        }
+        if (result.status === 400) return c.json(result.body, 400);
+        if (result.status === 403) return c.json(result.body, 403);
+        if (result.status === 404) return c.json(result.body, 404);
+        if (result.status === 409) return c.json(result.body, 409);
+        return c.json(result.body, 500);
+      } catch {
+        return c.json({ error: 'WordPress request failed' }, 502);
+      }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'put',
+      path: '/articles/{id}/wordpress',
+      summary: 'Update an article through the connected SEO Potion WordPress plugin',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.ArticleParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.WordPressArticleResponse } },
+          description: 'Inherited WordPress plugin response, including warnings',
+        },
+        400: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin rejected the payload',
+        },
+        403: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin rejected the site secret',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'Article or WordPress post was not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'Stored WordPress ID or connection is missing, or the slug conflicts',
+        },
+        500: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin failed to update the post',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
+          description: 'WordPress plugin response or network failure',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      if (!article || !org) return c.json({ error: 'Article not found' }, 404);
+      if (!org.wordpress_token || !org.wordpress_connected_at) {
+        return c.json({ error: 'WordPress is not connected' }, 409);
+      }
+      if (!article.wordpress_post_id) {
+        return c.json({ error: 'Article has not been submitted to WordPress' }, 409);
+      }
+      if (article.images_status !== 'complete') {
+        return c.json({ error: 'Article images are not complete' }, 409);
+      }
+
+      try {
+        const result = await editWordPressArticle(
+          org.website_url,
+          org.wordpress_token,
+          article.wordpress_post_id,
+          article,
+        );
+        if (result.status === 200) return c.json(result.body, 200);
+        if (result.status === 400) return c.json(result.body, 400);
+        if (result.status === 403) return c.json(result.body, 403);
+        if (result.status === 404) return c.json(result.body, 404);
+        if (result.status === 409) return c.json(result.body, 409);
+        return c.json(result.body, 500);
+      } catch {
+        return c.json({ error: 'WordPress request failed' }, 502);
+      }
     },
   )
   .openapi(

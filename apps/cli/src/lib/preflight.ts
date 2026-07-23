@@ -2,12 +2,14 @@
  * Pre-deploy prerequisite check for a backend environment (#16).
  *
  * The `SeoApiStack-<stage>` deploy assumes several things are provisioned
- * out-of-band (see `infra/ENVIRONMENTS.md`): four SSM SecureStrings per stage
- * (jwt-secret, mongo-uri, google-client-secret, gsc-token-key) resolved at
- * Lambda runtime, and two public values baked into the Lambda env at synth
- * time — `GOOGLE_CLIENT_ID_<STAGE>` and `WEB_ORIGIN_<STAGE>` (the GSC OAuth
- * redirect base). If any is missing the stack still deploys but ships broken
- * config. This verifies they are present before `cdk deploy`.
+ * out-of-band (see `infra/ENVIRONMENTS.md`): six SSM SecureStrings per stage
+ * (jwt-secret, mongo-uri, google-client-secret, gsc-token-key,
+ * lemonsqueezy-api-key, lemonsqueezy-webhook-secret) resolved at Lambda
+ * runtime, and public values baked into the Lambda env at synth time —
+ * `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>` (the GSC OAuth redirect
+ * base), and the LemonSqueezy store id + paid/expert variant ids. If any is
+ * missing the stack still deploys but ships broken config. This verifies they
+ * are present before `cdk deploy`.
  *
  * The names below mirror `infra/lib/config.ts` `STAGE_CONFIG` — `infra` is a
  * standalone package we can't import from the workspace, but the SSM naming is a
@@ -25,6 +27,8 @@ function ssmParamNames(stage: Stage): string[] {
     `/seo/${stage}/mongo-uri`,
     `/seo/${stage}/google-client-secret`,
     `/seo/${stage}/gsc-token-key`,
+    `/seo/${stage}/lemonsqueezy-api-key`,
+    `/seo/${stage}/lemonsqueezy-webhook-secret`,
   ];
 }
 
@@ -34,6 +38,20 @@ function googleClientIdVar(stage: Stage): string {
 
 function webOriginVar(stage: Stage): string {
   return stage === 'prod' ? 'WEB_ORIGIN_PROD' : 'WEB_ORIGIN_STAGING';
+}
+
+function lemonSqueezyStoreIdVar(stage: Stage): string {
+  return stage === 'prod' ? 'LEMONSQUEEZY_STORE_ID_PROD' : 'LEMONSQUEEZY_STORE_ID_STAGING';
+}
+
+function lemonSqueezyVariantPaidVar(stage: Stage): string {
+  return stage === 'prod' ? 'LEMONSQUEEZY_VARIANT_PAID_PROD' : 'LEMONSQUEEZY_VARIANT_PAID_STAGING';
+}
+
+function lemonSqueezyVariantExpertVar(stage: Stage): string {
+  return stage === 'prod'
+    ? 'LEMONSQUEEZY_VARIANT_EXPERT_PROD'
+    : 'LEMONSQUEEZY_VARIANT_EXPERT_STAGING';
 }
 
 async function checkSsmParam(client: SSMClient, name: string): Promise<PrereqCheck> {
@@ -70,6 +88,9 @@ export async function preflight(stage: Stage): Promise<Result<PreflightResult>> 
       ...ssmChecks,
       checkEnvVar(googleClientIdVar(stage)),
       checkEnvVar(webOriginVar(stage)),
+      checkEnvVar(lemonSqueezyStoreIdVar(stage)),
+      checkEnvVar(lemonSqueezyVariantPaidVar(stage)),
+      checkEnvVar(lemonSqueezyVariantExpertVar(stage)),
     ];
     return ok({ stage, ready: checks.every((c) => c.present), checks });
   } finally {

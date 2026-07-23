@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { GscConnectionRepo } from '@shared/db';
+import { isGscConnected } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { decryptSecret, encryptSecret } from '../lib/crypto';
 import { signGscState, verifyGscState } from '../lib/gsc-state';
@@ -175,6 +176,44 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
       if (!org) return c.json({ error: 'Not found' }, 404);
       const ok = await GscConnectionRepo.deleteByOrgId(org_id);
       return c.json({ ok }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['gsc'],
+      method: 'get',
+      path: '/status',
+      summary: 'Connection state for the Settings panel (DB read only, no Google calls)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { query: schemas.GscOrgQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.GscStatusResponse } },
+          description: 'Connection state: connected, account email, property, and health',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+      const conn = await GscConnectionRepo.findByOrgId(org_id);
+      return c.json(
+        {
+          connected: isGscConnected(conn),
+          google_email: conn?.google_email ?? null,
+          site_url: conn?.site_url ?? null,
+          connected_at: conn ? conn.connected_at.toISOString() : null,
+          needs_reconnect: conn !== null && conn.last_refresh_failed_at !== null,
+        },
+        200,
+      );
     },
   );
 

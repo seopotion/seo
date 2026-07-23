@@ -26,4 +26,15 @@ describe('UserRepo (integration)', () => {
   test('findByEmail returns null when no user matches', async () => {
     expect(await UserRepo.findByEmail('nobody@example.com')).toBeNull();
   });
+
+  test('deleteById removes the user; invalid/unknown ids return false', async () => {
+    const user = await UserRepo.upsertByGoogleSub({
+      google_sub: 'sub_2',
+      email: 'del@example.com',
+    });
+    expect(await UserRepo.deleteById(user.id)).toBe(true);
+    expect(await UserRepo.findByEmail('del@example.com')).toBeNull();
+    expect(await UserRepo.deleteById(user.id)).toBe(false);
+    expect(await UserRepo.deleteById('not-an-object-id')).toBe(false);
+  });
 });

@@ -51,6 +51,15 @@ export const ArticleRepo = {
     return toEntity({ _id: res.insertedId, ...data, created_at });
   },
 
+  async setWordPressPostId(id: string, postId: number): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { wordpress_post_id: postId } },
+    );
+    return res.matchedCount > 0;
+  },
+
   /** Save the editor's five editable fields, stamping `updated_at` (#74). */
   async updateContent(
     id: string,

@@ -1,4 +1,9 @@
-import { ENTITLEMENT_PLANS, SETUP_STATUSES, STRATEGY_STATUSES } from '@shared/types';
+import {
+  ENTITLEMENT_PLANS,
+  type EntitlementPlan,
+  SETUP_STATUSES,
+  STRATEGY_STATUSES,
+} from '@shared/types';
 import { z } from 'zod';
 import { SetupPresetsSchema } from './presets';
 
@@ -20,6 +25,8 @@ export const OrgSchema = z.object({
   // Automatic-strategy job lifecycle (#47).
   strategy_status: z.enum(STRATEGY_STATUSES).default('none'),
   name: z.string().optional(),
+  wordpress_token: z.string().optional(),
+  wordpress_connected_at: z.date().optional(),
   // Populated by the scanner worker once scanning completes.
   presets: SetupPresetsSchema.optional(),
   // Latest 0–100 Domain Rating for the dashboard badge (#12); refreshed by the
@@ -39,12 +46,36 @@ export const OrgSchema = z.object({
 });
 export type Org = z.infer<typeof OrgSchema>;
 
-/** Input for creating an org — the server assigns `id` and `created_at`. */
-export const CreateOrgInput = OrgSchema.omit({ id: true, created_at: true, presets: true });
+/**
+ * Input for creating an org — the server assigns `id` and `created_at`, and the
+ * WordPress connection fields are server-owned (written only by
+ * `saveWordPressConnection` after a successful integration test).
+ */
+export const CreateOrgInput = OrgSchema.omit({
+  id: true,
+  created_at: true,
+  presets: true,
+  wordpress_token: true,
+  wordpress_connected_at: true,
+});
 // z.input (not z.infer): `plan`/`strategy_status` have defaults, so callers may omit them.
 export type CreateOrgInput = z.input<typeof CreateOrgInput>;
 
-/** True when the org has an active paid entitlement. #13 later backs this with Stripe. */
+/** True when the org has an active paid entitlement (paid or expert). Backed by
+ * billing webhooks (#13); the `db set-plan` CLI can also flip it. */
 export function isPaid(org: Org): boolean {
-  return org.plan === 'paid';
+  return org.plan === 'paid' || org.plan === 'expert';
+}
+
+/** True when the org is on the expert tier (human-operator assistance + extras). */
+export function hasExpert(org: Org): boolean {
+  return org.plan === 'expert';
+}
+
+/**
+ * Numeric rank of an entitlement tier (free < paid < expert), for comparing
+ * "already entitled at an equal-or-higher tier than X" (#13).
+ */
+export function planRank(plan: EntitlementPlan): number {
+  return ENTITLEMENT_PLANS.indexOf(plan);
 }

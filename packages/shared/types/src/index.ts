@@ -13,8 +13,9 @@ export const SETUP_STATUSES = [
 
 export type SetupStatus = (typeof SETUP_STATUSES)[number];
 
-/** Billing entitlement plans. `paid` unlocks the automated pipeline (#56). */
-export const ENTITLEMENT_PLANS = ['free', 'trial', 'paid'] as const;
+/** Billing entitlement plans. `paid`/`expert` unlock the automated pipeline (#56);
+ * `expert` additionally grants human-operator assistance + extra features (#13). */
+export const ENTITLEMENT_PLANS = ['free', 'paid', 'expert'] as const;
 export type EntitlementPlan = (typeof ENTITLEMENT_PLANS)[number];
 
 /** Lifecycle of an org's automatic 30-day strategy job (#47). */

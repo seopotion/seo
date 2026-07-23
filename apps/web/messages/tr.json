@@ -5,6 +5,39 @@
     "retry": "Tekrar dene",
     "workspaceError": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin."
   },
+  "BillingPage": {
+    "activating": {
+      "continue": "Panele devam et",
+      "error": "Abonelik durumunuz kontrol edilemedi. Tekrar deneyin.",
+      "message": "Aboneliğiniz etkinleştiriliyor…",
+      "retry": "Tekrar dene",
+      "timeout": "Bu beklenenden uzun sürüyor. Panelinize devam edebilirsiniz — yükseltme onaylanır onaylanmaz uygulanacaktır."
+    },
+    "description": "Planınızı yükselterek anahtar kelime araştırması ve planlamasının kilidini açın.",
+    "errors": {
+      "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
+      "generic": "Ödeme başlatılamadı. Tekrar deneyin."
+    },
+    "redirecting": "Yönlendiriliyor…",
+    "status": {
+      "loading": "Organizasyonunuz yükleniyor...",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
+      "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+    },
+    "tiers": {
+      "expert": {
+        "cta": "Expert-led Growth planına yükselt",
+        "description": "Growth planındaki her şeye ek olarak, içerik stratejiniz için uzman desteği.",
+        "name": "Expert-led Growth"
+      },
+      "paid": {
+        "cta": "Growth planına yükselt",
+        "description": "Anahtar kelime araştırması, planlaması ve içerik takviminizin kilidini açın.",
+        "name": "Growth"
+      }
+    },
+    "title": "Planınızı seçin"
+  },
   "GoogleJoinButton": {
     "checkingWorkspace": "Çalışma alanı kontrol ediliyor...",
     "label": "Google ile katıl",
@@ -14,6 +47,23 @@
     "signInError": "Google ile oturum açılamadı. Tekrar deneyin.",
     "signingIn": "Oturum açılıyor...",
     "workspaceError": "Çalışma alanınız kontrol edilemedi."
+  },
+  "GscCallback": {
+    "backToSettings": "Ayarlara dön",
+    "confirm": "Bu mülkü kullan",
+    "errors": {
+      "cancelled": "Google bağlantısı iptal edildi veya başarısız oldu.",
+      "exchangeFailed": "Google bağlantısı tamamlanamadı. Lütfen Ayarlar'dan tekrar deneyin.",
+      "siteFailed": "Bu mülk kaydedilemedi. Lütfen tekrar deneyin."
+    },
+    "exchanging": "Google bağlantısı tamamlanıyor...",
+    "noSites": "Bu Google hesabında Search Console mülkü yok. Sitenizi Search Console'a ekleyin ve yeniden bağlanmayı deneyin.",
+    "openGsc": "Google Search Console'u aç",
+    "pickBody": "Web sitenize karşılık gelen mülkü seçin.",
+    "pickTitle": "Sitenizin mülkünü seçin",
+    "recommended": "Önerilen",
+    "saving": "Kaydediliyor...",
+    "title": "Google Search Console'u Bağla"
   },
   "HomePage": {
     "articles": {
@@ -28,8 +78,11 @@
       "upgrade": "Kilidi açmak için yükselt"
     },
     "bestArticles": {
+      "clicks": "{count, plural, other {# tıklama}}",
       "empty": "Henüz makale performans verisi yok.",
       "gated": "Bu alanı açmak için Google Search Console'u bağlayın.",
+      "gatedCta": "Search Console'u bağla",
+      "subtitle": "Tıklamaya göre en iyi sayfalar — son 28 gün",
       "title": "En İyi Makaleler"
     },
     "loadError": "Dashboard API kullanılamıyor, bu yüzden boş geliştirme verisi gösteriliyor.",
@@ -47,6 +100,16 @@
         "upgrade": "Anahtar kelime araştırmasını açmak için yükselt"
       },
       "title": "Önerilen Aksiyonlar"
+    },
+    "searchPerformance": {
+      "clicks": "Tıklamalar",
+      "ctr": "TO",
+      "gated": "Arama performansınızı görmek için Google Search Console'u bağlayın.",
+      "gatedCta": "Search Console'u bağla",
+      "impressions": "Gösterimler",
+      "position": "Ort. konum",
+      "subtitle": "Son 28 gün",
+      "title": "Arama Performansı"
     }
   },
   "ContentPlannerPage": {
@@ -108,6 +171,7 @@
       "tableLabel": "Kullanılabilir hedef anahtar kelimeler",
       "title": "{date} için bir anahtar kelime seç",
       "upgrade": {
+        "cta": "Yükselt",
         "description": "Hedef anahtar kelimeleri içerik takviminizde planlamak için ücretli bir plana yükseltin.",
         "title": "Anahtar kelime planlama ücretli bir özelliktir"
       }
@@ -242,6 +306,7 @@
       },
       "title": "Anahtar Kelime Araştır",
       "upgrade": {
+        "cta": "Yükselt",
         "description": "Anahtar kelime araştırmak ve içerik planınıza eklemek için ücretli bir plana yükseltin.",
         "title": "Anahtar kelime araştırması ücretli bir özelliktir"
       }
@@ -359,7 +424,11 @@
   },
   "ArticleDetailPage": {
     "actions": {
-      "back": "İçerik geçmişine dön"
+      "back": "İçerik geçmişine dön",
+      "publishWordPress": "WordPress'e gönder",
+      "publishingWordPress": "WordPress'e gönderiliyor...",
+      "updateWordPress": "WordPress'i güncelle",
+      "updatingWordPress": "WordPress güncelleniyor..."
     },
     "labels": {
       "createdAt": "Oluşturulma",
@@ -378,7 +447,16 @@
       "generated": "Oluşturuldu",
       "published": "Yayınlandı"
     },
-    "title": "Makale"
+    "title": "Makale",
+    "wordpress": {
+      "connectFirst": "Bu yazıyı göndermek için <link>Ayarlar'dan WordPress'i bağlayın</link>.",
+      "pluginError": "WordPress isteği tamamlayamadı: {error}",
+      "published": "WordPress'e gönderildi.",
+      "requestError": "WordPress'e ulaşılamadı. Tekrar deneyin.",
+      "sentBadge": "WordPress'e gönderildi · #{id}",
+      "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
+      "warnings": "WordPress isteği uyarılarla tamamladı:"
+    }
   },
   "ArticleSettingsPage": {
     "actions": {
@@ -419,16 +497,43 @@
       "save": "Kaydet",
       "saving": "Kaydediliyor..."
     },
+    "billing": {
+      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
+      "freeDescription": "Anahtar kelime araştırması ve planlamasının kilidini açmak için yükseltin.",
+      "manage": "Faturalandırmayı yönet",
+      "manageError": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
+      "opening": "Açılıyor...",
+      "upgradeCta": "Planları görüntüle"
+    },
     "googleSearchConsole": {
-      "comingSoon": "Yakında",
-      "connect": "Bağlan",
-      "description": "Google Search Console bağlantı ayarları burada görünecek."
+      "badges": { "connected": "Bağlı", "notConnected": "Bağlı değil" },
+      "benefit1": "Son 28 günün tıklama, gösterim, TO ve ortalama konum verileri",
+      "benefit2": "Gerçek Google Arama tıklamalarına göre en iyi performans gösteren makaleleriniz",
+      "changeConnection": "Hesabı veya mülkü değiştir",
+      "connect": "Google ile bağlan",
+      "connectError": "Google bağlantısı başlatılamadı. Lütfen tekrar deneyin.",
+      "connectedAccount": "Google hesabı",
+      "connectedOn": "{date} tarihinde bağlandı",
+      "connectedSuccess": "Google Search Console bağlandı. Arama verileriniz artık Ana Sayfa'da.",
+      "connecting": "Google açılıyor...",
+      "description": "Sitenizin Google Arama'daki performansını — tıklamaları, gösterimleri ve en iyi makalelerinizi — doğrudan Ana Sayfa panelinizde görün.",
+      "disconnect": "Bağlantıyı kes",
+      "disconnectCancel": "Vazgeç",
+      "disconnectConfirm": "Search Console bağlantısı kesilsin mi? Ana Sayfa'daki performans kartları yeniden kilitlenecek.",
+      "disconnectConfirmYes": "Evet, bağlantıyı kes",
+      "disconnectError": "Bağlantı kesilemedi. Lütfen tekrar deneyin.",
+      "property": "Mülk",
+      "readOnlyNote": "SEO Potion, Search Console verilerinizi yalnızca okur. Google hesabınızda hiçbir şeyi değiştirmez.",
+      "reconnect": "Yeniden bağlan",
+      "reconnectNeeded": "Search Console erişimi iptal edilmiş veya süresi dolmuş. Arama verilerinizin akmaya devam etmesi için yeniden bağlanın.",
+      "statusError": "Search Console bağlantı durumu yüklenemedi.",
+      "statusLoading": "Search Console bağlantısı kontrol ediliyor...",
+      "title": "Google Search Console"
     },
     "placeholders": {
       "competitorUrl": "https://rakip.com"
     },
     "status": {
-      "integrationsUnsupported": "Entegrasyon seçimleri henüz kaydedilmiyor çünkü canlı entegrasyon API'si hazır değil.",
       "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "Ayarlar yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
@@ -438,10 +543,51 @@
     },
     "tabs": {
       "audienceCompetitors": "Hedef Kitle ve Rakipler",
+      "billing": "Faturalandırma",
       "business": "İşletme",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
       "label": "Ayar bölümleri"
+    },
+    "wordpress": {
+      "badges": {
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil"
+      },
+      "cancel": "İptal",
+      "comingSoon": "Çok yakında",
+      "connectAndTest": "Bağlan ve test et",
+      "connectedOn": "{date} tarihinde bağlandı",
+      "connectedSuccess": "WordPress bağlantısı başarıyla kuruldu ve test edildi.",
+      "connecting": "Bağlanıyor...",
+      "downloadPlugin": "Eklentiyi indir (.zip)",
+      "errors": {
+        "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
+        "invalidToken": "Bu token, WordPress eklentinizde kayıtlı olanla eşleşmiyor. 2. adımı kontrol edip aynı token'ı yapıştırın.",
+        "pluginNotConfigured": "Eklentide henüz kayıtlı bir token yok. Önce WordPress yönetim panelinizde 2. adımı tamamlayın.",
+        "requestFailed": "Sitenizdeki SEO Potion eklentisine ulaşamadık. Eklentinin kurulu ve etkin olduğundan emin olun (1. adım) ve tekrar deneyin."
+      },
+      "gallery": "Yayınlama entegrasyonları",
+      "loadError": "Kayıtlı WordPress bağlantı durumu yüklenemedi.",
+      "loading": "WordPress bağlantısı kontrol ediliyor...",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress",
+        "wordpressCom": "WordPress.com"
+      },
+      "replaceNote": "Yeniden bağlanmak yeni token'ı sitenizde test eder ve kayıtlı token'ın yerine geçer.",
+      "replaceToken": "Token'ı değiştir",
+      "setupTitle": "WordPress sitenizi bağlayın",
+      "step1Action": "Eklenti yükleme sayfasını aç",
+      "step1Body": "SEO Potion eklentisini indirin, ardından WordPress yönetim panelinizden yükleyip etkinleştirin.",
+      "step1Title": "SEO Potion eklentisini kurun",
+      "step2Action": "Eklenti ayarlarını aç",
+      "step2Body": "WordPress'te SEO Potion → Manage sayfasını açın. Güçlü bir token seçin, gönderilen yazıların taslak olarak mı kaydedileceğini yoksa doğrudan mı yayınlanacağını belirleyin ve kaydedin.",
+      "step2Title": "Entegrasyon token'ınızı oluşturun",
+      "step3Body": "Aynı token'ı buraya yapıştırın. Kaydetmeden önce sitenizde test ederiz — kayıtlı token'lar bir daha gösterilmez.",
+      "step3Title": "SEO Potion'ı bağlayın",
+      "token": "Entegrasyon token'ı",
+      "tokenPlaceholder": "WordPress'te kaydettiğiniz token'ı yapıştırın"
     }
   },
   "LandingPage": {
@@ -620,6 +766,11 @@
     "integrations": {
       "availableIntegrations": "Mevcut entegrasyonlar",
       "comingSoon": "Yakında",
+      "connectWordPressLater": "WordPress'i daha sonra Ayarlar'dan bağlayabilirsiniz.",
+      "providers": {
+        "framer": "Framer",
+        "wordpress": "Kendi sunucunuzdaki WordPress"
+      },
       "referralSource": "Bizi nereden duydunuz?",
       "selectOption": "Bir seçenek seç",
       "settingsNotice": "Onboarding tamamlandığında entegrasyonlarınızı kontrol panelinizdeki Ayarlar bölümünden bağlayabilir ve yönetebilirsiniz.",
