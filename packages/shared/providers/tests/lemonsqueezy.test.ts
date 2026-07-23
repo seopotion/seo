@@ -104,6 +104,25 @@ describe('lemonsqueezy parseWebhookEvent', () => {
   });
 });
 
+describe('lemonsqueezy cancelSubscription', () => {
+  afterEach(() => vi.restoreAllMocks());
+  test('DELETEs the subscription', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ data: {} }), { status: 200 }));
+    await provider.cancelSubscription('sub_9');
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe('https://api.lemonsqueezy.com/v1/subscriptions/sub_9');
+    expect(init?.method).toBe('DELETE');
+  });
+  test('throws on a non-ok response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }));
+    await expect(provider.cancelSubscription('sub_9')).rejects.toThrow(
+      'LemonSqueezy subscription cancel failed: 404',
+    );
+  });
+});
+
 describe('lemonsqueezy createCheckout', () => {
   afterEach(() => vi.restoreAllMocks());
   test('POSTs a checkout with org_id in custom data and returns the url', async () => {

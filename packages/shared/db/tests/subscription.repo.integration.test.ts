@@ -56,6 +56,21 @@ describe('SubscriptionRepo (integration)', () => {
     ).toBeNull();
   });
 
+  test('listActiveByOrg returns only the org’s active subscriptions', async () => {
+    // o3 has one active, one cancelled, plus an unrelated org's active sub.
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o3', provider_subscription_id: 'sub_3a', status: 'active' }),
+    );
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o3', provider_subscription_id: 'sub_3b', status: 'cancelled' }),
+    );
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o4', provider_subscription_id: 'sub_4', status: 'active' }),
+    );
+    const active = await SubscriptionRepo.listActiveByOrg('o3');
+    expect(active.map((s) => s.provider_subscription_id)).toEqual(['sub_3a']);
+  });
+
   test('findLatestByOrg returns the most recent subscription regardless of status', async () => {
     await SubscriptionRepo.upsertFromEvent(
       evt({ org_id: 'o2', provider_subscription_id: 'sub_2', status: 'cancelled' }),

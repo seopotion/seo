@@ -126,6 +126,18 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
       }
     },
 
+    async cancelSubscription(providerSubscriptionId) {
+      const res = await fetch(`${LS_API}/subscriptions/${providerSubscriptionId}`, {
+        method: 'DELETE',
+        headers: { Accept: JSON_API, Authorization: `Bearer ${cfg.apiKey}` },
+      });
+      if (!res.ok) {
+        throw new Error(
+          `LemonSqueezy subscription cancel failed: ${res.status} ${await res.text()}`,
+        );
+      }
+    },
+
     async getCustomerPortalUrl(providerCustomerId) {
       const res = await fetch(`${LS_API}/customers/${providerCustomerId}`, {
         headers: { Accept: JSON_API, Authorization: `Bearer ${cfg.apiKey}` },

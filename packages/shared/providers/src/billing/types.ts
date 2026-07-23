@@ -47,4 +47,7 @@ export interface BillingProvider {
 
   /** "Manage billing" link (cancel / update card). */
   getCustomerPortalUrl(providerCustomerId: string): Promise<{ url: string }>;
+
+  /** Cancel a subscription (access-until-expiry semantics on the provider side). */
+  cancelSubscription(providerSubscriptionId: string): Promise<void>;
 }

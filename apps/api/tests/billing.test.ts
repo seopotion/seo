@@ -12,14 +12,19 @@ vi.mock('../src/lib/billing/apply-event', () => ({ applyBillingEvent }));
 const { findLatestByOrg } = vi.hoisted(() => ({ findLatestByOrg: vi.fn() }));
 vi.mock('@shared/db', () => ({ SubscriptionRepo: { findLatestByOrg } }));
 
-const { createCheckout, verifyWebhook, parseWebhookEvent, getCustomerPortalUrl } = vi.hoisted(
-  () => ({
-    createCheckout: vi.fn(),
-    verifyWebhook: vi.fn(),
-    parseWebhookEvent: vi.fn(),
-    getCustomerPortalUrl: vi.fn(),
-  }),
-);
+const {
+  createCheckout,
+  verifyWebhook,
+  parseWebhookEvent,
+  getCustomerPortalUrl,
+  cancelSubscription,
+} = vi.hoisted(() => ({
+  createCheckout: vi.fn(),
+  verifyWebhook: vi.fn(),
+  parseWebhookEvent: vi.fn(),
+  getCustomerPortalUrl: vi.fn(),
+  cancelSubscription: vi.fn(),
+}));
 vi.mock('../src/clients/billing', () => ({
   getBillingProvider: async () => ({
     name: 'lemonsqueezy',
@@ -27,6 +32,7 @@ vi.mock('../src/clients/billing', () => ({
     verifyWebhook,
     parseWebhookEvent,
     getCustomerPortalUrl,
+    cancelSubscription,
   }),
 }));
 
@@ -136,10 +142,10 @@ describe('POST /webhook/lemonsqueezy', () => {
       body: '{"meta":{}}',
     });
     expect(res.status).toBe(200);
-    expect(applyBillingEvent).toHaveBeenCalledWith({
-      type: 'subscription_expired',
-      providerSubscriptionId: 'sub_1',
-    });
+    expect(applyBillingEvent).toHaveBeenCalledWith(
+      { type: 'subscription_expired', providerSubscriptionId: 'sub_1' },
+      expect.objectContaining({ name: 'lemonsqueezy' }),
+    );
   });
 
   test('200 no-op on an unknown/ignored event', async () => {

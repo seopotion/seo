@@ -102,7 +102,7 @@ const billing = new OpenAPIHono<AuthEnv>()
       const provider = await getBillingProvider();
       if (!provider.verifyWebhook(raw, signature)) return c.body(null, 401);
       const event = provider.parseWebhookEvent(raw);
-      if (event) await applyBillingEvent(event);
+      if (event) await applyBillingEvent(event, provider);
       return c.json({ received: true }, 200);
     },
   );

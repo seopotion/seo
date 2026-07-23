@@ -30,6 +30,14 @@ export const SubscriptionRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  /** All of the org's active subscriptions. Normally at most one, but an
+   * upgrade checkout creates a new provider subscription, so the applier uses
+   * this to cancel any superseded ones. */
+  async listActiveByOrg(org_id: string): Promise<Subscription[]> {
+    const docs = await (await collection()).find({ org_id, status: 'active' }).toArray();
+    return docs.map(toEntity);
+  },
+
   /**
    * The org's most recent subscription regardless of status. Used by the
    * portal route: past_due (dunning) and cancelled (access-until-expiry) orgs
