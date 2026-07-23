@@ -5,6 +5,7 @@ describe('categorizeHttpStatus', () => {
   test.each([
     [401, 'auth'],
     [403, 'auth'],
+    [402, 'payment_required'],
     [429, 'rate_limit'],
     [400, 'invalid_request'],
     [404, 'invalid_request'],
@@ -18,7 +19,8 @@ describe('categorizeHttpStatus', () => {
 describe('categorizeApiStatus (DataForSEO body status_code)', () => {
   test.each([
     [40100, 'auth'],
-    [40200, 'rate_limit'],
+    [40200, 'payment_required'],
+    [40202, 'rate_limit'],
     [40000, 'invalid_request'],
     [50000, 'provider'],
   ])('%i -> %s', (code, expected) => {
@@ -33,6 +35,7 @@ describe('isRetryable', () => {
     expect(isRetryable('network')).toBe(true);
     expect(isRetryable('timeout')).toBe(true);
     expect(isRetryable('auth')).toBe(false);
+    expect(isRetryable('payment_required')).toBe(false);
     expect(isRetryable('invalid_request')).toBe(false);
   });
 });
