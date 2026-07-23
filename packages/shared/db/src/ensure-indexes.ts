@@ -56,4 +56,10 @@ export async function ensureIndexes(): Promise<void> {
   // One GSC connection per org (#12); the unique index makes upsertToken safe
   // under concurrent connect callbacks.
   await db.collection('gsc_connections').createIndex({ org_id: 1 }, { unique: true });
+  // Billing (#13). Unique on the provider subscription id makes upsertFromEvent
+  // idempotent under at-least-once webhooks; org_id index serves findActiveByOrg.
+  await db
+    .collection('subscriptions')
+    .createIndex({ provider_subscription_id: 1 }, { unique: true });
+  await db.collection('subscriptions').createIndex({ org_id: 1, status: 1 });
 }

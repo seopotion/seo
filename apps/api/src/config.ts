@@ -11,6 +11,10 @@ export const config = {
   JWT_SECRET: process.env.JWT_SECRET ?? 'dev-secret-change-me',
   /** Google OAuth client id — the audience our login tokens are verified against. */
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+  /** Route-wide shared secret for the WordPress publishing endpoints, sent as
+   * `X-Secret-Key`. Hardcoded so staging matches automatically — must equal the
+   * value baked into the WordPress plugin. */
+  WORDPRESS_ROUTE_SECRET: 'cb69e1ec7ba2ed6641b122ca3af368823a941b99b5ea67c191c4e8e1923e1772',
   /** Name of the SSM SecureString holding the Google OAuth client secret in
    * deployed envs. Unset locally — GOOGLE_CLIENT_SECRET below is used directly. */
   GOOGLE_CLIENT_SECRET_PARAM: process.env.GOOGLE_CLIENT_SECRET_PARAM ?? '',
@@ -22,6 +26,20 @@ export const config = {
   GSC_TOKEN_KEY: process.env.GSC_TOKEN_KEY ?? '',
   /** Web app origin — builds the GSC OAuth redirect URI (<origin>/dashboard/gsc/callback). */
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  /** Name of the SSM SecureString holding the LemonSqueezy API key (deployed).
+   * Unset locally — LEMONSQUEEZY_API_KEY below is used directly. */
+  LEMONSQUEEZY_API_KEY_PARAM: process.env.LEMONSQUEEZY_API_KEY_PARAM ?? '',
+  /** Local-dev LemonSqueezy API key (#13). */
+  LEMONSQUEEZY_API_KEY: process.env.LEMONSQUEEZY_API_KEY ?? '',
+  /** Name of the SSM SecureString holding the LemonSqueezy webhook signing secret. */
+  LEMONSQUEEZY_WEBHOOK_SECRET_PARAM: process.env.LEMONSQUEEZY_WEBHOOK_SECRET_PARAM ?? '',
+  /** Local-dev LemonSqueezy webhook signing secret (#13). */
+  LEMONSQUEEZY_WEBHOOK_SECRET: process.env.LEMONSQUEEZY_WEBHOOK_SECRET ?? '',
+  /** LemonSqueezy store id (public, per-env). */
+  LEMONSQUEEZY_STORE_ID: process.env.LEMONSQUEEZY_STORE_ID ?? '',
+  /** LemonSqueezy variant ids per paid tier (public, per-env). */
+  LEMONSQUEEZY_VARIANT_PAID: process.env.LEMONSQUEEZY_VARIANT_PAID ?? '',
+  LEMONSQUEEZY_VARIANT_EXPERT: process.env.LEMONSQUEEZY_VARIANT_EXPERT ?? '',
   /** Session token lifetime. */
   JWT_TTL_SECONDS: 60 * 60 * 24 * 7,
 };

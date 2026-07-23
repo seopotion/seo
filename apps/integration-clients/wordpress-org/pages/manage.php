@@ -1,0 +1,83 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
+
+// Handle API key form submission
+if (isset($_POST['btn_save_and_sync'])) {
+    // Nonce verification
+    check_admin_referer('seo_potion_save_key');
+
+    // Securely handle input
+    $seo_potion_api_key = isset($_POST['api_key']) ? sanitize_text_field(wp_unslash($_POST['api_key'])) : '';
+    $seo_potion_post_mode = isset($_POST['post_as_draft']) ? sanitize_text_field(wp_unslash($_POST['post_as_draft'])) : 'no';
+
+    if (!in_array($seo_potion_post_mode, ['yes', 'no'])) {
+        $seo_potion_post_mode = 'no'; // fallback
+    }
+
+    update_option('seo_potion_api_key', $seo_potion_api_key);
+    update_option('seo_potion_post_as_draft', $seo_potion_post_mode);
+
+    echo '<div class="seo-potion-success-notice">
+            <div class="notice-content">
+                <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                </svg>
+                <div>
+                    <div class="notice-title">Settings Saved Successfully!</div>
+                    <div class="notice-subtitle">Integration token and preferences updated successfully.</div>
+                </div>
+            </div>
+          </div>';
+}
+
+// Get saved values
+$seo_potion_api_key = get_option('seo_potion_api_key');
+$seo_potion_is_draft = get_option('seo_potion_post_as_draft', 'no');
+?>
+
+<div class="seo-potion-settings-container">
+    <div class="seo-potion-settings-card">
+        <div class="seo-potion-settings-header">
+            <h1 class="settings-title"><?php echo empty($seo_potion_api_key) ? 'SEO Potion Plugin Set Up' : 'Plugin Settings'; ?></h1>
+            <p class="settings-subtitle">Configure SEO Potion plugin to publish articles to your website</p>
+        </div>
+
+        <div class="settings-form-container">
+            <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=seo-potion-manage')); ?>" class="settings-form">
+                <?php wp_nonce_field('seo_potion_save_key'); ?>
+
+                <div class="field-group">
+                    <label for="api_key" class="field-label">Integration Token</label>
+                    <input 
+                        type="text" 
+                        id="api_key" 
+                        name="api_key" 
+                        class="field-input" 
+                        value="<?php echo esc_attr($seo_potion_api_key); ?>" 
+                        placeholder="Choose a strong integration token..."
+                        required 
+                    />
+                    <p class="field-description">
+                        Choose a strong integration token here, save it, then paste the same token into SEO Potion Settings.
+                    </p>
+                </div>
+
+                <div class="field-group">
+                    <label for="post_as_draft" class="field-label">Post Mode</label>
+                    <select name="post_as_draft" id="post_as_draft" class="field-input">
+                        <option value="" disabled>Select Post Mode</option>
+                        <option value="yes" <?php selected($seo_potion_is_draft, 'yes'); ?>>Save as Draft</option>
+                        <option value="no" <?php selected($seo_potion_is_draft, 'no'); ?>>Publish Directly</option>
+                    </select>
+                    <p class="field-description">Choose whether incoming posts are published immediately or saved as drafts.</p>
+                </div>
+
+                <div class="flex-buttons" style="display: flex; gap: 12px; margin-top: 16px;">
+                    <button id="save-btn" type="submit" name="btn_save_and_sync" class="save-button">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -66,7 +66,7 @@ export const dbCommand = defineCommand({
       args: {
         org: { type: 'string', description: 'Org id to update' },
         user: { type: 'string', description: "Owner's email; resolves to their single org" },
-        plan: { type: 'string', description: 'free | trial | paid', default: 'paid' },
+        plan: { type: 'string', description: 'free | paid | expert', default: 'paid' },
         ...outputOption,
         ...verboseOption,
       },

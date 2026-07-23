@@ -45,11 +45,37 @@ describe('ArticleSchema', () => {
     });
     expect(a.status).toBe('generated');
     expect(a.published_at).toBeNull();
+    expect(a.wordpress_post_id).toBeUndefined();
   });
 
-  test('CreateArticleInput omits id and created_at', () => {
+  test('accepts only a positive integer WordPress post ID', () => {
+    const base = {
+      id: 'a1',
+      org_id: 'o1',
+      keyword_id: 'k1',
+      title: 'Best Practices',
+      meta_title: 'Best Practices 2026',
+      slug: 'best-practices',
+      keyword: 'notion seo',
+      meta_description: 'meta',
+      featured_image_url: 'https://x/i.png',
+      content: '# body',
+      difficulty: 36,
+      search_volume: 170,
+      status: 'generated' as const,
+      created_at: new Date(),
+      published_at: null,
+    };
+
+    expect(ArticleSchema.parse({ ...base, wordpress_post_id: 42 }).wordpress_post_id).toBe(42);
+    expect(() => ArticleSchema.parse({ ...base, wordpress_post_id: 0 })).toThrow();
+    expect(() => ArticleSchema.parse({ ...base, wordpress_post_id: 1.5 })).toThrow();
+  });
+
+  test('CreateArticleInput omits server-owned fields', () => {
     expect('id' in CreateArticleInput.shape).toBe(false);
     expect('created_at' in CreateArticleInput.shape).toBe(false);
+    expect('wordpress_post_id' in CreateArticleInput.shape).toBe(false);
     expect('keyword_id' in CreateArticleInput.shape).toBe(true);
   });
 });

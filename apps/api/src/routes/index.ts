@@ -3,6 +3,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
+import billing from './billing';
 import core from './core';
 import dashboard from './dashboard';
 import gsc from './gsc';
@@ -22,6 +23,7 @@ app.get('/health', (c) => c.text('OK'));
  */
 const routes = app
   .route(`/api/${API_VERSION}/core`, core)
+  .route(`/api/${API_VERSION}/billing`, billing)
   .route(`/api/${API_VERSION}/setup`, setup)
   .route(`/api/${API_VERSION}/keywords`, keywords)
   .route(`/api/${API_VERSION}/dashboard`, dashboard)

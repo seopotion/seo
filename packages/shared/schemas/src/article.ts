@@ -65,6 +65,7 @@ export const ArticleSchema = z.object({
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),
   published_at: z.date().nullable(),
+  wordpress_post_id: z.number().int().positive().optional(),
   // Last editor save (#74). Defaulted so pre-#74 docs still parse; null means
   // never edited since generation.
   updated_at: z.date().nullable().default(null),
@@ -77,11 +78,13 @@ export const ArticleSchema = z.object({
 });
 export type Article = z.infer<typeof ArticleSchema>;
 
-/** Input for creating an article — the server assigns `id`, `created_at`, `updated_at`. */
+/** Input for creating an article — the server assigns `id`, `created_at`,
+ * `updated_at`, and `wordpress_post_id`. */
 export const CreateArticleInput = ArticleSchema.omit({
   id: true,
   created_at: true,
   updated_at: true,
+  wordpress_post_id: true,
 });
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the
 // type, matching the runtime contract — same rationale as `CreateKeywordInput`.

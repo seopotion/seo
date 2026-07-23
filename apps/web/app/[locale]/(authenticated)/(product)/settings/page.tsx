@@ -2,11 +2,9 @@
 
 import type { SetupPresets } from '@shared/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
   Input,
   Label,
@@ -26,7 +24,6 @@ import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { TextEntryList } from '../../onboarding/components/TextEntryList';
 import { countries, languages, MAX_TARGET_AUDIENCES } from '../../onboarding/constants';
-import { integrationOptions } from '../../onboarding/steps/IntegrationsStep';
 import type { TextEntry } from '../../onboarding/types';
 import {
   createEntryId,
@@ -34,12 +31,16 @@ import {
   stringsToTextEntries,
   textEntriesToStrings,
 } from '../../onboarding/utils';
+import { BillingPanel } from './_components/BillingPanel';
+import { GoogleSearchConsolePanel } from './_components/GoogleSearchConsolePanel';
+import { IntegrationsPanel } from './_components/IntegrationsPanel';
 
 const settingsTabs = [
   'business',
   'audienceCompetitors',
   'integrations',
   'googleSearchConsole',
+  'billing',
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number];
@@ -49,7 +50,6 @@ type SettingsForm = {
   businessName: string;
   competitors: TextEntry[];
   country: string;
-  integrations: string[];
   language: string;
   targetAudience: TextEntry[];
 };
@@ -69,7 +69,6 @@ const initialSettings: SettingsForm = {
   businessName: '',
   competitors: [],
   country: countries[0].value,
-  integrations: [],
   language: languages[0].value,
   targetAudience: [],
 };
@@ -108,7 +107,6 @@ export default function SettingsPage() {
   const t = useTranslations('SettingsPage');
   const businessT = useTranslations('Onboarding.business');
   const audienceT = useTranslations('Onboarding.audience');
-  const integrationsT = useTranslations('Onboarding.integrations');
   const optionsT = useTranslations('Onboarding.options');
   const validationT = useTranslations('Onboarding.validation');
   const router = useRouter();
@@ -228,6 +226,15 @@ export default function SettingsPage() {
     },
   });
 
+  useEffect(() => {
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    const matchedTab = settingsTabs.find((tab) => tab === tabParam);
+
+    if (matchedTab) {
+      setActiveTab(matchedTab);
+    }
+  }, []);
+
   function markEdited() {
     editRevisionRef.current += 1;
     setSaveState('idle');
@@ -319,18 +326,6 @@ export default function SettingsPage() {
     }));
     markEdited();
     setCompetitorError('');
-  }
-
-  function toggleIntegration(integrationId: string) {
-    setSettings((currentSettings) => {
-      const selected = currentSettings.integrations.includes(integrationId);
-
-      return {
-        ...currentSettings,
-        integrations: selected ? [] : [integrationId],
-      };
-    });
-    markEdited();
   }
 
   if (
@@ -503,43 +498,7 @@ export default function SettingsPage() {
         aria-labelledby="settings-tab-integrations"
         hidden={activeTab !== 'integrations'}
       >
-        <div className="grid gap-4">
-          <FieldPanel>
-            <p className="font-medium text-sm leading-none">
-              {integrationsT('availableIntegrations')}
-            </p>
-            <p className="mt-1 text-slate-500 text-sm">{t('status.integrationsUnsupported')}</p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {integrationOptions.map((integration) => {
-                const selected = settings.integrations.includes(integration.id);
-
-                return (
-                  <Button
-                    key={integration.id}
-                    type="button"
-                    variant="outline"
-                    onClick={() => toggleIntegration(integration.id)}
-                    aria-pressed={selected}
-                    className={cn(
-                      'h-auto justify-start gap-3 px-3 py-3 text-left',
-                      selected
-                        ? 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary'
-                        : 'text-foreground',
-                    )}
-                  >
-                    <span className="flex size-9 items-center justify-center">
-                      <Image src={integration.logoSrc} alt="" width={20} height={20} aria-hidden />
-                    </span>
-                    <span className="font-semibold">{integration.name}</span>
-                    {integration.comingSoon ? (
-                      <Badge variant="secondary">{integrationsT('comingSoon')}</Badge>
-                    ) : null}
-                  </Button>
-                );
-              })}
-            </div>
-          </FieldPanel>
-        </div>
+        <IntegrationsPanel organization={organization} onUnauthorized={handleUnauthorized} />
       </div>
 
       <div
@@ -548,17 +507,16 @@ export default function SettingsPage() {
         aria-labelledby="settings-tab-googleSearchConsole"
         hidden={activeTab !== 'googleSearchConsole'}
       >
-        <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="font-medium text-slate-950 text-sm">
-              {t('googleSearchConsole.comingSoon')}
-            </p>
-            <p className="mt-1 text-slate-500 text-sm">{t('googleSearchConsole.description')}</p>
-          </div>
-          <Button type="button" disabled>
-            {t('googleSearchConsole.connect')}
-          </Button>
-        </div>
+        <GoogleSearchConsolePanel organization={organization} onUnauthorized={handleUnauthorized} />
+      </div>
+
+      <div
+        id="settings-panel-billing"
+        role="tabpanel"
+        aria-labelledby="settings-tab-billing"
+        hidden={activeTab !== 'billing'}
+      >
+        <BillingPanel onUnauthorized={handleUnauthorized} organization={organization} />
       </div>
 
       <div className="flex justify-end">
@@ -579,6 +537,7 @@ function StatusPanel({
 }) {
   return (
     <div
+      aria-live="polite"
       className={cn(
         'rounded-md border px-4 py-3 text-sm',
         tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
