@@ -66,7 +66,20 @@ export interface SetPlanData {
 export interface ResetUserData {
   user_id: string;
   org_ids: string[];
-  deleted: { orgs: number; keywords: number; candidates: number; articles: number };
+  /** Active provider (LemonSqueezy) subscriptions cancelled before deletion. */
+  cancelled_subscriptions: number;
+  deleted: {
+    orgs: number;
+    keywords: number;
+    candidates: number;
+    articles: number;
+    gsc_connections: number;
+    subscriptions: number;
+  };
+}
+
+export interface DeleteUserData extends ResetUserData {
+  user_deleted: boolean;
 }
 
 export type Stage = 'staging' | 'prod';

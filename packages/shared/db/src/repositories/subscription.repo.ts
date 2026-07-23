@@ -70,6 +70,12 @@ export const SubscriptionRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  /** Delete all of an org's subscriptions (CLI reset/delete-user). Returns the count. */
+  async deleteByOrgId(org_id: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id });
+    return res.deletedCount;
+  },
+
   /**
    * Idempotent upsert keyed on `provider_subscription_id`. Sets `created_at`
    * only on insert; always bumps `updated_at`. Webhooks are at-least-once, so

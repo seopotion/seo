@@ -92,6 +92,35 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'delete-user': defineCommand({
+      meta: {
+        name: 'delete-user',
+        description:
+          'Nuke a user entirely: cancel active LemonSqueezy subs, delete all org data AND the user document',
+      },
+      args: {
+        user: { type: 'string', description: "User's email; deletes them and every org they own" },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { deleteUser } = await import('../lib/db');
+
+          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.step('db:delete-user', 'start');
+
+          const result = await deleteUser({ user: args.user as string | undefined });
+          emitter.step('db:delete-user', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'reset-user': defineCommand({
       meta: {
         name: 'reset-user',
