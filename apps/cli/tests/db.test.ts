@@ -14,7 +14,12 @@ const {
   deleteKeywordsByOrgId,
   deleteCandidatesByOrgId,
   deleteArticlesByOrgId,
+  deleteGscConnectionByOrgId,
+  deleteSubscriptionsByOrgId,
+  listActiveByOrg,
+  deleteUserById,
   enqueueStrategyTask,
+  cancelSubscription,
 } = vi.hoisted(() => ({
   ensureIndexes: vi.fn(async () => {}),
   runMigrations: vi.fn(async () => ({
@@ -45,7 +50,12 @@ const {
   deleteKeywordsByOrgId: vi.fn(async () => 3),
   deleteCandidatesByOrgId: vi.fn(async () => 2),
   deleteArticlesByOrgId: vi.fn(async () => 1),
+  deleteGscConnectionByOrgId: vi.fn(async () => true),
+  deleteSubscriptionsByOrgId: vi.fn(async () => 1),
+  listActiveByOrg: vi.fn(async (): Promise<{ provider_subscription_id: string }[]> => []),
+  deleteUserById: vi.fn(async () => true),
   enqueueStrategyTask: vi.fn(async () => {}),
+  cancelSubscription: vi.fn(async () => {}),
 }));
 
 vi.mock('@shared/db', () => ({
@@ -60,15 +70,21 @@ vi.mock('@shared/db', () => ({
     findByUserId,
     deleteById: deleteOrgById,
   },
-  UserRepo: { findByEmail },
+  UserRepo: { findByEmail, deleteById: deleteUserById },
   KeywordRepo: { deleteByOrgId: deleteKeywordsByOrgId },
   CandidateRepo: { deleteByOrgId: deleteCandidatesByOrgId },
   ArticleRepo: { deleteByOrgId: deleteArticlesByOrgId },
+  GscConnectionRepo: { deleteByOrgId: deleteGscConnectionByOrgId },
+  SubscriptionRepo: { deleteByOrgId: deleteSubscriptionsByOrgId, listActiveByOrg },
 }));
 
 vi.mock('../src/lib/sqs', () => ({ enqueueStrategyTask }));
 
-import { initDb, migrateDb, resetUser, setOrgPlan } from '../src/lib/db';
+vi.mock('@shared/providers', () => ({
+  createLemonSqueezyProvider: () => ({ cancelSubscription }),
+}));
+
+import { deleteUser, initDb, migrateDb, resetUser, setOrgPlan } from '../src/lib/db';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -231,21 +247,66 @@ describe('setOrgPlan', () => {
 });
 
 describe('resetUser', () => {
-  test('deletes org data, the org, and reports counts', async () => {
+  test('deletes org data (incl. gsc + subscriptions), the org, and reports counts', async () => {
     const res = await resetUser({ user: 'dev@example.com' });
     expect(findByEmail).toHaveBeenCalledWith('dev@example.com');
     expect(deleteKeywordsByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteCandidatesByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteArticlesByOrgId).toHaveBeenCalledWith('org_1');
+    expect(deleteGscConnectionByOrgId).toHaveBeenCalledWith('org_1');
+    expect(deleteSubscriptionsByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteOrgById).toHaveBeenCalledWith('org_1');
+    expect(deleteUserById).not.toHaveBeenCalled();
     expect(closeDb).toHaveBeenCalledOnce();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
     expect(res.data).toEqual({
       user_id: 'u_1',
       org_ids: ['org_1'],
-      deleted: { orgs: 1, keywords: 3, candidates: 2, articles: 1 },
+      cancelled_subscriptions: 0,
+      deleted: {
+        orgs: 1,
+        keywords: 3,
+        candidates: 2,
+        articles: 1,
+        gsc_connections: 1,
+        subscriptions: 1,
+      },
     });
+  });
+
+  test('cancels active provider subscriptions before deleting anything', async () => {
+    process.env.LEMONSQUEEZY_API_KEY = 'test-key';
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await resetUser({ user: 'dev@example.com' });
+    expect(cancelSubscription).toHaveBeenCalledWith('sub_9');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.cancelled_subscriptions).toBe(1);
+    delete process.env.LEMONSQUEEZY_API_KEY;
+  });
+
+  test('fails before deleting when an active sub exists but LEMONSQUEEZY_API_KEY is unset', async () => {
+    delete process.env.LEMONSQUEEZY_API_KEY;
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await resetUser({ user: 'dev@example.com' });
+    expect(cancelSubscription).not.toHaveBeenCalled();
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('SUB_CANCEL_FAILED');
+  });
+
+  test('fails before deleting when the provider cancel call throws', async () => {
+    process.env.LEMONSQUEEZY_API_KEY = 'test-key';
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    cancelSubscription.mockRejectedValueOnce(new Error('LS down'));
+    const res = await resetUser({ user: 'dev@example.com' });
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('SUB_CANCEL_FAILED');
+    delete process.env.LEMONSQUEEZY_API_KEY;
   });
 
   test('wipes every org for a multi-org user, summing counts', async () => {
@@ -257,7 +318,14 @@ describe('resetUser', () => {
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.org_ids).toEqual(['org_1', 'org_2']);
-    expect(res.data.deleted).toEqual({ orgs: 2, keywords: 6, candidates: 4, articles: 2 });
+    expect(res.data.deleted).toEqual({
+      orgs: 2,
+      keywords: 6,
+      candidates: 4,
+      articles: 2,
+      gsc_connections: 2,
+      subscriptions: 2,
+    });
   });
 
   test('succeeds with zero counts when the user owns no org', async () => {
@@ -267,7 +335,14 @@ describe('resetUser', () => {
     expect(deleteOrgById).not.toHaveBeenCalled();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data.deleted).toEqual({ orgs: 0, keywords: 0, candidates: 0, articles: 0 });
+    expect(res.data.deleted).toEqual({
+      orgs: 0,
+      keywords: 0,
+      candidates: 0,
+      articles: 0,
+      gsc_connections: 0,
+      subscriptions: 0,
+    });
   });
 
   test('fails when the email matches no user', async () => {
@@ -286,5 +361,57 @@ describe('resetUser', () => {
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('expected failure');
     expect(res.error.code).toBe('BAD_TARGET');
+  });
+});
+
+describe('deleteUser', () => {
+  test('wipes org data like reset and deletes the user document too', async () => {
+    const res = await deleteUser({ user: 'dev@example.com' });
+    expect(deleteKeywordsByOrgId).toHaveBeenCalledWith('org_1');
+    expect(deleteSubscriptionsByOrgId).toHaveBeenCalledWith('org_1');
+    expect(deleteOrgById).toHaveBeenCalledWith('org_1');
+    expect(deleteUserById).toHaveBeenCalledWith('u_1');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data).toEqual({
+      user_id: 'u_1',
+      org_ids: ['org_1'],
+      cancelled_subscriptions: 0,
+      user_deleted: true,
+      deleted: {
+        orgs: 1,
+        keywords: 3,
+        candidates: 2,
+        articles: 1,
+        gsc_connections: 1,
+        subscriptions: 1,
+      },
+    });
+  });
+
+  test('cancels active provider subscriptions before deleting', async () => {
+    process.env.LEMONSQUEEZY_API_KEY = 'test-key';
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await deleteUser({ user: 'dev@example.com' });
+    expect(cancelSubscription).toHaveBeenCalledWith('sub_9');
+    expect(deleteUserById).toHaveBeenCalledWith('u_1');
+    expect(res.ok).toBe(true);
+    delete process.env.LEMONSQUEEZY_API_KEY;
+  });
+
+  test('fails without --user', async () => {
+    const res = await deleteUser({});
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('BAD_TARGET');
+  });
+
+  test('fails when the email matches no user', async () => {
+    findByEmail.mockResolvedValueOnce(null);
+    const res = await deleteUser({ user: 'nobody@example.com' });
+    expect(deleteUserById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('USER_NOT_FOUND');
   });
 });

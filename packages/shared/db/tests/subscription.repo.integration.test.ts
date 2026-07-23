@@ -106,6 +106,18 @@ describe('SubscriptionRepo (integration)', () => {
     expect(active.map((s) => s.provider_subscription_id)).toEqual(['sub_3a']);
   });
 
+  test('deleteByOrgId removes all of an org’s subscriptions and reports the count', async () => {
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o6', provider_subscription_id: 'sub_6a', status: 'active' }),
+    );
+    await SubscriptionRepo.upsertFromEvent(
+      evt({ org_id: 'o6', provider_subscription_id: 'sub_6b', status: 'expired' }),
+    );
+    expect(await SubscriptionRepo.deleteByOrgId('o6')).toBe(2);
+    expect(await SubscriptionRepo.findLatestByOrg('o6')).toBeNull();
+    expect(await SubscriptionRepo.deleteByOrgId('o6')).toBe(0);
+  });
+
   test('findLatestByOrg returns the most recent subscription regardless of status', async () => {
     await SubscriptionRepo.upsertFromEvent(
       evt({ org_id: 'o2', provider_subscription_id: 'sub_2', status: 'cancelled' }),

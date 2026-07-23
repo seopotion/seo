@@ -49,9 +49,11 @@ function rankKey(a: WorkingCandidate, b: WorkingCandidate): number {
 
 export async function runKeywordPipeline(input: PipelineInput): Promise<PipelineResult> {
   const config = resolveConfig(input.presets, input.config);
+  const progress = input.onProgress ?? (() => {});
   const rejected: WorkingCandidate[] = [];
 
   // 1 gather → 2 dedupe
+  progress('gather');
   const raw = await gatherCandidates(
     {
       websiteUrl: input.websiteUrl,
@@ -76,6 +78,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   rejected.push(...clustered.rejected);
 
   // 5 fill difficulty → 6 ceiling
+  progress('fill_difficulty', { candidates: clustered.survivors.length });
   const filled = await fillDifficulty(clustered.survivors, {
     dataForSeo: input.clients.dataForSeo,
     config,
@@ -84,6 +87,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   rejected.push(...ceiling.rejected);
 
   // 7 relevance → 8 score
+  progress('relevance', { candidates: ceiling.survivors.length });
   const withRelevance = await applyRelevance(ceiling.survivors, {
     llm: input.clients.llm,
     presets: input.presets,
@@ -99,6 +103,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   const belowN = ranked.slice(config.serpTopN);
 
   // 10 SERP validate → 11 classify
+  progress('serp_validate', { candidates: topN.length });
   const serp = await validateSerp(topN, {
     dataForSeo: input.clients.dataForSeo,
     llm: input.clients.llm,
@@ -106,6 +111,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     config,
   });
   rejected.push(...serp.rejected);
+  progress('classify', { candidates: serp.accepted.length });
   const classified = await classifyCandidates(serp.accepted, {
     llm: input.clients.llm,
     presets: input.presets,
