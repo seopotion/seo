@@ -177,7 +177,8 @@ flowchart LR
   (:8788), same pattern as :8787.
 - **Typed client**: `packages/shared/clients/src/client.admin.ts` wrapping
   `hc<AdminAppType>` — a sibling of `client.api.ts`, same zero-codegen chain.
-- **Admin UI**: new thin workspace `apps/admin` (Next.js, no i18n/marketing baggage) on
+- **Admin UI**: new thin workspace `apps/admin` (Vite + React SPA — an internal
+  operator tool needs no SSR, and none of `apps/web`'s i18n/marketing baggage) on
   the admin typed client. **Not** a route group in `apps/web`: operators aren't
   customers, the app must never ship in the customer bundle, and — usefully — customer
   frontend hosting is itself still blocked (#35), so for MVP `apps/admin` is
