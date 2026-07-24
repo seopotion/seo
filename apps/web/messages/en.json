@@ -350,6 +350,12 @@
         "upgrade": "Removing keywords is a paid feature."
       },
       "description": "Review available and scheduled keywords for your content plan.",
+      "filter": {
+        "activeLabel": "Filter by status, {count} selected",
+        "clear": "Clear",
+        "heading": "Filter by status",
+        "label": "Filter by status"
+      },
       "intents": {
         "commercial": "Commercial",
         "informational": "Informational",
@@ -367,11 +373,15 @@
         "range": "{start}-{end} of {total}"
       },
       "researchPaidFeature": "Paid feature",
+      "sort": {
+        "byDescending": "Sort by {column}, high to low"
+      },
       "states": {
         "emptyDescription": "Available and scheduled keywords will appear here.",
         "emptyTitle": "No target keywords yet",
         "loadError": "Available keywords could not be loaded. The content calendar is still available.",
-        "loading": "Loading target keywords..."
+        "loading": "Loading target keywords...",
+        "noFilterMatches": "No keywords match the selected statuses."
       },
       "statuses": {
         "available": "Available",

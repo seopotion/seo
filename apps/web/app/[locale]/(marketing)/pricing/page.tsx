@@ -173,9 +173,9 @@ export default function PricingPage() {
                     {(annual ? card.listAnnual : card.listMonthly) !== null && (
                       <span className="text-gray-400 text-sm line-through">
                         $
-                      {annual && card.listAnnual !== null
-                        ? Math.round(card.listAnnual / 12)
-                        : card.listMonthly}
+                        {annual && card.listAnnual !== null
+                          ? Math.round(card.listAnnual / 12)
+                          : card.listMonthly}
                       </span>
                     )}
                     <span className="font-bold text-3xl text-gray-900">

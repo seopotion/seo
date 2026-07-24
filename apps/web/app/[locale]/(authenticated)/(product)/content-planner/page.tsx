@@ -499,20 +499,12 @@ function PlannerDayCell({
   return (
     <div
       className={cn(
-        'flex h-36 min-w-0 flex-col border-slate-200 border-r border-b p-2',
+        'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2',
         day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p
-            className={cn(
-              'truncate font-medium text-slate-600 text-xs',
-              !day.inRange && 'text-slate-400',
-            )}
-          >
-            {formatWeekday(day.date, locale, 'short')}
-          </p>
           <p
             className={cn('font-semibold text-slate-950 text-sm', !day.inRange && 'text-slate-400')}
           >
@@ -524,7 +516,7 @@ function PlannerDayCell({
         )}
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 items-end">
+      <div className="flex min-h-0 flex-1 items-end">
         {day.article ? (
           <ArticleButton
             article={day.article}
@@ -635,7 +627,7 @@ function ArticleButton({
       aria-label={t('actions.openArticle', { title: article.title })}
       onClick={() => onSelectArticle(article)}
     >
-      <span className="line-clamp-2 font-semibold text-slate-950 text-sm leading-snug">
+      <span className="line-clamp-2 font-medium text-slate-950 text-sm leading-snug">
         {article.keyword}
       </span>
       <span className="truncate font-normal text-slate-600 text-xs">

@@ -350,6 +350,12 @@
         "upgrade": "Anahtar kelime kaldırma ücretli bir özelliktir."
       },
       "description": "İçerik planınız için kullanılabilir ve planlanmış anahtar kelimeleri inceleyin.",
+      "filter": {
+        "activeLabel": "Duruma göre filtrele, {count} seçili",
+        "clear": "Temizle",
+        "heading": "Duruma göre filtrele",
+        "label": "Duruma göre filtrele"
+      },
       "intents": {
         "commercial": "Ticari",
         "informational": "Bilgilendirici",
@@ -367,11 +373,15 @@
         "range": "{start}-{end} / {total}"
       },
       "researchPaidFeature": "Ücretli özellik",
+      "sort": {
+        "byDescending": "{column} ölçütüne göre büyükten küçüğe sırala"
+      },
       "states": {
         "emptyDescription": "Kullanılabilir ve planlanmış anahtar kelimeler burada görünecek.",
         "emptyTitle": "Henüz hedef anahtar kelime yok",
         "loadError": "Kullanılabilir anahtar kelimeler yüklenemedi. İçerik takvimini kullanmaya devam edebilirsiniz.",
-        "loading": "Hedef anahtar kelimeler yükleniyor..."
+        "loading": "Hedef anahtar kelimeler yükleniyor...",
+        "noFilterMatches": "Seçili durumlarla eşleşen anahtar kelime yok."
       },
       "statuses": {
         "available": "Kullanılabilir",
