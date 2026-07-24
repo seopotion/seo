@@ -20,13 +20,14 @@ import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { articleStyles } from '../../onboarding/constants';
+import { articleStyles, internalLinkCounts } from '../../onboarding/constants';
 
 type ArticleSettingsForm = {
   autoPublish: boolean;
   articleStyle: string;
   internalLinksCount: string;
   tableOfContents: boolean;
+  youtubeVideos: boolean;
 };
 
 type ArticleSettingsSaveState = 'error' | 'idle' | 'saved';
@@ -36,10 +37,15 @@ type ArticleSettingsResponse = {
     content_seo: {
       article_style: string;
       internal_links_count: number;
+      table_of_contents: boolean;
       llm_instructions: string;
     };
     engagement: {
       image_style: string;
+      youtube_videos: boolean;
+    };
+    publishing: {
+      auto_publish: boolean;
     };
   };
 };
@@ -55,6 +61,7 @@ const initialArticleSettings: ArticleSettingsForm = {
   autoPublish: false,
   internalLinksCount: '1',
   tableOfContents: true,
+  youtubeVideos: true,
 };
 
 function mergeArticleSettings(
@@ -65,6 +72,9 @@ function mergeArticleSettings(
     ...currentSettings,
     articleStyle: data.article_preferences.content_seo.article_style,
     internalLinksCount: String(data.article_preferences.content_seo.internal_links_count),
+    tableOfContents: data.article_preferences.content_seo.table_of_contents,
+    youtubeVideos: data.article_preferences.engagement.youtube_videos,
+    autoPublish: data.article_preferences.publishing.auto_publish,
   };
 }
 
@@ -73,6 +83,13 @@ function buildArticleSettingsPatch(settings: ArticleSettingsForm) {
     content_seo: {
       article_style: settings.articleStyle,
       internal_links_count: Number.parseInt(settings.internalLinksCount, 10),
+      table_of_contents: settings.tableOfContents,
+    },
+    engagement: {
+      youtube_videos: settings.youtubeVideos,
+    },
+    publishing: {
+      auto_publish: settings.autoPublish,
     },
   };
 }
@@ -246,55 +263,78 @@ export default function ArticleSettingsPage() {
 
   return (
     <form className="grid w-full gap-4" onSubmit={saveSettings}>
-      <StatusPanel>{t('status.unsupportedFields')}</StatusPanel>
       {saveState === 'saved' && <StatusPanel tone="success">{t('status.saved')}</StatusPanel>}
       {saveState === 'error' && <StatusPanel tone="error">{t('status.saveError')}</StatusPanel>}
 
-      <SwitchSetting
-        checked={settings.autoPublish}
-        description={t('fields.autoPublish.description')}
-        id="auto-publish"
-        label={t('fields.autoPublish.label')}
-        onCheckedChange={(checked) => updateSetting('autoPublish', checked)}
-      />
+      <div className="rounded-md border border-slate-200 bg-white">
+        <SwitchSetting
+          checked={settings.autoPublish}
+          description={t('fields.autoPublish.description')}
+          id="auto-publish"
+          label={t('fields.autoPublish.label')}
+          onCheckedChange={(checked) => updateSetting('autoPublish', checked)}
+        />
 
-      <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-4">
-        <div>
-          <Label htmlFor="article-style">{t('fields.articleStyle.label')}</Label>
-          <p className="mt-1 text-slate-500 text-sm">{t('fields.articleStyle.description')}</p>
+        <div className="grid gap-2 p-4">
+          <div>
+            <Label htmlFor="article-style">{t('fields.articleStyle.label')}</Label>
+            <p className="mt-1 text-slate-500 text-sm">{t('fields.articleStyle.description')}</p>
+          </div>
+          <Select
+            value={settings.articleStyle}
+            onValueChange={(value) => updateSetting('articleStyle', value)}
+          >
+            <SelectTrigger id="article-style" className="max-w-95">
+              <SelectValue placeholder={t('fields.articleStyle.placeholder')} />
+            </SelectTrigger>
+            <SelectContent>
+              {articleStyles.map((style) => (
+                <SelectItem key={style.value} value={style.value}>
+                  {optionsT(`articleStyles.${style.labelKey}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Select
-          value={settings.articleStyle}
-          onValueChange={(value) => updateSetting('articleStyle', value)}
-        >
-          <SelectTrigger id="article-style" className="max-w-md">
-            <SelectValue placeholder={t('fields.articleStyle.placeholder')} />
-          </SelectTrigger>
-          <SelectContent>
-            {articleStyles.map((style) => (
-              <SelectItem key={style.value} value={style.value}>
-                {optionsT(`articleStyles.${style.labelKey}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        <div className="grid gap-2 p-4">
+          <div>
+            <Label htmlFor="internal-links">{t('fields.internalLinks.label')}</Label>
+            <p className="mt-1 text-slate-500 text-sm">{t('fields.internalLinks.description')}</p>
+          </div>
+          <Select
+            value={settings.internalLinksCount}
+            onValueChange={(value) => updateSetting('internalLinksCount', value)}
+          >
+            <SelectTrigger id="internal-links" className="max-w-95">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {internalLinkCounts.map((count) => (
+                <SelectItem key={count} value={count}>
+                  {count}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <SwitchSetting
+          checked={settings.tableOfContents}
+          description={t('fields.tableOfContents.description')}
+          id="table-of-contents"
+          label={t('fields.tableOfContents.label')}
+          onCheckedChange={(checked) => updateSetting('tableOfContents', checked)}
+        />
+
+        <SwitchSetting
+          checked={settings.youtubeVideos}
+          description={t('fields.youtubeVideos.description')}
+          id="youtube-videos"
+          label={t('fields.youtubeVideos.label')}
+          onCheckedChange={(checked) => updateSetting('youtubeVideos', checked)}
+        />
       </div>
-
-      <SwitchSetting
-        checked={Number.parseInt(settings.internalLinksCount, 10) > 0}
-        description={t('fields.internalLinks.description')}
-        id="internal-links"
-        label={t('fields.internalLinks.label')}
-        onCheckedChange={(checked) => updateSetting('internalLinksCount', checked ? '1' : '0')}
-      />
-
-      <SwitchSetting
-        checked={settings.tableOfContents}
-        description={t('fields.tableOfContents.description')}
-        id="table-of-contents"
-        label={t('fields.tableOfContents.label')}
-        onCheckedChange={(checked) => updateSetting('tableOfContents', checked)}
-      />
 
       <div className="flex justify-end">
         <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
@@ -340,7 +380,7 @@ function SwitchSetting({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <Label htmlFor={id}>{label}</Label>
         <p className="mt-1 text-slate-500 text-sm">{description}</p>

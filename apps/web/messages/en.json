@@ -474,12 +474,16 @@
         "label": "Auto-publish"
       },
       "internalLinks": {
-        "description": "Choose whether generated articles should include internal links.",
+        "description": "Choose how many internal links generated articles should include (0–3).",
         "label": "Internal links"
       },
       "tableOfContents": {
         "description": "Include a table of contents in generated articles.",
         "label": "Table of contents"
+      },
+      "youtubeVideos": {
+        "description": "Embed a relevant YouTube video in generated articles.",
+        "label": "YouTube videos"
       }
     },
     "status": {
@@ -488,8 +492,7 @@
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again.",
       "saveError": "Could not save article settings. Try again.",
-      "saved": "Article settings saved.",
-      "unsupportedFields": "Only article style and whether internal links are enabled are saved. Auto-publish and table of contents are not supported by the live API yet."
+      "saved": "Article settings saved."
     }
   },
   "SettingsPage": {

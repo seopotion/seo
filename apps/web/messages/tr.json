@@ -474,12 +474,16 @@
         "label": "Otomatik yayınlama"
       },
       "internalLinks": {
-        "description": "Oluşturulan makalelerde iç bağlantıların kullanılıp kullanılmayacağını seçin.",
+        "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
         "label": "İç bağlantılar"
       },
       "tableOfContents": {
         "description": "Oluşturulan makalelere içindekiler bölümü ekleyin.",
         "label": "İçindekiler"
+      },
+      "youtubeVideos": {
+        "description": "Oluşturulan makalelere ilgili bir YouTube videosu ekleyin.",
+        "label": "YouTube videoları"
       }
     },
     "status": {
@@ -488,8 +492,7 @@
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
       "saveError": "Makale ayarları kaydedilemedi. Tekrar deneyin.",
-      "saved": "Makale ayarları kaydedildi.",
-      "unsupportedFields": "Yalnızca makale stili ve iç bağlantıların açık olup olmadığı kaydedilir. Otomatik yayınlama ve içindekiler canlı API tarafından henüz desteklenmiyor."
+      "saved": "Makale ayarları kaydedildi."
     }
   },
   "SettingsPage": {

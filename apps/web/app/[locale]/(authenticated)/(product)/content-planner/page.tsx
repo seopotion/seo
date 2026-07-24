@@ -631,7 +631,7 @@ function ArticleButton({
   return (
     <button
       type="button"
-      className="grid w-full min-w-0 gap-1 rounded-md border border-slate-200 bg-slate-50 p-2 text-left transition-colors hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="grid w-full min-w-0 gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={t('actions.openArticle', { title: article.title })}
       onClick={() => onSelectArticle(article)}
     >
