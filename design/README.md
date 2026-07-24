@@ -8,3 +8,4 @@ Planning and design documents for the project. These describe what we intend to 
 - [product-flow.md](product-flow.md) — end-to-end product flow: auth, setup/onboarding, dashboard, subscription model, and endpoints. UI mockups are described inline as text/diagrams.
 - [llm-image-providers.md](llm-image-providers.md) — LLM (OpenRouter) + image (fal.ai) provider decision for the article pipeline, and the provider-neutral `LlmClient` / `ImageClient` interfaces in `@shared/providers`.
 - [article-images.md](article-images.md) — article cover/OG + inline image pipeline (#51): image SQS task, per-stage S3 + CloudFront storage, embedded image state, idempotent per-slot retries.
+- [admin-panel.md](admin-panel.md) — internal operator panel for the wizard-of-oz operating model: separate admin Lambda + auth boundary, on-behalf-of mutations over the existing repos, append-only audit log, pipeline trigger/replay levers.
