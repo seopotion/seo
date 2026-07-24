@@ -496,13 +496,13 @@ function PlannerDayCell({
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
-  return (
-    <div
-      className={cn(
-        'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2',
-        day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
-      )}
-    >
+  const cellClassName = cn(
+    'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2 text-left',
+    day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
+  );
+
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p
@@ -521,12 +521,7 @@ function PlannerDayCell({
 
       <div className="flex min-h-0 flex-1 items-end">
         {day.article ? (
-          <ArticleButton
-            article={day.article}
-            locale={locale}
-            onSelectArticle={onSelectArticle}
-            t={t}
-          />
+          <ArticleSummary article={day.article} locale={locale} t={t} />
         ) : day.inRange ? (
           <Button
             type="button"
@@ -546,8 +541,27 @@ function PlannerDayCell({
           </Button>
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  if (day.article) {
+    const article = day.article;
+    return (
+      <button
+        type="button"
+        className={cn(
+          cellClassName,
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+        aria-label={t('actions.openArticle', { title: article.title })}
+        onClick={() => onSelectArticle(article)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cellClassName}>{content}</div>;
 }
 
 function PlannerAgendaRow({
@@ -567,8 +581,10 @@ function PlannerAgendaRow({
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
-  return (
-    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3">
+  const rowClassName = 'grid gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left';
+
+  const content = (
+    <>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-600 text-sm">
@@ -587,12 +603,7 @@ function PlannerAgendaRow({
       </div>
 
       {day.article ? (
-        <ArticleButton
-          article={day.article}
-          locale={locale}
-          onSelectArticle={onSelectArticle}
-          t={t}
-        />
+        <ArticleSummary article={day.article} locale={locale} t={t} />
       ) : (
         <Button
           type="button"
@@ -611,8 +622,27 @@ function PlannerAgendaRow({
           <span className="min-w-0">{t('actions.chooseKeyword')}</span>
         </Button>
       )}
-    </div>
+    </>
   );
+
+  if (day.article) {
+    const article = day.article;
+    return (
+      <button
+        type="button"
+        className={cn(
+          rowClassName,
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+        aria-label={t('actions.openArticle', { title: article.title })}
+        onClick={() => onSelectArticle(article)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={rowClassName}>{content}</div>;
 }
 
 function PlannerStatusBadge({
@@ -641,24 +671,17 @@ function PlannerStatusBadge({
   return null;
 }
 
-function ArticleButton({
+function ArticleSummary({
   article,
   locale,
-  onSelectArticle,
   t,
 }: {
   article: PlannerArticle;
   locale: string;
-  onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
   return (
-    <button
-      type="button"
-      className="grid w-full min-w-0 gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={t('actions.openArticle', { title: article.title })}
-      onClick={() => onSelectArticle(article)}
-    >
+    <div className="grid w-full min-w-0 gap-1">
       <span className="line-clamp-2 font-medium text-slate-950 text-sm leading-snug">
         {article.keyword}
       </span>
@@ -668,7 +691,7 @@ function ArticleButton({
       <span className="truncate font-normal text-slate-600 text-xs">
         {t('metrics.difficulty')}: {formatNumber(article.difficulty, locale)}
       </span>
-    </button>
+    </div>
   );
 }
 
