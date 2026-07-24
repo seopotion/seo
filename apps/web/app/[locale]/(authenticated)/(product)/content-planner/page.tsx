@@ -5,7 +5,7 @@ import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
@@ -511,9 +511,12 @@ function PlannerDayCell({
             {formatDayNumber(day.date, locale)}
           </p>
         </div>
-        {isFirstDayOfMonth(day.date) && (
-          <span className="truncate text-slate-500 text-xs">{formatMonth(day.date, locale)}</span>
-        )}
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+          {isFirstDayOfMonth(day.date) && (
+            <span className="truncate text-slate-500 text-xs">{formatMonth(day.date, locale)}</span>
+          )}
+          {day.article && <PlannerStatusBadge article={day.article} t={t} />}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 items-end">
@@ -575,9 +578,12 @@ function PlannerAgendaRow({
             {formatDate(day.date, locale, 'long')}
           </p>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700 text-xs">
-          {formatDayNumber(day.date, locale)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {day.article && <PlannerStatusBadge article={day.article} t={t} />}
+          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700 text-xs">
+            {formatDayNumber(day.date, locale)}
+          </span>
+        </div>
       </div>
 
       {day.article ? (
@@ -607,6 +613,32 @@ function PlannerAgendaRow({
       )}
     </div>
   );
+}
+
+function PlannerStatusBadge({
+  article,
+  t,
+}: {
+  article: PlannerArticle;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
+}) {
+  if (article.status === 'generated') {
+    return (
+      <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-700">
+        {t('statuses.generated')}
+      </Badge>
+    );
+  }
+
+  if (article.generationStatus === 'pending') {
+    return (
+      <Badge variant="secondary" className="border-transparent bg-sky-100 text-sky-700">
+        {t('targetKeywords.statuses.scheduled')}
+      </Badge>
+    );
+  }
+
+  return null;
 }
 
 function ArticleButton({
