@@ -350,6 +350,12 @@
         "upgrade": "Removing keywords is a paid feature."
       },
       "description": "Review available and scheduled keywords for your content plan.",
+      "filter": {
+        "activeLabel": "Filter by status, {count} selected",
+        "clear": "Clear",
+        "heading": "Filter by status",
+        "label": "Filter by status"
+      },
       "intents": {
         "commercial": "Commercial",
         "informational": "Informational",
@@ -367,11 +373,15 @@
         "range": "{start}-{end} of {total}"
       },
       "researchPaidFeature": "Paid feature",
+      "sort": {
+        "byDescending": "Sort by {column}, high to low"
+      },
       "states": {
         "emptyDescription": "Available and scheduled keywords will appear here.",
         "emptyTitle": "No target keywords yet",
         "loadError": "Available keywords could not be loaded. The content calendar is still available.",
-        "loading": "Loading target keywords..."
+        "loading": "Loading target keywords...",
+        "noFilterMatches": "No keywords match the selected statuses."
       },
       "statuses": {
         "available": "Available",
@@ -474,12 +484,16 @@
         "label": "Auto-publish"
       },
       "internalLinks": {
-        "description": "Choose whether generated articles should include internal links.",
+        "description": "Choose how many internal links generated articles should include (0–3).",
         "label": "Internal links"
       },
       "tableOfContents": {
         "description": "Include a table of contents in generated articles.",
         "label": "Table of contents"
+      },
+      "youtubeVideos": {
+        "description": "Embed a relevant YouTube video in generated articles.",
+        "label": "YouTube videos"
       }
     },
     "status": {
@@ -488,8 +502,7 @@
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again.",
       "saveError": "Could not save article settings. Try again.",
-      "saved": "Article settings saved.",
-      "unsupportedFields": "Only article style and whether internal links are enabled are saved. Auto-publish and table of contents are not supported by the live API yet."
+      "saved": "Article settings saved."
     }
   },
   "SettingsPage": {
@@ -721,7 +734,7 @@
     "audience": {
       "competitorUrls": "Competitor website URLs",
       "targetAudience": "Target audience",
-      "targetAudiencePlaceholder": "SaaS founders",
+      "targetAudiencePlaceholder": "",
       "title": "Target Audience And Competitors"
     },
     "blog": {
@@ -844,7 +857,7 @@
     },
     "websiteScan": {
       "completeMessage": "Scan complete. Generated setup details have been added to the next steps.",
-      "description": "Start with the site Seopotion should learn from.",
+      "description": "Let's start with scanning your business website",
       "orgStatus": "Org {orgId}",
       "scanButton": "Scan website",
       "scanningButton": "Scanning...",
@@ -1064,13 +1077,5 @@
       }
     },
     "organizationFallback": "Your organization"
-  },
-  "WishlistForm": {
-    "emailPlaceholder": "Enter your email",
-    "error": "Something went wrong. Please try again.",
-    "honeypotLabel": "Website",
-    "joining": "Joining...",
-    "submit": "Join the wishlist",
-    "success": "You're on the SEO Potion wishlist. We'll let you know when early access opens."
   }
 }

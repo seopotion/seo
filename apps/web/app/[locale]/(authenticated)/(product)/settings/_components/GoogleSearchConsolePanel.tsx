@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Badge, Button } from '@/components/ui';
@@ -126,15 +126,7 @@ export function GoogleSearchConsolePanel({
       {justConnected ? <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel> : null}
 
       <div className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-slate-900 text-white">
-            <BarChart3 aria-hidden className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="font-semibold text-slate-950 text-sm">{t('title')}</p>
-            <p className="mt-0.5 text-slate-500 text-sm">{t('description')}</p>
-          </div>
-        </div>
+        <p className="text-slate-500 text-sm">{t('description')}</p>
 
         {statusQuery.isPending ? (
           <p className="text-slate-500 text-sm">{t('statusLoading')}</p>

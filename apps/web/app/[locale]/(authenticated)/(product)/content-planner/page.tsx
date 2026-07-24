@@ -5,7 +5,7 @@ import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
@@ -496,42 +496,32 @@ function PlannerDayCell({
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
-  return (
-    <div
-      className={cn(
-        'flex h-36 min-w-0 flex-col border-slate-200 border-r border-b p-2',
-        day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
-      )}
-    >
+  const cellClassName = cn(
+    'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2 text-left',
+    day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
+  );
+
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p
-            className={cn(
-              'truncate font-medium text-slate-600 text-xs',
-              !day.inRange && 'text-slate-400',
-            )}
-          >
-            {formatWeekday(day.date, locale, 'short')}
-          </p>
           <p
             className={cn('font-semibold text-slate-950 text-sm', !day.inRange && 'text-slate-400')}
           >
             {formatDayNumber(day.date, locale)}
           </p>
         </div>
-        {isFirstDayOfMonth(day.date) && (
-          <span className="truncate text-slate-500 text-xs">{formatMonth(day.date, locale)}</span>
-        )}
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+          {isFirstDayOfMonth(day.date) && (
+            <span className="truncate text-slate-500 text-xs">{formatMonth(day.date, locale)}</span>
+          )}
+          {day.article && <PlannerStatusBadge article={day.article} t={t} />}
+        </div>
       </div>
 
-      <div className="mt-3 flex min-h-0 flex-1 items-end">
+      <div className="flex min-h-0 flex-1 items-end">
         {day.article ? (
-          <ArticleButton
-            article={day.article}
-            locale={locale}
-            onSelectArticle={onSelectArticle}
-            t={t}
-          />
+          <ArticleSummary article={day.article} locale={locale} t={t} />
         ) : day.inRange ? (
           <Button
             type="button"
@@ -551,8 +541,27 @@ function PlannerDayCell({
           </Button>
         ) : null}
       </div>
-    </div>
+    </>
   );
+
+  if (day.article) {
+    const article = day.article;
+    return (
+      <button
+        type="button"
+        className={cn(
+          cellClassName,
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+        aria-label={t('actions.openArticle', { title: article.title })}
+        onClick={() => onSelectArticle(article)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cellClassName}>{content}</div>;
 }
 
 function PlannerAgendaRow({
@@ -572,8 +581,10 @@ function PlannerAgendaRow({
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
-  return (
-    <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3">
+  const rowClassName = 'grid gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left';
+
+  const content = (
+    <>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium text-slate-600 text-sm">
@@ -583,18 +594,16 @@ function PlannerAgendaRow({
             {formatDate(day.date, locale, 'long')}
           </p>
         </div>
-        <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700 text-xs">
-          {formatDayNumber(day.date, locale)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {day.article && <PlannerStatusBadge article={day.article} t={t} />}
+          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700 text-xs">
+            {formatDayNumber(day.date, locale)}
+          </span>
+        </div>
       </div>
 
       {day.article ? (
-        <ArticleButton
-          article={day.article}
-          locale={locale}
-          onSelectArticle={onSelectArticle}
-          t={t}
-        />
+        <ArticleSummary article={day.article} locale={locale} t={t} />
       ) : (
         <Button
           type="button"
@@ -613,29 +622,67 @@ function PlannerAgendaRow({
           <span className="min-w-0">{t('actions.chooseKeyword')}</span>
         </Button>
       )}
-    </div>
+    </>
   );
+
+  if (day.article) {
+    const article = day.article;
+    return (
+      <button
+        type="button"
+        className={cn(
+          rowClassName,
+          'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+        aria-label={t('actions.openArticle', { title: article.title })}
+        onClick={() => onSelectArticle(article)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={rowClassName}>{content}</div>;
 }
 
-function ArticleButton({
+function PlannerStatusBadge({
+  article,
+  t,
+}: {
+  article: PlannerArticle;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
+}) {
+  if (article.status === 'generated') {
+    return (
+      <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-700">
+        {t('statuses.generated')}
+      </Badge>
+    );
+  }
+
+  if (article.generationStatus === 'pending') {
+    return (
+      <Badge variant="secondary" className="border-transparent bg-sky-100 text-sky-700">
+        {t('targetKeywords.statuses.scheduled')}
+      </Badge>
+    );
+  }
+
+  return null;
+}
+
+function ArticleSummary({
   article,
   locale,
-  onSelectArticle,
   t,
 }: {
   article: PlannerArticle;
   locale: string;
-  onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
   return (
-    <button
-      type="button"
-      className="grid w-full min-w-0 gap-1 rounded-md border border-slate-200 bg-slate-50 p-2 text-left transition-colors hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={t('actions.openArticle', { title: article.title })}
-      onClick={() => onSelectArticle(article)}
-    >
-      <span className="line-clamp-2 font-semibold text-slate-950 text-sm leading-snug">
+    <div className="grid w-full min-w-0 gap-1">
+      <span className="line-clamp-2 font-medium text-slate-950 text-sm leading-snug">
         {article.keyword}
       </span>
       <span className="truncate font-normal text-slate-600 text-xs">
@@ -644,7 +691,7 @@ function ArticleButton({
       <span className="truncate font-normal text-slate-600 text-xs">
         {t('metrics.difficulty')}: {formatNumber(article.difficulty, locale)}
       </span>
-    </button>
+    </div>
   );
 }
 

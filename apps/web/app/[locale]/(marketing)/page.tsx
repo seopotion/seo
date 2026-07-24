@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
-import { WishlistForm } from '@/components/WishlistForm';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { languageAlternates, localizedPath, localizedUrl } from '@/i18n/urls';
@@ -236,7 +235,6 @@ export default function LandingPage() {
               {t('hero.titleLine1')} <br /> {t('hero.titleLine2')}
             </h1>
             <h2 className="mx-auto mb-10 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
-            <WishlistForm source="landing_hero" />
           </div>
         </section>
 
@@ -523,8 +521,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-4xl">
             <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-gray-700 md:p-12">
               <h2 className="mb-4 font-bold text-3xl md:text-4xl">{t('finalCta.title')}</h2>
-              <p className="mx-auto mb-8 max-w-2xl text-xl">{t('finalCta.description')}</p>
-              <WishlistForm source="landing_final_cta" />
+              <p className="mx-auto max-w-2xl text-xl">{t('finalCta.description')}</p>
             </div>
           </div>
         </section>

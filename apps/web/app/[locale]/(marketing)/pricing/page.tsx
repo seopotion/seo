@@ -172,15 +172,16 @@ export default function PricingPage() {
                   <div className="flex items-baseline gap-1.5">
                     {(annual ? card.listAnnual : card.listMonthly) !== null && (
                       <span className="text-gray-400 text-sm line-through">
-                        ${annual ? card.listAnnual : card.listMonthly}
+                        $
+                        {annual && card.listAnnual !== null
+                          ? Math.round(card.listAnnual / 12)
+                          : card.listMonthly}
                       </span>
                     )}
                     <span className="font-bold text-3xl text-gray-900">
-                      ${annual ? card.annualPrice : card.monthlyPrice}
+                      ${annual ? Math.round(card.annualPrice / 12) : card.monthlyPrice}
                     </span>
-                    <span className="text-gray-500 text-sm">
-                      /{annual ? t('year') : t('monthShort')}
-                    </span>
+                    <span className="text-gray-500 text-sm">/{t('monthShort')}</span>
                   </div>
                 ) : (
                   <span className="font-bold text-3xl text-gray-900">{t('free')}</span>
