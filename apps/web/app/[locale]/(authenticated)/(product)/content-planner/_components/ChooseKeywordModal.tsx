@@ -64,7 +64,12 @@ export function ChooseKeywordModal({
   const t = useTranslations('ContentPlannerPage.chooseKeyword');
   const targetKeywordsT = useTranslations('ContentPlannerPage.targetKeywords');
   const queryClient = useQueryClient();
-  const [scheduleError, setScheduleError] = useState<CandidateScheduleError | null>(null);
+  // `upgrade` is not an error banner — it swaps the whole body for the upgrade
+  // panel (see `showUpgrade`), so it never reaches `errors.*` and has no message.
+  const [scheduleError, setScheduleError] = useState<Exclude<
+    CandidateScheduleError,
+    'upgrade'
+  > | null>(null);
   const [upgradeRequired, setUpgradeRequired] = useState(false);
   const schedulePendingRef = useRef(false);
   const sessionRef = useRef(0);

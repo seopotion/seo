@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations, setRequestLocale } from 'next-intl/server';
+import { routeLocale } from '@/i18n/locale';
 import { Link } from '@/i18n/navigation';
-import { type Locale, routing } from '@/i18n/routing';
+import { routing } from '@/i18n/routing';
 import { languageAlternates, localizedPath } from '@/i18n/urls';
 import { absoluteUrl } from '@/lib/seo';
 import { loadDoc, loadDocFrontmatter } from '../content';
@@ -19,12 +20,14 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { locale, slug } = await params;
+  const { locale: rawLocale, slug } = await params;
   if (!findDoc(slug)) notFound();
 
-  const { title, description } = await loadDocFrontmatter(locale as Locale, slug);
+  const locale = routeLocale(rawLocale);
+
+  const { title, description } = await loadDocFrontmatter(locale, slug);
   const path = docPath(slug);
-  const canonical = localizedPath(path, locale as Locale);
+  const canonical = localizedPath(path, locale);
 
   return {
     title,
@@ -43,7 +46,8 @@ export default async function DocPage({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { locale, slug } = await params;
+  const { locale: rawLocale, slug } = await params;
+  const locale = routeLocale(rawLocale);
   setRequestLocale(locale);
 
   const entry = findDoc(slug);
@@ -52,14 +56,14 @@ export default async function DocPage({
   const [t, format, { default: Body, frontmatter }] = await Promise.all([
     getTranslations({ locale, namespace: 'Docs' }),
     getFormatter({ locale }),
-    loadDoc(locale as Locale, slug),
+    loadDoc(locale, slug),
   ]);
 
   const groupLabel = t(`groups.${entry.group}`);
   const { previous, next } = docNeighbours(slug);
   const [previousMeta, nextMeta] = await Promise.all([
-    previous ? loadDocFrontmatter(locale as Locale, previous.slug) : null,
-    next ? loadDocFrontmatter(locale as Locale, next.slug) : null,
+    previous ? loadDocFrontmatter(locale, previous.slug) : null,
+    next ? loadDocFrontmatter(locale, next.slug) : null,
   ]);
 
   // Flat URLs give up the hierarchy signal that nested paths carry; the
@@ -69,9 +73,9 @@ export default async function DocPage({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { name: t('home'), url: absoluteUrl(localizedPath('/docs', locale as Locale)) },
-      { name: groupLabel, url: absoluteUrl(localizedPath('/docs', locale as Locale)) },
-      { name: frontmatter.title, url: absoluteUrl(localizedPath(docPath(slug), locale as Locale)) },
+      { name: t('home'), url: absoluteUrl(localizedPath('/docs', locale)) },
+      { name: groupLabel, url: absoluteUrl(localizedPath('/docs', locale)) },
+      { name: frontmatter.title, url: absoluteUrl(localizedPath(docPath(slug), locale)) },
     ].map((item, index) => ({
       '@type': 'ListItem',
       position: index + 1,

@@ -1,11 +1,12 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { routeLocale } from '@/i18n/locale';
 import type { Locale } from '@/i18n/routing';
 import { DocsNav, type DocsNavSection } from './_components/DocsNav';
 import { loadDocsFrontmatter } from './content';
-import { docPath, groupedDocs } from './registry';
+import { type DocGroup, docPath, groupedDocs } from './registry';
 
-async function navSections(locale: Locale, groupLabel: (group: string) => string) {
+async function navSections(locale: Locale, groupLabel: (group: DocGroup) => string) {
   const sections = groupedDocs();
   const titles = await Promise.all(
     sections.map((section) =>
@@ -32,11 +33,11 @@ export default async function DocsLayout({
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  const { locale } = await params;
+  const locale = routeLocale((await params).locale);
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: 'Docs' });
-  const sections = await navSections(locale as Locale, (group) => t(`groups.${group}`));
+  const sections = await navSections(locale, (group) => t(`groups.${group}`));
 
   return (
     <main className="min-h-screen bg-white">

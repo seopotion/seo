@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { routeLocale } from '@/i18n/locale';
 import { Link } from '@/i18n/navigation';
-import type { Locale } from '@/i18n/routing';
 import { languageAlternates, localizedPath } from '@/i18n/urls';
 import { loadDocsFrontmatter } from './content';
 import { docPath, groupedDocs } from './registry';
@@ -11,9 +11,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
-  const { locale } = await params;
+  const locale = routeLocale((await params).locale);
   const t = await getTranslations({ locale, namespace: 'DocsMetadata' });
-  const canonical = localizedPath('/docs', locale as Locale);
+  const canonical = localizedPath('/docs', locale);
 
   return {
     title: t('title'),
@@ -35,7 +35,7 @@ export async function generateMetadata({
 }
 
 export default async function DocsIndexPage({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params;
+  const locale = routeLocale((await params).locale);
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: 'Docs' });
@@ -43,7 +43,7 @@ export default async function DocsIndexPage({ params }: { params: Promise<{ loca
   const frontmatter = await Promise.all(
     sections.map((section) =>
       loadDocsFrontmatter(
-        locale as Locale,
+        locale,
         section.entries.map((entry) => entry.slug),
       ),
     ),
