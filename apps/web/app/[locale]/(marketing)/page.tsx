@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { use } from 'react';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { languageAlternates, localizedPath, localizedUrl } from '@/i18n/urls';
@@ -167,7 +168,11 @@ function LogoMark() {
   );
 }
 
-export default function LandingPage() {
+export default function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
+  // Opts this page into static rendering: without it next-intl resolves the
+  // locale from the request, which makes the route render on demand.
+  setRequestLocale(use(params).locale);
+
   const locale = useLocale() as Locale;
   const t = useTranslations('LandingPage');
   const metadataT = useTranslations('Metadata');

@@ -1,5 +1,9 @@
+import { setRequestLocale } from 'next-intl/server';
 import { ProductPlaceholderPage } from '../_components/ProductPlaceholderPage';
 
-export default function BacklinksPage() {
+export default async function BacklinksPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
   return <ProductPlaceholderPage />;
 }
