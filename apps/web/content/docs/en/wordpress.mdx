@@ -1,0 +1,236 @@
+---
+title: Publish to WordPress
+description: Install the SEO Potion plugin, connect it with an integration token, send and update articles, and fix the errors you are most likely to hit.
+updated: 2026-07-26
+---
+
+WordPress is the publishing integration Seopotion supports today. You install a small plugin on
+your site, agree on a shared token between the plugin and your Seopotion workspace, and from then
+on you can send any generated article to WordPress as a post — with its featured image, inline
+images, meta description and focus keyword attached.
+
+The connection is one WordPress site per workspace, and it always uses the website URL you entered
+when you created the workspace.
+
+## Before you start
+
+- A **self-hosted WordPress** site. WordPress.com is not supported yet.
+- **WordPress 6.4 or newer** and **PHP 8.0 or newer**. The plugin is tested up to WordPress 6.9.
+- An account on that site with the **Administrator** role, so you can install plugins and open the
+  plugin's settings screen.
+- The site must be reachable from the public internet at the URL saved on your workspace, with the
+  WordPress REST API enabled. Staging sites behind HTTP auth, an IP allowlist, or "coming soon"
+  plugins will not answer.
+
+## Step 1 — Install the SEO Potion plugin
+
+1. In Seopotion, open **Settings → Integrations**.
+2. Under **Publishing integrations**, find the **Self-hosted WordPress** card and select
+   **Download plugin (.zip)**. Keep the `.zip` as-is — do not unzip it.
+3. In your WordPress admin, go to **Plugins → Add New → Upload Plugin**. The **Open Upload Plugin
+   page** button in Seopotion links straight there for your site.
+4. Choose the `.zip` file, select **Install Now**, then **Activate Plugin**.
+
+On activation the plugin adds an **SEO Potion** entry to the WordPress admin menu and sends you
+directly to its **Manage** screen, because there is no token saved yet. Until a token exists, the
+plugin's Home screen always redirects there.
+
+## Step 2 — Create your integration token
+
+The integration token is a **shared secret that you invent**. Seopotion does not issue it — you
+type the same value in two places, and the plugin only accepts requests that present it.
+
+1. In WordPress, open **SEO Potion → Manage**.
+2. In **Integration Token**, enter a long, random string. Treat it like a password: anything that
+   knows this value can create posts on your site.
+3. Choose a **Post Mode**:
+   - **Save as Draft** — articles arrive as drafts for you to review and publish by hand.
+   - **Publish Directly** — articles are published the moment they arrive.
+4. Select **Save**. You should see *Settings Saved Successfully!*.
+
+Post Mode only applies to **newly created** posts. Updating an article that is already on your site
+never changes its published/draft state — see [Sending updates](#sending-updates).
+
+## Step 3 — Connect Seopotion
+
+1. Back in Seopotion, open **Settings → Integrations**.
+2. In **Connect your WordPress site**, paste the exact same token into **Integration token**.
+3. Select **Connect & test**.
+
+The test is a real round trip, not a ping. Seopotion calls your site, and the plugin creates a
+draft post named *Test Post - SEO Potion Integration*, then deletes it immediately. That proves
+three things at once: the plugin is installed and answering, the token matches, and WordPress will
+actually accept a new post.
+
+On success the card flips to **Connected** and shows the date you connected. The token is saved on
+your workspace and is never displayed again — if you lose it, set a new one on both sides using
+**Replace token**.
+
+## What gets sent to WordPress
+
+Each article is sent as a standard WordPress **post** (not a custom post type). The plugin writes:
+
+| Element | Where it lands in WordPress |
+| --- | --- |
+| Title | Post title |
+| Slug | Post slug, de-duplicated if it is already taken |
+| Body | Post content — Markdown is converted to HTML before sending |
+| Featured image | Downloaded into your Media Library and set as the featured image |
+| Inline images | Downloaded into your Media Library, and the article's image links are rewritten to point at your copies |
+| YouTube embeds | Kept as embedded players |
+| Meta description | SEO plugin meta description |
+| Focus keyword | SEO plugin focus keyword |
+
+A few details worth knowing:
+
+- **Author and category are defaults.** Posts are created under the site's first user account and
+  the site's default category. You can reassign both in WordPress afterwards; changing them there
+  does not break the link back to Seopotion.
+- **Slugs are made unique before the post is created.** If `my-article` already exists — as a
+  published post, a draft, or a row the plugin is already tracking — the new post becomes
+  `my-article-2`, and so on.
+- **Images are copied, not hotlinked.** Both the cover image and any inline images are downloaded
+  into your Media Library, so your posts do not depend on Seopotion staying online.
+- **Only YouTube embeds survive.** The plugin strips HTML that WordPress considers unsafe, and of
+  all `iframe` embeds it keeps only `youtube.com/embed/…` and `youtube-nocookie.com/embed/…`.
+  Anything else is removed.
+
+### SEO plugin fields
+
+If you use an SEO plugin, the meta description, focus keyword and title are written into its
+fields automatically. Supported: **Yoast SEO**, **Rank Math**, **All in One SEO**, **SEOPress**,
+and **Squirrly SEO**. Values are written for all of them, so switching SEO plugins later does not
+require a re-send. If you use none of them, the meta description is still stored on the post and
+you can read it back from the plugin's Manage data.
+
+## Sending an article
+
+1. Open **Content history** and select the article you want.
+2. Select **Send to WordPress**.
+
+Two conditions have to be met, and the button tells you when they are not:
+
+- **WordPress must be connected.** If it is not, the page shows *Connect WordPress in Settings to
+  send this article* with a link.
+- **The article's images must have finished.** An article whose cover or inline images are still
+  being generated is rejected until they complete.
+
+When it succeeds you get *Sent to WordPress.* and the article gains a **Sent to WordPress · #123**
+badge, where `123` is the WordPress post ID. That ID is what links the two systems from then on.
+
+## Sending updates
+
+Once an article has been sent, the button becomes **Update WordPress**. It pushes the current
+stored article — title, slug, body, featured image, meta description and focus keyword — over the
+existing post.
+
+- **Seopotion is the source of truth for an update.** Anything you edited in the WordPress editor
+  for those fields is overwritten. If you want to keep WordPress-side edits, make the same edit in
+  the Seopotion article editor instead, or simply stop updating that post.
+- **Update never changes the post status.** A published post stays published; a draft stays a
+  draft. Post Mode is only consulted when a post is first created.
+- **Update can partially succeed.** If the post is updated but something about the images could
+  not be finished, you get the post plus a warning list rather than an error — see below.
+
+You cannot send the same article twice. A second **Send to WordPress** is refused with *Article is
+already published to WordPress*, which exists so a retry can never create a duplicate post.
+
+## Replacing the token
+
+Select **Replace token** on the WordPress card. Set the new value in **SEO Potion → Manage** on
+your site first, then paste it in Seopotion and select **Connect & test** again. Connecting tests
+the new token against your site before it replaces the saved one, so a typo leaves the working
+connection intact.
+
+## What the plugin keeps on your site
+
+The plugin creates one database table on activation and tracks every post it created there: slug,
+title, meta description, featured image ID and current status. It keeps that table in step with
+WordPress — changing a post's status updates the row, and permanently deleting a post removes it.
+
+Deactivating the plugin leaves your posts alone; they are ordinary WordPress posts. On a multisite
+network the table is created per site.
+
+## Troubleshooting
+
+### "We couldn't reach the SEO Potion plugin on your site"
+
+Seopotion could not get a valid response from your site at all. In order of likelihood:
+
+- The plugin is not **installed and activated**. Re-check step 1.
+- Your workspace's website URL does not match where WordPress actually lives — for example the
+  workspace says `example.com` but the site is served from `www.example.com`, or from `/blog`.
+  The plugin is only reachable at the exact URL saved on the workspace.
+- The **WordPress REST API is blocked** — by a security plugin, a firewall rule, or a server
+  configuration that rejects unknown `/wp-json/` routes.
+- The site is behind HTTP basic auth, an IP allowlist, or a maintenance-mode plugin.
+
+A quick check: open `https://your-site.com/wp-json/seo-potion/v1/capabilities` in a browser. If
+the plugin is installed and reachable you get a small JSON response listing its version. Anything
+else — a 404, a login prompt, an HTML error page — reproduces the same failure Seopotion sees.
+
+### "The plugin doesn't have a saved token yet"
+
+The plugin is installed and answering, but no token has been saved in **SEO Potion → Manage**.
+Complete step 2 on your site, then connect again.
+
+### "This token doesn't match the one saved in your WordPress plugin"
+
+Both sides have a token, but they differ. Tokens are compared exactly — a trailing space, a
+different case, or a partially selected copy all fail. Re-copy the value from **SEO Potion →
+Manage** and paste it again.
+
+### "WordPress could not be connected. Check the token and try again"
+
+The site answered with something Seopotion did not recognise. This usually means a plugin or theme
+on your site is injecting output into REST API responses, or a caching layer is serving a stale or
+HTML response for the plugin's routes. Try disabling caching for `/wp-json/` and reconnect.
+
+### "WordPress could not complete the request: …"
+
+The plugin was reached and accepted the token, but WordPress refused the operation. The message
+after the colon comes straight from the plugin:
+
+| Message | What it means |
+| --- | --- |
+| `Slug already exists` | You are updating an article to a slug another post already uses. Change the slug in the Seopotion article editor and update again. |
+| `Post not found` | The WordPress post this article was linked to has been permanently deleted. The link cannot be repaired from the UI today — contact support. |
+| `Failed to create post: …` | WordPress itself rejected the insert. The trailing text is WordPress's own error. |
+| `Failed to upload image` | WordPress could not download or store the cover image — usually file permissions on `wp-content/uploads` or an upload size limit. |
+| `Failed to insert into tracking table…` | The post could not be recorded in the plugin's table, so it was rolled back. Deactivating and reactivating the plugin recreates the table. |
+
+### "WordPress completed the request with warnings"
+
+The post was created or updated, but something secondary did not finish. You will see one or more
+of:
+
+- *Content images could not be localized.* — inline images stayed pointing at their original URLs
+  instead of being copied into your Media Library.
+- *Featured image could not be assigned.* — the image was uploaded but not attached to the post.
+- *Featured image metadata could not be updated.* — the image is attached but its author/parent
+  fields were not set.
+
+The post is live either way. Running **Update WordPress** again usually clears warnings once the
+underlying cause (uploads permissions, an image host timing out) is fixed.
+
+### The Send button is disabled or missing
+
+- *Connect WordPress in Settings to send this article* means the workspace has no WordPress
+  connection yet.
+- If the article's images have not finished generating, sending is refused. Wait for the article's
+  images to complete and try again.
+
+### Posts arrive as drafts (or publish immediately) when you wanted the opposite
+
+That is **Post Mode** in **SEO Potion → Manage**. Change it and save; the new setting applies to
+articles sent from then on, not to posts that already exist.
+
+## Security notes
+
+- The integration token is a **shared secret you choose**, not an account password, and it is only
+  ever used between Seopotion and your site. Use a long random value and do not reuse a password.
+- Anything holding that token can create posts on your site. If you suspect it leaked, set a new
+  one in **SEO Potion → Manage** and use **Replace token** in Seopotion. The old value stops
+  working the moment you save the new one.
+- Seopotion never shows a saved token back to you, and never asks for your WordPress username or
+  password.

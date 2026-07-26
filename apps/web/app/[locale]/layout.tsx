@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { routing } from '@/i18n/routing';
 import { languageAlternates } from '@/i18n/urls';
@@ -11,6 +11,29 @@ type LocaleLayoutProps = {
   children: ReactNode;
   params: Promise<{ locale: string }>;
 };
+
+/**
+ * Namespaces reachable from a `'use client'` component. Everything else —
+ * metadata namespaces, the landing page, the navbar, docs chrome — renders on
+ * the server, so serializing it into every page's payload buys nothing.
+ * Adding `useTranslations` to a client component means adding its namespace here.
+ */
+const CLIENT_NAMESPACES = [
+  'ArticleDetailPage',
+  'ArticleSettingsPage',
+  'AuthGuard',
+  'BillingPage',
+  'ContentHistoryPage',
+  'ContentPlannerPage',
+  'GoogleJoinButton',
+  'GscCallback',
+  'HomePage',
+  'LocaleSwitcher',
+  'Onboarding',
+  'PricingPage',
+  'ProductShell',
+  'SettingsPage',
+] as const;
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -67,5 +90,10 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   setRequestLocale(locale);
 
-  return <NextIntlClientProvider>{children}</NextIntlClientProvider>;
+  const messages = await getMessages({ locale });
+  const clientMessages = Object.fromEntries(
+    CLIENT_NAMESPACES.map((namespace) => [namespace, messages[namespace]]),
+  );
+
+  return <NextIntlClientProvider messages={clientMessages}>{children}</NextIntlClientProvider>;
 }
