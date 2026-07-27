@@ -252,8 +252,8 @@
       "type": "Makale tipi"
     },
     "metrics": {
-      "difficulty": "Difficulty",
-      "volume": "Volume"
+      "difficulty": "Zorluk",
+      "volume": "Hacim"
     },
     "oneArticlePerDay": "Günde 1 makale",
     "researchKeywords": {
@@ -402,10 +402,10 @@
     "articlesCount": "{count} makale",
     "columns": {
       "articleName": "Makale adı",
-      "difficulty": "Difficulty",
+      "difficulty": "Zorluk",
       "keyword": "Anahtar kelime",
       "publishDate": "Yayın tarihi",
-      "volume": "Volume"
+      "volume": "Hacim"
     },
     "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
     "empty": {
@@ -708,7 +708,8 @@
     "homeLabel": "Seopotion ana sayfa",
     "links": {
       "features": "Özellikler",
-      "pricing": "Fiyatlandırma"
+      "pricing": "Fiyatlandırma",
+      "docs": "Dokümanlar"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"
@@ -1029,7 +1030,7 @@
   },
   "PrivateMetadata": {
     "home": "Ana Sayfa",
-    "onboarding": "Onboarding"
+    "onboarding": "Kurulum"
   },
   "ProductPlaceholderPage": {
     "description": "Bu özellik yakında yayınlanacak. Eğer acil olarak ihtiyacınız varsa yada başka bir isteğiniz olursa support@seopotıo.co üzerinden yazabilirsiniz.",
@@ -1077,5 +1078,29 @@
       }
     },
     "organizationFallback": "Organizasyonunuz"
+  },
+  "DocsMetadata": {
+    "title": "Dokümantasyon | Seopotion",
+    "description": "Seopotion'ı nasıl kuracağınızı, bir aylık SEO içeriği planlamayı, makale üretmeyi ve bunları blogunuzda yayınlamayı öğrenin.",
+    "openGraphTitle": "Seopotion Dokümantasyonu"
+  },
+  "Docs": {
+    "sidebarLabel": "Dokümantasyon menüsü",
+    "breadcrumbLabel": "Sayfa yolu",
+    "pagerLabel": "Rehber gezinmesi",
+    "home": "Dokümantasyon",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "updated": "Son güncelleme {date}",
+    "groups": {
+      "getting-started": "Başlangıç",
+      "content": "İçerik",
+      "publishing": "Yayınlama"
+    },
+    "index": {
+      "eyebrow": "Dokümantasyon",
+      "title": "Seopotion ile SEO içeriği yayınlamaya başlayın",
+      "subtitle": "Çalışma alanınızı kurun, bir aylık içerik planlayın ve blogunuzda yayınlayın — her adımın nasıl çalıştığı burada."
+    }
   }
 }

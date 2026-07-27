@@ -708,7 +708,8 @@
     "homeLabel": "Seopotion home",
     "links": {
       "features": "Features",
-      "pricing": "Pricing"
+      "pricing": "Pricing",
+      "docs": "Docs"
     },
     "logoAlt": "Seopotion logo",
     "primaryNavigation": "Primary navigation"
@@ -1077,5 +1078,29 @@
       }
     },
     "organizationFallback": "Your organization"
+  },
+  "DocsMetadata": {
+    "title": "Documentation | Seopotion",
+    "description": "Learn how to set up Seopotion, plan a month of SEO content, generate articles, and publish them to your blog.",
+    "openGraphTitle": "Seopotion Documentation"
+  },
+  "Docs": {
+    "sidebarLabel": "Documentation navigation",
+    "breadcrumbLabel": "Breadcrumb",
+    "pagerLabel": "Guide navigation",
+    "home": "Docs",
+    "previous": "Previous",
+    "next": "Next",
+    "updated": "Last updated {date}",
+    "groups": {
+      "getting-started": "Getting started",
+      "content": "Content",
+      "publishing": "Publishing"
+    },
+    "index": {
+      "eyebrow": "Documentation",
+      "title": "Start publishing SEO content with Seopotion",
+      "subtitle": "Set up your workspace, plan a month of content, and publish to your blog — here's how each part works."
+    }
   }
 }

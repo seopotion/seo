@@ -1,7 +1,18 @@
+import { setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { Navbar } from '@/components/navbar';
+import { routeLocale } from '@/i18n/locale';
 
-export default function MarketingLayout({ children }: { children: ReactNode }) {
+export default async function MarketingLayout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  setRequestLocale(routeLocale(locale));
+
   return (
     <>
       <Navbar />

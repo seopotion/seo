@@ -1,0 +1,140 @@
+---
+title: Content planner
+description: How the 30-day plan is built, why the calendar shows 45 days, and how to research keywords and schedule them onto specific dates yourself.
+updated: 2026-07-26
+---
+
+The content planner is where your month of content lives. It answers one question per day: *which
+keyword are we writing about, and where does that article stand?*
+
+Everything on this page is a **paid feature**. On the free plan the calendar renders, but keyword
+research and scheduling are locked — see [Quickstart](/docs/quickstart#4-where-free-and-paid-diverge).
+
+## The 30-day plan and the 45-day calendar
+
+These are two different numbers and it is worth being precise about them.
+
+- **The plan is 30 days.** When you finish setup on a paid plan, keyword research runs and up to
+  **30 keywords** are scheduled — one per day, across the next 30 days.
+- **The calendar shows 45 days.** The extra fifteen days are **forward visibility, not capacity**.
+  They exist so you can see, and schedule onto, dates beyond the end of the automatic plan.
+
+So an empty stretch at the end of the calendar is normal and expected. It is where you add
+keywords by hand, not a sign that something failed.
+
+The calendar is a Monday-start grid. Dates outside the 45-day window are greyed out and cannot be
+scheduled.
+
+### While the plan is being built
+
+Immediately after setup, the planner shows *Your 30-day content plan is in progress*. The page
+tells you roughly how long to expect and refreshes itself, so you can leave it open or come back
+later.
+
+If it fails, you get *Your content plan could not be created* instead. Nothing is stranded — your
+business profile and workspace are intact. Contact support if it keeps happening.
+
+## Reading a calendar day
+
+Each scheduled day shows:
+
+- The **keyword** the article targets.
+- **Volume** — estimated monthly searches for that keyword.
+- **Difficulty** — how hard it is to rank for, on a 0–100 scale.
+- A **status badge**: **Planned** while the article is waiting for its date, **Generated** once the
+  article exists.
+
+Selecting a day with an article opens the **article editor**, where you can revise the title, slug,
+body, meta title, meta description and featured image. The editor flags a meta title over 60
+characters and a meta description outside the 120–160 character target, and warns you before
+closing with unsaved changes.
+
+Empty days inside the window show **+ Choose keyword**.
+
+On narrow screens the grid becomes a day-by-day agenda list with the same content.
+
+## Target keywords
+
+Below the calendar, **Target Keywords** is the full pool for this workspace — everything available
+to schedule plus everything already on the plan, in one table.
+
+Columns: keyword, volume, difficulty, intent, opportunity score, and status.
+
+- **Intent** classifies what the searcher wants: *informational*, *commercial*, *transactional* or
+  *navigational*.
+- **Opportunity score** is a single 0–100 ranking number. It combines how relevant the keyword is
+  to your business, its search volume, how easy it is to rank for, its trend, and whether it
+  overlaps with content you already have. The automatic plan picks the highest-scoring keywords
+  first, and it is the most useful column to sort by when choosing manually.
+
+Statuses:
+
+| Status | Meaning |
+| --- | --- |
+| **Available** | In your pool, not scheduled. This is what you can put on a date. |
+| **Scheduled** | On the calendar, waiting for its date. |
+| **Generating** | Its article is being written right now. |
+| **Generated** | The article exists — open it from the calendar or Content history. |
+| **Failed** | Generation did not succeed. The keyword stays in the pool. |
+
+You can filter by status and sort by any metric column. Removing a keyword you do not want is done
+from the row's actions and asks for confirmation first — you can only remove keywords that are not
+already committed to the plan.
+
+## Scheduling a keyword onto a date
+
+The automatic plan is a starting point, not a cage. Any empty date inside the 45-day window can be
+filled by hand.
+
+1. Select **+ Choose keyword** on the date you want.
+2. The chooser lists your **available** target keywords with volume, difficulty, intent and
+   opportunity score. Sort to taste; select **Load more** if your pool is large.
+3. Select **Schedule** on the keyword you want.
+
+The keyword moves to **Scheduled** and the date fills in immediately. Generation happens on the
+scheduled date, the same as for keywords the automatic plan placed.
+
+Keywords missing volume or difficulty data cannot be scheduled — the chooser marks them *Required
+volume or difficulty metrics are missing.* Research the keyword again to fill in its metrics.
+
+### When scheduling conflicts
+
+The planner enforces two rules: **one article per date**, and **one article per keyword**. If
+someone else in your workspace — or a background job — got there first, you get a specific message
+and the view refreshes itself rather than leaving you looking at stale data:
+
+| Message | What happened |
+| --- | --- |
+| *This date was just taken. The planner was refreshed.* | Another keyword landed on that date first. Pick another date. |
+| *This target keyword was just scheduled.* | The keyword you chose was placed on a different date. |
+| *This keyword is already on the content plan.* | The same keyword text is already scheduled. |
+| *This target keyword is no longer available to schedule.* | The keyword left the available pool — it was removed or already used. |
+| *This calendar date is no longer valid.* | The date fell outside the window, usually because the day rolled over while the chooser was open. |
+
+## Researching new keywords
+
+When the pool runs low, select **Research Keywords** — from the Target Keywords header or from
+inside the keyword chooser.
+
+1. Enter a seed keyword or topic (up to 200 characters), for example `content marketing`.
+2. Seopotion returns the seed keyword plus related keywords, each with volume, difficulty and
+   intent.
+3. Select **Add** on any result to put it in your target pool. Results you already have are marked
+   *Already exists* rather than duplicated.
+
+Added keywords land with status **Available**, ready to schedule onto a date.
+
+If research is briefly unavailable you will see *The keyword data provider is unavailable right
+now. Try again later.* — that is the upstream metrics provider, not your workspace, and it
+resolves on its own.
+
+## Frequently confused points
+
+- **The plan is not a queue.** Articles are generated on their scheduled date, not as fast as
+  possible. An article dated three weeks out will be written three weeks out.
+- **Scheduling is a one-way step today.** A keyword placed on a date cannot be moved to a
+  different date or taken off the calendar from the planner. Choose the date deliberately.
+- **A generated article is not published.** Generation writes and stores the article; getting it
+  onto your blog is a separate, manual step — see [Publish to WordPress](/docs/wordpress).
+- **Removing a keyword from the pool does not delete an article** that was already generated from
+  it. Generated articles live in Content history.
