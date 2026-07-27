@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const repos = vi.hoisted(() => ({
   OrgRepo: { findById: vi.fn() },
-  CandidateRepo: { findById: vi.fn(), listByOrg: vi.fn(), rejectIfCandidate: vi.fn() },
+  CandidateRepo: {
+    findById: vi.fn(),
+    listByOrg: vi.fn(),
+    rejectIfCandidate: vi.fn(),
+    restoreRejected: vi.fn(),
+  },
   AdminActionRepo: { insert: vi.fn() },
   addCandidates: vi.fn(),
   scheduleCandidate: vi.fn(),
@@ -254,6 +259,39 @@ describe('DELETE /admin/v0/candidates/{candidate_id}', () => {
     );
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'candidate_not_deletable' });
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /admin/v0/candidates/{candidate_id}/restore', () => {
+  const restore = async (candidate_id: string) =>
+    client.admin.v0.candidates[':candidate_id'].restore.$post(
+      { param: { candidate_id } },
+      await authed(),
+    );
+
+  test('restores a rejected candidate -> 204 + audit with before snapshot', async () => {
+    repos.CandidateRepo.findById.mockResolvedValueOnce(rejectedCandidate);
+    repos.CandidateRepo.restoreRejected.mockResolvedValueOnce(true);
+
+    const res = await restore(rejectedCandidate.id);
+    expect(res.status).toBe(204);
+    expect(repos.CandidateRepo.restoreRejected).toHaveBeenCalledWith(rejectedCandidate.id);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'candidate.restore', before: rejectedCandidate }),
+    );
+  });
+
+  test('conditional miss (not rejected) -> 409 candidate_not_restorable, no audit', async () => {
+    repos.CandidateRepo.findById.mockResolvedValueOnce({
+      ...rejectedCandidate,
+      status: 'candidate',
+    });
+    repos.CandidateRepo.restoreRejected.mockResolvedValueOnce(false);
+
+    const res = await restore(rejectedCandidate.id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'candidate_not_restorable' });
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 });

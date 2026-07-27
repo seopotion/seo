@@ -1,10 +1,12 @@
 import { z } from '@hono/zod-openapi';
 import {
   ARTICLE_STATUSES,
+  ARTICLE_TYPES,
   CANDIDATE_STATUSES,
   IMAGES_STATUSES,
   ONBOARDING_INTEGRATIONS,
   REJECTION_REASONS,
+  SEARCH_INTENTS,
   SerpCompetitorSchema,
   SetupPresetsSchema,
   SUBSCRIPTION_STATUSES,
@@ -163,9 +165,46 @@ export const AdminPresetsResponse = z
   .object({ presets: SetupPresetsSchema })
   .openapi('AdminPresetsResponse');
 
+export const AdminStrategyRunBody = z
+  .object({
+    /** Force-rerun of a completed strategy: resets the status, then claims.
+     * Safe to repeat — the pipeline dedupes against existing planner keywords
+     * and pool candidates. */
+    force: z.boolean().optional(),
+  })
+  .openapi('AdminStrategyRunBody');
+
 export const AdminStrategyRunResponse = z
   .object({ strategy_status: z.literal('pending') })
   .openapi('AdminStrategyRunResponse');
+
+// --- Phase 2 unstick levers ---
+
+export const AdminEnqueuedResponse = z
+  .object({ enqueued: z.literal(true) })
+  .openapi('AdminEnqueuedResponse');
+
+/** Editable planner-brief fields; at least one must be present. */
+export const AdminBriefPatchBody = z
+  .object({
+    article_type: z.enum(ARTICLE_TYPES).nullable().optional(),
+    intent: z.enum(SEARCH_INTENTS).nullable().optional(),
+    opportunity_score: z.number().nullable().optional(),
+  })
+  .refine((body) => Object.keys(body).length > 0, { message: 'at least one field is required' })
+  .openapi('AdminBriefPatchBody');
+
+export const AdminWordPressConnectBody = z
+  .object({ token: z.string().min(1) })
+  .openapi('AdminWordPressConnectBody');
+
+export const AdminWordPressConnectResponse = z
+  .object({ success: z.literal(true) })
+  .openapi('AdminWordPressConnectResponse');
+
+export const AdminWordPressConnectErrorResponse = z
+  .object({ success: z.literal(false), error_code: z.string() })
+  .openapi('AdminWordPressConnectErrorResponse');
 
 // --- Keyword curation (Phase 1) ---
 

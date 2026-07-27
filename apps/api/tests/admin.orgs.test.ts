@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 const repos = vi.hoisted(() => ({
   OrgRepo: {
@@ -9,15 +9,20 @@ const repos = vi.hoisted(() => ({
     claimStrategy: vi.fn(),
     setStrategyStatus: vi.fn(),
     updatePresets: vi.fn(),
+    saveWordPressConnection: vi.fn(),
+    clearWordPressConnection: vi.fn(),
   },
   UserRepo: { findById: vi.fn(), findByEmail: vi.fn() },
   SubscriptionRepo: { findLatestByOrg: vi.fn(), listActiveByOrg: vi.fn() },
-  GscConnectionRepo: { findByOrgId: vi.fn() },
+  GscConnectionRepo: { findByOrgId: vi.fn(), deleteByOrgId: vi.fn() },
   KeywordRepo: { countScheduled: vi.fn() },
   ArticleRepo: { countByStatus: vi.fn() },
   AdminActionRepo: { insert: vi.fn(), listByOrg: vi.fn() },
 }));
 vi.mock('@shared/db', () => repos);
+
+const wp = vi.hoisted(() => ({ testWordPressIntegration: vi.fn() }));
+vi.mock('../src/clients/wordpress', () => wp);
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
@@ -27,6 +32,10 @@ const client = testClient<AdminAppType>(adminApp);
 
 const authed = async () => ({
   headers: { Authorization: `Bearer ${await signAdminToken('op@example.com')}` },
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 const org = {
@@ -238,6 +247,134 @@ describe('PATCH /admin/v0/orgs/{org_id}/presets', () => {
     );
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'no_presets' });
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('WordPress connect / disconnect (on behalf)', () => {
+  test('connect verifies then saves; the token is redacted in the audit payload', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce({ ...org, wordpress_token: undefined });
+    wp.testWordPressIntegration.mockResolvedValueOnce({ success: true });
+    repos.OrgRepo.saveWordPressConnection.mockResolvedValueOnce(true);
+
+    const res = await client.admin.v0.orgs[':org_id'].integrations.wordpress.$post(
+      { param: { org_id: org.id }, json: { token: 'plugin-secret-key' } },
+      await authed(),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true });
+    expect(wp.testWordPressIntegration).toHaveBeenCalledWith(org.website_url, 'plugin-secret-key');
+    expect(repos.OrgRepo.saveWordPressConnection).toHaveBeenCalledWith(
+      org.id,
+      'plugin-secret-key',
+      expect.any(Date),
+    );
+    const auditRow = repos.AdminActionRepo.insert.mock.calls[0]?.[0] as { payload: unknown };
+    expect(JSON.stringify(auditRow.payload)).not.toContain('plugin-secret-key');
+  });
+
+  test('connect refuses an invalid key -> 403, nothing saved, no audit', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    wp.testWordPressIntegration.mockResolvedValueOnce({
+      success: false,
+      error_code: 'invalid_integration_key',
+    });
+
+    const res = await client.admin.v0.orgs[':org_id'].integrations.wordpress.$post(
+      { param: { org_id: org.id }, json: { token: 'bad' } },
+      await authed(),
+    );
+    expect(res.status).toBe(403);
+    expect(repos.OrgRepo.saveWordPressConnection).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('connect maps a network failure -> 502', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    wp.testWordPressIntegration.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    const res = await client.admin.v0.orgs[':org_id'].integrations.wordpress.$post(
+      { param: { org_id: org.id }, json: { token: 't' } },
+      await authed(),
+    );
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ success: false, error_code: 'wordpress_request_failed' });
+  });
+
+  test('disconnect clears the connection and audits -> 204', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org); // has wordpress_token
+    repos.OrgRepo.clearWordPressConnection.mockResolvedValueOnce(true);
+
+    const res = await client.admin.v0.orgs[':org_id'].integrations.wordpress.$delete(
+      { param: { org_id: org.id } },
+      await authed(),
+    );
+    expect(res.status).toBe(204);
+    expect(repos.OrgRepo.clearWordPressConnection).toHaveBeenCalledWith(org.id);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.wordpress_disconnect' }),
+    );
+  });
+
+  test('disconnect without a connection -> 409, no audit', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce({ ...org, wordpress_token: undefined });
+
+    const res = await client.admin.v0.orgs[':org_id'].integrations.wordpress.$delete(
+      { param: { org_id: org.id } },
+      await authed(),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'wordpress_not_connected' });
+    expect(repos.OrgRepo.clearWordPressConnection).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('DELETE /admin/v0/orgs/{org_id}/gsc', () => {
+  const gscConn = {
+    id: 'g1',
+    org_id: 'a'.repeat(24),
+    refresh_token_enc: 'secret-refresh-token-enc',
+    site_url: 'sc-domain:example.com',
+    google_email: 'o@x.com',
+    connected_at: new Date('2026-07-10T00:00:00.000Z'),
+    last_refresh_failed_at: new Date('2026-07-20T00:00:00.000Z'),
+  };
+
+  test('deletes the connection; the audit before snapshot never carries the token', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.GscConnectionRepo.findByOrgId.mockResolvedValueOnce(gscConn);
+    repos.GscConnectionRepo.deleteByOrgId.mockResolvedValueOnce(true);
+
+    const res = await client.admin.v0.orgs[':org_id'].gsc.$delete(
+      { param: { org_id: org.id } },
+      await authed(),
+    );
+    expect(res.status).toBe(204);
+    expect(repos.GscConnectionRepo.deleteByOrgId).toHaveBeenCalledWith(org.id);
+    const auditRow = repos.AdminActionRepo.insert.mock.calls[0]?.[0] as { before: unknown };
+    expect(JSON.stringify(auditRow.before)).not.toContain('secret-refresh-token-enc');
+    expect(JSON.stringify(auditRow.before)).not.toContain('refresh_token_enc');
+    expect(auditRow.before).toMatchObject({ google_email: 'o@x.com' });
+  });
+
+  test('no connection -> 409 gsc_not_connected, no audit', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.GscConnectionRepo.findByOrgId.mockResolvedValueOnce(null);
+
+    const res = await client.admin.v0.orgs[':org_id'].gsc.$delete(
+      { param: { org_id: org.id } },
+      await authed(),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'gsc_not_connected' });
+    expect(repos.GscConnectionRepo.deleteByOrgId).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 });

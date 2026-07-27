@@ -6,6 +6,7 @@ import {
   META_TITLE_MAX,
   type Org,
 } from '@shared/schemas';
+import { enqueueImageTask } from '../../clients/sqs';
 import { editWordPressArticle, submitWordPressArticle } from '../../clients/wordpress';
 import { audit } from '../audit';
 import { toAdminArticleDetail, toAdminArticleListItem } from '../dto';
@@ -343,6 +344,42 @@ const articles = new OpenAPIHono<AdminEnv>()
       } catch {
         return c.json({ error: 'wordpress_request_failed' }, 502);
       }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/articles/{article_id}/images',
+      summary: 'Replay the image task (lever for images_status: failed)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminArticleParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminEnqueuedResponse } },
+          description:
+            "Image task enqueued; the worker's set-if-absent plan and per-slot guards make replay safe",
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Article not found',
+        },
+      },
+    }),
+    async (c) => {
+      const { article_id } = c.req.valid('param');
+      const article = await ArticleRepo.findById(article_id);
+      if (!article) return c.json({ error: 'not_found' }, 404);
+
+      await enqueueImageTask({ org_id: article.org_id, article_id: article.id });
+      await audit(c, {
+        action: 'article.images_replay',
+        org_id: article.org_id,
+        entity: { type: 'article', id: article.id },
+        before: { images_status: article.images_status },
+      });
+      return c.json({ enqueued: true as const }, 200);
     },
   );
 

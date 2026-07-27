@@ -207,6 +207,96 @@ const planner = new OpenAPIHono<AdminEnv>()
       });
       return c.json({ enqueued: true as const }, 200);
     },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/scheduled/{keyword_id}/reset',
+      summary: 'Reset a failed keyword to pending with zero attempts (over-cap lever)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminKeywordParams },
+      responses: {
+        204: { description: 'Keyword reset; the daily scheduler (or generate-now) can retry it' },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Keyword not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'not_resettable — only failed, unlinked keywords reset',
+        },
+      },
+    }),
+    async (c) => {
+      const { keyword_id } = c.req.valid('param');
+      const keyword = await KeywordRepo.findById(keyword_id);
+      if (!keyword) return c.json({ error: 'not_found' }, 404);
+
+      const reset = await KeywordRepo.resetGeneration(keyword.id);
+      if (!reset) return c.json({ error: 'not_resettable' }, 409);
+      await audit(c, {
+        action: 'keyword.reset_generation',
+        org_id: keyword.org_id,
+        entity: { type: 'keyword', id: keyword.id },
+        before: keyword,
+      });
+      return c.body(null, 204);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'patch',
+      path: '/scheduled/{keyword_id}/brief',
+      summary: 'Edit the planner brief (type / intent / score) while ungenerated',
+      security: [{ Bearer: [] }],
+      request: {
+        params: schemas.AdminKeywordParams,
+        body: {
+          content: { 'application/json': { schema: schemas.AdminBriefPatchBody } },
+          required: true,
+        },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminScheduledKeywordResponse } },
+          description: 'The updated planner row',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Keyword not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'generation_started — the brief feeds generation, so it locks once started',
+        },
+      },
+    }),
+    async (c) => {
+      const { keyword_id } = c.req.valid('param');
+      const fields = c.req.valid('json');
+      const keyword = await KeywordRepo.findById(keyword_id);
+      if (!keyword) return c.json({ error: 'not_found' }, 404);
+
+      const updated = await KeywordRepo.updateBrief(keyword.id, fields);
+      // Conditional update misses once generation started or an article linked.
+      if (!updated) return c.json({ error: 'generation_started' }, 409);
+      await audit(c, {
+        action: 'keyword.update_brief',
+        org_id: keyword.org_id,
+        entity: { type: 'keyword', id: keyword.id },
+        payload: fields,
+        before: {
+          article_type: keyword.article_type,
+          intent: keyword.intent,
+          opportunity_score: keyword.opportunity_score,
+        },
+      });
+      return c.json({ keyword: toAdminScheduledKeyword(updated) }, 200);
+    },
   );
 
 export default planner;
