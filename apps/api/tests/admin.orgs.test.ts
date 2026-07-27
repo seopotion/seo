@@ -8,13 +8,14 @@ const repos = vi.hoisted(() => ({
     setPlan: vi.fn(),
     claimStrategy: vi.fn(),
     setStrategyStatus: vi.fn(),
+    updatePresets: vi.fn(),
   },
   UserRepo: { findById: vi.fn(), findByEmail: vi.fn() },
   SubscriptionRepo: { findLatestByOrg: vi.fn(), listActiveByOrg: vi.fn() },
   GscConnectionRepo: { findByOrgId: vi.fn() },
   KeywordRepo: { countScheduled: vi.fn() },
   ArticleRepo: { countByStatus: vi.fn() },
-  AdminActionRepo: { insert: vi.fn() },
+  AdminActionRepo: { insert: vi.fn(), listByOrg: vi.fn() },
 }));
 vi.mock('@shared/db', () => repos);
 
@@ -154,5 +155,89 @@ describe('GET /admin/v0/orgs/{org_id} (detail)', () => {
     );
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'not_found' });
+  });
+});
+
+describe('GET /admin/v0/orgs/{org_id}/audit', () => {
+  test('returns the org actions newest-first with ISO timestamps', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.AdminActionRepo.listByOrg.mockResolvedValueOnce({
+      actions: [
+        {
+          id: 'act_1',
+          at: new Date('2026-07-27T09:00:00.000Z'),
+          actor: 'op@example.com',
+          action: 'org.set_plan',
+          org_id: org.id,
+          entity: null,
+          payload: { plan: 'expert' },
+          before: { plan: 'free' },
+        },
+      ],
+      total: 1,
+    });
+
+    const res = await client.admin.v0.orgs[':org_id'].audit.$get(
+      { param: { org_id: org.id }, query: {} },
+      await authed(),
+    );
+    if (res.status !== 200) throw new Error('expected 200');
+    const json = await res.json();
+    expect(json.total).toBe(1);
+    expect(json.actions[0]).toMatchObject({
+      actor: 'op@example.com',
+      action: 'org.set_plan',
+      at: '2026-07-27T09:00:00.000Z',
+    });
+    expect(repos.AdminActionRepo.listByOrg).toHaveBeenCalledWith(org.id, { limit: 50, offset: 0 });
+  });
+
+  test('unknown org -> 404', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(null);
+    const res = await client.admin.v0.orgs[':org_id'].audit.$get(
+      { param: { org_id: 'f'.repeat(24) }, query: {} },
+      await authed(),
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /admin/v0/orgs/{org_id}/presets', () => {
+  test('deep-merges over the stored presets regardless of setup status, and audits', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    // Mid-onboarding org — the customer flow would refuse this status.
+    repos.OrgRepo.findById.mockResolvedValueOnce({ ...org, setup_status: 'setup_scan_completed' });
+
+    const res = await client.admin.v0.orgs[':org_id'].presets.$patch(
+      {
+        param: { org_id: org.id },
+        json: { business: { name: 'Renamed' }, audience: { competitors: ['x.com'] } },
+      },
+      await authed(),
+    );
+    if (res.status !== 200) throw new Error('expected 200');
+    const json = await res.json();
+    expect(json.presets.business.name).toBe('Renamed');
+    expect(json.presets.business.language).toBe('en'); // untouched field survives
+    expect(json.presets.audience.competitors).toEqual(['x.com']); // arrays replace wholesale
+
+    expect(repos.OrgRepo.updatePresets).toHaveBeenCalledWith(org.id, json.presets);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledTimes(1);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.update_presets', before: org.presets }),
+    );
+  });
+
+  test('org without presets -> 409 no_presets, no audit row', async () => {
+    repos.AdminActionRepo.insert.mockClear();
+    repos.OrgRepo.findById.mockResolvedValueOnce({ ...org, presets: undefined });
+
+    const res = await client.admin.v0.orgs[':org_id'].presets.$patch(
+      { param: { org_id: org.id }, json: { business: { name: 'X' } } },
+      await authed(),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'no_presets' });
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 });

@@ -4,8 +4,11 @@ import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
 import { type AdminEnv, adminAuthMiddleware } from './middleware';
+import articles from './routes/articles';
+import candidates from './routes/candidates';
 import login from './routes/login';
 import orgs from './routes/orgs';
+import planner from './routes/planner';
 
 /**
  * Admin operator app (epic #150) — served by its own Lambda (admin-index.ts),
@@ -45,7 +48,10 @@ app.get(`/admin/${API_VERSION}/ui`, swaggerUI({ url: `/admin/${API_VERSION}/open
 const routes = app
   .route(`/admin/${API_VERSION}`, login)
   .use('*', adminAuthMiddleware)
-  .route(`/admin/${API_VERSION}`, orgs);
+  .route(`/admin/${API_VERSION}`, orgs)
+  .route(`/admin/${API_VERSION}`, candidates)
+  .route(`/admin/${API_VERSION}`, planner)
+  .route(`/admin/${API_VERSION}`, articles);
 
 export default app;
 export type AdminAppType = typeof routes;
