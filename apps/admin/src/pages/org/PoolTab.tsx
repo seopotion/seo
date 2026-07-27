@@ -12,6 +12,7 @@ import {
   fetchCandidates,
   POOL_PAGE_SIZE,
   rejectCandidate,
+  restoreCandidate,
   scheduleCandidate,
 } from '../../lib/queries';
 import { useOrgDetail } from '../OrgWorkspace';
@@ -20,6 +21,7 @@ import { ResearchPanel } from './ResearchPanel';
 /** The pending two-step confirm, if any. */
 type Pending =
   | { kind: 'reject'; candidate: CandidateItem }
+  | { kind: 'restore'; candidate: CandidateItem }
   | { kind: 'schedule'; candidate: CandidateItem; date: string };
 
 const SCHEDULE_CUSTOMER_VISIBLE =
@@ -52,6 +54,11 @@ export function PoolTab() {
 
   const reject = useMutation({
     mutationFn: (candidate: CandidateItem) => rejectCandidate(candidate.id),
+    onSuccess: invalidatePool,
+  });
+
+  const restore = useMutation({
+    mutationFn: (candidate: CandidateItem) => restoreCandidate(candidate.id),
     onSuccess: invalidatePool,
   });
 
@@ -106,6 +113,11 @@ export function PoolTab() {
       {reject.isError && (
         <p className="mt-3 text-sm text-red-400">
           {errorText(reject.error, 'Could not reject that candidate.')}
+        </p>
+      )}
+      {restore.isError && (
+        <p className="mt-3 text-sm text-red-400">
+          {errorText(restore.error, 'Could not restore that candidate.')}
         </p>
       )}
       {schedule.isError && (
@@ -175,7 +187,15 @@ export function PoolTab() {
                   <SerpCell competitors={candidate.serp_competitors} />
                 </Td>
                 <Td>
-                  {candidate.status !== 'candidate' ? (
+                  {candidate.status === 'rejected' ? (
+                    <button
+                      type="button"
+                      onClick={() => setPending({ kind: 'restore', candidate })}
+                      className="rounded border border-neutral-700 px-2 py-1 text-xs whitespace-nowrap hover:bg-neutral-800"
+                    >
+                      Restore
+                    </button>
+                  ) : candidate.status !== 'candidate' ? (
                     <span className="text-xs text-neutral-600">{EMPTY}</span>
                   ) : scheduling === candidate.id ? (
                     <DateForm
@@ -249,6 +269,19 @@ export function PoolTab() {
           onConfirm={() => {
             setPending(null);
             reject.mutate(pending.candidate);
+          }}
+        />
+      )}
+
+      {pending?.kind === 'restore' && (
+        <ConfirmDialog
+          title="Restore candidate"
+          body={`"${pending.candidate.keyword}" goes back into the pool as a plain candidate, where it can be scheduled again. The rejection reason stays on the record.`}
+          confirmLabel="Restore"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            setPending(null);
+            restore.mutate(pending.candidate);
           }}
         />
       )}

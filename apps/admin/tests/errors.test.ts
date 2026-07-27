@@ -24,6 +24,23 @@ describe('errorMessage', () => {
     }
   });
 
+  test('maps every refusal the phase-2 unstick levers can return', () => {
+    for (const code of [
+      'candidate_not_restorable',
+      'not_resettable',
+      'generation_started',
+      'setup_complete',
+      'gsc_not_connected',
+      'wordpress_not_connected',
+      'invalid_integration_key',
+      'integration_not_configured',
+      'wordpress_request_failed',
+      'strategy_not_claimable',
+    ]) {
+      expect(errorMessage(code)).not.toBe(code);
+    }
+  });
+
   test('falls back to the raw code for anything unmapped', () => {
     // Better than a generic "something went wrong": the operator can still act
     // on a code they can read (WordPress plugin codes arrive verbatim).

@@ -13,6 +13,7 @@ import {
   ArticleValidationError,
   fetchArticle,
   publishToWordPress,
+  retryImages,
   updateArticle,
   updateWordPressPost,
 } from '../lib/queries';
@@ -26,6 +27,11 @@ const UPDATE_CUSTOMER_VISIBLE =
 const UNSAVED_WARNING =
   'You have unsaved edits — WordPress is sent the last saved version, not what is in the editor. ' +
   'Save first if you meant to publish these changes.';
+
+const IMAGES_REPLAY_BODY =
+  'The image task is queued again for this article. Replay is idempotent by design — the worker ' +
+  'fills each slot only if it is still empty, so an image that already landed is left alone and ' +
+  'nothing already written is overwritten. Safe to click.';
 
 const IMAGES_PENDING_BANNER =
   'Images are being generated — editing is blocked until they finish. The images worker rewrites ' +
@@ -92,7 +98,7 @@ function toDraft(article: ArticleDetail): ArticleDraft {
 }
 
 /** The pending two-step confirm, if any. */
-type Pending = { kind: 'publish' } | { kind: 'update' };
+type Pending = { kind: 'publish' } | { kind: 'update' } | { kind: 'images' };
 
 function ArticleEditor({
   article,
@@ -117,6 +123,7 @@ function ArticleEditor({
 
   const imagesPending = article.images_status === 'pending';
   const imagesComplete = article.images_status === 'complete';
+  const imagesFailed = article.images_status === 'failed';
   const published = article.wordpress_post_id;
 
   // The tab-close half of the leave guard; the in-app half is the blocker below.
@@ -155,6 +162,13 @@ function ArticleEditor({
     onSuccess: invalidateArticle,
   });
 
+  const replayImages = useMutation({
+    mutationFn: () => retryImages(article.id),
+    // Like generate-now: the worker flips the status on its own schedule, so
+    // this only refetches — the row updates when the replay lands.
+    onSuccess: invalidateArticle,
+  });
+
   const fieldErrors = save.error instanceof ArticleValidationError ? save.error.fields : null;
   const set = (field: keyof ArticleDraft, value: string) =>
     setDraft((current) => ({ ...current, [field]: value }));
@@ -187,6 +201,33 @@ function ArticleEditor({
         <p className="mt-5 rounded border border-amber-600 bg-amber-950 p-3 text-sm font-semibold text-amber-200">
           {IMAGES_PENDING_BANNER}
         </p>
+      )}
+
+      {imagesFailed && (
+        <div className="mt-5 rounded border border-red-800 bg-red-950/50 p-3 text-sm text-red-200">
+          <p>
+            Image generation failed, which blocks publishing to WordPress. Replaying the task is
+            safe — the worker only fills slots that are still empty.
+          </p>
+          <button
+            type="button"
+            disabled={replayImages.isPending}
+            onClick={() => setPending({ kind: 'images' })}
+            className="mt-3 rounded border border-red-700 px-3 py-1.5 text-sm font-semibold text-red-100 hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {replayImages.isPending ? 'Queueing…' : 'Retry images'}
+          </button>
+          {replayImages.isError && (
+            <p className="mt-2 text-red-400">
+              {errorText(replayImages.error, 'Could not queue the image task.')}
+            </p>
+          )}
+          {replayImages.isSuccess && (
+            <p className="mt-2 text-emerald-400">
+              Images queued — reload in a minute to see the status move.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="mt-6 space-y-4">
@@ -377,6 +418,19 @@ function ArticleEditor({
           onConfirm={() => {
             setPending(null);
             updatePost.mutate();
+          }}
+        />
+      )}
+
+      {pending?.kind === 'images' && (
+        <ConfirmDialog
+          title="Retry images"
+          body={IMAGES_REPLAY_BODY}
+          confirmLabel="Queue the image task"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            setPending(null);
+            replayImages.mutate();
           }}
         />
       )}

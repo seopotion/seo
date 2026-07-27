@@ -12,8 +12,7 @@ const MESSAGES: Record<string, string> = {
   not_found: 'That record no longer exists — reload the page.',
   no_presets: 'This org has no presets yet — the onboarding scan has not produced them.',
   strategy_not_claimable:
-    'A strategy job is already pending or completed for this org — force re-run arrives with the ' +
-    'phase-2 levers.',
+    'A strategy job is already pending or completed for this org — use “Force re-run” instead.',
 
   // Keyword curation (pool + planner).
   keyword_provider_failed: 'The research provider failed — try again in a moment.',
@@ -43,6 +42,22 @@ const MESSAGES: Record<string, string> = {
     'WordPress created the post but we failed to store its id — check the site before retrying, ' +
     'or a second publish would duplicate it.',
   wordpress_request_failed: "The customer's WordPress site did not respond — try again.",
+
+  // Phase-2 unstick levers. Each is a conditional update losing its race: the
+  // row moved on since the page loaded, so the copy says what to do about it.
+  candidate_not_restorable: 'This candidate is no longer rejected — reload the pool.',
+  not_resettable:
+    'Only a failed entry with no article can be reset — reload the planner to see its real state.',
+  setup_complete:
+    'Refused for live orgs: a rescan would overwrite the presets and knock this org out of its ' +
+    'dashboard.',
+  gsc_not_connected: 'This org has no Search Console connection to remove.',
+
+  // WordPress connect-on-behalf: the plugin reports these through the
+  // verify-then-save step, before anything is stored.
+  invalid_integration_key: "The plugin rejected that key — check it in the customer's WordPress.",
+  integration_not_configured:
+    'The plugin is installed but its integration is not switched on for this site.',
 };
 
 export function errorMessage(code: string): string {
