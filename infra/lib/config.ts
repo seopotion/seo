@@ -14,6 +14,8 @@ interface StageConfig {
   lemonSqueezyStoreId: string; // public
   lemonSqueezyVariantPaid: string; // public
   lemonSqueezyVariantExpert: string; // public
+  adminJwtSecretParam: string; // SSM SecureString NAME (admin Lambda only)
+  adminOperatorsParam: string; // SSM String NAME — comma-separated operator emails
 }
 
 export const STAGE_CONFIG: Record<Stage, StageConfig> = {
@@ -31,6 +33,8 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     lemonSqueezyStoreId: process.env.LEMONSQUEEZY_STORE_ID_STAGING ?? '',
     lemonSqueezyVariantPaid: process.env.LEMONSQUEEZY_VARIANT_PAID_STAGING ?? '',
     lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_STAGING ?? '',
+    adminJwtSecretParam: '/seo/staging/admin/jwt-secret',
+    adminOperatorsParam: '/seo/staging/admin/operators',
   },
   prod: {
     mongoDb: 'seo_prod',
@@ -46,5 +50,7 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     lemonSqueezyStoreId: process.env.LEMONSQUEEZY_STORE_ID_PROD ?? '',
     lemonSqueezyVariantPaid: process.env.LEMONSQUEEZY_VARIANT_PAID_PROD ?? '',
     lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD ?? '',
+    adminJwtSecretParam: '/seo/prod/admin/jwt-secret',
+    adminOperatorsParam: '/seo/prod/admin/operators',
   },
 };

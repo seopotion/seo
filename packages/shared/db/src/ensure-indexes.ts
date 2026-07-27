@@ -62,4 +62,7 @@ export async function ensureIndexes(): Promise<void> {
     .collection('subscriptions')
     .createIndex({ provider_subscription_id: 1 }, { unique: true });
   await db.collection('subscriptions').createIndex({ org_id: 1, status: 1 });
+  // Admin audit log (epic #150): per-org history (newest first) + global feed.
+  await db.collection('admin_actions').createIndex({ org_id: 1, at: -1 });
+  await db.collection('admin_actions').createIndex({ at: -1 });
 }
