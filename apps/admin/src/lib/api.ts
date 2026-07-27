@@ -41,6 +41,23 @@ type OkJson<R> = R extends { ok: true; json: () => Promise<infer T> } ? T : neve
  * once: drop the token and go back to login.
  */
 export async function unwrap<R extends JsonResponse>(res: R): Promise<OkJson<R>> {
+  await assertOk(res);
+  // Guarded by `assertOk` — the runtime body is the success payload that
+  // `OkJson` selected, which the `json(): Promise<unknown>` bound hides.
+  return res.json() as Promise<OkJson<R>>;
+}
+
+/**
+ * The same handling for routes whose success is `204 No Content` (reject,
+ * unschedule): there is no body to parse, so reading one would throw on the
+ * happy path.
+ */
+export async function unwrapEmpty(res: JsonResponse): Promise<void> {
+  await assertOk(res);
+}
+
+/** Turns a non-2xx response into an `ApiError`; an expired session logs out. */
+async function assertOk(res: JsonResponse): Promise<void> {
   if (res.status === 401) {
     clearToken();
     window.location.assign('/login');
@@ -49,9 +66,6 @@ export async function unwrap<R extends JsonResponse>(res: R): Promise<OkJson<R>>
   if (!res.ok) {
     throw new ApiError(errorCode(await res.text().catch(() => ''), res.statusText), res.status);
   }
-  // Guarded by the `ok` check above — the runtime body is the success payload
-  // that `OkJson` selected, which the `json(): Promise<unknown>` bound hides.
-  return res.json() as Promise<OkJson<R>>;
 }
 
 /** Admin errors are `{ error: '<code>' }`; anything else falls back to the status text. */
