@@ -25,6 +25,26 @@ export const OrgRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  /**
+   * Operator org search (epic #150): an exact-id hit, else a case-insensitive
+   * `website_url` substring match (capped — a regex scan over the url index is
+   * acceptable at this scale). Email lookups are the caller's job
+   * (`UserRepo.findByEmail` -> `findByUserId`).
+   */
+  async search(query: string): Promise<Org[]> {
+    if (ObjectId.isValid(query)) {
+      const doc = await (await collection()).findOne({ _id: new ObjectId(query) });
+      return doc ? [toEntity(doc)] : [];
+    }
+    // Escape regex metacharacters so the query is a literal substring match.
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const docs = await (await collection())
+      .find({ website_url: { $regex: escaped, $options: 'i' } })
+      .limit(20)
+      .toArray();
+    return docs.map(toEntity);
+  },
+
   async findByUserId(userId: string): Promise<Org[]> {
     const docs = await (await collection()).find({ user_id: userId }).toArray();
     return docs.map(toEntity);
@@ -80,6 +100,16 @@ export const OrgRepo = {
       { $set: { wordpress_token: token, wordpress_connected_at: connectedAt } },
     );
     return res.matchedCount > 0;
+  },
+
+  /** Remove the WordPress connection (admin disconnect lever, epic #150). */
+  async clearWordPressConnection(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $unset: { wordpress_token: '', wordpress_connected_at: '' } },
+    );
+    return res.matchedCount === 1;
   },
 
   /** Persist final presets (+ optional onboarding metadata) and flip the org to

@@ -62,6 +62,13 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per-env wiring documented/plumbed — [#21](https://github.com/seopotion/seo/issues/21); actual deployed frontend hosting still blocked on [#35](https://github.com/seopotion/seo/issues/35)
 - ⬜ No component/DOM tests (no jsdom) — [#22](https://github.com/seopotion/seo/issues/22)
 
+## Admin panel (wizard-of-oz operations)
+
+- ✅ Phase 0 — separate admin Lambda/HTTP API, allowlist-gated Google login + admin JWT, append-only `admin_actions` audit, org search/detail (redacted), plan override with strategy kick, `getAdminApiClient` — [#150](https://github.com/seopotion/seo/issues/150)
+- ✅ Phase 1 — content-curation MVP: research (extracted core), candidate pool + planner curation, generate-now, article editor + WordPress publish/update, presets PATCH, strategy run, audit read — [#150](https://github.com/seopotion/seo/issues/150)
+- ✅ Phase 2 — unstick levers: generation reset (over-cap), candidate restore, brief edit, strategy force-rerun, guarded scan re-run, image replay, WordPress connect/disconnect, GSC disconnect — [#150](https://github.com/seopotion/seo/issues/150). Backend epic complete; Phase 3 deliberately unbuilt
+- ⬜ Operator UI (`apps/admin`) — [#151](https://github.com/seopotion/seo/issues/151)
+
 ## Infrastructure / ops
 
 - ✅ CDK `ApiStack` — API + worker + db-init Lambdas, SQS queue + DLQ, HTTP API, deploy-time index init; NodejsFunction bundling (ESM `createRequire` banner) verified

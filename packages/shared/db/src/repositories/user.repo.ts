@@ -15,6 +15,12 @@ function toEntity(doc: WithId<Document>): User {
 }
 
 export const UserRepo = {
+  async findById(id: string): Promise<User | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOne({ _id: new ObjectId(id) });
+    return doc ? toEntity(doc) : null;
+  },
+
   async findByGoogleSub(googleSub: string): Promise<User | null> {
     const doc = await (await collection()).findOne({ google_sub: googleSub });
     return doc ? toEntity(doc) : null;

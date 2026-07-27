@@ -95,4 +95,64 @@ describe('OrgRepo (integration)', () => {
     expect(found?.domain_rating?.value).toBe(42);
     expect(found?.domain_rating?.checked_at).toBeInstanceOf(Date);
   });
+
+  test('search by org id returns a 0/1-element array', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_search',
+      website_url: 'https://search-by-id.example.com',
+      setup_status: 'setup_scan_in_progress',
+    });
+
+    const hit = await OrgRepo.search(org.id);
+    expect(hit).toHaveLength(1);
+    expect(hit[0]?.id).toBe(org.id);
+
+    expect(await OrgRepo.search(new ObjectId().toString())).toEqual([]);
+  });
+
+  test('search matches website_url substrings case-insensitively', async () => {
+    await OrgRepo.create({
+      user_id: 'user_search',
+      website_url: 'https://Unique-Widgets.example.com',
+      setup_status: 'setup_scan_in_progress',
+    });
+
+    const found = await OrgRepo.search('unique-widgets');
+    expect(found).toHaveLength(1);
+    expect(found[0]?.website_url).toBe('https://Unique-Widgets.example.com');
+  });
+
+  test('search escapes regex metacharacters (no throw, no wildcard match)', async () => {
+    await OrgRepo.create({
+      user_id: 'user_search',
+      website_url: 'https://dotted.example.com',
+      setup_status: 'setup_scan_in_progress',
+    });
+
+    // '.' must be literal: 'dotted.example' matches, 'dottedXexample' must not.
+    expect((await OrgRepo.search('dotted.example')).length).toBe(1);
+    expect(await OrgRepo.search('dotted.example'.replace('.', 'X'))).toEqual([]);
+    expect(await OrgRepo.search('d.tted')).toEqual([]);
+    // Unbalanced metacharacters must not throw.
+    expect(await OrgRepo.search('a(b[c')).toEqual([]);
+    expect(await OrgRepo.search('.*')).toEqual([]);
+  });
+
+  test('clearWordPressConnection unsets token + timestamp', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_wp_clear',
+      website_url: 'https://wp-clear.example.com',
+      setup_status: 'setup_complete',
+    });
+    await OrgRepo.saveWordPressConnection(org.id, 'wp-token', new Date());
+    expect((await OrgRepo.findById(org.id))!.wordpress_token).toBe('wp-token');
+
+    expect(await OrgRepo.clearWordPressConnection(org.id)).toBe(true);
+    const cleared = await OrgRepo.findById(org.id);
+    expect(cleared!.wordpress_token).toBeUndefined();
+    expect(cleared!.wordpress_connected_at).toBeUndefined();
+
+    expect(await OrgRepo.clearWordPressConnection(new ObjectId().toString())).toBe(false);
+    expect(await OrgRepo.clearWordPressConnection('not-an-objectid')).toBe(false);
+  });
 });
