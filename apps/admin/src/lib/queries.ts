@@ -1,5 +1,6 @@
 import type { ARTICLE_STATUSES, CandidateStatus, IMAGES_STATUSES } from '@shared/schemas';
 import { ApiError, adminApi, unwrap, unwrapEmpty } from './api';
+import type { PresetsPatch } from './presets';
 
 /** The two article enums, straight from the entity schema the DTOs mirror. */
 export type ArticleStatus = (typeof ARTICLE_STATUSES)[number];
@@ -37,6 +38,42 @@ export async function setPlan(orgId: string, plan: Plan) {
     }),
   );
 }
+
+// --- Presets, strategy, audit ---
+
+/** Deep-merge PATCH: the body carries only the subtrees the operator changed. */
+export async function updatePresets(orgId: string, patch: PresetsPatch) {
+  return unwrap(
+    await adminApi.admin.v0.orgs[':org_id'].presets.$patch({
+      param: { org_id: orgId },
+      json: patch,
+    }),
+  );
+}
+
+/** Runs the 30-day strategy job. Force-rerun is a phase-2 lever, so no `force`. */
+export async function runStrategy(orgId: string) {
+  return unwrap(
+    await adminApi.admin.v0.orgs[':org_id'].strategy.$post({
+      param: { org_id: orgId },
+      json: {},
+    }),
+  );
+}
+
+/** One page of the audit trail — the API's own default page size. */
+export const AUDIT_PAGE_SIZE = 50;
+
+export async function fetchAudit(orgId: string, offset = 0) {
+  return unwrap(
+    await adminApi.admin.v0.orgs[':org_id'].audit.$get({
+      param: { org_id: orgId },
+      query: { limit: String(AUDIT_PAGE_SIZE), offset: String(offset) },
+    }),
+  );
+}
+
+export type AuditAction = Awaited<ReturnType<typeof fetchAudit>>['actions'][number];
 
 // --- Candidate pool ---
 

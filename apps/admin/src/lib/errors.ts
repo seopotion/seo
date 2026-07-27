@@ -11,7 +11,9 @@ import { ApiError } from './api';
 const MESSAGES: Record<string, string> = {
   not_found: 'That record no longer exists — reload the page.',
   no_presets: 'This org has no presets yet — the onboarding scan has not produced them.',
-  strategy_not_claimable: 'A strategy job is already pending or completed for this org.',
+  strategy_not_claimable:
+    'A strategy job is already pending or completed for this org — force re-run arrives with the ' +
+    'phase-2 levers.',
 
   // Keyword curation (pool + planner).
   keyword_provider_failed: 'The research provider failed — try again in a moment.',

@@ -35,11 +35,14 @@ const {
   ArticleValidationError,
   fetchArticle,
   fetchArticles,
+  fetchAudit,
   fetchOrg,
   publishToWordPress,
+  runStrategy,
   searchOrgs,
   setPlan,
   updateArticle,
+  updatePresets,
   updateWordPressPost,
 } = await import('../src/lib/queries');
 const { ApiError } = await import('../src/lib/api');
@@ -95,6 +98,55 @@ describe('setPlan', () => {
       code: 'strategy_not_claimable',
       status: 409,
     });
+  });
+});
+
+describe('updatePresets', () => {
+  test('patches only the subtree it is given', async () => {
+    reply = { status: 200, body: { presets: { business: { name: 'Acme Corp' } } } };
+
+    await updatePresets('org1', { business: { name: 'Acme Corp' } });
+    expect(calls[0]?.method).toBe('PATCH');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/presets');
+    expect(calls[0]?.body).toBe('{"business":{"name":"Acme Corp"}}');
+  });
+
+  test('surfaces the no-presets refusal as its code', async () => {
+    reply = { status: 409, body: { error: 'no_presets' } };
+
+    await expect(updatePresets('org1', { business: { name: 'x' } })).rejects.toMatchObject({
+      code: 'no_presets',
+      status: 409,
+    });
+  });
+});
+
+describe('runStrategy', () => {
+  test('posts an empty body — force is a phase-2 lever', async () => {
+    reply = { status: 200, body: { strategy_status: 'pending' } };
+
+    await expect(runStrategy('org1')).resolves.toEqual({ strategy_status: 'pending' });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/strategy');
+    expect(calls[0]?.body).toBe('{}');
+  });
+
+  test('surfaces the claim refusal as its code', async () => {
+    reply = { status: 409, body: { error: 'strategy_not_claimable' } };
+
+    await expect(runStrategy('org1')).rejects.toMatchObject({
+      code: 'strategy_not_claimable',
+      status: 409,
+    });
+  });
+});
+
+describe('fetchAudit', () => {
+  test('sends the page window', async () => {
+    reply = { status: 200, body: { actions: [], total: 0 } };
+
+    await fetchAudit('org1', 50);
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/audit?limit=50&offset=50');
   });
 });
 

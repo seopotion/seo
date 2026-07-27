@@ -11,8 +11,8 @@ import { ArticlePage } from './pages/ArticlePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrgWorkspace } from './pages/OrgWorkspace';
 import { ArticlesTab } from './pages/org/ArticlesTab';
+import { AuditTab } from './pages/org/AuditTab';
 import { OverviewTab } from './pages/org/OverviewTab';
-import { PlaceholderTab } from './pages/org/PlaceholderTab';
 import { PlannerTab } from './pages/org/PlannerTab';
 import { PoolTab } from './pages/org/PoolTab';
 import { SearchPage } from './pages/SearchPage';
@@ -32,7 +32,7 @@ const router = createBrowserRouter(
           <Route path="pool" element={<PoolTab />} />
           <Route path="planner" element={<PlannerTab />} />
           <Route path="articles" element={<ArticlesTab />} />
-          <Route path="audit" element={<PlaceholderTab name="The audit trail" />} />
+          <Route path="audit" element={<AuditTab />} />
         </Route>
         {/* Workspace-independent, so an article link stands on its own. */}
         <Route path="/articles/:articleId" element={<ArticlePage />} />
