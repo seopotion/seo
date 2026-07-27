@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import {
+  AdminActionRepo,
   ArticleRepo,
   GscConnectionRepo,
   KeywordRepo,
@@ -9,8 +10,15 @@ import {
 } from '@shared/db';
 import { isPaid } from '@shared/schemas';
 import { enqueueStrategyTask } from '../../clients/sqs';
+import { mergePresets } from '../../lib/merge-presets';
 import { audit } from '../audit';
-import { toAdminGsc, toAdminOrg, toAdminOrgSummary, toAdminSubscription } from '../dto';
+import {
+  toAdminAuditAction,
+  toAdminGsc,
+  toAdminOrg,
+  toAdminOrgSummary,
+  toAdminSubscription,
+} from '../dto';
 import type { AdminEnv } from '../middleware';
 import * as schemas from '../schemas';
 
@@ -160,6 +168,129 @@ const orgs = new OpenAPIHono<AdminEnv>()
 
       await audit(c, { action: 'org.set_plan', org_id: org.id, payload: { plan }, before: org });
       return c.json({ plan, strategy_kicked }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'get',
+      path: '/orgs/{org_id}/audit',
+      summary: "The org's admin actions, newest first (paginated)",
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminOrgParams, query: schemas.AdminAuditQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminAuditResponse } },
+          description: 'Audit rows with actor, payload, and before snapshots',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const { limit, offset } = c.req.valid('query');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+
+      const { actions, total } = await AdminActionRepo.listByOrg(org.id, { limit, offset });
+      return c.json({ actions: actions.map(toAdminAuditAction), total }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'patch',
+      path: '/orgs/{org_id}/presets',
+      summary: 'Deep-merge edit over the full SetupPresets (any setup status)',
+      security: [{ Bearer: [] }],
+      request: {
+        params: schemas.AdminOrgParams,
+        body: {
+          content: { 'application/json': { schema: schemas.AdminPresetsPatchBody } },
+          required: true,
+        },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminPresetsResponse } },
+          description: 'Merged presets (persisted)',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org has no presets yet (scan has not produced them)',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const patch = c.req.valid('json');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+      // Unlike the customer flow there is no setup-status gate — any status is
+      // editable — but there must be something to merge over.
+      if (!org.presets) return c.json({ error: 'no_presets' }, 409);
+
+      const merged = mergePresets(org.presets, patch);
+      await OrgRepo.updatePresets(org.id, merged);
+      await audit(c, {
+        action: 'org.update_presets',
+        org_id: org.id,
+        payload: patch,
+        before: org.presets,
+      });
+      return c.json({ presets: merged }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/orgs/{org_id}/strategy',
+      summary: 'Run the 30-day strategy job (claims from none|failed)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminOrgParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminStrategyRunResponse } },
+          description: 'Strategy job claimed and enqueued',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Not claimable — the job is pending or completed (force-rerun is Phase 2)',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+
+      if (!(await OrgRepo.claimStrategy(org.id))) {
+        return c.json({ error: 'strategy_not_claimable' }, 409);
+      }
+      try {
+        await enqueueStrategyTask({ org_id: org.id });
+      } catch (err) {
+        // Revert the claim so a retry can reclaim (same as the plan route).
+        await OrgRepo.setStrategyStatus(org.id, 'failed');
+        throw err;
+      }
+      await audit(c, { action: 'org.strategy_run', org_id: org.id, before: org });
+      return c.json({ strategy_status: 'pending' as const }, 200);
     },
   );
 

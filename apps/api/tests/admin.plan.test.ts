@@ -138,3 +138,41 @@ describe('POST /admin/v0/orgs/{org_id}/plan', () => {
     expect(await res.json()).toEqual({ plan: 'expert', strategy_kicked: true });
   });
 });
+
+describe('POST /admin/v0/orgs/{org_id}/strategy (non-force)', () => {
+  const runStrategy = async (org_id: string) =>
+    client.admin.v0.orgs[':org_id'].strategy.$post({ param: { org_id } }, await authed());
+
+  test('claim wins -> enqueue + audit + 200', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+
+    const res = await runStrategy(baseOrg.id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ strategy_status: 'pending' });
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.strategy_run', org_id: baseOrg.id }),
+    );
+  });
+
+  test('claim refused (pending/completed) -> 409, no enqueue, no audit', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+    repos.OrgRepo.claimStrategy.mockResolvedValueOnce(false);
+
+    const res = await runStrategy(baseOrg.id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'strategy_not_claimable' });
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('enqueue failure reverts the claim and 500s', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+    enqueueStrategyTask.mockRejectedValueOnce(new Error('sqs down'));
+
+    const res = await runStrategy(baseOrg.id);
+    expect(res.status).toBe(500);
+    expect(repos.OrgRepo.setStrategyStatus).toHaveBeenCalledWith(baseOrg.id, 'failed');
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+});

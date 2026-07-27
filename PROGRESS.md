@@ -63,7 +63,8 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Admin panel (wizard-of-oz operations)
 
 - ✅ Phase 0 — separate admin Lambda/HTTP API, allowlist-gated Google login + admin JWT, append-only `admin_actions` audit, org search/detail (redacted), plan override with strategy kick, `getAdminApiClient` — [#150](https://github.com/seopotion/seo/issues/150)
-- ⬜ Phase 1 (content-curation MVP) + Phase 2 (unstick levers) — [#150](https://github.com/seopotion/seo/issues/150); operator UI (`apps/admin`) — [#151](https://github.com/seopotion/seo/issues/151)
+- ✅ Phase 1 — content-curation MVP: research (extracted core), candidate pool + planner curation, generate-now, article editor + WordPress publish/update, presets PATCH, strategy run, audit read — [#150](https://github.com/seopotion/seo/issues/150)
+- ⬜ Phase 2 (unstick levers) — [#150](https://github.com/seopotion/seo/issues/150); operator UI (`apps/admin`) — [#151](https://github.com/seopotion/seo/issues/151)
 
 ## Infrastructure / ops
 
