@@ -31,7 +31,17 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
   });
 });
 
-const { fetchOrg, searchOrgs, setPlan } = await import('../src/lib/queries');
+const {
+  ArticleValidationError,
+  fetchArticle,
+  fetchArticles,
+  fetchOrg,
+  publishToWordPress,
+  searchOrgs,
+  setPlan,
+  updateArticle,
+  updateWordPressPost,
+} = await import('../src/lib/queries');
 const { ApiError } = await import('../src/lib/api');
 
 beforeEach(() => {
@@ -83,6 +93,109 @@ describe('setPlan', () => {
 
     await expect(setPlan('org1', 'paid')).rejects.toMatchObject({
       code: 'strategy_not_claimable',
+      status: 409,
+    });
+  });
+});
+
+describe('fetchArticles', () => {
+  test('sends the status filter and page window', async () => {
+    reply = { status: 200, body: { articles: [], total: 0 } };
+
+    await fetchArticles('org1', 'published', 20);
+    expect(calls[0]?.url).toBe(
+      'http://localhost:8788/admin/v0/orgs/org1/articles?status=published&limit=20&offset=20',
+    );
+  });
+
+  test('omits the status entirely when unfiltered', async () => {
+    reply = { status: 200, body: { articles: [], total: 0 } };
+
+    await fetchArticles('org1', null);
+    expect(calls[0]?.url).toBe(
+      'http://localhost:8788/admin/v0/orgs/org1/articles?limit=20&offset=0',
+    );
+  });
+});
+
+describe('fetchArticle', () => {
+  test('requests the article by id', async () => {
+    reply = { status: 200, body: { id: 'art1' } };
+
+    await expect(fetchArticle('art1')).resolves.toEqual({ id: 'art1' });
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1');
+  });
+
+  test('turns a 404 into the not_found code the page renders', async () => {
+    reply = { status: 404, body: { error: 'not_found' } };
+
+    await expect(fetchArticle('missing')).rejects.toMatchObject({ code: 'not_found', status: 404 });
+  });
+});
+
+describe('updateArticle', () => {
+  const draft = {
+    title: 'T',
+    slug: 's',
+    meta_title: 'MT',
+    meta_description: 'MD',
+    content: '## Body',
+  };
+
+  test('patches the five editable fields', async () => {
+    reply = { status: 200, body: { id: 'art1', title: 'T' } };
+
+    await expect(updateArticle('art1', draft)).resolves.toEqual({ id: 'art1', title: 'T' });
+    expect(calls[0]?.method).toBe('PATCH');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1');
+    expect(calls[0]?.body).toBe(JSON.stringify(draft));
+  });
+
+  test('carries the per-field messages of a 400 through to the editor', async () => {
+    reply = {
+      status: 400,
+      body: { error: 'validation_failed', fields: { slug: 'Slug is required' } },
+    };
+
+    await expect(updateArticle('art1', draft)).rejects.toBeInstanceOf(ArticleValidationError);
+    await expect(updateArticle('art1', draft)).rejects.toMatchObject({
+      code: 'validation_failed',
+      fields: { slug: 'Slug is required' },
+    });
+  });
+
+  test('surfaces the images guard as its 409 code', async () => {
+    reply = { status: 409, body: { error: 'images_in_progress' } };
+
+    await expect(updateArticle('art1', draft)).rejects.toMatchObject({
+      code: 'images_in_progress',
+      status: 409,
+    });
+  });
+});
+
+describe('WordPress publish/update', () => {
+  test('publish POSTs to the article WordPress route', async () => {
+    reply = { status: 200, body: { success: true, post_id: 42 } };
+
+    await expect(publishToWordPress('art1')).resolves.toEqual({ success: true, post_id: 42 });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1/wordpress');
+  });
+
+  test('update PUTs to the same route', async () => {
+    reply = { status: 200, body: { success: true, post_id: 42 } };
+
+    await updateWordPressPost('art1');
+    expect(calls[0]?.method).toBe('PUT');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1/wordpress');
+  });
+
+  test('surfaces a publish refusal as its error code', async () => {
+    reply = { status: 409, body: { error: 'images_not_complete' } };
+
+    await expect(publishToWordPress('art1')).rejects.toMatchObject({
+      code: 'images_not_complete',
       status: 409,
     });
   });
