@@ -7,5 +7,15 @@
     "packages/shared/*/tests/**/*",
     "scripts/**/*.ts"
   ],
-  "exclude": ["node_modules", "**/node_modules", "dist", "**/dist", "infra", "cdk.out"]
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "dist",
+    "**/dist",
+    "infra",
+    "cdk.out",
+    // Browser app with its own DOM/JSX tsconfig — `npm run check:admin` covers
+    // it. (apps/web needs no entry here only because it has no src/ directory.)
+    "apps/admin"
+  ]
 }
