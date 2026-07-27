@@ -1,4 +1,5 @@
 export type { SetupStatus, StrategyStatus } from '@shared/types';
+export * from './admin-action';
 export * from './article';
 export * from './candidate';
 export * from './gsc';

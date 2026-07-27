@@ -60,6 +60,11 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per-env wiring documented/plumbed — [#21](https://github.com/seopotion/seo/issues/21); actual deployed frontend hosting still blocked on [#35](https://github.com/seopotion/seo/issues/35)
 - ⬜ No component/DOM tests (no jsdom) — [#22](https://github.com/seopotion/seo/issues/22)
 
+## Admin panel (wizard-of-oz operations)
+
+- ✅ Phase 0 — separate admin Lambda/HTTP API, allowlist-gated Google login + admin JWT, append-only `admin_actions` audit, org search/detail (redacted), plan override with strategy kick, `getAdminApiClient` — [#150](https://github.com/seopotion/seo/issues/150)
+- ⬜ Phase 1 (content-curation MVP) + Phase 2 (unstick levers) — [#150](https://github.com/seopotion/seo/issues/150); operator UI (`apps/admin`) — [#151](https://github.com/seopotion/seo/issues/151)
+
 ## Infrastructure / ops
 
 - ✅ CDK `ApiStack` — API + worker + db-init Lambdas, SQS queue + DLQ, HTTP API, deploy-time index init; NodejsFunction bundling (ESM `createRequire` banner) verified

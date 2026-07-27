@@ -390,6 +390,69 @@ export class ApiStack extends Stack {
       description: 'Base URL of the HTTP API — set as NEXT_PUBLIC_API_URL for the web app',
     });
 
+    // Admin API (epic #150) — its own Lambda + HTTP API: separate URL, separate
+    // secret, separate bundle. The customer Lambda contains zero admin code and
+    // the admin Lambda is granted ONLY its own secrets — never the customer JWT
+    // secret, GSC token key, Google client secret, or LemonSqueezy params.
+    //
+    // Admin signing secret, created out-of-band like the others:
+    //   aws ssm put-parameter --name /seo/<stage>/admin/jwt-secret --type SecureString --value <secret>
+    const adminJwtSecretParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'AdminJwtSecretParam',
+      { parameterName: cfg.adminJwtSecretParam },
+    );
+
+    // Operator allowlist: a PLAIN String parameter (comma-separated emails —
+    // not secret), short-cached at runtime so edits apply without a redeploy:
+    //   aws ssm put-parameter --name /seo/<stage>/admin/operators --type String --value "a@x.com,b@y.com"
+    const adminOperatorsParam = StringParameter.fromStringParameterName(
+      this,
+      'AdminOperatorsParam',
+      cfg.adminOperatorsParam,
+    );
+
+    const adminFn = new NodejsFunction(this, 'AdminFn', {
+      entry: join(projectRoot, 'apps/api/src/admin-index.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        ...providerEnv, // operator keyword research (DataForSEO, phase 1)
+        ADMIN_JWT_SECRET_PARAM: cfg.adminJwtSecretParam,
+        ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
+        GOOGLE_CLIENT_ID: cfg.googleClientId,
+        SCAN_QUEUE_URL: scanQueue.queueUrl,
+        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+        GENERATION_QUEUE_URL: generationQueue.queueUrl,
+        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
+      },
+      bundling,
+    });
+    scanQueue.grantSendMessages(adminFn);
+    strategyQueue.grantSendMessages(adminFn);
+    generationQueue.grantSendMessages(adminFn);
+    imagesQueue.grantSendMessages(adminFn);
+    mongoUriParam.grantRead(adminFn);
+    adminJwtSecretParam.grantRead(adminFn);
+    adminOperatorsParam.grantRead(adminFn);
+
+    const adminHttpApi = new HttpApi(this, 'AdminHttpApi');
+    adminHttpApi.addRoutes({
+      path: '/{proxy+}',
+      methods: [HttpMethod.ANY],
+      integration: new HttpLambdaIntegration('AdminApiIntegration', adminFn),
+    });
+
+    new CfnOutput(this, 'AdminHttpApiUrl', {
+      value: adminHttpApi.apiEndpoint,
+      description: 'Base URL of the admin HTTP API — point apps/admin at this',
+    });
+
     // Image CDN domain — the base of every stored article-image URL.
     new CfnOutput(this, 'ImagesCdnDomain', { value: imagesCdn.distributionDomainName });
   }

@@ -1,0 +1,140 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const repos = vi.hoisted(() => ({
+  OrgRepo: {
+    findById: vi.fn(),
+    search: vi.fn(),
+    findByUserId: vi.fn(),
+    setPlan: vi.fn(),
+    claimStrategy: vi.fn(),
+    setStrategyStatus: vi.fn(),
+  },
+  UserRepo: { findById: vi.fn(), findByEmail: vi.fn() },
+  SubscriptionRepo: { findLatestByOrg: vi.fn(), listActiveByOrg: vi.fn() },
+  GscConnectionRepo: { findByOrgId: vi.fn() },
+  KeywordRepo: { countScheduled: vi.fn() },
+  ArticleRepo: { countByStatus: vi.fn() },
+  AdminActionRepo: { insert: vi.fn() },
+}));
+vi.mock('@shared/db', () => repos);
+
+const { enqueueStrategyTask } = vi.hoisted(() => ({ enqueueStrategyTask: vi.fn() }));
+vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask }));
+
+import { testClient } from 'hono/testing';
+import adminApp, { type AdminAppType } from '../src/admin';
+import { signAdminToken } from '../src/admin/jwt';
+
+const client = testClient<AdminAppType>(adminApp);
+
+const authed = async () => ({
+  headers: { Authorization: `Bearer ${await signAdminToken('op@example.com')}` },
+});
+
+const baseOrg = {
+  id: 'a'.repeat(24),
+  user_id: 'u'.repeat(24),
+  website_url: 'https://example.com',
+  setup_status: 'setup_complete' as const,
+  plan: 'free' as const,
+  strategy_status: 'none' as const,
+  presets: { business: { name: 'X' } }, // truthiness is what the kick checks
+  created_at: new Date('2026-06-01T00:00:00.000Z'),
+};
+
+const setPlan = async (org_id: string, plan: 'free' | 'paid' | 'expert') =>
+  client.admin.v0.orgs[':org_id'].plan.$post({ param: { org_id }, json: { plan } }, await authed());
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  repos.OrgRepo.setPlan.mockResolvedValue(true);
+  repos.OrgRepo.claimStrategy.mockResolvedValue(true);
+  repos.AdminActionRepo.insert.mockResolvedValue({});
+  enqueueStrategyTask.mockResolvedValue(undefined);
+});
+
+describe('POST /admin/v0/orgs/{org_id}/plan', () => {
+  test('sets the plan and kicks strategy when setup_complete + presets + paid + claim wins', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+
+    const res = await setPlan(baseOrg.id, 'expert');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ plan: 'expert', strategy_kicked: true });
+
+    expect(repos.OrgRepo.setPlan).toHaveBeenCalledWith(baseOrg.id, 'expert');
+    expect(repos.OrgRepo.claimStrategy).toHaveBeenCalledWith(baseOrg.id);
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+  });
+
+  test('writes one audit row with actor, action and a before snapshot', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+
+    await setPlan(baseOrg.id, 'expert');
+
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledTimes(1);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: 'op@example.com',
+        action: 'org.set_plan',
+        org_id: baseOrg.id,
+        payload: { plan: 'expert' },
+        before: baseOrg,
+      }),
+    );
+  });
+
+  test.each([
+    [
+      'org not setup_complete',
+      { ...baseOrg, setup_status: 'setup_scan_completed' as const },
+      'expert' as const,
+    ],
+    ['org has no presets', { ...baseOrg, presets: undefined }, 'expert' as const],
+    ['new plan is free', baseOrg, 'free' as const],
+  ])('no strategy kick when %s', async (_name, org, plan) => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+
+    const res = await setPlan(org.id, plan);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ plan, strategy_kicked: false });
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+  });
+
+  test('no strategy kick when the claim loses', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+    repos.OrgRepo.claimStrategy.mockResolvedValueOnce(false);
+
+    const res = await setPlan(baseOrg.id, 'paid');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ plan: 'paid', strategy_kicked: false });
+    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+  });
+
+  test('reverts the claim and rethrows on enqueue failure (and audits nothing)', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+    enqueueStrategyTask.mockRejectedValueOnce(new Error('sqs down'));
+
+    const res = await setPlan(baseOrg.id, 'expert');
+    expect(res.status).toBe(500);
+    expect(repos.OrgRepo.setStrategyStatus).toHaveBeenCalledWith(baseOrg.id, 'failed');
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('unknown org -> 404 and no mutation, no audit row', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(null);
+
+    const res = await setPlan('f'.repeat(24), 'expert');
+    expect(res.status).toBe(404);
+    expect(repos.OrgRepo.setPlan).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('audit-insert failure still returns the mutation success', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+    repos.AdminActionRepo.insert.mockRejectedValueOnce(new Error('mongo down'));
+
+    const res = await setPlan(baseOrg.id, 'expert');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ plan: 'expert', strategy_kicked: true });
+  });
+});
