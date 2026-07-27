@@ -1,5 +1,5 @@
 import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import type { GenerateTask, ScanTask, StrategyTask } from '@shared/schemas';
+import type { GenerateTask, ImageTask, ScanTask, StrategyTask } from '@shared/schemas';
 
 // `SQS_ENDPOINT` points the client at a local SQS (ElasticMQ via docker compose)
 // for local dev; unset in deployed envs, where the SDK uses real AWS + the
@@ -41,6 +41,17 @@ export async function enqueueGenerateTask(task: GenerateTask): Promise<void> {
   await sqs.send(
     new SendMessageCommand({
       QueueUrl: process.env.GENERATION_QUEUE_URL,
+      MessageBody: JSON.stringify(task),
+    }),
+  );
+}
+
+/** Enqueue an article-image task for the images worker (admin replay, epic
+ * #150; the worker's set-if-absent plan + per-slot guards make replay safe). */
+export async function enqueueImageTask(task: ImageTask): Promise<void> {
+  await sqs.send(
+    new SendMessageCommand({
+      QueueUrl: process.env.IMAGES_QUEUE_URL,
       MessageBody: JSON.stringify(task),
     }),
   );

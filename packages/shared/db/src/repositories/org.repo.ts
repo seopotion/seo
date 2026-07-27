@@ -102,6 +102,16 @@ export const OrgRepo = {
     return res.matchedCount > 0;
   },
 
+  /** Remove the WordPress connection (admin disconnect lever, epic #150). */
+  async clearWordPressConnection(id: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $unset: { wordpress_token: '', wordpress_connected_at: '' } },
+    );
+    return res.matchedCount === 1;
+  },
+
   /** Persist final presets (+ optional onboarding metadata) and flip the org to
    * `setup_complete` in a single update. */
   async finalize(

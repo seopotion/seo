@@ -274,4 +274,71 @@ describe('KeywordRepo (integration)', () => {
     await KeywordRepo.claimGeneration(generating.id);
     expect(await KeywordRepo.deleteUnstarted(generating.id)).toBeNull();
   });
+
+  test('resetGeneration resets only failed, unlinked keywords (attempts back to 0)', async () => {
+    const mk = (kw: string, date: string) =>
+      KeywordRepo.create({
+        org_id: 'org_reset',
+        keyword: kw,
+        status: 'scheduled',
+        scheduled_date: date,
+        search_volume: 1,
+        difficulty: 1,
+        article_id: null,
+      });
+
+    // Burn attempts to the cap, then fail — the over-cap scenario (epic #150).
+    const failed = await mk('reset failed', '2026-11-01');
+    for (let i = 0; i < 3; i++) {
+      await KeywordRepo.claimGeneration(failed.id);
+      await KeywordRepo.failGeneration(failed.id, 'boom');
+    }
+    expect((await KeywordRepo.findById(failed.id))!.generation_attempts).toBe(3);
+
+    expect(await KeywordRepo.resetGeneration(failed.id)).toBe(true);
+    const reset = await KeywordRepo.findById(failed.id);
+    expect(reset!.generation_status).toBe('pending');
+    expect(reset!.generation_attempts).toBe(0);
+    expect(reset!.generation_error).toBeNull();
+
+    // Pending (never failed) does not reset.
+    const pending = await mk('reset pending', '2026-11-02');
+    expect(await KeywordRepo.resetGeneration(pending.id)).toBe(false);
+
+    // In-flight does not reset.
+    const generating = await mk('reset generating', '2026-11-03');
+    await KeywordRepo.claimGeneration(generating.id);
+    expect(await KeywordRepo.resetGeneration(generating.id)).toBe(false);
+
+    // Linked (article exists) does not reset even if failed.
+    const linked = await mk('reset linked', '2026-11-04');
+    await KeywordRepo.claimGeneration(linked.id);
+    await KeywordRepo.failGeneration(linked.id, 'boom');
+    await KeywordRepo.setArticleId(linked.id, 'art_x');
+    expect(await KeywordRepo.resetGeneration(linked.id)).toBe(false);
+  });
+
+  test('updateBrief edits type/intent/score only while pending + unlinked', async () => {
+    const kw = await KeywordRepo.create({
+      org_id: 'org_brief',
+      keyword: 'brief target',
+      status: 'scheduled',
+      scheduled_date: '2026-11-10',
+      search_volume: 1,
+      difficulty: 1,
+      article_id: null,
+    });
+
+    const updated = await KeywordRepo.updateBrief(kw.id, {
+      article_type: 'listicle',
+      opportunity_score: 42,
+    });
+    expect(updated!.article_type).toBe('listicle');
+    expect(updated!.opportunity_score).toBe(42);
+    expect(updated!.intent).toBeNull(); // untouched field survives
+
+    // Locked once generation starts.
+    await KeywordRepo.claimGeneration(kw.id);
+    expect(await KeywordRepo.updateBrief(kw.id, { intent: 'commercial' })).toBeNull();
+  });
 });

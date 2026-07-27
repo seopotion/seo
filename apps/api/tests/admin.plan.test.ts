@@ -18,8 +18,11 @@ const repos = vi.hoisted(() => ({
 }));
 vi.mock('@shared/db', () => repos);
 
-const { enqueueStrategyTask } = vi.hoisted(() => ({ enqueueStrategyTask: vi.fn() }));
-vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask }));
+const { enqueueStrategyTask, enqueueScanTask } = vi.hoisted(() => ({
+  enqueueStrategyTask: vi.fn(),
+  enqueueScanTask: vi.fn(),
+}));
+vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask, enqueueScanTask }));
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
@@ -139,9 +142,12 @@ describe('POST /admin/v0/orgs/{org_id}/plan', () => {
   });
 });
 
-describe('POST /admin/v0/orgs/{org_id}/strategy (non-force)', () => {
-  const runStrategy = async (org_id: string) =>
-    client.admin.v0.orgs[':org_id'].strategy.$post({ param: { org_id } }, await authed());
+describe('POST /admin/v0/orgs/{org_id}/strategy', () => {
+  const runStrategy = async (org_id: string, force?: boolean) =>
+    client.admin.v0.orgs[':org_id'].strategy.$post(
+      { param: { org_id }, json: force === undefined ? {} : { force } },
+      await authed(),
+    );
 
   test('claim wins -> enqueue + audit + 200', async () => {
     repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
@@ -150,6 +156,8 @@ describe('POST /admin/v0/orgs/{org_id}/strategy (non-force)', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ strategy_status: 'pending' });
     expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    // Non-force never touches the status ahead of the claim.
+    expect(repos.OrgRepo.setStrategyStatus).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'org.strategy_run', org_id: baseOrg.id }),
     );
@@ -174,5 +182,65 @@ describe('POST /admin/v0/orgs/{org_id}/strategy (non-force)', () => {
     expect(res.status).toBe(500);
     expect(repos.OrgRepo.setStrategyStatus).toHaveBeenCalledWith(baseOrg.id, 'failed');
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('force: true resets a completed strategy before claiming, audits the force action', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce({
+      ...baseOrg,
+      strategy_status: 'completed' as const,
+    });
+
+    const res = await runStrategy(baseOrg.id, true);
+    expect(res.status).toBe(200);
+    // Reset happens BEFORE the claim (claimStrategy only claims none|failed).
+    const resetOrder = repos.OrgRepo.setStrategyStatus.mock.invocationCallOrder[0] ?? 0;
+    const claimOrder = repos.OrgRepo.claimStrategy.mock.invocationCallOrder[0] ?? 0;
+    expect(repos.OrgRepo.setStrategyStatus).toHaveBeenCalledWith(baseOrg.id, 'failed');
+    expect(resetOrder).toBeLessThan(claimOrder);
+    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.strategy_force_rerun', payload: { force: true } }),
+    );
+  });
+
+  test('force: false behaves as a plain run', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
+
+    const res = await runStrategy(baseOrg.id, false);
+    expect(res.status).toBe(200);
+    expect(repos.OrgRepo.setStrategyStatus).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.strategy_run' }),
+    );
+  });
+});
+
+describe('POST /admin/v0/orgs/{org_id}/scan', () => {
+  const rerunScan = async (org_id: string) =>
+    client.admin.v0.orgs[':org_id'].scan.$post({ param: { org_id } }, await authed());
+
+  test('setup_complete org -> hard 409, nothing enqueued, no audit', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg); // setup_complete
+    const res = await rerunScan(baseOrg.id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'setup_complete' });
+    expect(enqueueScanTask).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('stuck onboarding org -> re-enqueues the scan and audits', async () => {
+    const stuck = { ...baseOrg, setup_status: 'setup_scan_in_progress' as const };
+    repos.OrgRepo.findById.mockResolvedValueOnce(stuck);
+
+    const res = await rerunScan(stuck.id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ enqueued: true });
+    expect(enqueueScanTask).toHaveBeenCalledWith({
+      org_id: stuck.id,
+      website_url: stuck.website_url,
+    });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'org.scan_rerun', before: stuck }),
+    );
   });
 });

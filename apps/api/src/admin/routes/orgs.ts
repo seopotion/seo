@@ -9,7 +9,8 @@ import {
   UserRepo,
 } from '@shared/db';
 import { isPaid } from '@shared/schemas';
-import { enqueueStrategyTask } from '../../clients/sqs';
+import { enqueueScanTask, enqueueStrategyTask } from '../../clients/sqs';
+import { testWordPressIntegration } from '../../clients/wordpress';
 import { mergePresets } from '../../lib/merge-presets';
 import { audit } from '../audit';
 import {
@@ -255,9 +256,15 @@ const orgs = new OpenAPIHono<AdminEnv>()
       tags: ['admin'],
       method: 'post',
       path: '/orgs/{org_id}/strategy',
-      summary: 'Run the 30-day strategy job (claims from none|failed)',
+      summary: 'Run the 30-day strategy job ({ force: true } re-runs a completed one)',
       security: [{ Bearer: [] }],
-      request: { params: schemas.AdminOrgParams },
+      request: {
+        params: schemas.AdminOrgParams,
+        body: {
+          content: { 'application/json': { schema: schemas.AdminStrategyRunBody } },
+          required: true,
+        },
+      },
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.AdminStrategyRunResponse } },
@@ -270,15 +277,21 @@ const orgs = new OpenAPIHono<AdminEnv>()
         },
         409: {
           content: { 'application/json': { schema: schemas.AdminErrorResponse } },
-          description: 'Not claimable — the job is pending or completed (force-rerun is Phase 2)',
+          description: 'Not claimable — the job is pending or completed (pass force to re-run)',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('param');
+      const force = c.req.valid('json').force === true;
       const org = await OrgRepo.findById(org_id);
       if (!org) return c.json({ error: 'not_found' }, 404);
 
+      // Force-rerun (design §0.3): claimStrategy only claims from none|failed
+      // and the worker skips completed strategies, so a completed job needs an
+      // explicit status reset first. Safe to repeat — the pipeline dedupes
+      // against existing planner keywords and pool candidates.
+      if (force) await OrgRepo.setStrategyStatus(org.id, 'failed');
       if (!(await OrgRepo.claimStrategy(org.id))) {
         return c.json({ error: 'strategy_not_claimable' }, 409);
       }
@@ -289,8 +302,205 @@ const orgs = new OpenAPIHono<AdminEnv>()
         await OrgRepo.setStrategyStatus(org.id, 'failed');
         throw err;
       }
-      await audit(c, { action: 'org.strategy_run', org_id: org.id, before: org });
+      await audit(c, {
+        action: force ? 'org.strategy_force_rerun' : 'org.strategy_run',
+        org_id: org.id,
+        payload: { force },
+        before: org,
+      });
       return c.json({ strategy_status: 'pending' as const }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/orgs/{org_id}/scan',
+      summary: 'Re-enqueue the onboarding scan (stuck onboarding only)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminOrgParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminEnqueuedResponse } },
+          description: 'Scan task re-enqueued',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description:
+            "setup_complete — the worker's completeScan would overwrite presets and knock a live org out of the dashboard gate",
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+      // Hard guard (design §7): rescanning a live org is a different (deferred)
+      // feature that must merge, not overwrite.
+      if (org.setup_status === 'setup_complete') {
+        return c.json({ error: 'setup_complete' }, 409);
+      }
+
+      await enqueueScanTask({ org_id: org.id, website_url: org.website_url });
+      await audit(c, { action: 'org.scan_rerun', org_id: org.id, before: org });
+      return c.json({ enqueued: true as const }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/orgs/{org_id}/integrations/wordpress',
+      summary: 'Connect WordPress on behalf of the customer (verify-then-save)',
+      security: [{ Bearer: [] }],
+      request: {
+        params: schemas.AdminOrgParams,
+        body: {
+          content: { 'application/json': { schema: schemas.AdminWordPressConnectBody } },
+          required: true,
+        },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AdminWordPressConnectResponse } },
+          description: 'WordPress integration verified and saved',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        403: {
+          content: { 'application/json': { schema: schemas.AdminWordPressConnectErrorResponse } },
+          description: 'WordPress integration key rejected or not configured',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.AdminWordPressConnectErrorResponse } },
+          description: 'WordPress plugin or network failure',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const { token } = c.req.valid('json');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+
+      // Same verify-then-save as the customer route in routes/dashboard.ts.
+      try {
+        const result = await testWordPressIntegration(org.website_url, token);
+        if (!result.success) {
+          if (
+            result.error_code === 'invalid_integration_key' ||
+            result.error_code === 'integration_not_configured'
+          ) {
+            return c.json(result, 403);
+          }
+          return c.json(result, 502);
+        }
+      } catch {
+        return c.json({ success: false as const, error_code: 'wordpress_request_failed' }, 502);
+      }
+
+      await OrgRepo.saveWordPressConnection(org.id, token, new Date());
+      await audit(c, {
+        action: 'org.wordpress_connect',
+        org_id: org.id,
+        // The plugin key is a secret — audit rows are readable via GET /audit.
+        payload: { token: '[redacted]' },
+        before: {
+          connected: Boolean(org.wordpress_token),
+          connected_at: org.wordpress_connected_at ?? null,
+        },
+      });
+      return c.json({ success: true as const }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'delete',
+      path: '/orgs/{org_id}/integrations/wordpress',
+      summary: 'Disconnect WordPress',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminOrgParams },
+      responses: {
+        204: { description: 'Connection removed' },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'wordpress_not_connected',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+      if (!org.wordpress_token) return c.json({ error: 'wordpress_not_connected' }, 409);
+
+      await OrgRepo.clearWordPressConnection(org.id);
+      await audit(c, {
+        action: 'org.wordpress_disconnect',
+        org_id: org.id,
+        before: { connected: true, connected_at: org.wordpress_connected_at ?? null },
+      });
+      return c.body(null, 204);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'delete',
+      path: '/orgs/{org_id}/gsc',
+      summary: 'Disconnect Google Search Console (customer must re-consent)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminOrgParams },
+      responses: {
+        204: { description: 'Connection removed; the customer reconnects via OAuth' },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'gsc_not_connected',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+      // Nothing can repair a consent server-side — OAuth consent is the
+      // customer's; disconnect is the correct lever (design §6).
+      const conn = await GscConnectionRepo.findByOrgId(org.id);
+      if (!conn) return c.json({ error: 'gsc_not_connected' }, 409);
+
+      await GscConnectionRepo.deleteByOrgId(org.id);
+      await audit(c, {
+        action: 'org.gsc_disconnect',
+        org_id: org.id,
+        // Health fields only — refresh_token_enc is never returned by
+        // anything, and audit rows are readable via GET /audit.
+        before: {
+          google_email: conn.google_email,
+          site_url: conn.site_url,
+          connected_at: conn.connected_at,
+          last_refresh_failed_at: conn.last_refresh_failed_at,
+        },
+      });
+      return c.body(null, 204);
     },
   );
 

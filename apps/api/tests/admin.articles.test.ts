@@ -18,6 +18,14 @@ const wp = vi.hoisted(() => ({
 }));
 vi.mock('../src/clients/wordpress', () => wp);
 
+const { enqueueImageTask } = vi.hoisted(() => ({ enqueueImageTask: vi.fn() }));
+vi.mock('../src/clients/sqs', () => ({
+  enqueueImageTask,
+  enqueueGenerateTask: vi.fn(),
+  enqueueScanTask: vi.fn(),
+  enqueueStrategyTask: vi.fn(),
+}));
+
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
 import { signAdminToken } from '../src/admin/jwt';
@@ -295,5 +303,38 @@ describe('PUT /admin/v0/articles/{article_id}/wordpress (update)', () => {
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'article.wordpress_update' }),
     );
+  });
+});
+
+describe('POST /admin/v0/articles/{article_id}/images (replay)', () => {
+  test('enqueues the image task and audits with the prior status', async () => {
+    repos.ArticleRepo.findById.mockResolvedValueOnce({
+      ...article,
+      images_status: 'failed' as const,
+    });
+
+    const res = await client.admin.v0.articles[':article_id'].images.$post(
+      { param: { article_id: article.id } },
+      await authed(),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ enqueued: true });
+    expect(enqueueImageTask).toHaveBeenCalledWith({ org_id: org.id, article_id: article.id });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'article.images_replay',
+        before: { images_status: 'failed' },
+      }),
+    );
+  });
+
+  test('unknown article -> 404, nothing enqueued', async () => {
+    repos.ArticleRepo.findById.mockResolvedValueOnce(null);
+    const res = await client.admin.v0.articles[':article_id'].images.$post(
+      { param: { article_id: 'f'.repeat(24) } },
+      await authed(),
+    );
+    expect(res.status).toBe(404);
+    expect(enqueueImageTask).not.toHaveBeenCalled();
   });
 });

@@ -137,4 +137,22 @@ describe('OrgRepo (integration)', () => {
     expect(await OrgRepo.search('a(b[c')).toEqual([]);
     expect(await OrgRepo.search('.*')).toEqual([]);
   });
+
+  test('clearWordPressConnection unsets token + timestamp', async () => {
+    const org = await OrgRepo.create({
+      user_id: 'user_wp_clear',
+      website_url: 'https://wp-clear.example.com',
+      setup_status: 'setup_complete',
+    });
+    await OrgRepo.saveWordPressConnection(org.id, 'wp-token', new Date());
+    expect((await OrgRepo.findById(org.id))!.wordpress_token).toBe('wp-token');
+
+    expect(await OrgRepo.clearWordPressConnection(org.id)).toBe(true);
+    const cleared = await OrgRepo.findById(org.id);
+    expect(cleared!.wordpress_token).toBeUndefined();
+    expect(cleared!.wordpress_connected_at).toBeUndefined();
+
+    expect(await OrgRepo.clearWordPressConnection(new ObjectId().toString())).toBe(false);
+    expect(await OrgRepo.clearWordPressConnection('not-an-objectid')).toBe(false);
+  });
 });

@@ -247,6 +247,44 @@ const candidates = new OpenAPIHono<AdminEnv>()
       });
       return c.body(null, 204);
     },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/candidates/{candidate_id}/restore',
+      summary: 'Un-reject a candidate back into the pool (conditional)',
+      security: [{ Bearer: [] }],
+      request: { params: schemas.AdminCandidateParams },
+      responses: {
+        204: { description: 'Candidate restored to the pool' },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Candidate not found',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'candidate_not_restorable — only a rejected candidate restores',
+        },
+      },
+    }),
+    async (c) => {
+      const { candidate_id } = c.req.valid('param');
+      const candidate = await CandidateRepo.findById(candidate_id);
+      if (!candidate) return c.json({ error: 'not_found' }, 404);
+
+      const restored = await CandidateRepo.restoreRejected(candidate.id);
+      // One-winner conditional: only a `rejected` candidate restores.
+      if (!restored) return c.json({ error: 'candidate_not_restorable' }, 409);
+      await audit(c, {
+        action: 'candidate.restore',
+        org_id: candidate.org_id,
+        entity: { type: 'candidate', id: candidate.id },
+        before: candidate,
+      });
+      return c.body(null, 204);
+    },
   );
 
 export default candidates;

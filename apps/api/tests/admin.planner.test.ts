@@ -8,6 +8,8 @@ const repos = vi.hoisted(() => ({
     findByOrgAndDate: vi.fn(),
     reschedulePending: vi.fn(),
     deleteUnstarted: vi.fn(),
+    resetGeneration: vi.fn(),
+    updateBrief: vi.fn(),
   },
   CandidateRepo: { releaseAfterUnschedule: vi.fn() },
   AdminActionRepo: { insert: vi.fn() },
@@ -224,5 +226,92 @@ describe('POST /admin/v0/scheduled/{keyword_id}/generate', () => {
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'keyword.generate_now' }),
     );
+  });
+});
+
+describe('POST /admin/v0/scheduled/{keyword_id}/reset', () => {
+  const reset = async (keyword_id: string) =>
+    client.admin.v0.scheduled[':keyword_id'].reset.$post({ param: { keyword_id } }, await authed());
+
+  test('resets a failed keyword -> 204 + audit with before snapshot', async () => {
+    const failed = { ...keyword, generation_status: 'failed' as const, generation_attempts: 3 };
+    repos.KeywordRepo.findById.mockResolvedValueOnce(failed);
+    repos.KeywordRepo.resetGeneration.mockResolvedValueOnce(true);
+
+    const res = await reset(keyword.id);
+    expect(res.status).toBe(204);
+    expect(repos.KeywordRepo.resetGeneration).toHaveBeenCalledWith(keyword.id);
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'keyword.reset_generation', before: failed }),
+    );
+  });
+
+  test('conditional miss (not failed / linked) -> 409 not_resettable, no audit', async () => {
+    repos.KeywordRepo.findById.mockResolvedValueOnce(keyword); // pending
+    repos.KeywordRepo.resetGeneration.mockResolvedValueOnce(false);
+
+    const res = await reset(keyword.id);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'not_resettable' });
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /admin/v0/scheduled/{keyword_id}/brief', () => {
+  const patchBrief = async (
+    keyword_id: string,
+    body: {
+      article_type?: 'listicle' | null;
+      intent?: 'commercial' | null;
+      opportunity_score?: number | null;
+    },
+  ) =>
+    client.admin.v0.scheduled[':keyword_id'].brief.$patch(
+      { param: { keyword_id }, json: body },
+      await authed(),
+    );
+
+  test('updates the brief fields and audits with the old brief as before', async () => {
+    repos.KeywordRepo.findById.mockResolvedValueOnce(keyword);
+    repos.KeywordRepo.updateBrief.mockResolvedValueOnce({
+      ...keyword,
+      article_type: 'listicle' as const,
+      opportunity_score: 99,
+    });
+
+    const res = await patchBrief(keyword.id, { article_type: 'listicle', opportunity_score: 99 });
+    if (res.status !== 200) throw new Error('expected 200');
+    const json = await res.json();
+    expect(json.keyword.article_type).toBe('listicle');
+    expect(repos.KeywordRepo.updateBrief).toHaveBeenCalledWith(keyword.id, {
+      article_type: 'listicle',
+      opportunity_score: 99,
+    });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'keyword.update_brief',
+        before: {
+          article_type: keyword.article_type,
+          intent: keyword.intent,
+          opportunity_score: keyword.opportunity_score,
+        },
+      }),
+    );
+  });
+
+  test('conditional miss (generation started) -> 409, no audit', async () => {
+    repos.KeywordRepo.findById.mockResolvedValueOnce(keyword);
+    repos.KeywordRepo.updateBrief.mockResolvedValueOnce(null);
+
+    const res = await patchBrief(keyword.id, { intent: 'commercial' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'generation_started' });
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('empty patch -> 400 (at least one field required)', async () => {
+    const res = await patchBrief(keyword.id, {});
+    expect(res.status).toBe(400);
+    expect(repos.KeywordRepo.findById).not.toHaveBeenCalled();
   });
 });
