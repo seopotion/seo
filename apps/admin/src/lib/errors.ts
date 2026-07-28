@@ -12,6 +12,19 @@ const MESSAGES: Record<string, string> = {
   not_found: 'That org no longer exists.',
   no_presets: 'This org has no presets yet — the onboarding scan has not produced them.',
   strategy_not_claimable: 'A strategy job is already pending or completed for this org.',
+
+  // Keyword curation (pool + planner).
+  keyword_provider_failed: 'The research provider failed — try again in a moment.',
+  date_occupied: 'That day already has a planner entry — pick another date.',
+  keyword_already_scheduled: 'This keyword is already on the planner for another date.',
+  candidate_already_scheduled: 'This candidate is already scheduled.',
+  candidate_not_schedulable:
+    'This candidate is missing the volume/difficulty metrics scheduling requires.',
+  candidate_not_deletable: 'Only a pooled candidate can be rejected — this one moved on already.',
+  generation_started: 'Generation already started — this entry can no longer be changed.',
+  org_not_paid:
+    'This org is on the free plan: generation would fail and burn an attempt. Set the plan first.',
+  generation_terminal: 'This keyword already generated its article.',
 };
 
 export function errorMessage(code: string): string {

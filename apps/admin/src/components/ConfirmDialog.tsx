@@ -14,6 +14,7 @@ export function ConfirmDialog({
   confirmLabel,
   variant = 'default',
   customerVisible,
+  warning,
   onConfirm,
   onCancel,
 }: {
@@ -22,6 +23,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   variant?: 'default' | 'danger';
   customerVisible?: string;
+  /** A reason not to go through with this — louder than `customerVisible`. */
+  warning?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -43,6 +46,12 @@ export function ConfirmDialog({
       >
         <h2 className="text-lg font-semibold">{title}</h2>
         <p className="mt-2 text-sm text-neutral-300">{body}</p>
+
+        {warning && (
+          <p className="mt-4 rounded border border-red-500 bg-red-950 p-3 text-sm font-semibold text-red-200">
+            {warning}
+          </p>
+        )}
 
         {customerVisible && (
           <p className="mt-4 rounded border border-amber-600/60 bg-amber-950/60 p-3 text-sm text-amber-200">

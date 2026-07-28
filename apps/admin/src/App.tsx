@@ -5,6 +5,8 @@ import { LoginPage } from './pages/LoginPage';
 import { OrgWorkspace } from './pages/OrgWorkspace';
 import { OverviewTab } from './pages/org/OverviewTab';
 import { PlaceholderTab } from './pages/org/PlaceholderTab';
+import { PlannerTab } from './pages/org/PlannerTab';
+import { PoolTab } from './pages/org/PoolTab';
 import { SearchPage } from './pages/SearchPage';
 
 export function App() {
@@ -19,8 +21,8 @@ export function App() {
           {/* Tabs are nested routes, so every tab is a deep-linkable URL. */}
           <Route path="/orgs/:orgId" element={<OrgWorkspace />}>
             <Route index element={<OverviewTab />} />
-            <Route path="pool" element={<PlaceholderTab name="The candidate pool" />} />
-            <Route path="planner" element={<PlaceholderTab name="The planner" />} />
+            <Route path="pool" element={<PoolTab />} />
+            <Route path="planner" element={<PlannerTab />} />
             <Route path="articles" element={<PlaceholderTab name="Articles" />} />
             <Route path="audit" element={<PlaceholderTab name="The audit trail" />} />
           </Route>
