@@ -9,10 +9,25 @@ describe('errorMessage', () => {
     }
   });
 
+  test('maps every refusal the article editor and WordPress routes can return', () => {
+    for (const code of [
+      'validation_failed',
+      'images_in_progress',
+      'wordpress_not_connected',
+      'already_published',
+      'not_published',
+      'images_not_complete',
+      'post_id_not_saved',
+      'wordpress_request_failed',
+    ]) {
+      expect(errorMessage(code)).not.toBe(code);
+    }
+  });
+
   test('falls back to the raw code for anything unmapped', () => {
     // Better than a generic "something went wrong": the operator can still act
-    // on a code they can read.
-    expect(errorMessage('wordpress_not_connected')).toBe('wordpress_not_connected');
+    // on a code they can read (WordPress plugin codes arrive verbatim).
+    expect(errorMessage('rest_cannot_create')).toBe('rest_cannot_create');
   });
 });
 
