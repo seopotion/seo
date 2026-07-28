@@ -20,20 +20,27 @@ export class ApiError extends Error {
 }
 
 /** Structural shape of a `ClientResponse` — avoids depending on hono directly. */
-type JsonResponse<T> = {
+type JsonResponse = {
   ok: boolean;
   status: number;
   statusText: string;
-  json: () => Promise<T>;
+  json: () => Promise<unknown>;
   text: () => Promise<string>;
 };
+
+/**
+ * The success payload of a typed client response. A route's client type is a
+ * *union* of one response per declared status, so picking the `ok: true` member
+ * is what turns `Detail | { error: string } | {}` into just `Detail`.
+ */
+type OkJson<R> = R extends { ok: true; json: () => Promise<infer T> } ? T : never;
 
 /**
  * The single place an admin API response becomes data or an error. Every query
  * and mutation goes through it, so an expired or invalid session is handled
  * once: drop the token and go back to login.
  */
-export async function unwrap<T>(res: JsonResponse<T>): Promise<T> {
+export async function unwrap<R extends JsonResponse>(res: R): Promise<OkJson<R>> {
   if (res.status === 401) {
     clearToken();
     window.location.assign('/login');
@@ -42,7 +49,9 @@ export async function unwrap<T>(res: JsonResponse<T>): Promise<T> {
   if (!res.ok) {
     throw new ApiError(errorCode(await res.text().catch(() => ''), res.statusText), res.status);
   }
-  return res.json();
+  // Guarded by the `ok` check above — the runtime body is the success payload
+  // that `OkJson` selected, which the `json(): Promise<unknown>` bound hides.
+  return res.json() as Promise<OkJson<R>>;
 }
 
 /** Admin errors are `{ error: '<code>' }`; anything else falls back to the status text. */

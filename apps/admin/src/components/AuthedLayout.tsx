@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useNavigate } from 'react-router';
+import { Link, Navigate, Outlet, useNavigate } from 'react-router';
 import { clearToken, getOperatorEmail, getToken } from '../lib/auth';
 
 /**
@@ -19,7 +19,9 @@ export function AuthedLayout() {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="flex items-center justify-between border-b border-neutral-800 px-6 py-3">
-        <span className="font-semibold">SEO Admin</span>
+        <Link to="/" className="font-semibold">
+          SEO Admin
+        </Link>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-neutral-400">{getOperatorEmail()}</span>
           <button
