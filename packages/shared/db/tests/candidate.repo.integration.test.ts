@@ -126,4 +126,28 @@ describe('CandidateRepo (integration)', () => {
     expect(await CandidateRepo.rejectIfCandidate('not-an-object-id')).toBe(false);
     expect(await CandidateRepo.rejectIfCandidate('ffffffffffffffffffffffff')).toBe(false);
   });
+
+  test('restoreRejected is a one-winner rejected -> candidate transition', async () => {
+    const [c] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'restore me', source: 'manual' },
+    ]);
+    await CandidateRepo.rejectIfCandidate(c!.id);
+
+    const [a, b] = await Promise.all([
+      CandidateRepo.restoreRejected(c!.id),
+      CandidateRepo.restoreRejected(c!.id),
+    ]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect((await CandidateRepo.findById(c!.id))!.status).toBe('candidate');
+
+    // Non-rejected statuses never restore.
+    expect(await CandidateRepo.restoreRejected(c!.id)).toBe(false); // now 'candidate'
+    const [sel] = await CandidateRepo.insertMany('org_cand', [
+      { org_id: 'org_cand', keyword: 'restore selected', source: 'manual' },
+    ]);
+    await CandidateRepo.claimForScheduling(sel!.id);
+    expect(await CandidateRepo.restoreRejected(sel!.id)).toBe(false);
+
+    expect(await CandidateRepo.restoreRejected('not-an-object-id')).toBe(false);
+  });
 });

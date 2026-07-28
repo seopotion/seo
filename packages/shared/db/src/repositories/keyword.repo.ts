@@ -145,6 +145,47 @@ export const KeywordRepo = {
     return res.modifiedCount === 1;
   },
 
+  /**
+   * Reset a failed, unlinked keyword to a fresh `pending` with zero attempts
+   * (admin unstick lever, epic #150). This is the only recovery for keywords
+   * past MAX_GENERATION_ATTEMPTS — `listDueForGeneration` excludes them
+   * forever otherwise. Conditional: in-flight/terminal entries never reset.
+   */
+  async resetGeneration(keywordId: string): Promise<boolean> {
+    if (!ObjectId.isValid(keywordId)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(keywordId), article_id: null, generation_status: 'failed' },
+      { $set: { generation_status: 'pending', generation_attempts: 0, generation_error: null } },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  /**
+   * Edit the planner brief fields (admin lever, epic #150). Conditional on
+   * `pending` + unlinked — the brief feeds generation, so an in-flight or
+   * generated entry never changes under the worker.
+   */
+  async updateBrief(
+    keywordId: string,
+    fields: {
+      article_type?: Keyword['article_type'];
+      intent?: Keyword['intent'];
+      opportunity_score?: number | null;
+    },
+  ): Promise<Keyword | null> {
+    if (!ObjectId.isValid(keywordId)) return null;
+    const set: Record<string, unknown> = {};
+    if (fields.article_type !== undefined) set.article_type = fields.article_type;
+    if (fields.intent !== undefined) set.intent = fields.intent;
+    if (fields.opportunity_score !== undefined) set.opportunity_score = fields.opportunity_score;
+    const doc = await (await collection()).findOneAndUpdate(
+      { _id: new ObjectId(keywordId), article_id: null, generation_status: 'pending' },
+      { $set: set },
+      { returnDocument: 'after' },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
   /** Record a generation failure (retryable until the attempt cap / DLQ). */
   async failGeneration(id: string, error: string): Promise<void> {
     if (!ObjectId.isValid(id)) return;

@@ -118,6 +118,21 @@ export const CandidateRepo = {
     return doc !== null;
   },
 
+  /**
+   * Conditionally un-reject a candidate (admin unstick lever, epic #150):
+   * only a `rejected` one may return to the pool, so concurrent restores have
+   * exactly one winner — same style as `rejectIfCandidate`. Supersedes the
+   * dead unconditional `setStatus`; never expose that raw setter.
+   */
+  async restoreRejected(candidateId: string): Promise<boolean> {
+    if (!ObjectId.isValid(candidateId)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(candidateId), status: 'rejected' },
+      { $set: { status: 'candidate', updated_at: new Date() } },
+    );
+    return res.modifiedCount === 1;
+  },
+
   /** Return a `selected` candidate to the pool after unscheduling (#99). */
   async releaseAfterUnschedule(candidateId: string): Promise<boolean> {
     if (!ObjectId.isValid(candidateId)) return false;

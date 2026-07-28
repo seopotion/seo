@@ -1,10 +1,21 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, LoaderCircle, LockKeyhole, Search, Trash2 } from 'lucide-react';
+import {
+  ArrowDownWideNarrow,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ListFilter,
+  LoaderCircle,
+  LockKeyhole,
+  Search,
+  Trash2,
+} from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Badge, Button } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -13,6 +24,16 @@ import { formatNumber, getCandidateDeleteApiError } from '../planner-utils';
 import type { CandidateDeleteApiError, TargetKeyword, TargetKeywordStatus } from '../types';
 
 const KEYWORDS_PER_PAGE = 20;
+const STATUS_FILTER_OPTIONS: TargetKeywordStatus[] = [
+  'available',
+  'scheduled',
+  'generating',
+  'generated',
+  'failed',
+];
+const STATUS_FILTER_PANEL_WIDTH = 224;
+
+type SortKey = 'opportunityScore' | 'volume';
 
 type DeleteError = Exclude<CandidateDeleteApiError, 'unauthorized'>;
 
@@ -57,6 +78,8 @@ export function TargetKeywordsSection({
   const [renderedKeywords, setRenderedKeywords] = useState(targetKeywords);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, DeleteError>>({});
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [statusFilter, setStatusFilter] = useState<Set<TargetKeywordStatus>>(() => new Set());
 
   const deleteMutation = useMutation({
     mutationFn: async (candidateId: string) => {
@@ -126,12 +149,53 @@ export function TargetKeywordsSection({
     setPage(1);
   }
 
-  const totalPages = Math.max(1, Math.ceil(targetKeywords.length / KEYWORDS_PER_PAGE));
+  const applySort = (key: SortKey) => {
+    // Descending only: re-clicking the active column is a no-op, other columns switch the sort.
+    if (sortKey === key) {
+      return;
+    }
+
+    setPage(1);
+    setSortKey(key);
+  };
+  const toggleStatus = (status: TargetKeywordStatus) => {
+    setPage(1);
+    setStatusFilter((current) => {
+      const next = new Set(current);
+
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+
+      return next;
+    });
+  };
+  const clearStatusFilter = () => {
+    setPage(1);
+    setStatusFilter(new Set());
+  };
+
+  const processedKeywords = useMemo(() => {
+    const filtered =
+      statusFilter.size > 0
+        ? targetKeywords.filter((keyword) => statusFilter.has(keyword.status))
+        : targetKeywords;
+
+    if (!sortKey) {
+      return filtered;
+    }
+
+    return [...filtered].sort((a, b) => compareMetricDescending(a[sortKey], b[sortKey]));
+  }, [sortKey, statusFilter, targetKeywords]);
+
+  const totalPages = Math.max(1, Math.ceil(processedKeywords.length / KEYWORDS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * KEYWORDS_PER_PAGE;
   const visibleKeywords = useMemo(
-    () => targetKeywords.slice(startIndex, startIndex + KEYWORDS_PER_PAGE),
-    [startIndex, targetKeywords],
+    () => processedKeywords.slice(startIndex, startIndex + KEYWORDS_PER_PAGE),
+    [processedKeywords, startIndex],
   );
 
   return (
@@ -184,16 +248,55 @@ export function TargetKeywordsSection({
                 <tr>
                   <TableHeading className="w-[30%]">{t('columns.keyword')}</TableHeading>
                   <TableHeading>{t('columns.difficulty')}</TableHeading>
-                  <TableHeading>{t('columns.volume')}</TableHeading>
+                  <TableHeading ariaSort={sortKey === 'volume' ? 'descending' : 'none'}>
+                    <SortHeaderButton
+                      active={sortKey === 'volume'}
+                      label={t('columns.volume')}
+                      onSort={() => applySort('volume')}
+                      sortLabel={t('sort.byDescending', { column: t('columns.volume') })}
+                    />
+                  </TableHeading>
                   <TableHeading>{t('columns.intent')}</TableHeading>
-                  <TableHeading>{t('columns.opportunityScore')}</TableHeading>
-                  <TableHeading>{t('columns.status')}</TableHeading>
+                  <TableHeading ariaSort={sortKey === 'opportunityScore' ? 'descending' : 'none'}>
+                    <SortHeaderButton
+                      active={sortKey === 'opportunityScore'}
+                      label={t('columns.opportunityScore')}
+                      onSort={() => applySort('opportunityScore')}
+                      sortLabel={t('sort.byDescending', { column: t('columns.opportunityScore') })}
+                    />
+                  </TableHeading>
+                  <TableHeading>
+                    <StatusFilterHeader
+                      label={t('columns.status')}
+                      onClear={clearStatusFilter}
+                      onToggle={toggleStatus}
+                      selected={statusFilter}
+                      t={t}
+                    />
+                  </TableHeading>
                   <TableHeading className="w-32">
                     <span className="sr-only">{t('columns.action')}</span>
                   </TableHeading>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
+                {visibleKeywords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center">
+                      <div className="grid justify-items-center gap-2 text-slate-600 text-sm">
+                        <span>{t('states.noFilterMatches')}</span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearStatusFilter}
+                        >
+                          {t('filter.clear')}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
                 {visibleKeywords.map((targetKeyword) => (
                   <tr key={`${targetKeyword.source}-${targetKeyword.id}`}>
                     <td className="truncate px-4 py-3 font-medium text-slate-950">
@@ -232,6 +335,11 @@ export function TargetKeywordsSection({
           </div>
 
           <ul aria-label={t('listLabel')} className="grid list-none gap-2 md:hidden">
+            {visibleKeywords.length === 0 ? (
+              <li className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-slate-600 text-sm">
+                {t('states.noFilterMatches')}
+              </li>
+            ) : null}
             {visibleKeywords.map((targetKeyword) => (
               <li
                 key={`${targetKeyword.source}-${targetKeyword.id}`}
@@ -303,7 +411,7 @@ export function TargetKeywordsSection({
           rangeLabel={t('pagination.range', {
             end: startIndex + visibleKeywords.length,
             start: startIndex + 1,
-            total: targetKeywords.length,
+            total: processedKeywords.length,
           })}
           setPage={setPage}
           totalPages={totalPages}
@@ -412,12 +520,223 @@ function DeleteCandidateAction({
   );
 }
 
-function TableHeading({ children, className }: { children: ReactNode; className?: string }) {
+function TableHeading({
+  ariaSort,
+  children,
+  className,
+}: {
+  ariaSort?: 'ascending' | 'descending' | 'none';
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <th scope="col" className={cn('px-4 py-2 font-semibold text-xs', className)}>
+    <th
+      aria-sort={ariaSort}
+      scope="col"
+      className={cn('px-4 py-2 font-semibold text-xs', className)}
+    >
       {children}
     </th>
   );
+}
+
+function SortHeaderButton({
+  active,
+  label,
+  onSort,
+  sortLabel,
+}: {
+  active: boolean;
+  label: string;
+  onSort: () => void;
+  sortLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={sortLabel}
+      onClick={onSort}
+      className={cn(
+        'group -mx-1 flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        active ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900',
+      )}
+    >
+      <span>{label}</span>
+      <ArrowDownWideNarrow
+        aria-hidden="true"
+        className={cn(
+          'size-3.5 transition-opacity',
+          active ? 'text-sky-600 opacity-100' : 'opacity-40 group-hover:opacity-70',
+        )}
+      />
+    </button>
+  );
+}
+
+function StatusFilterHeader({
+  label,
+  onClear,
+  onToggle,
+  selected,
+  t,
+}: {
+  label: string;
+  onClear: () => void;
+  onToggle: (status: TargetKeywordStatus) => void;
+  selected: Set<TargetKeywordStatus>;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ left: number; top: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const activeCount = selected.size;
+  const filtering = activeCount > 0;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const trigger = triggerRef.current;
+
+    if (!trigger) {
+      return;
+    }
+
+    const reposition = () => setCoords(computeStatusFilterCoords(trigger));
+
+    reposition();
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
+      }
+
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label={filtering ? t('filter.activeLabel', { count: activeCount }) : t('filter.label')}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          '-mx-1 flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          filtering ? 'text-sky-700' : 'text-slate-600 hover:text-slate-900',
+        )}
+      >
+        <span>{label}</span>
+        <ListFilter
+          aria-hidden="true"
+          className={cn('size-3.5', filtering ? 'text-sky-600' : 'opacity-40')}
+        />
+        {filtering ? (
+          <span className="flex min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 font-semibold text-[10px] text-white leading-4">
+            {activeCount}
+          </span>
+        ) : null}
+      </button>
+      {open && coords && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="z-50 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+              style={{ left: coords.left, position: 'fixed', top: coords.top }}
+            >
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <span className="font-medium text-slate-500 text-xs">{t('filter.heading')}</span>
+                <button
+                  type="button"
+                  disabled={!filtering}
+                  onClick={onClear}
+                  className="rounded px-1 py-0.5 font-medium text-sky-700 text-xs transition-colors hover:text-sky-800 disabled:cursor-default disabled:text-slate-300"
+                >
+                  {t('filter.clear')}
+                </button>
+              </div>
+              <ul className="grid list-none">
+                {STATUS_FILTER_OPTIONS.map((status) => {
+                  const checked = selected.has(status);
+
+                  return (
+                    <li key={status}>
+                      <button
+                        type="button"
+                        aria-pressed={checked}
+                        onClick={() => onToggle(status)}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span
+                          className={cn(
+                            'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
+                            checked ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300',
+                          )}
+                        >
+                          {checked ? <Check className="size-3" aria-hidden="true" /> : null}
+                        </span>
+                        <TargetKeywordStatusBadge status={status} t={t} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function computeStatusFilterCoords(trigger: HTMLElement) {
+  const rect = trigger.getBoundingClientRect();
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - STATUS_FILTER_PANEL_WIDTH - 8));
+
+  return { left, top: rect.bottom + 4 };
+}
+
+function compareMetricDescending(a: number | null, b: number | null) {
+  if (a === b) {
+    return 0;
+  }
+
+  // Missing metrics always sink to the bottom.
+  if (a === null) {
+    return 1;
+  }
+
+  if (b === null) {
+    return -1;
+  }
+
+  return b - a;
 }
 
 function MetricCell({

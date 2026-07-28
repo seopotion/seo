@@ -42,4 +42,18 @@ export const config = {
   LEMONSQUEEZY_VARIANT_EXPERT: process.env.LEMONSQUEEZY_VARIANT_EXPERT ?? '',
   /** Session token lifetime. */
   JWT_TTL_SECONDS: 60 * 60 * 24 * 7,
+  /** Name of the SSM SecureString holding the admin HS256 signing secret in
+   * deployed envs (granted to the admin Lambda ONLY). Unset locally —
+   * ADMIN_JWT_SECRET below is used directly. See admin/secret.ts. */
+  ADMIN_JWT_SECRET_PARAM: process.env.ADMIN_JWT_SECRET_PARAM ?? '',
+  /** Local-dev admin signing secret. Deliberately different from JWT_SECRET's
+   * default so customer/admin cross-token tests are meaningful locally. */
+  ADMIN_JWT_SECRET: process.env.ADMIN_JWT_SECRET ?? 'dev-admin-secret-change-me',
+  /** Name of the SSM String parameter holding the comma-separated operator
+   * email allowlist in deployed envs. Unset locally — ADMIN_OPERATORS is used. */
+  ADMIN_OPERATORS_PARAM: process.env.ADMIN_OPERATORS_PARAM ?? '',
+  /** Local-dev operator allowlist (comma-separated emails). */
+  ADMIN_OPERATORS: process.env.ADMIN_OPERATORS ?? '',
+  /** Admin session token lifetime. */
+  ADMIN_JWT_TTL_SECONDS: 60 * 60 * 12,
 };

@@ -4,6 +4,7 @@ import { Link } from '@/i18n/navigation';
 const NAV_LINKS = [
   { href: '/#features', key: 'features' },
   { href: '/pricing', key: 'pricing' },
+  { href: '/docs', key: 'docs' },
 ] as const;
 
 const linkClassName =

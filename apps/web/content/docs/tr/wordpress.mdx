@@ -1,0 +1,245 @@
+---
+title: WordPress'te yayınlama
+description: SEO Potion eklentisini kurun, entegrasyon token'ıyla bağlayın, makale gönderip güncelleyin ve en sık karşılaşacağınız hataları çözün.
+updated: 2026-07-26
+---
+
+WordPress, Seopotion'ın bugün desteklediği yayınlama entegrasyonudur. Sitenize küçük bir eklenti
+kurar, eklenti ile Seopotion çalışma alanınız arasında ortak bir token belirlersiniz; bundan sonra
+üretilen her makaleyi WordPress'e yazı olarak gönderebilirsiniz — kapak görseli, içerik görselleri,
+meta açıklaması ve odak anahtar kelimesiyle birlikte.
+
+Bağlantı, çalışma alanı başına tek bir WordPress sitesi içindir ve her zaman çalışma alanını
+oluştururken girdiğiniz web sitesi adresini kullanır.
+
+## Başlamadan önce
+
+- **Kendi sunucunuzdaki (self-hosted) bir WordPress** sitesi. WordPress.com henüz desteklenmiyor.
+- **WordPress 6.4 veya üzeri** ve **PHP 8.0 veya üzeri**. Eklenti WordPress 6.9'a kadar test
+  edilmiştir.
+- O sitede **Yönetici** rolüne sahip bir hesap; eklenti kurabilmeniz ve eklentinin ayar ekranını
+  açabilmeniz için gerekir.
+- Site, çalışma alanınızda kayıtlı adres üzerinden internete açık olmalı ve WordPress REST API
+  etkin olmalıdır. HTTP kimlik doğrulaması, IP kısıtlaması veya "çok yakında" eklentileri arkasındaki
+  test siteleri yanıt vermez.
+
+## Adım 1 — SEO Potion eklentisini kurun
+
+1. Seopotion'da **Ayarlar → Entegrasyonlar** bölümünü açın.
+2. **Yayınlama entegrasyonları** altında **Kendi sunucunuzdaki WordPress** kartını bulun ve
+   **Eklentiyi indir (.zip)** seçeneğine tıklayın. `.zip` dosyasını olduğu gibi bırakın — açmayın.
+3. WordPress yönetim panelinizde **Eklentiler → Yeni Ekle → Eklenti Yükle** yolunu izleyin.
+   Seopotion'daki **Eklenti yükleme sayfasını aç** düğmesi doğrudan sitenizin bu sayfasına gider.
+4. `.zip` dosyasını seçin, **Şimdi Kur** ve ardından **Eklentiyi Etkinleştir** deyin.
+
+Etkinleştirdiğinizde eklenti, WordPress yönetim menüsüne **SEO Potion** girişini ekler ve sizi
+doğrudan **Manage** ekranına yönlendirir; çünkü henüz kayıtlı bir token yoktur. Token kaydedilene
+kadar eklentinin Home ekranı da hep oraya yönlendirir.
+
+## Adım 2 — Entegrasyon token'ınızı oluşturun
+
+Entegrasyon token'ı **sizin belirlediğiniz ortak bir gizli anahtardır**. Seopotion size bir token
+vermez — aynı değeri iki yere yazarsınız ve eklenti yalnızca bu değeri sunan istekleri kabul eder.
+
+1. WordPress'te **SEO Potion → Manage** ekranını açın.
+2. **Integration Token** alanına uzun ve rastgele bir metin girin. Bunu bir parola gibi görün: bu
+   değeri bilen her şey sitenizde yazı oluşturabilir.
+3. Bir **Post Mode** seçin:
+   - **Save as Draft** — makaleler taslak olarak gelir, siz inceleyip elle yayınlarsınız.
+   - **Publish Directly** — makaleler ulaştıkları anda yayına alınır.
+4. **Save** deyin. *Settings Saved Successfully!* mesajını görmelisiniz.
+
+Post Mode yalnızca **yeni oluşturulan** yazılar için geçerlidir. Sitenizde zaten bulunan bir
+makaleyi güncellemek, yayında/taslak durumunu asla değiştirmez — bkz.
+[Güncelleme gönderme](#güncelleme-gönderme).
+
+## Adım 3 — Seopotion'ı bağlayın
+
+1. Seopotion'a dönün ve **Ayarlar → Entegrasyonlar** bölümünü açın.
+2. **WordPress sitenizi bağlayın** alanında, **Entegrasyon token'ı** kutusuna birebir aynı token'ı
+   yapıştırın.
+3. **Bağlan ve test et** deyin.
+
+Bu test basit bir bağlantı denemesi değil, gerçek bir gidiş-dönüştür. Seopotion sitenizi çağırır,
+eklenti *Test Post - SEO Potion Integration* adlı bir taslak yazı oluşturur ve hemen siler. Bu tek
+işlem üç şeyi birden kanıtlar: eklenti kurulu ve yanıt veriyor, token eşleşiyor ve WordPress
+gerçekten yeni yazı kabul ediyor.
+
+Başarılı olduğunda kart **Bağlandı** durumuna geçer ve bağlanma tarihini gösterir. Token çalışma
+alanınıza kaydedilir ve bir daha size gösterilmez — kaybederseniz **Token'ı değiştir** ile her iki
+tarafta yeni bir değer belirleyin.
+
+## WordPress'e ne gönderilir
+
+Her makale standart bir WordPress **yazısı** (post) olarak gönderilir, özel bir içerik türü olarak
+değil. Eklenti şunları yazar:
+
+| Öğe | WordPress'te nereye gider |
+| --- | --- |
+| Başlık | Yazı başlığı |
+| Kısa ad (slug) | Yazı kısa adı; zaten kullanılıyorsa benzersizleştirilir |
+| Gövde | Yazı içeriği — Markdown, gönderilmeden önce HTML'e çevrilir |
+| Kapak görseli | Ortam Kitaplığınıza indirilir ve öne çıkarılan görsel olarak atanır |
+| İçerik görselleri | Ortam Kitaplığınıza indirilir; makaledeki görsel bağlantıları sizdeki kopyaları gösterecek şekilde güncellenir |
+| YouTube gömüleri | Gömülü oynatıcı olarak korunur |
+| Meta açıklaması | SEO eklentisinin meta açıklama alanı |
+| Odak anahtar kelime | SEO eklentisinin odak anahtar kelime alanı |
+
+Bilmeye değer birkaç ayrıntı:
+
+- **Yazar ve kategori varsayılandır.** Yazılar sitenin ilk kullanıcı hesabı ve varsayılan kategorisi
+  altında oluşturulur. İkisini de WordPress'te sonradan değiştirebilirsiniz; bunu yapmak Seopotion
+  ile bağı bozmaz.
+- **Kısa adlar yazı oluşturulmadan önce benzersizleştirilir.** `makalem` zaten varsa — yayınlanmış
+  bir yazı, bir taslak ya da eklentinin izlediği bir kayıt olarak — yeni yazı `makalem-2` olur.
+- **Görseller kopyalanır, dışarıdan bağlanmaz.** Hem kapak hem içerik görselleri Ortam
+  Kitaplığınıza indirilir; böylece yazılarınız Seopotion'ın erişilebilir kalmasına bağımlı olmaz.
+- **Yalnızca YouTube gömüleri korunur.** Eklenti, WordPress'in güvenli saymadığı HTML'i temizler ve
+  tüm `iframe` gömüleri arasından yalnızca `youtube.com/embed/…` ile `youtube-nocookie.com/embed/…`
+  adreslerini bırakır. Diğerleri kaldırılır.
+
+### SEO eklentisi alanları
+
+Bir SEO eklentisi kullanıyorsanız meta açıklaması, odak anahtar kelime ve başlık onun alanlarına
+otomatik yazılır. Desteklenenler: **Yoast SEO**, **Rank Math**, **All in One SEO**, **SEOPress** ve
+**Squirrly SEO**. Değerler hepsi için yazılır, dolayısıyla ileride SEO eklentinizi değiştirmeniz
+yeniden gönderim gerektirmez. Hiçbirini kullanmıyorsanız meta açıklaması yine de yazıda saklanır.
+
+## Makale gönderme
+
+1. **İçerik Geçmişi** sayfasını açın ve istediğiniz makaleyi seçin.
+2. **WordPress'e gönder** deyin.
+
+İki koşulun sağlanması gerekir ve sağlanmadığında arayüz bunu size söyler:
+
+- **WordPress bağlı olmalıdır.** Değilse sayfada *Bu yazıyı göndermek için Ayarlar'dan WordPress'i bağlayın* bağlantısı görünür.
+- **Makalenin görselleri tamamlanmış olmalıdır.** Kapak veya içerik görselleri hâlâ üretilmekte olan
+  bir makale, görseller bitene kadar reddedilir.
+
+İşlem başarılı olduğunda *WordPress'e gönderildi.* mesajını görürsünüz ve makale
+**WordPress'e gönderildi · #123** rozetini kazanır; buradaki `123`, WordPress yazı kimliğidir. Bu
+kimlik, o andan sonra iki sistemi birbirine bağlayan şeydir.
+
+## Güncelleme gönderme
+
+Bir makale gönderildikten sonra düğme **WordPress'i güncelle** hâline gelir. Kayıtlı makalenin
+güncel hâlini — başlık, kısa ad, gövde, kapak görseli, meta açıklaması ve odak anahtar kelime —
+mevcut yazının üzerine yazar.
+
+- **Güncellemede kaynak Seopotion'dır.** Bu alanlarda WordPress editöründe yaptığınız değişikliklerin
+  üzerine yazılır. WordPress tarafındaki düzenlemeleri korumak istiyorsanız aynı değişikliği
+  Seopotion makale editöründe yapın ya da o yazıyı güncellemeyi bırakın.
+- **Güncelleme yazı durumunu değiştirmez.** Yayındaki yazı yayında, taslak taslak kalır. Post Mode
+  yalnızca yazı ilk oluşturulurken dikkate alınır.
+- **Güncelleme kısmen başarılı olabilir.** Yazı güncellenip görsellerle ilgili bir şey
+  tamamlanamazsa hata yerine yazı ve bir uyarı listesi alırsınız — aşağıya bakın.
+
+Aynı makaleyi iki kez gönderemezsiniz. İkinci bir **WordPress'e gönder** denemesi *Makale zaten
+WordPress'te yayınlanmış* yanıtıyla reddedilir; bu, bir yeniden denemenin asla yinelenen yazı
+oluşturmamasını sağlar.
+
+## Token'ı değiştirme
+
+WordPress kartında **Token'ı değiştir** deyin. Önce sitenizde **SEO Potion → Manage** ekranında yeni
+değeri kaydedin, sonra Seopotion'a yapıştırıp yeniden **Bağlan ve test et** deyin. Bağlanma işlemi
+yeni token'ı kaydedilen token'ın yerine koymadan önce sitenizde test eder; böylece bir yazım hatası
+çalışan bağlantınızı bozmaz.
+
+## Eklentinin sitenizde tuttukları
+
+Eklenti, etkinleştirildiğinde bir veritabanı tablosu oluşturur ve oluşturduğu her yazıyı orada
+izler: kısa ad, başlık, meta açıklaması, kapak görseli kimliği ve güncel durum. Bu tabloyu
+WordPress ile uyumlu tutar — bir yazının durumunu değiştirmek kaydı günceller, bir yazıyı kalıcı
+olarak silmek kaydı kaldırır.
+
+Eklentiyi devre dışı bırakmak yazılarınıza dokunmaz; onlar sıradan WordPress yazılarıdır. Çok
+siteli (multisite) bir ağda tablo her site için ayrı oluşturulur.
+
+## Sorun giderme
+
+### "Sitenizdeki SEO Potion eklentisine ulaşamadık"
+
+Seopotion sitenizden hiç geçerli yanıt alamadı. Olasılık sırasıyla:
+
+- Eklenti **kurulu ve etkin** değil. 1. adımı yeniden kontrol edin.
+- Çalışma alanınızdaki web sitesi adresi WordPress'in gerçekte bulunduğu yerle eşleşmiyor —
+  örneğin çalışma alanında `ornek.com` yazıyor ama site `www.ornek.com` üzerinden ya da `/blog`
+  altında sunuluyor. Eklentiye yalnızca çalışma alanında kayıtlı adresten erişilebilir.
+- **WordPress REST API engellenmiş** — bir güvenlik eklentisi, bir güvenlik duvarı kuralı ya da
+  bilinmeyen `/wp-json/` yollarını reddeden bir sunucu yapılandırması yüzünden.
+- Site HTTP kimlik doğrulaması, IP kısıtlaması veya bakım modu eklentisi arkasında.
+
+Hızlı bir kontrol: tarayıcıda `https://siteniz.com/wp-json/seo-potion/v1/capabilities` adresini
+açın. Eklenti kurulu ve erişilebilirse sürümünü listeleyen küçük bir JSON yanıtı alırsınız. Bunun
+dışında herhangi bir şey — 404, giriş ekranı, HTML hata sayfası — Seopotion'ın gördüğü hatanın
+aynısıdır.
+
+### "Eklentide henüz kayıtlı bir token yok"
+
+Eklenti kurulu ve yanıt veriyor, ancak **SEO Potion → Manage** ekranında kaydedilmiş bir token yok.
+Sitenizde 2. adımı tamamlayın ve yeniden bağlanın.
+
+### "Bu token, WordPress eklentinizde kayıtlı olanla eşleşmiyor"
+
+İki tarafta da token var ama farklılar. Token'lar birebir karşılaştırılır — sondaki bir boşluk,
+farklı bir büyük/küçük harf ya da eksik kopyalanmış bir değer başarısız olur. Değeri
+**SEO Potion → Manage** ekranından yeniden kopyalayıp yapıştırın.
+
+### "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin"
+
+Site, Seopotion'ın tanımadığı bir yanıt döndürdü. Bu genellikle sitenizdeki bir eklenti ya da
+temanın REST API yanıtlarına çıktı eklediği veya bir önbellek katmanının eklenti yolları için eski
+ya da HTML bir yanıt sunduğu anlamına gelir. `/wp-json/` için önbelleklemeyi kapatıp yeniden
+bağlanmayı deneyin.
+
+### "WordPress isteği tamamlayamadı: …"
+
+Eklentiye ulaşıldı ve token kabul edildi, ancak WordPress işlemi reddetti. İki nokta üst üsteden
+sonraki mesaj doğrudan eklentiden gelir:
+
+| Mesaj | Anlamı |
+| --- | --- |
+| `Slug already exists` | Bir makaleyi, başka bir yazının kullandığı bir kısa ada güncellemeye çalışıyorsunuz. Kısa adı Seopotion makale editöründe değiştirip yeniden güncelleyin. |
+| `Post not found` | Bu makalenin bağlı olduğu WordPress yazısı kalıcı olarak silinmiş. Bağ bugün arayüzden onarılamıyor — destekle iletişime geçin. |
+| `Failed to create post: …` | WordPress kaydı kendisi reddetti. Sondaki metin WordPress'in kendi hata mesajıdır. |
+| `Failed to upload image` | WordPress kapak görselini indiremedi veya saklayamadı — genellikle `wp-content/uploads` dosya izinleri ya da bir yükleme boyutu sınırı. |
+| `Failed to insert into tracking table…` | Yazı eklentinin tablosuna kaydedilemedi, bu yüzden geri alındı. Eklentiyi devre dışı bırakıp yeniden etkinleştirmek tabloyu yeniden oluşturur. |
+
+### "WordPress isteği uyarılarla tamamladı"
+
+Yazı oluşturuldu ya da güncellendi, ancak ikincil bir şey tamamlanamadı. Şunlardan bir ya da
+birkaçını görürsünüz:
+
+- *Content images could not be localized.* — içerik görselleri Ortam Kitaplığınıza kopyalanmak
+  yerine özgün adreslerini göstermeye devam etti.
+- *Featured image could not be assigned.* — görsel yüklendi ama yazıya atanmadı.
+- *Featured image metadata could not be updated.* — görsel atandı ama yazar/üst öğe alanları
+  ayarlanmadı.
+
+Yazı her hâlükârda yayındadır. Altta yatan neden (yükleme izinleri, zaman aşımına uğrayan bir
+görsel sunucusu) giderildikten sonra **WordPress'i güncelle** işlemini tekrarlamak uyarıları
+genellikle temizler.
+
+### Gönder düğmesi devre dışı ya da görünmüyor
+
+- *Bu yazıyı göndermek için Ayarlar'dan WordPress'i bağlayın* mesajı, çalışma alanının henüz bir
+  WordPress bağlantısı olmadığı anlamına gelir.
+- Makalenin görselleri henüz üretilmediyse gönderim reddedilir. Görsellerin tamamlanmasını bekleyip
+  tekrar deneyin.
+
+### Yazılar taslak geliyor (ya da istemediğiniz hâlde hemen yayınlanıyor)
+
+Bunun sebebi **SEO Potion → Manage** ekranındaki **Post Mode** ayarıdır. Ayarı değiştirip
+kaydedin; yeni ayar o andan sonra gönderilen makaleler için geçerlidir, hâlihazırda var olan
+yazılar için değil.
+
+## Güvenlik notları
+
+- Entegrasyon token'ı **sizin seçtiğiniz ortak bir gizli anahtardır**, bir hesap parolası değildir
+  ve yalnızca Seopotion ile siteniz arasında kullanılır. Uzun ve rastgele bir değer kullanın, bir
+  parolanızı yeniden kullanmayın.
+- Bu token’a sahip olan her şey sitenizde yazı oluşturabilir. Sızdığından şüpheleniyorsanız
+  **SEO Potion → Manage** ekranında yeni bir değer belirleyin ve Seopotion'da **Token'ı değiştir**
+  deyin. Yeni değeri kaydettiğiniz anda eskisi çalışmayı bırakır.
+- Seopotion kayıtlı bir token'ı size asla geri göstermez ve WordPress kullanıcı adınızı ya da
+  parolanızı hiçbir zaman istemez.

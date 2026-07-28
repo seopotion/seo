@@ -64,7 +64,12 @@ export function ChooseKeywordModal({
   const t = useTranslations('ContentPlannerPage.chooseKeyword');
   const targetKeywordsT = useTranslations('ContentPlannerPage.targetKeywords');
   const queryClient = useQueryClient();
-  const [scheduleError, setScheduleError] = useState<CandidateScheduleError | null>(null);
+  // `upgrade` is not an error banner — it swaps the whole body for the upgrade
+  // panel (see `showUpgrade`), so it never reaches `errors.*` and has no message.
+  const [scheduleError, setScheduleError] = useState<Exclude<
+    CandidateScheduleError,
+    'upgrade'
+  > | null>(null);
   const [upgradeRequired, setUpgradeRequired] = useState(false);
   const schedulePendingRef = useRef(false);
   const sessionRef = useRef(0);
@@ -331,7 +336,7 @@ function CandidateList({
           <tbody className="divide-y divide-slate-200">
             {candidates.map((candidate) => (
               <tr key={candidate.id}>
-                <td className="break-words px-4 py-3 font-medium text-slate-950">
+                <td className="wrap-break-words px-4 py-3 font-medium text-slate-950">
                   {candidate.keyword}
                 </td>
                 <MetricCell locale={locale} t={targetKeywordsT} value={candidate.difficulty} />
@@ -365,7 +370,7 @@ function CandidateList({
             key={candidate.id}
             className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
           >
-            <h3 className="break-words font-semibold text-slate-950 text-sm">
+            <h3 className="wrap-break-words font-semibold text-slate-950 text-sm">
               {candidate.keyword}
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">

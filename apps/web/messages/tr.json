@@ -252,8 +252,8 @@
       "type": "Makale tipi"
     },
     "metrics": {
-      "difficulty": "Difficulty",
-      "volume": "Volume"
+      "difficulty": "Zorluk",
+      "volume": "Hacim"
     },
     "oneArticlePerDay": "Günde 1 makale",
     "researchKeywords": {
@@ -350,6 +350,12 @@
         "upgrade": "Anahtar kelime kaldırma ücretli bir özelliktir."
       },
       "description": "İçerik planınız için kullanılabilir ve planlanmış anahtar kelimeleri inceleyin.",
+      "filter": {
+        "activeLabel": "Duruma göre filtrele, {count} seçili",
+        "clear": "Temizle",
+        "heading": "Duruma göre filtrele",
+        "label": "Duruma göre filtrele"
+      },
       "intents": {
         "commercial": "Ticari",
         "informational": "Bilgilendirici",
@@ -367,11 +373,15 @@
         "range": "{start}-{end} / {total}"
       },
       "researchPaidFeature": "Ücretli özellik",
+      "sort": {
+        "byDescending": "{column} ölçütüne göre büyükten küçüğe sırala"
+      },
       "states": {
         "emptyDescription": "Kullanılabilir ve planlanmış anahtar kelimeler burada görünecek.",
         "emptyTitle": "Henüz hedef anahtar kelime yok",
         "loadError": "Kullanılabilir anahtar kelimeler yüklenemedi. İçerik takvimini kullanmaya devam edebilirsiniz.",
-        "loading": "Hedef anahtar kelimeler yükleniyor..."
+        "loading": "Hedef anahtar kelimeler yükleniyor...",
+        "noFilterMatches": "Seçili durumlarla eşleşen anahtar kelime yok."
       },
       "statuses": {
         "available": "Kullanılabilir",
@@ -392,10 +402,10 @@
     "articlesCount": "{count} makale",
     "columns": {
       "articleName": "Makale adı",
-      "difficulty": "Difficulty",
+      "difficulty": "Zorluk",
       "keyword": "Anahtar kelime",
       "publishDate": "Yayın tarihi",
-      "volume": "Volume"
+      "volume": "Hacim"
     },
     "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
     "empty": {
@@ -474,12 +484,16 @@
         "label": "Otomatik yayınlama"
       },
       "internalLinks": {
-        "description": "Oluşturulan makalelerde iç bağlantıların kullanılıp kullanılmayacağını seçin.",
+        "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
         "label": "İç bağlantılar"
       },
       "tableOfContents": {
         "description": "Oluşturulan makalelere içindekiler bölümü ekleyin.",
         "label": "İçindekiler"
+      },
+      "youtubeVideos": {
+        "description": "Oluşturulan makalelere ilgili bir YouTube videosu ekleyin.",
+        "label": "YouTube videoları"
       }
     },
     "status": {
@@ -488,8 +502,7 @@
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin.",
       "saveError": "Makale ayarları kaydedilemedi. Tekrar deneyin.",
-      "saved": "Makale ayarları kaydedildi.",
-      "unsupportedFields": "Yalnızca makale stili ve iç bağlantıların açık olup olmadığı kaydedilir. Otomatik yayınlama ve içindekiler canlı API tarafından henüz desteklenmiyor."
+      "saved": "Makale ayarları kaydedildi."
     }
   },
   "SettingsPage": {
@@ -695,7 +708,8 @@
     "homeLabel": "Seopotion ana sayfa",
     "links": {
       "features": "Özellikler",
-      "pricing": "Fiyatlandırma"
+      "pricing": "Fiyatlandırma",
+      "docs": "Dokümanlar"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"
@@ -721,7 +735,7 @@
     "audience": {
       "competitorUrls": "Rakip web sitesi URL'leri",
       "targetAudience": "Hedef kitle",
-      "targetAudiencePlaceholder": "SaaS kurucuları",
+      "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
     },
     "blog": {
@@ -844,7 +858,7 @@
     },
     "websiteScan": {
       "completeMessage": "Tarama tamamlandı. Oluşturulan kurulum detayları sonraki adımlara eklendi.",
-      "description": "Seopotion'ın öğrenmesini istediğiniz siteyle başlayın.",
+      "description": "İşletme web sitenizi tarayarak başlayalım",
       "orgStatus": "Org {orgId}",
       "scanButton": "Web sitesini tara",
       "scanningButton": "Taranıyor...",
@@ -1016,7 +1030,7 @@
   },
   "PrivateMetadata": {
     "home": "Ana Sayfa",
-    "onboarding": "Onboarding"
+    "onboarding": "Kurulum"
   },
   "ProductPlaceholderPage": {
     "description": "Bu özellik yakında yayınlanacak. Eğer acil olarak ihtiyacınız varsa yada başka bir isteğiniz olursa support@seopotıo.co üzerinden yazabilirsiniz.",
@@ -1065,12 +1079,28 @@
     },
     "organizationFallback": "Organizasyonunuz"
   },
-  "WishlistForm": {
-    "emailPlaceholder": "E-posta adresinizi girin",
-    "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
-    "honeypotLabel": "Web sitesi",
-    "joining": "Katılınıyor...",
-    "submit": "Bekleme listesine katıl",
-    "success": "SEO Potion bekleme listesine eklendiniz. Erken erişim açıldığında size haber vereceğiz."
+  "DocsMetadata": {
+    "title": "Dokümantasyon | Seopotion",
+    "description": "Seopotion'ı nasıl kuracağınızı, bir aylık SEO içeriği planlamayı, makale üretmeyi ve bunları blogunuzda yayınlamayı öğrenin.",
+    "openGraphTitle": "Seopotion Dokümantasyonu"
+  },
+  "Docs": {
+    "sidebarLabel": "Dokümantasyon menüsü",
+    "breadcrumbLabel": "Sayfa yolu",
+    "pagerLabel": "Rehber gezinmesi",
+    "home": "Dokümantasyon",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "updated": "Son güncelleme {date}",
+    "groups": {
+      "getting-started": "Başlangıç",
+      "content": "İçerik",
+      "publishing": "Yayınlama"
+    },
+    "index": {
+      "eyebrow": "Dokümantasyon",
+      "title": "Seopotion ile SEO içeriği yayınlamaya başlayın",
+      "subtitle": "Çalışma alanınızı kurun, bir aylık içerik planlayın ve blogunuzda yayınlayın — her adımın nasıl çalıştığı burada."
+    }
   }
 }
