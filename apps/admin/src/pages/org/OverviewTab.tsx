@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { EMPTY, formatDateTime, orEmpty } from '../../lib/format';
 import type { OrgDetail } from '../../lib/queries';
 import { useOrgDetail } from '../OrgWorkspace';
+import { ConnectionLevers } from './ConnectionLevers';
 import { PresetsEditor } from './PresetsEditor';
+import { ScanRerun } from './ScanRerun';
 import { SetPlan } from './SetPlan';
 import { StrategyRun } from './StrategyRun';
 
@@ -22,6 +24,7 @@ export function OverviewTab() {
           <Row label="Created">{formatDateTime(org.created_at)}</Row>
           <Row label="Owner">{owner ? orEmpty(owner.email) : EMPTY}</Row>
           <Row label="Owner name">{orEmpty(owner?.name)}</Row>
+          <ScanRerun orgId={org.id} setupStatus={org.setup_status} />
         </Section>
 
         <Section title="Plan">
@@ -31,7 +34,7 @@ export function OverviewTab() {
 
         <Section title="Strategy">
           <Row label="Status">{org.strategy_status}</Row>
-          <StrategyRun orgId={org.id} />
+          <StrategyRun orgId={org.id} strategyStatus={org.strategy_status} />
         </Section>
 
         <Section title="Subscription">
@@ -73,6 +76,13 @@ export function OverviewTab() {
           <Row label="Refresh failing since">{formatDateTime(gsc?.last_refresh_failed_at)}</Row>
           <Row label="WordPress">{org.wordpress.connected ? 'connected' : 'not connected'}</Row>
           <Row label="WordPress since">{formatDateTime(org.wordpress.connected_at)}</Row>
+          <ConnectionLevers
+            orgId={org.id}
+            wordpressConnected={org.wordpress.connected}
+            // The API 409s on a missing connection row, which is exactly what a
+            // null `gsc` means — a broken-but-present one stays disconnectable.
+            gscConnected={gsc !== null}
+          />
         </Section>
       </div>
 
@@ -98,7 +108,7 @@ function Row({ label, children }: { label: string; children?: ReactNode }) {
   return (
     <div className="flex gap-3">
       <dt className="w-44 shrink-0 text-neutral-500">{label}</dt>
-      <dd className="min-w-0 break-words">{children ?? EMPTY}</dd>
+      <dd className="min-w-0 wrap-break-words">{children ?? EMPTY}</dd>
     </div>
   );
 }

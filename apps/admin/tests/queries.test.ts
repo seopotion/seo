@@ -25,7 +25,9 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
     auth: request.headers.get('Authorization'),
     body: request.body ? await request.text() : null,
   });
-  return new Response(JSON.stringify(reply.body), {
+  // The unstick levers that succeed with 204 have no body to send, and
+  // constructing a `Response` with one at that status throws.
+  return new Response(reply.status === 204 ? null : JSON.stringify(reply.body), {
     status: reply.status,
     headers: { 'content-type': 'application/json' },
   });
@@ -33,15 +35,23 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
 
 const {
   ArticleValidationError,
+  connectWordPress,
+  disconnectGsc,
+  disconnectWordPress,
   fetchArticle,
   fetchArticles,
   fetchAudit,
   fetchOrg,
   publishToWordPress,
+  rerunScan,
+  resetGeneration,
+  restoreCandidate,
+  retryImages,
   runStrategy,
   searchOrgs,
   setPlan,
   updateArticle,
+  updateBrief,
   updatePresets,
   updateWordPressPost,
 } = await import('../src/lib/queries');
@@ -131,6 +141,13 @@ describe('runStrategy', () => {
     expect(calls[0]?.body).toBe('{}');
   });
 
+  test('sends { force: true } for the phase-2 re-run', async () => {
+    reply = { status: 200, body: { strategy_status: 'pending' } };
+
+    await runStrategy('org1', true);
+    expect(calls[0]?.body).toBe('{"force":true}');
+  });
+
   test('surfaces the claim refusal as its code', async () => {
     reply = { status: 409, body: { error: 'strategy_not_claimable' } };
 
@@ -147,6 +164,163 @@ describe('fetchAudit', () => {
 
     await fetchAudit('org1', 50);
     expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/audit?limit=50&offset=50');
+  });
+});
+
+describe('rerunScan', () => {
+  test('posts to the org scan route', async () => {
+    reply = { status: 200, body: { enqueued: true } };
+
+    await expect(rerunScan('org1')).resolves.toEqual({ enqueued: true });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/scan');
+  });
+
+  test('surfaces the live-org refusal as its code', async () => {
+    reply = { status: 409, body: { error: 'setup_complete' } };
+
+    await expect(rerunScan('org1')).rejects.toMatchObject({
+      code: 'setup_complete',
+      status: 409,
+    });
+  });
+});
+
+describe('WordPress connect / disconnect', () => {
+  test('connect sends only the plugin token', async () => {
+    reply = { status: 200, body: { success: true } };
+
+    await expect(connectWordPress('org1', 'plugin-key')).resolves.toEqual({ success: true });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/integrations/wordpress');
+    expect(calls[0]?.body).toBe('{"token":"plugin-key"}');
+  });
+
+  test('lifts the verify failure out of its { success, error_code } envelope', async () => {
+    // Not the admin `{ error }` shape, so without the explicit lift the operator
+    // would read "Forbidden" instead of what the plugin actually said.
+    reply = { status: 403, body: { success: false, error_code: 'invalid_integration_key' } };
+
+    await expect(connectWordPress('org1', 'bad-key')).rejects.toMatchObject({
+      code: 'invalid_integration_key',
+      status: 403,
+    });
+  });
+
+  test('lifts a plugin/network failure the same way', async () => {
+    reply = { status: 502, body: { success: false, error_code: 'wordpress_request_failed' } };
+
+    await expect(connectWordPress('org1', 'plugin-key')).rejects.toMatchObject({
+      code: 'wordpress_request_failed',
+      status: 502,
+    });
+  });
+
+  test('disconnect DELETEs the integration', async () => {
+    reply = { status: 204, body: null };
+
+    await expect(disconnectWordPress('org1')).resolves.toBeUndefined();
+    expect(calls[0]?.method).toBe('DELETE');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/integrations/wordpress');
+  });
+
+  test('surfaces the not-connected refusal as its code', async () => {
+    reply = { status: 409, body: { error: 'wordpress_not_connected' } };
+
+    await expect(disconnectWordPress('org1')).rejects.toMatchObject({
+      code: 'wordpress_not_connected',
+      status: 409,
+    });
+  });
+});
+
+describe('disconnectGsc', () => {
+  test('DELETEs the connection', async () => {
+    reply = { status: 204, body: null };
+
+    await expect(disconnectGsc('org1')).resolves.toBeUndefined();
+    expect(calls[0]?.method).toBe('DELETE');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/gsc');
+  });
+
+  test('surfaces the not-connected refusal as its code', async () => {
+    reply = { status: 409, body: { error: 'gsc_not_connected' } };
+
+    await expect(disconnectGsc('org1')).rejects.toMatchObject({
+      code: 'gsc_not_connected',
+      status: 409,
+    });
+  });
+});
+
+describe('restoreCandidate', () => {
+  test('posts to the restore route', async () => {
+    reply = { status: 204, body: null };
+
+    await expect(restoreCandidate('cand1')).resolves.toBeUndefined();
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/candidates/cand1/restore');
+  });
+
+  test('surfaces the conditional miss as its code', async () => {
+    reply = { status: 409, body: { error: 'candidate_not_restorable' } };
+
+    await expect(restoreCandidate('cand1')).rejects.toMatchObject({
+      code: 'candidate_not_restorable',
+      status: 409,
+    });
+  });
+});
+
+describe('resetGeneration', () => {
+  test('posts to the reset route', async () => {
+    reply = { status: 204, body: null };
+
+    await expect(resetGeneration('kw1')).resolves.toBeUndefined();
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/scheduled/kw1/reset');
+  });
+
+  test('surfaces the over-cap guard as its code', async () => {
+    reply = { status: 409, body: { error: 'not_resettable' } };
+
+    await expect(resetGeneration('kw1')).rejects.toMatchObject({
+      code: 'not_resettable',
+      status: 409,
+    });
+  });
+});
+
+describe('updateBrief', () => {
+  const patch = {
+    article_type: 'listicle' as const,
+    intent: 'commercial' as const,
+    opportunity_score: 42,
+  };
+
+  test('patches the three brief fields', async () => {
+    reply = { status: 200, body: { keyword: { id: 'kw1' } } };
+
+    await expect(updateBrief('kw1', patch)).resolves.toEqual({ keyword: { id: 'kw1' } });
+    expect(calls[0]?.method).toBe('PATCH');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/scheduled/kw1/brief');
+    expect(calls[0]?.body).toBe(JSON.stringify(patch));
+  });
+
+  test('sends nulls to clear a field', async () => {
+    reply = { status: 200, body: { keyword: { id: 'kw1' } } };
+
+    await updateBrief('kw1', { article_type: null, intent: null, opportunity_score: null });
+    expect(calls[0]?.body).toBe('{"article_type":null,"intent":null,"opportunity_score":null}');
+  });
+
+  test('surfaces the generation lock as its code', async () => {
+    reply = { status: 409, body: { error: 'generation_started' } };
+
+    await expect(updateBrief('kw1', patch)).rejects.toMatchObject({
+      code: 'generation_started',
+      status: 409,
+    });
   });
 });
 
@@ -250,5 +424,15 @@ describe('WordPress publish/update', () => {
       code: 'images_not_complete',
       status: 409,
     });
+  });
+});
+
+describe('retryImages', () => {
+  test('posts to the article images route', async () => {
+    reply = { status: 200, body: { enqueued: true } };
+
+    await expect(retryImages('art1')).resolves.toEqual({ enqueued: true });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1/images');
   });
 });

@@ -51,12 +51,18 @@ export async function updatePresets(orgId: string, patch: PresetsPatch) {
   );
 }
 
-/** Runs the 30-day strategy job. Force-rerun is a phase-2 lever, so no `force`. */
-export async function runStrategy(orgId: string) {
+/**
+ * Runs the 30-day strategy job. `force` resets a `completed`/`pending` status
+ * before claiming — the only way to re-run one, and safe to repeat because the
+ * pipeline dedupes against the existing planner and pool.
+ */
+export async function runStrategy(orgId: string, force = false) {
   return unwrap(
     await adminApi.admin.v0.orgs[':org_id'].strategy.$post({
       param: { org_id: orgId },
-      json: {},
+      // Omitted rather than sent as `false`: the plain run is the default and
+      // the API only looks for `force === true`.
+      json: force ? { force: true } : {},
     }),
   );
 }
@@ -74,6 +80,49 @@ export async function fetchAudit(orgId: string, offset = 0) {
 }
 
 export type AuditAction = Awaited<ReturnType<typeof fetchAudit>>['actions'][number];
+
+// --- Org unstick levers (phase 2) ---
+
+/**
+ * Re-enqueues the onboarding scan. The API hard-409s a `setup_complete` org —
+ * the worker's `completeScan` would overwrite presets and knock a live org out
+ * of its dashboard gate — so callers offer this only for stuck onboarding.
+ */
+export async function rerunScan(orgId: string) {
+  return unwrap(await adminApi.admin.v0.orgs[':org_id'].scan.$post({ param: { org_id: orgId } }));
+}
+
+/**
+ * Connects WordPress on the customer's behalf; the site URL is the org's own, so
+ * the plugin token is the whole body. Verification happens server-side, and its
+ * refusals arrive as `{ success: false, error_code }` rather than the admin
+ * `{ error }` envelope — lifted here, since `unwrap` would only see "Forbidden".
+ */
+export async function connectWordPress(orgId: string, token: string) {
+  const res = await adminApi.admin.v0.orgs[':org_id'].integrations.wordpress.$post({
+    param: { org_id: orgId },
+    json: { token },
+  });
+  if (res.status === 403 || res.status === 502) {
+    throw new ApiError((await res.json()).error_code, res.status);
+  }
+  return unwrap(res);
+}
+
+export async function disconnectWordPress(orgId: string) {
+  return unwrapEmpty(
+    await adminApi.admin.v0.orgs[':org_id'].integrations.wordpress.$delete({
+      param: { org_id: orgId },
+    }),
+  );
+}
+
+/** Forces a clean re-onboard: only the customer can re-grant OAuth consent. */
+export async function disconnectGsc(orgId: string) {
+  return unwrapEmpty(
+    await adminApi.admin.v0.orgs[':org_id'].gsc.$delete({ param: { org_id: orgId } }),
+  );
+}
 
 // --- Candidate pool ---
 
@@ -136,6 +185,16 @@ export async function rejectCandidate(candidateId: string) {
   );
 }
 
+/** Un-reject: a conditional `rejected → candidate` update, so a 409 means the
+ * row already moved on and the pool needs a refresh. */
+export async function restoreCandidate(candidateId: string) {
+  return unwrapEmpty(
+    await adminApi.admin.v0.candidates[':candidate_id'].restore.$post({
+      param: { candidate_id: candidateId },
+    }),
+  );
+}
+
 // --- Planner ---
 
 /** Already sorted by `scheduled_date` ascending server-side (KeywordRepo.listByOrg). */
@@ -164,6 +223,32 @@ export async function generateNow(keywordId: string) {
   return unwrap(
     await adminApi.admin.v0.scheduled[':keyword_id'].generate.$post({
       param: { keyword_id: keywordId },
+    }),
+  );
+}
+
+/**
+ * The over-cap lever: back to `pending` with zero attempts, so the daily run
+ * stops ignoring a keyword that burned its 3 attempts. Conditional on
+ * `failed` + unlinked, hence the 409.
+ */
+export async function resetGeneration(keywordId: string) {
+  return unwrapEmpty(
+    await adminApi.admin.v0.scheduled[':keyword_id'].reset.$post({
+      param: { keyword_id: keywordId },
+    }),
+  );
+}
+
+/** Exactly the PATCH body: the three brief fields, `null` clearing one. */
+export type BriefPatch = Pick<ScheduledKeyword, 'article_type' | 'intent' | 'opportunity_score'>;
+
+/** The brief steers generation, so the API locks it once generation started. */
+export async function updateBrief(keywordId: string, patch: BriefPatch) {
+  return unwrap(
+    await adminApi.admin.v0.scheduled[':keyword_id'].brief.$patch({
+      param: { keyword_id: keywordId },
+      json: patch,
     }),
   );
 }
@@ -241,6 +326,19 @@ export async function publishToWordPress(articleId: string) {
 export async function updateWordPressPost(articleId: string) {
   return unwrap(
     await adminApi.admin.v0.articles[':article_id'].wordpress.$put({
+      param: { article_id: articleId },
+    }),
+  );
+}
+
+/**
+ * Re-enqueues the image task — the lever for `images_status: 'failed'`, which
+ * blocks WordPress publish. The worker's set-if-absent slots make replay
+ * idempotent, so there is no guard to trip and no 409 to handle.
+ */
+export async function retryImages(articleId: string) {
+  return unwrap(
+    await adminApi.admin.v0.articles[':article_id'].images.$post({
       param: { article_id: articleId },
     }),
   );

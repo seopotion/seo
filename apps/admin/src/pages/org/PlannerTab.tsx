@@ -1,3 +1,4 @@
+import { ARTICLE_TYPES, SEARCH_INTENTS } from '@shared/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Badge, type Tone } from '../../components/Badge';
@@ -7,18 +8,23 @@ import { Table, Td, Th } from '../../components/Table';
 import { errorText } from '../../lib/errors';
 import { EMPTY, formatDateTime, orEmpty } from '../../lib/format';
 import {
+  type BriefPatch,
   fetchPlanner,
   generateNow,
   rescheduleKeyword,
+  resetGeneration,
   type ScheduledKeyword,
   unscheduleKeyword,
+  updateBrief,
 } from '../../lib/queries';
 import { useOrgDetail } from '../OrgWorkspace';
 
 type Pending =
   | { kind: 'reschedule'; keyword: ScheduledKeyword; date: string }
   | { kind: 'unschedule'; keyword: ScheduledKeyword }
-  | { kind: 'generate'; keyword: ScheduledKeyword };
+  | { kind: 'generate'; keyword: ScheduledKeyword }
+  | { kind: 'reset'; keyword: ScheduledKeyword }
+  | { kind: 'brief'; keyword: ScheduledKeyword; patch: BriefPatch };
 
 const RESCHEDULE_CUSTOMER_VISIBLE = "The entry moves on the customer's planner.";
 
@@ -29,6 +35,11 @@ const GENERATE_CUSTOMER_VISIBLE = "A generated article will appear in the custom
 const FREE_PLAN_WARNING =
   'This org is on the free plan: generation fails for unpaid orgs and burns one of 3 attempts. ' +
   'Set the plan first.';
+
+const RESET_BODY =
+  'The entry goes back to pending with 0 attempts, so the daily 07:00 UTC run — or "Generate ' +
+  'now" — will pick it up again. Without this, a keyword past the 3-attempt cap is ignored ' +
+  'forever. The recorded failure reason is cleared with it.';
 
 /**
  * The operator planner: every scheduled keyword with the generation attempts,
@@ -42,6 +53,8 @@ export function PlannerTab() {
 
   /** Id of the row whose inline date form is open. */
   const [rescheduling, setRescheduling] = useState<string | null>(null);
+  /** Id of the row whose inline brief form is open. */
+  const [editing, setEditing] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
 
   const planner = useQuery({
@@ -78,6 +91,20 @@ export function PlannerTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['planner', orgId] }),
   });
 
+  const reset = useMutation({
+    mutationFn: (keyword: ScheduledKeyword) => resetGeneration(keyword.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['planner', orgId] }),
+  });
+
+  const editBrief = useMutation({
+    mutationFn: (input: { keyword: ScheduledKeyword; patch: BriefPatch }) =>
+      updateBrief(input.keyword.id, input.patch),
+    onSuccess: () => {
+      setEditing(null);
+      queryClient.invalidateQueries({ queryKey: ['planner', orgId] });
+    },
+  });
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-400">
@@ -100,6 +127,16 @@ export function PlannerTab() {
       {generate.isError && (
         <p className="mt-3 text-sm text-red-400">
           {errorText(generate.error, 'Could not queue generation.')}
+        </p>
+      )}
+      {reset.isError && (
+        <p className="mt-3 text-sm text-red-400">
+          {errorText(reset.error, 'Could not reset that entry.')}
+        </p>
+      )}
+      {editBrief.isError && (
+        <p className="mt-3 text-sm text-red-400">
+          {errorText(editBrief.error, 'Could not save that brief.')}
         </p>
       )}
       {generate.isSuccess && (
@@ -150,6 +187,11 @@ export function PlannerTab() {
                 keyword.generation_status === 'pending' && keyword.article_id === null;
               const generatable =
                 keyword.generation_status !== 'generated' && keyword.article_id === null;
+              // The over-cap lever: `resetGeneration` only matches a failed,
+              // article-less entry. `movable` is the same guard `updateBrief`
+              // uses, so the brief is editable exactly while the row can move.
+              const resettable =
+                keyword.generation_status === 'failed' && keyword.article_id === null;
 
               return (
                 <tr key={keyword.id}>
@@ -193,8 +235,15 @@ export function PlannerTab() {
                         onSubmit={(date) => setPending({ kind: 'reschedule', keyword, date })}
                         onCancel={() => setRescheduling(null)}
                       />
+                    ) : editing === keyword.id ? (
+                      <BriefForm
+                        keyword={keyword}
+                        pending={editBrief.isPending}
+                        onSubmit={(patch) => setPending({ kind: 'brief', keyword, patch })}
+                        onCancel={() => setEditing(null)}
+                      />
                     ) : (
-                      <div className="flex gap-2 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-2 whitespace-nowrap">
                         {movable && (
                           <>
                             <button
@@ -206,12 +255,28 @@ export function PlannerTab() {
                             </button>
                             <button
                               type="button"
+                              onClick={() => setEditing(keyword.id)}
+                              className="rounded border border-neutral-700 px-2 py-1 text-xs hover:bg-neutral-800"
+                            >
+                              Edit brief
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => setPending({ kind: 'unschedule', keyword })}
                               className="rounded border border-red-800 px-2 py-1 text-xs text-red-300 hover:bg-red-950"
                             >
                               Unschedule
                             </button>
                           </>
+                        )}
+                        {resettable && (
+                          <button
+                            type="button"
+                            onClick={() => setPending({ kind: 'reset', keyword })}
+                            className="rounded border border-neutral-700 px-2 py-1 text-xs hover:bg-neutral-800"
+                          >
+                            Reset generation
+                          </button>
                         )}
                         {generatable && (
                           <button
@@ -222,7 +287,7 @@ export function PlannerTab() {
                             Generate now
                           </button>
                         )}
-                        {!movable && !generatable && (
+                        {!movable && !generatable && !resettable && (
                           <span className="text-xs text-neutral-600">{EMPTY}</span>
                         )}
                       </div>
@@ -264,6 +329,32 @@ export function PlannerTab() {
         />
       )}
 
+      {pending?.kind === 'brief' && (
+        <ConfirmDialog
+          title="Edit brief"
+          body={`The brief for "${pending.keyword.keyword}" becomes ${describeBrief(pending.patch)}. It steers the article the generator writes — nothing already generated changes.`}
+          confirmLabel="Save brief"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            setPending(null);
+            editBrief.mutate({ keyword: pending.keyword, patch: pending.patch });
+          }}
+        />
+      )}
+
+      {pending?.kind === 'reset' && (
+        <ConfirmDialog
+          title="Reset generation"
+          body={`"${pending.keyword.keyword}" failed ${pending.keyword.generation_attempts} time(s). ${RESET_BODY}`}
+          confirmLabel="Reset to pending"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            setPending(null);
+            reset.mutate(pending.keyword);
+          }}
+        />
+      )}
+
       {pending?.kind === 'generate' && (
         <ConfirmDialog
           title="Generate now"
@@ -283,6 +374,117 @@ export function PlannerTab() {
   );
 }
 
+/**
+ * The three brief fields, edited in place. Every field is nullable, so an empty
+ * select or box means `null` — and all three are always sent: they are seeded
+ * from the row, and a partial body would only add a diff to get wrong.
+ */
+function BriefForm({
+  keyword,
+  pending,
+  onSubmit,
+  onCancel,
+}: {
+  keyword: ScheduledKeyword;
+  pending: boolean;
+  onSubmit: (patch: BriefPatch) => void;
+  onCancel: () => void;
+}) {
+  const [patch, setPatch] = useState<BriefPatch>({
+    article_type: keyword.article_type,
+    intent: keyword.intent,
+    opportunity_score: keyword.opportunity_score,
+  });
+
+  return (
+    <form
+      className="flex w-52 flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(patch);
+      }}
+    >
+      <select
+        aria-label="Article type"
+        value={patch.article_type ?? ''}
+        onChange={(event) =>
+          setPatch({
+            ...patch,
+            article_type: (event.target.value || null) as BriefPatch['article_type'],
+          })
+        }
+        className={BRIEF_INPUT}
+      >
+        <option value="">(no type)</option>
+        {ARTICLE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </select>
+
+      <select
+        aria-label="Intent"
+        value={patch.intent ?? ''}
+        onChange={(event) =>
+          setPatch({ ...patch, intent: (event.target.value || null) as BriefPatch['intent'] })
+        }
+        className={BRIEF_INPUT}
+      >
+        <option value="">(no intent)</option>
+        {SEARCH_INTENTS.map((intent) => (
+          <option key={intent} value={intent}>
+            {intent}
+          </option>
+        ))}
+      </select>
+
+      <input
+        type="number"
+        step="any"
+        aria-label="Opportunity score"
+        placeholder="opportunity score"
+        value={patch.opportunity_score ?? ''}
+        onChange={(event) =>
+          setPatch({
+            ...patch,
+            opportunity_score: event.target.value === '' ? null : Number(event.target.value),
+          })
+        }
+        className={BRIEF_INPUT}
+      />
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded bg-neutral-100 px-2 py-1 text-xs font-semibold text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? 'Saving…' : 'Save brief'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded border border-neutral-700 px-2 py-1 text-xs hover:bg-neutral-800"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const BRIEF_INPUT =
+  'w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1 text-xs text-neutral-100';
+
+function describeBrief(patch: BriefPatch): string {
+  return [
+    `type ${patch.article_type ?? 'none'}`,
+    `intent ${patch.intent ?? 'none'}`,
+    `opportunity ${patch.opportunity_score ?? 'none'}`,
+  ].join(', ');
+}
+
 function generationTone(status: ScheduledKeyword['generation_status']): Tone {
   if (status === 'generated') return 'good';
   if (status === 'failed') return 'bad';
@@ -298,7 +500,9 @@ function ErrorCell({ error }: { error: string | null }) {
       <summary className="max-w-48 cursor-pointer truncate text-red-300" title={error}>
         {error}
       </summary>
-      <p className="mt-1 max-w-md text-xs break-words whitespace-pre-wrap text-red-300">{error}</p>
+      <p className="mt-1 max-w-md text-xs wrap-break-words whitespace-pre-wrap text-red-300">
+        {error}
+      </p>
     </details>
   );
 }
