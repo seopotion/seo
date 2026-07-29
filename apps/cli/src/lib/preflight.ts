@@ -2,9 +2,10 @@
  * Pre-deploy prerequisite check for a backend environment (#16).
  *
  * The `SeoApiStack-<stage>` deploy assumes several things are provisioned
- * out-of-band (see `infra/ENVIRONMENTS.md`): six SSM SecureStrings per stage
+ * out-of-band (see `infra/ENVIRONMENTS.md`): seven SSM SecureStrings per stage
  * (jwt-secret, mongo-uri, google-client-secret, gsc-token-key,
- * lemonsqueezy-api-key, lemonsqueezy-webhook-secret) resolved at Lambda
+ * lemonsqueezy-api-key, lemonsqueezy-webhook-secret, admin/jwt-secret) plus the
+ * plain-String admin operator allowlist, all resolved at Lambda
  * runtime, and public values baked into the Lambda env at synth time —
  * `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>` (the GSC OAuth redirect
  * base), and the LemonSqueezy store id + paid/expert variant ids. If any is
@@ -29,6 +30,11 @@ function ssmParamNames(stage: Stage): string[] {
     `/seo/${stage}/gsc-token-key`,
     `/seo/${stage}/lemonsqueezy-api-key`,
     `/seo/${stage}/lemonsqueezy-webhook-secret`,
+    // Admin Lambda (#150). Missing either one deploys a stack whose operator
+    // login throws on every attempt — getAdminJwtSecret / getOperatorAllowlist
+    // resolve them at runtime, so nothing else surfaces the gap.
+    `/seo/${stage}/admin/jwt-secret`,
+    `/seo/${stage}/admin/operators`,
   ];
 }
 

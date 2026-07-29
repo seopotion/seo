@@ -44,6 +44,19 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    aws ssm put-parameter --name /seo/prod/lemonsqueezy-webhook-secret     --type SecureString --value '<ls_webhook_secret>'
    ```
 
+   The admin panel (#150) needs two more per stage: its **own** HS256 signing
+   secret (granted to the admin Lambda alone — never the customer one) and the
+   **operator allowlist**, a *plain String* of comma-separated emails. The
+   allowlist is re-read every ~5 min at runtime, so editing it takes effect
+   without a redeploy; the signing secret rotates only by redeploy.
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/admin/jwt-secret --type SecureString --value "$(openssl rand -base64 32)"
+   aws ssm put-parameter --name /seo/staging/admin/operators  --type String       --value 'a@x.com,b@y.com'
+   aws ssm put-parameter --name /seo/prod/admin/jwt-secret    --type SecureString --value "$(openssl rand -base64 32)"
+   aws ssm put-parameter --name /seo/prod/admin/operators     --type String       --value 'a@x.com,b@y.com'
+   ```
+
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
    clients](#google-oauth-clients) below. Set each as a GitHub Actions repo
    **variable** `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` (public, not
@@ -197,9 +210,10 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the out-of-band items for a stage are actually in
-place. The preflight checks that all six SSM SecureStrings exist (jwt-secret,
+place. The preflight checks that all seven SSM SecureStrings exist (jwt-secret,
 mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-lemonsqueezy-webhook-secret — presence only, it does not decrypt them) and
+lemonsqueezy-webhook-secret, admin/jwt-secret — presence only, it does not
+decrypt them), that the plain-String `admin/operators` allowlist exists, and
 that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
 `LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
 `LEMONSQUEEZY_VARIANT_EXPERT_<STAGE>` are set — the same names the stack reads
