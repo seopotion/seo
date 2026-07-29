@@ -2,9 +2,10 @@
  * Pre-deploy prerequisite check for a backend environment (#16).
  *
  * The `SeoApiStack-<stage>` deploy assumes several things are provisioned
- * out-of-band (see `infra/ENVIRONMENTS.md`): six SSM SecureStrings per stage
+ * out-of-band (see `infra/ENVIRONMENTS.md`): seven SSM SecureStrings per stage
  * (jwt-secret, mongo-uri, google-client-secret, gsc-token-key,
- * lemonsqueezy-api-key, lemonsqueezy-webhook-secret) resolved at Lambda
+ * lemonsqueezy-api-key, lemonsqueezy-webhook-secret, admin/jwt-secret) plus the
+ * plain-String admin/operators allowlist, all resolved at Lambda
  * runtime, and public values baked into the Lambda env at synth time —
  * `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>` (the GSC OAuth redirect
  * base), and the LemonSqueezy store id + paid/expert variant ids. If any is
@@ -29,6 +30,11 @@ function ssmParamNames(stage: Stage): string[] {
     `/seo/${stage}/gsc-token-key`,
     `/seo/${stage}/lemonsqueezy-api-key`,
     `/seo/${stage}/lemonsqueezy-webhook-secret`,
+    `/seo/${stage}/admin/jwt-secret`,
+    // admin/operators is a plain String the stack references as a CloudFormation
+    // SSM template parameter — if it's absent, `cdk deploy` dies at changeset
+    // creation (run 30376446564), so catching it here is the whole point.
+    `/seo/${stage}/admin/operators`,
   ];
 }
 

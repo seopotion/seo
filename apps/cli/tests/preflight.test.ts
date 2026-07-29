@@ -61,8 +61,10 @@ describe('preflight', () => {
     // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
     expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
     // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-    // lemonsqueezy-webhook-secret, and the five public env vars.
+    // lemonsqueezy-webhook-secret, the two admin params, and the five public env vars.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/staging/admin/jwt-secret',
+      '/seo/staging/admin/operators',
       '/seo/staging/google-client-secret',
       '/seo/staging/gsc-token-key',
       '/seo/staging/jwt-secret',
@@ -83,6 +85,8 @@ describe('preflight', () => {
     const res = await preflight('prod');
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/prod/admin/jwt-secret',
+      '/seo/prod/admin/operators',
       '/seo/prod/google-client-secret',
       '/seo/prod/gsc-token-key',
       '/seo/prod/jwt-secret',
@@ -142,6 +146,23 @@ describe('preflight', () => {
     expect(res.data.checks.find((c) => c.name === 'WEB_ORIGIN_STAGING')).toMatchObject({
       present: false,
       kind: 'env',
+    });
+  });
+
+  test('not ready when an admin SSM param is missing', async () => {
+    // Regression: run 30376446564 — /seo/staging/admin/operators was absent and
+    // preflight passed, so the failure surfaced only at CloudFormation changeset time.
+    ssmSend.mockImplementation(async (cmd: { Name: string }) =>
+      cmd.Name === '/seo/staging/admin/operators'
+        ? Promise.reject(Object.assign(new Error('not found'), { name: 'ParameterNotFound' }))
+        : paramValue('present'),
+    );
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === '/seo/staging/admin/operators')).toMatchObject({
+      present: false,
     });
   });
 
