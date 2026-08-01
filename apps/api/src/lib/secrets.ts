@@ -33,3 +33,18 @@ export async function getGscTokenKey(): Promise<Buffer> {
   }
   return key;
 }
+
+/**
+ * The GitHub App private key (#7, design/github-app.md § The private key): a
+ * PKCS#1 PEM, signed with node:crypto because WebCrypto imports PKCS#8 only.
+ * The `\n` unescaping is for the local `.env` path — SSM stores the PEM's real
+ * newlines (`put-parameter --value file://…`), a dotenv line cannot.
+ */
+export async function getGithubAppKey(): Promise<string> {
+  const raw = await resolve(config.GITHUB_APP_KEY_PARAM, config.GITHUB_APP_KEY, 'github app key');
+  const pem = raw.replace(/\\n/g, '\n');
+  if (!pem.includes('PRIVATE KEY')) {
+    throw new Error('GitHub App key is not a PEM private key (GITHUB_APP_KEY / _PARAM)');
+  }
+  return pem;
+}

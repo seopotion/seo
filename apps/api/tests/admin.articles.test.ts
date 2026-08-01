@@ -7,6 +7,7 @@ const repos = vi.hoisted(() => ({
     listByOrg: vi.fn(),
     updateContent: vi.fn(),
     setWordPressPostId: vi.fn(),
+    recordPublication: vi.fn(),
   },
   AdminActionRepo: { insert: vi.fn() },
 }));
@@ -65,6 +66,7 @@ const article = {
   created_at: new Date('2026-07-10T00:00:00.000Z'),
   published_at: null,
   updated_at: null,
+  publications: [],
   images: [],
   images_status: 'complete' as const,
   video: null,

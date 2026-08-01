@@ -26,6 +26,17 @@ export const config = {
   GSC_TOKEN_KEY: process.env.GSC_TOKEN_KEY ?? '',
   /** Web app origin — builds the GSC OAuth redirect URI (<origin>/dashboard/gsc/callback). */
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  /** GitHub App slug (public, per-env) — builds the install URL. One App per
+   * environment, because the Setup URL is a single field on the registration.
+   * See design/github-app.md. */
+  GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG ?? '',
+  /** GitHub App client id (public, per-env) — the `iss` claim of the App JWT. */
+  GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID ?? '',
+  /** Name of the SSM SecureString holding the GitHub App private key (deployed,
+   * API Lambda only). Unset locally — GITHUB_APP_KEY below is used directly. */
+  GITHUB_APP_KEY_PARAM: process.env.GITHUB_APP_KEY_PARAM ?? '',
+  /** Local-dev GitHub App private key: the PKCS#1 PEM GitHub hands you. */
+  GITHUB_APP_KEY: process.env.GITHUB_APP_KEY ?? '',
   /** Name of the SSM SecureString holding the LemonSqueezy API key (deployed).
    * Unset locally — LEMONSQUEEZY_API_KEY below is used directly. */
   LEMONSQUEEZY_API_KEY_PARAM: process.env.LEMONSQUEEZY_API_KEY_PARAM ?? '',

@@ -26,6 +26,7 @@ type ArticleDetail = {
   meta_description: string;
   published_at: string | null;
   slug: string;
+  static_site_published_at: string | null;
   status: ArticleStatus;
   title: string;
   wordpress_post_id?: number;
@@ -33,6 +34,26 @@ type ArticleDetail = {
 
 type ArticleLoadState = 'error' | 'loading' | 'not_found' | 'ready';
 type WordPressActionState = 'error' | 'idle' | 'loading' | 'published' | 'updated';
+type SiteActionState = 'error' | 'idle' | 'loading' | 'published';
+/** Publish failures the user can act on; anything else falls back to `failed`. */
+type SiteErrorKey =
+  | 'branchMoved'
+  | 'commitRejected'
+  | 'failed'
+  | 'imagesIncomplete'
+  | 'notConnected'
+  | 'recordFailed'
+  | 'slugConflict';
+
+const SITE_ERROR_KEYS: Record<string, SiteErrorKey> = {
+  not_connected: 'notConnected',
+  images_incomplete: 'imagesIncomplete',
+  slug_conflict: 'slugConflict',
+  ref_conflict: 'branchMoved',
+  commit_rejected: 'commitRejected',
+  missing_write_permission: 'commitRejected',
+  record_failed: 'recordFailed',
+};
 
 export default function ArticleDetailPage() {
   const t = useTranslations('ArticleDetailPage');
@@ -50,6 +71,9 @@ export default function ArticleDetailPage() {
   const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
   const [wordpressError, setWordpressError] = useState<string | null>(null);
   const [wordpressWarnings, setWordpressWarnings] = useState<string[]>([]);
+  const [siteActionState, setSiteActionState] = useState<SiteActionState>('idle');
+  const [siteErrorKey, setSiteErrorKey] = useState<SiteErrorKey>('failed');
+  const [siteCommitUrl, setSiteCommitUrl] = useState<string | null>(null);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
@@ -101,6 +125,16 @@ export default function ArticleDetailPage() {
         (integration) => integration.provider === 'wordpress',
       )
     : undefined;
+  const staticSiteConnected = connectedIntegrationsQuery.data
+    ? connectedIntegrationsQuery.data.integrations.some(
+        (integration) => integration.provider === 'static-site',
+      )
+    : undefined;
+  // One button per connected target. Until anything is connected we still show
+  // the WordPress one — disabled, with the hint that has always been there,
+  // which is how someone discovers publishing exists at all.
+  const showSiteButton = staticSiteConnected === true;
+  const showWordPressButton = wordpressConnected !== false || !showSiteButton;
 
   const article = articleQuery.data ?? null;
   const loadState: ArticleLoadState = !articleId
@@ -162,6 +196,56 @@ export default function ArticleDetailPage() {
     }
   }
 
+  async function publishToSite() {
+    if (!article || siteActionState === 'loading') return;
+
+    setSiteActionState('loading');
+    setSiteCommitUrl(null);
+
+    try {
+      const response = await api.api.v0.dashboard.articles[':id'].publish.$post({
+        param: { id: article.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const code = 'code' in data && typeof data.code === 'string' ? data.code : null;
+        setSiteErrorKey((code && SITE_ERROR_KEYS[code]) || 'failed');
+        setSiteActionState('error');
+        return;
+      }
+
+      if (!('commit_sha' in data)) {
+        throw new Error('publish_response_invalid');
+      }
+
+      // The article carries its first-publish date from here on, which is what
+      // flips the button to "Update".
+      queryClient.setQueryData<ArticleDetail | null>(
+        dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
+        (currentArticle) =>
+          currentArticle
+            ? {
+                ...currentArticle,
+                static_site_published_at:
+                  currentArticle.static_site_published_at ?? new Date().toISOString(),
+              }
+            : currentArticle,
+      );
+      setSiteCommitUrl(data.commit_url);
+      setSiteActionState('published');
+    } catch {
+      setSiteErrorKey('failed');
+      setSiteActionState('error');
+    }
+  }
+
   const statusMessage =
     loadState === 'loading'
       ? t('status.loading')
@@ -195,24 +279,51 @@ export default function ArticleDetailPage() {
                   {t('wordpress.sentBadge', { id: article.wordpress_post_id })}
                 </Badge>
               ) : null}
+              {article.static_site_published_at ? (
+                <Badge variant="secondary" className="w-fit border-transparent">
+                  {t('site.publishedBadge', {
+                    date: formatDate(article.static_site_published_at, dateFormatter),
+                  })}
+                </Badge>
+              ) : null}
             </div>
-            <Button
-              onClick={syncWordPressArticle}
-              disabled={wordpressActionState === 'loading' || wordpressConnected === false}
-            >
-              {wordpressActionState === 'loading'
-                ? t(
-                    article.wordpress_post_id
-                      ? 'actions.updatingWordPress'
-                      : 'actions.publishingWordPress',
-                  )
-                : t(
-                    article.wordpress_post_id
-                      ? 'actions.updateWordPress'
-                      : 'actions.publishWordPress',
-                  )}
-            </Button>
-            {wordpressConnected === false ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {showSiteButton ? (
+                <Button onClick={publishToSite} disabled={siteActionState === 'loading'}>
+                  {siteActionState === 'loading'
+                    ? t(
+                        article.static_site_published_at
+                          ? 'actions.updatingSite'
+                          : 'actions.publishingSite',
+                      )
+                    : t(
+                        article.static_site_published_at
+                          ? 'actions.updateSite'
+                          : 'actions.publishSite',
+                      )}
+                </Button>
+              ) : null}
+              {showWordPressButton ? (
+                <Button
+                  onClick={syncWordPressArticle}
+                  variant={showSiteButton ? 'outline' : 'default'}
+                  disabled={wordpressActionState === 'loading' || wordpressConnected === false}
+                >
+                  {wordpressActionState === 'loading'
+                    ? t(
+                        article.wordpress_post_id
+                          ? 'actions.updatingWordPress'
+                          : 'actions.publishingWordPress',
+                      )
+                    : t(
+                        article.wordpress_post_id
+                          ? 'actions.updateWordPress'
+                          : 'actions.publishWordPress',
+                      )}
+                </Button>
+              ) : null}
+            </div>
+            {showWordPressButton && wordpressConnected === false ? (
               <p className="text-slate-500 text-xs">
                 {t.rich('wordpress.connectFirst', {
                   link: (chunks) => (
@@ -233,28 +344,50 @@ export default function ArticleDetailPage() {
         </div>
       ) : null}
 
+      {siteActionState === 'published' ? (
+        <StatusPanel tone="success">
+          <span>{t('site.published')}</span>
+          {siteCommitUrl ? (
+            <>
+              {' '}
+              <a
+                className="underline"
+                href={siteCommitUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {t('site.viewCommit')}
+              </a>
+            </>
+          ) : null}
+        </StatusPanel>
+      ) : null}
+      {siteActionState === 'error' ? (
+        <StatusPanel tone="error">{t(`site.errors.${siteErrorKey}`)}</StatusPanel>
+      ) : null}
+
       {wordpressActionState === 'published' ? (
-        <WordPressStatus tone="success">{t('wordpress.published')}</WordPressStatus>
+        <StatusPanel tone="success">{t('wordpress.published')}</StatusPanel>
       ) : null}
       {wordpressActionState === 'updated' ? (
-        <WordPressStatus tone="success">{t('wordpress.updated')}</WordPressStatus>
+        <StatusPanel tone="success">{t('wordpress.updated')}</StatusPanel>
       ) : null}
       {wordpressActionState === 'error' ? (
-        <WordPressStatus tone="error">
+        <StatusPanel tone="error">
           {wordpressError
             ? t('wordpress.pluginError', { error: wordpressError })
             : t('wordpress.requestError')}
-        </WordPressStatus>
+        </StatusPanel>
       ) : null}
       {wordpressWarnings.length > 0 ? (
-        <WordPressStatus tone="warning">
+        <StatusPanel tone="warning">
           <p className="font-medium">{t('wordpress.warnings')}</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             {wordpressWarnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
-        </WordPressStatus>
+        </StatusPanel>
       ) : null}
 
       {article ? (
@@ -287,7 +420,7 @@ export default function ArticleDetailPage() {
   );
 }
 
-function WordPressStatus({
+function StatusPanel({
   children,
   tone,
 }: {

@@ -167,6 +167,8 @@ export function toAdminArticleDetail(a: Article): z.infer<typeof schemas.Article
     content: a.content,
     status: a.status,
     ...(a.wordpress_post_id ? { wordpress_post_id: a.wordpress_post_id } : {}),
+    static_site_published_at:
+      a.publications.find((p) => p.provider === 'static-site')?.published_at.toISOString() ?? null,
     images_status: a.images_status,
     created_at: a.created_at.toISOString(),
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,

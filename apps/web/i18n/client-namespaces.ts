@@ -18,6 +18,7 @@ export const CLIENT_NAMESPACES = [
   'BillingPage',
   'ContentHistoryPage',
   'ContentPlannerPage',
+  'GithubCallback',
   'GoogleJoinButton',
   'GscCallback',
   'HomePage',

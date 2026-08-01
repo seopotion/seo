@@ -59,6 +59,73 @@ describe('runMigrations (integration)', () => {
   });
 });
 
+describe('runMigrations publications backfill (#7, integration)', () => {
+  const ORG = 'org_publications_backfill';
+
+  beforeAll(async () => {
+    const db = await getDb();
+    await db.collection('articles').deleteMany({ org_id: ORG });
+    await db.collection('articles').insertMany([
+      // Published pre-#7: has the mirror, no publications field at all.
+      {
+        org_id: ORG,
+        slug: 'published-legacy',
+        wordpress_post_id: 77,
+        published_at: new Date('2026-05-01T00:00:00.000Z'),
+        created_at: new Date('2026-04-01T00:00:00.000Z'),
+      },
+      // Published but never stamped published_at — falls back to created_at.
+      {
+        org_id: ORG,
+        slug: 'no-published-at',
+        wordpress_post_id: 78,
+        published_at: null,
+        created_at: new Date('2026-04-02T00:00:00.000Z'),
+      },
+      // Never published: nothing to backfill.
+      { org_id: ORG, slug: 'unpublished', created_at: new Date('2026-04-03T00:00:00.000Z') },
+    ]);
+  });
+
+  afterAll(async () => {
+    const db = await getDb();
+    await db.collection('articles').deleteMany({ org_id: ORG });
+    await closeDb();
+  });
+
+  test('seeds publications[] from wordpress_post_id, skipping unpublished rows', async () => {
+    const report = await runMigrations();
+    expect(report.publications_backfilled).toBeGreaterThanOrEqual(2);
+
+    const db = await getDb();
+    const bySlug = async (slug: string) => db.collection('articles').findOne({ org_id: ORG, slug });
+
+    expect((await bySlug('published-legacy'))?.publications).toEqual([
+      {
+        provider: 'wordpress',
+        // The post id becomes a string — `ref` is one shape across providers.
+        ref: '77',
+        slug: 'published-legacy',
+        published_at: new Date('2026-05-01T00:00:00.000Z'),
+        updated_at: null,
+      },
+    ]);
+    expect((await bySlug('no-published-at'))?.publications?.[0]?.published_at).toEqual(
+      new Date('2026-04-02T00:00:00.000Z'),
+    );
+    expect((await bySlug('unpublished'))?.publications).toBeUndefined();
+  });
+
+  test('is idempotent: a second run adds nothing', async () => {
+    const before = await runMigrations();
+    expect(before.publications_backfilled).toBe(0);
+
+    const db = await getDb();
+    const doc = await db.collection('articles').findOne({ org_id: ORG, slug: 'published-legacy' });
+    expect(doc?.publications).toHaveLength(1);
+  });
+});
+
 describe('runMigrations keyword invariants (#99, integration)', () => {
   beforeAll(async () => {
     const db = await getDb();

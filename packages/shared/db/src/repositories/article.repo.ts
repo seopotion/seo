@@ -1,11 +1,12 @@
 import {
   type Article,
   type ArticleImage,
+  type ArticlePublication,
   ArticleSchema,
   type CreateArticleInput,
   CreateArticleInput as CreateArticleInputSchema,
 } from '@shared/schemas';
-import { type Document, ObjectId, type WithId } from 'mongodb';
+import { type Document, ObjectId, type UpdateFilter, type WithId } from 'mongodb';
 import { getDb } from '../client';
 
 const collection = async () => (await getDb()).collection('articles');
@@ -44,11 +45,68 @@ export const ArticleRepo = {
     return (await collection()).countDocuments({ org_id: orgId, status });
   },
 
+  /**
+   * Every article the org currently has live with one provider. Unpaginated on
+   * purpose: the static-site publisher rebuilds the whole `manifest.json` from
+   * this, so a partial page would silently drop articles out of the client's
+   * blog index (design/static-site-integration.md § The contract).
+   */
+  async listPublishedTo(
+    orgId: string,
+    provider: ArticlePublication['provider'],
+  ): Promise<Article[]> {
+    const docs = await (await collection())
+      .find({ org_id: orgId, status: { $ne: 'deleted' }, 'publications.provider': provider })
+      .toArray();
+    return docs.map(toEntity);
+  },
+
   async create(input: CreateArticleInput): Promise<Article> {
     const data = CreateArticleInputSchema.parse(input); // validate on write
     const created_at = new Date();
     const res = await (await collection()).insertOne({ ...data, created_at });
     return toEntity({ _id: res.insertedId, ...data, created_at });
+  },
+
+  /**
+   * Upsert the article's publish state for one provider (#7). A first publish
+   * pushes the entry; a re-publish updates `ref`/`slug` and stamps
+   * `updated_at`, so `published_at` keeps meaning "first went live".
+   * `slug` is the slug we actually wrote under, which the editor can later
+   * change on the article itself — that difference is what makes stale remote
+   * paths detectable at the next publish.
+   *
+   * `at` defaults to now. The static-site publisher passes the timestamp it
+   * already wrote into the committed `manifest.json`, so the next rebuild of
+   * that file from the database is byte-identical instead of producing a
+   * millisecond-wide diff on an untouched article.
+   */
+  async recordPublication(
+    id: string,
+    entry: { provider: ArticlePublication['provider']; ref: string; slug: string },
+    at: Date = new Date(),
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const col = await collection();
+    const _id = new ObjectId(id);
+    const updated = await col.updateOne(
+      { _id, 'publications.provider': entry.provider },
+      {
+        $set: {
+          'publications.$.ref': entry.ref,
+          'publications.$.slug': entry.slug,
+          'publications.$.updated_at': at,
+        },
+      },
+    );
+    if (updated.matchedCount > 0) return true;
+    // The cast is the driver's `PushOperator<Document>` wrinkle: on an untyped
+    // collection every field resolves to `undefined`, so no $push value is
+    // assignable. Nothing here is dynamic — the shape is ArticlePublication.
+    const pushed = await col.updateOne({ _id }, {
+      $push: { publications: { ...entry, published_at: at, updated_at: null } },
+    } as unknown as UpdateFilter<Document>);
+    return pushed.matchedCount > 0;
   },
 
   async setWordPressPostId(id: string, postId: number): Promise<boolean> {

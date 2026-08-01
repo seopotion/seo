@@ -69,6 +69,12 @@ jobs:
           LEMONSQUEEZY_STORE_ID_STAGING: ${{ vars.LEMONSQUEEZY_STORE_ID_STAGING }}
           LEMONSQUEEZY_VARIANT_PAID_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_STAGING }}
           LEMONSQUEEZY_VARIANT_EXPERT_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_STAGING }}
+          # GitHub App public config (#7), baked into the API Lambda at synth
+          # time. Unset until the App is registered by hand (design/github-app.md
+          # § Registration) — the install-url route 503s until then, so preflight
+          # deliberately does not assert these yet.
+          GITHUB_APP_SLUG_STAGING: ${{ vars.GITHUB_APP_SLUG_STAGING }}
+          GITHUB_APP_CLIENT_ID_STAGING: ${{ vars.GITHUB_APP_CLIENT_ID_STAGING }}
           # Provider secrets baked into the worker Lambdas at synth time
           # (infra/lib/api-stack.ts providerEnv; SSM provisioning deferred — #9/#43).
           DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
