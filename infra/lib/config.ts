@@ -16,6 +16,9 @@ interface StageConfig {
   lemonSqueezyVariantExpert: string; // public
   adminJwtSecretParam: string; // SSM SecureString NAME (admin Lambda only)
   adminOperatorsParam: string; // SSM String NAME — comma-separated operator emails
+  githubAppSlug: string; // public — builds the App install URL
+  githubAppClientId: string; // public — the App JWT `iss`
+  githubAppKeyParam: string; // SSM SecureString NAME (not value)
 }
 
 export const STAGE_CONFIG: Record<Stage, StageConfig> = {
@@ -35,6 +38,12 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_STAGING ?? '',
     adminJwtSecretParam: '/seo/staging/admin/jwt-secret',
     adminOperatorsParam: '/seo/staging/admin/operators',
+    // One GitHub App per environment (#7, design/github-app.md § Registration).
+    // Empty until the App is registered by hand — the install-url route 503s
+    // rather than sending anyone to a github.com 404.
+    githubAppSlug: process.env.GITHUB_APP_SLUG_STAGING ?? '',
+    githubAppClientId: process.env.GITHUB_APP_CLIENT_ID_STAGING ?? '',
+    githubAppKeyParam: '/seo/staging/github-app-key',
   },
   prod: {
     mongoDb: 'seo_prod',
@@ -52,5 +61,8 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD ?? '',
     adminJwtSecretParam: '/seo/prod/admin/jwt-secret',
     adminOperatorsParam: '/seo/prod/admin/operators',
+    githubAppSlug: process.env.GITHUB_APP_SLUG_PROD ?? '',
+    githubAppClientId: process.env.GITHUB_APP_CLIENT_ID_PROD ?? '',
+    githubAppKeyParam: '/seo/prod/github-app-key',
   },
 };

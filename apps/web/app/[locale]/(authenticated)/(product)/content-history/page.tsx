@@ -72,19 +72,24 @@ export default function ContentHistoryPage() {
   const historyQuery = useQuery({
     queryKey: dashboardQueryKeys.articleList(
       organization?.id ?? '',
-      'published',
+      'all',
       ARTICLES_PER_PAGE,
       offset,
     ),
     queryFn: async (): Promise<ContentHistoryData> => {
       if (!organization) return emptyContentHistoryData;
 
+      // Deliberately unfiltered. Filtering to `status: 'published'` left every
+      // generated-but-not-yet-published article with no route into it at all —
+      // Content Planner only links what is on the plan, so with an empty plan
+      // the article was reachable only by typing its id into the URL. The row
+      // already carries a status badge, which is the honest way to show the
+      // difference. `'deleted'` is unreachable today (nothing writes it).
       const response = await api.api.v0.dashboard.articles.$get({
         query: {
           org_id: organization.id,
           limit: ARTICLES_PER_PAGE,
           offset,
-          status: 'published',
         },
       });
 
@@ -164,11 +169,12 @@ export default function ContentHistoryPage() {
         aria-label={t('tableLabel')}
         className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
       >
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_10rem_7rem_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_7rem_6rem_6rem_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
           <span>{t('columns.articleName')}</span>
           <span>{t('columns.keyword')}</span>
           <span>{t('columns.volume')}</span>
           <span>{t('columns.difficulty')}</span>
+          <span>{t('columns.status')}</span>
           <span>{t('columns.publishDate')}</span>
         </div>
 
@@ -235,7 +241,7 @@ function DesktopArticleRow({
 }) {
   const publishedDate = formatPublishedDate(article.publishedAt, dateFormatter);
   const rowClassName =
-    'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_10rem_7rem_7rem] items-center gap-0 px-4 py-3 text-sm';
+    'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_7rem_6rem_6rem_7rem] items-center gap-0 px-4 py-3 text-sm';
 
   return (
     <Link
@@ -253,6 +259,9 @@ function DesktopArticleRow({
       </span>
       <span className="min-w-0 truncate text-slate-600">
         {formatNumber(article.difficulty, locale)}
+      </span>
+      <span className="min-w-0">
+        <StatusBadge status={article.status} t={t} />
       </span>
       <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
         {publishedDate}
@@ -282,7 +291,10 @@ function MobileArticleCard({
     >
       <Card className="gap-3 border-slate-200 py-4 shadow-none">
         <CardContent className="grid gap-3 px-4">
-          <ArticleName title={article.title} linked />
+          <div className="grid gap-2">
+            <ArticleName title={article.title} linked />
+            <StatusBadge status={article.status} t={t} />
+          </div>
           <Separator />
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div className="min-w-0">
@@ -320,6 +332,35 @@ function ArticleName({ linked = false, title }: { linked?: boolean; title: strin
       <span className="min-w-0 truncate font-medium text-slate-950">{title}</span>
       {linked ? <FileText className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
     </span>
+  );
+}
+
+/**
+ * The list is no longer filtered to published articles, so the row has to say
+ * which state it is in — otherwise a generated draft and a live article are
+ * indistinguishable. Same colours as the badge on the article detail page.
+ */
+function StatusBadge({
+  status,
+  t,
+}: {
+  status: ArticleListStatus;
+  t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
+}) {
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        'w-fit border-transparent',
+        status === 'published'
+          ? 'bg-emerald-100 text-emerald-700'
+          : status === 'generated'
+            ? 'bg-sky-100 text-sky-700'
+            : 'bg-slate-200 text-slate-700',
+      )}
+    >
+      {t(`articleStatuses.${status}`)}
+    </Badge>
   );
 }
 

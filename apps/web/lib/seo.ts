@@ -17,11 +17,11 @@ export function absoluteUrl(path = '/') {
 }
 
 function normalizeSiteUrl(value: string | undefined) {
-  if (!value) return 'https://seopotion.com';
+  if (!value) return 'https://seopotion.co';
 
   try {
     return new URL(value).origin;
   } catch {
-    return 'https://seopotion.com';
+    return 'https://seopotion.co';
   }
 }

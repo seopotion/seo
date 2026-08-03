@@ -12,6 +12,7 @@ is separate.
 | --- | --- |
 | Pipeline shape | Separate **image SQS task** (`ImageTask`), enqueued by the generation worker after the article persists; consumed by a new images worker Lambda |
 | Durable storage | **One private S3 bucket per stage** + **CloudFront distribution** (Origin Access Control); article URLs are CloudFront URLs |
+| Encoding | **WebP at store time** — re-encoded + downscaled in the worker before the S3 put, so every consumer (CDN, WordPress, git) gets the same small bytes |
 | Image policy | **Cover (1200×630) + 2 inline images, all required** for `images_status: 'complete'`; inline count is a config constant |
 | Placement | Inline images **injected into `article.content` markdown** directly after their target `## heading`; cover stays out of content (`featured_image_url` + metadata) |
 | Image state | **Embedded on the Article document** (`images` array + `images_status`), no new collection |
@@ -89,15 +90,129 @@ For each slot without a `url`:
    `image_size` accepts custom dimensions natively). Inline images use
    `landscape_16_9`.
 2. Fetch the returned image bytes from the fal URL.
-3. Upload to the stage bucket at a **deterministic key**:
-   `articles/{article_id}/{cover|inline-1|inline-2}.{ext}`. Deterministic keys make
+3. **Re-encode to WebP and downscale** — see [Encoding](#encoding-webp--downscale).
+4. Upload to the stage bucket at a **deterministic key**:
+   `articles/{article_id}/{cover|inline-1|inline-2}.webp`. Deterministic keys make
    retries overwrite-idempotent — no orphaned or duplicate assets.
-4. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
+5. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
    `generated_at`.
 
-> **Decide before prod:** stored URLs bake in the CloudFront domain. If we want a
-> custom domain (e.g. `img.seopotion.com`), alias it onto the distribution **before**
-> real articles exist, or accept the default `*.cloudfront.net` domain permanently.
+> **Decide before prod — and this got sharper on 2026-07-30.** Stored URLs bake in the
+> CloudFront domain. If we want a custom domain (e.g. `img.seopotion.com`), alias it onto
+> the distribution **before** real articles exist, or accept the default
+> `*.cloudfront.net` domain permanently.
+>
+> The static-site integration now leaves images on the CDN and commits the absolute URL
+> into the client's repo, so these strings escape our systems entirely: they land in
+> someone else's **permanent git history** and render on their live pages. Changing the
+> domain afterwards is no longer a database migration — it is a rewrite-and-republish
+> across every customer repository, and a period of 404s on published articles for anyone
+> who does not accept the republish. A raw `d1234.cloudfront.net` also reads as
+> third-party junk in a client's `git diff`, which is a bad first impression for a feature
+> whose pitch is "auditable". **Alias the domain before the first static-site install.**
+
+## Encoding: WebP + downscale
+
+The provider's bytes are stored unmodified today — a 1200×630 FLUX PNG is 1.5–2.5 MB.
+Across ~50 articles at 4 images each that is ~400 MB of PNG versus ~24 MB of WebP.
+
+The original argument was that this is fatal in git, because the static-site integration
+committed images into the client's repo and git history is permanent. **That integration
+now leaves images on our CDN** ([`static-site-integration.md`](static-site-integration.md),
+revised 2026-07-30), so the git argument is gone — and the case is, if anything, stronger
+without it. Those URLs render on *someone else's* pages now: a 2 MB PNG cover is the
+client's Largest Contentful Paint, on a page we sold them as an SEO asset, and we pay the
+egress for every view of it. What was a one-time storage cost is now a recurring
+performance and bandwidth cost that scales with their traffic.
+
+**Where: between the fetch and the S3 put**, in the images worker — the only point in
+the system where the bytes are already in memory. The alternatives are both worse:
+
+- *At publish time (API Lambda).* Re-converts on every republish and once per target,
+  needs a re-download, and puts a native module in the request-path Lambda. It also
+  leaves the dashboard preview, `og:image` and the WordPress path still shipping
+  full-size PNG — the problem was never git-specific, which is why the design outlived
+  the git argument that first motivated it.
+- *Ask the provider for WebP.* `ImageGenerateParams` has no format field, fal's support
+  would need re-verifying per model, and it yields no control over quality or
+  dimensions — which is most of the win.
+
+Converting at store time means there is exactly **one copy of the bytes** and every
+consumer — dashboard, `og:image`, WordPress, and a client's static site linking straight to
+CloudFront — gets the same small file. The API Lambda never needs sharp.
+
+| Slot | Resize | Encode |
+| --- | --- | --- |
+| cover | `1200×630`, `fit: 'cover'` | WebP `quality: 80` |
+| inline | max width `1200`, `withoutEnlargement` | WebP `quality: 80` |
+
+The cover is already *requested* at 1200×630, but FLUX snaps to model-friendly
+dimensions — the resize is what actually guarantees the OG aspect ratio. Metadata is
+stripped (sharp's default): smaller files, and no provider EXIF served from our CDN. `slotKey`'s extension becomes a constant `webp` and `storeImage` gets
+`ContentType: image/webp`, so the content-type-sniffing branch in the worker disappears.
+
+### Packaging sharp on Lambda
+
+sharp ships **platform-specific native binaries** (`@img/sharp-linux-x64` and friends).
+`NodejsFunction` local bundling runs `npm install` on the *developer's* machine, so a Mac
+would ship a `darwin-arm64` binary to a `linux-x64` Lambda and the function would throw
+on import. The fix is a **second bundling object for the images worker only** — the
+shared `bundling` const backs every Lambda in the stack and must not grow a native dep:
+
+```ts
+// Images worker only: sharp is native, so it stays external and is installed
+// inside the Lambda build image. Docker bundling is what makes the binary
+// linux-x64 rather than the build host's platform.
+const imageBundling = { ...bundling, nodeModules: ['sharp'], forceDockerBundling: true };
+```
+
+plus `sharp` in [`apps/worker/package.json`](../apps/worker/package.json) `dependencies`
+— CDK resolves the version from the package.json nearest the entry, and the root
+`package-lock.json` is already wired in as `depsLockFilePath`.
+
+Consequences, all accepted:
+
+- **`cdk synth` / `deploy` now needs Docker running**, for the whole stack, since the
+  function lives in it. The repo already requires Docker for local infra
+  (`docker compose up -d`) and the deploy workflow runs on `ubuntu-latest`, which has
+  it. Worth a check in `cli infra preflight`, which already gates deploys.
+- **`architecture` is unset, so it is `X86_64`** — not arm64. CDK derives the Docker
+  build platform from it, giving a correct but emulated (slow) build on Apple Silicon.
+  Moving *this* Lambda to `ARM64` would make local builds native and the function ~20%
+  cheaper; a separate call, not required here.
+- **`memorySize` 512 → 1024.** Lambda scales vCPU with memory and WebP encoding is
+  CPU-bound, so the work finishes proportionally faster at roughly flat GB-ms cost. The
+  10-minute timeout is untouched and generous.
+- **Local dev is unaffected** — `npm run dev -w worker` runs under tsx against the host's
+  own sharp binary.
+
+If Docker-at-synth ever becomes unacceptable, the fallback is a **prebuilt Lambda layer**
+from its own CI job: it removes the synth-time Docker requirement and adds an artifact to
+build, version and publish. More moving parts, so not the first choice.
+
+**Existing articles are not touched.** They are `images_status: 'complete'`, so the worker
+skips them and their `.png` keys stay valid. A backfill would also have to rewrite the
+URLs already embedded in `article.content`; out of scope until something needs it.
+
+### Recorded dimensions
+
+sharp hands back the final `width` / `height` for free, so both are stored on the slot:
+
+```ts
+// article.ts — ArticleImageSchema
+width: z.number().nullable(),
+height: z.number().nullable(),
+```
+
+**Nullable, not required.** Repositories `parse` through Zod at the boundary, so every
+article generated before this lands would fail to *load* if the fields were mandatory —
+this is a read-path break, not just a write-path one. They follow `model` / `seed` /
+`generated_at`, already nullable for the same unfilled-slot reason.
+
+They flow into the static-site contract's manifest and frontmatter so an adapter can set
+explicit `width`/`height` on `<img>` and reserve the space before the image loads.
+CLS is a ranking signal, which makes it our problem and not only the client's. Consumers
+that ignore the fields are unaffected, so the contract stays `version: 1`.
 
 ## Placement
 
@@ -113,8 +228,8 @@ Per SQS record:
 1. `ImageTask.parse` → load article; skip if missing or `images_status === 'complete'`.
 2. If `images` is empty: run the image-plan LLM call, validate, persist slots
    (set-if-absent).
-3. For each slot without a `url`: generate → download → S3 → update slot (+ inject
-   markdown for inline).
+3. For each slot without a `url`: generate → download → **re-encode to WebP** → S3 →
+   update slot (+ inject markdown for inline).
 4. All slots done → `images_status: 'complete'`, `featured_image_url` = cover URL.
 5. On error: log, rethrow → SQS redelivery resumes at the first unfinished slot → DLQ
    after 3 receives → `images_status` left `'pending'` (visible for ops; a manual

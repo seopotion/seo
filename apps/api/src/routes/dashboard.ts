@@ -1,13 +1,15 @@
 import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
-import { ArticleRepo, GscConnectionRepo, KeywordRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, GscConnectionRepo, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { domainRatingFromRank } from '@shared/providers';
 import {
   type Article,
+  type Integration,
   isGscConnected,
   META_DESCRIPTION_MAX,
   META_DESCRIPTION_MIN,
   META_TITLE_MAX,
 } from '@shared/schemas';
+import { type CommitFile, commitFiles, GithubError } from '../clients/github';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
 import {
@@ -15,10 +17,18 @@ import {
   submitWordPressArticle,
   testWordPressIntegration,
 } from '../clients/wordpress';
-import { decryptSecret } from '../lib/crypto';
+import { decryptSecret, encryptSecret } from '../lib/crypto';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
+import { recordWordPressPublication } from '../lib/publications';
 import { getGscTokenKey } from '../lib/secrets';
+import {
+  articlePath,
+  manifestPath,
+  type PublishedArticle,
+  renderArticle,
+  renderManifest,
+} from '../lib/static-site';
 import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/dashboard';
@@ -41,6 +51,7 @@ function toArticleListItem(a: Article) {
 
 /** Map an Article entity to the full article record (Date -> ISO string). */
 function toArticleDetail(a: Article) {
+  const staticSite = a.publications.find((p) => p.provider === 'static-site');
   return {
     id: a.id,
     keyword_id: a.keyword_id,
@@ -53,12 +64,65 @@ function toArticleDetail(a: Article) {
     content: a.content,
     status: a.status,
     ...(a.wordpress_post_id ? { wordpress_post_id: a.wordpress_post_id } : {}),
+    static_site_published_at: staticSite ? staticSite.published_at.toISOString() : null,
     images_status: a.images_status,
     created_at: a.created_at.toISOString(),
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,
     published_at: a.published_at ? a.published_at.toISOString() : null,
     video: a.video,
   };
+}
+
+/** Map an Integration entity to a settings-panel row (Date -> ISO string).
+ * `target` is what the panel renders after "Connected to". */
+function toConnectedIntegration(i: Integration) {
+  return {
+    id: i.id,
+    provider: i.provider,
+    target: i.provider === 'wordpress' ? i.site_url : `${i.repo}@${i.branch}`,
+    connected_at: i.connected_at.toISOString(),
+  };
+}
+
+/**
+ * An already-published article as the static-site contract sees it: addressed by
+ * the slug we last committed under, not by `article.slug`, which the editor can
+ * have renamed since. Callers only pass articles `listPublishedTo` returned, so
+ * the entry is always there.
+ */
+function toPublishedArticle(a: Article): PublishedArticle | null {
+  const publication = a.publications.find((p) => p.provider === 'static-site');
+  if (!publication) return null;
+  return {
+    article: a,
+    slug: publication.slug,
+    published_at: publication.published_at,
+    updated_at: publication.updated_at,
+  };
+}
+
+/**
+ * GithubError -> HTTP for the publish route. A lost push race is the caller's to
+ * retry (409); anything else GitHub refused is permanent for this request (422,
+ * e.g. the branch became protected); a failure to reach GitHub is ours (502).
+ */
+function publishFailure(err: unknown): {
+  status: 409 | 422 | 502;
+  body: { error: string; code: string };
+} {
+  if (err instanceof GithubError) {
+    if (err.code === 'ref_conflict') {
+      return {
+        status: 409,
+        body: { error: 'The branch moved while publishing — try again', code: err.code },
+      };
+    }
+    return {
+      status: err.code === 'github_request_failed' ? 502 : 422,
+      body: { error: err.message, code: err.code },
+    };
+  }
+  return { status: 502, body: { error: 'GitHub request failed', code: 'github_request_failed' } };
 }
 
 /**
@@ -302,6 +366,9 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       return c.json({ count }, 200);
     },
   )
+  // The rest of /dashboard/integrations lives here; the GitHub App install flow
+  // and the static-site connect are their own router (routes/integrations.ts),
+  // the same split gsc.ts makes for the Google OAuth dance.
   .openapi(
     createRoute({
       tags: ['dashboard'],
@@ -356,8 +423,15 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ success: false as const, error_code: 'wordpress_request_failed' }, 502);
       }
 
+      // #7: the integrations collection is the new home for the connection;
+      // the org fields below stay as a deprecated plaintext mirror for one
+      // release, because the publish paths and the admin levers still read
+      // them. Encrypt first — an env that cannot encrypt a publishing secret is
+      // misconfigured, and failing here beats silently storing plaintext only.
+      const tokenEnc = encryptSecret(token, await getGscTokenKey());
       const saved = await OrgRepo.saveWordPressConnection(org.id, token, new Date());
       if (!saved) return c.json({ error: 'Not found' }, 404);
+      await IntegrationRepo.connectWordPress(org.id, org.website_url, tokenEnc);
       return c.json({ success: true as const }, 200);
     },
   )
@@ -386,21 +460,55 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       const { userId } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.json({ error: 'Not found' }, 404);
-      if (!org.wordpress_token || !org.wordpress_connected_at) {
-        return c.json({ integrations: [] }, 200);
+      const rows = (await IntegrationRepo.listByOrgId(org.id)).map(toConnectedIntegration);
+      // The admin connect lever writes only the org mirror — the admin Lambda
+      // is granted none of the customer secrets, so it cannot encrypt a token.
+      // Synthesize the row for an operator-made connection until the mirror is
+      // dropped (design/integrations-model.md § Migration).
+      if (
+        !rows.some((r) => r.provider === 'wordpress') &&
+        org.wordpress_token &&
+        org.wordpress_connected_at
+      ) {
+        rows.push({
+          id: 'wordpress',
+          provider: 'wordpress',
+          target: org.website_url,
+          connected_at: org.wordpress_connected_at.toISOString(),
+        });
       }
-      return c.json(
-        {
-          integrations: [
-            {
-              id: 'wordpress',
-              provider: 'wordpress' as const,
-              connected_at: org.wordpress_connected_at.toISOString(),
-            },
-          ],
+      return c.json({ integrations: rows }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'delete',
+      path: '/integrations/{provider}',
+      summary: 'Disconnect a publishing integration',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.IntegrationProviderParams, query: schemas.OrgQuery },
+      responses: {
+        204: { description: 'Disconnected (idempotent — also 204 when not connected)' },
+        404: {
+          content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
+          description: 'Org not found or not owned by the caller',
         },
-        200,
-      );
+      },
+    }),
+    async (c) => {
+      const { provider } = c.req.valid('param');
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.json({ error: 'Not found' }, 404);
+
+      await IntegrationRepo.deleteByOrgAndProvider(org.id, provider);
+      // Clear the deprecated mirror too, else the fallback above would resurrect
+      // a connection the user just removed.
+      if (provider === 'wordpress') await OrgRepo.clearWordPressConnection(org.id);
+      return c.body(null, 204);
     },
   )
   .openapi(
@@ -624,6 +732,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
           if (!persisted) {
             return c.json({ error: 'WordPress post created but its ID could not be saved' }, 500);
           }
+          await recordWordPressPublication(article, result.body.post_id);
           return c.json(result.body, 200);
         }
         if (result.status === 400) return c.json(result.body, 400);
@@ -699,7 +808,10 @@ const dashboard = new OpenAPIHono<AuthEnv>()
           article.wordpress_post_id,
           article,
         );
-        if (result.status === 200) return c.json(result.body, 200);
+        if (result.status === 200) {
+          await recordWordPressPublication(article, article.wordpress_post_id);
+          return c.json(result.body, 200);
+        }
         if (result.status === 400) return c.json(result.body, 400);
         if (result.status === 403) return c.json(result.body, 403);
         if (result.status === 404) return c.json(result.body, 404);
@@ -708,6 +820,145 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       } catch {
         return c.json({ error: 'WordPress request failed' }, 502);
       }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'post',
+      path: '/articles/{id}/publish',
+      summary: 'Publish an article to the connected static site, as one git commit',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.ArticleParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.StaticSitePublishResponse } },
+          description: 'Committed; the client’s build takes it from here',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
+          description: 'Article not found or not owned by the caller',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
+          description: 'Not connected, images incomplete, slug taken, or the branch moved',
+        },
+        422: {
+          content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
+          description: 'GitHub refused the commit',
+        },
+        500: {
+          content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
+          description: 'Committed, but the publish state could not be saved',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
+          description: 'GitHub request failed',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      if (!article || !org) return c.json({ error: 'Article not found' }, 404);
+
+      const integration = await IntegrationRepo.findByOrgAndProvider(org.id, 'static-site');
+      if (integration?.provider !== 'static-site') {
+        return c.json({ error: 'No static site is connected', code: 'not_connected' }, 409);
+      }
+      // Same gate as WordPress, and it matters more here: an article published
+      // mid-generation commits <img> tags pointing at objects that do not exist
+      // yet — the diff looks fine and the page breaks in the browser.
+      if (article.images_status !== 'complete') {
+        return c.json({ error: 'Article images are not complete', code: 'images_incomplete' }, 409);
+      }
+
+      const { content_path } = integration;
+      const live = (await ArticleRepo.listPublishedTo(org.id, 'static-site'))
+        .filter((a) => a.id !== article.id)
+        .map(toPublishedArticle)
+        .filter((e) => e !== null);
+
+      // Every file is addressed by slug and there is no unique index on
+      // `articles.slug`, so without this the second article to claim a slug
+      // silently overwrites the first one's file
+      // (design/static-site-integration.md § Publish semantics).
+      if (live.some((e) => e.slug === article.slug)) {
+        return c.json(
+          {
+            error: `Another article is already published at "${article.slug}"`,
+            code: 'slug_conflict',
+          },
+          409,
+        );
+      }
+
+      // One timestamp for the commit and for the publish state it records, so
+      // rebuilding this manifest from the database reproduces it byte for byte.
+      const now = new Date();
+      const previous = article.publications.find((p) => p.provider === 'static-site');
+      const entry: PublishedArticle = {
+        article,
+        slug: article.slug,
+        published_at: previous?.published_at ?? now,
+        updated_at: previous ? now : null,
+      };
+
+      const files: CommitFile[] = [
+        { path: articlePath(content_path, article.slug), content: renderArticle(entry) },
+        {
+          path: manifestPath(content_path),
+          content: renderManifest([...live, entry], content_path, now),
+        },
+      ];
+      // A slug renamed since the last publish would otherwise leave the old file
+      // behind as a live duplicate-content page. Deleting it rides in this same
+      // commit, so the repo is never briefly serving both.
+      if (previous && previous.slug !== article.slug) {
+        files.push({ path: articlePath(content_path, previous.slug), content: null });
+      }
+
+      let commitSha: string;
+      try {
+        commitSha = await commitFiles({
+          installationId: integration.installation_id,
+          repo: integration.repo,
+          branch: integration.branch,
+          message: `seopotion: ${previous ? 'update' : 'publish'} "${article.title}"`,
+          files,
+        });
+      } catch (err) {
+        const fail = publishFailure(err);
+        if (fail.status === 409) return c.json(fail.body, 409);
+        if (fail.status === 422) return c.json(fail.body, 422);
+        return c.json(fail.body, 502);
+      }
+
+      const persisted = await ArticleRepo.recordPublication(
+        article.id,
+        { provider: 'static-site', ref: commitSha, slug: article.slug },
+        now,
+      );
+      if (!persisted) {
+        // The commit landed. Not recording it drops the article out of the next
+        // manifest rebuild, so say so rather than reporting success.
+        return c.json(
+          { error: 'Committed, but the publish state could not be saved', code: 'record_failed' },
+          500,
+        );
+      }
+
+      return c.json(
+        {
+          commit_sha: commitSha,
+          commit_url: `https://github.com/${integration.repo}/commit/${commitSha}`,
+          path: articlePath(content_path, article.slug),
+        },
+        200,
+      );
     },
   )
   .openapi(

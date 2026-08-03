@@ -80,6 +80,19 @@ export class ApiStack extends Stack {
       { parameterName: cfg.gscTokenKeyParam },
     );
 
+    // GitHub App private key (#7): the PKCS#1 PEM GitHub issues once at
+    // registration, minting per-publish installation tokens. Same out-of-band
+    // SecureString pattern — `file://` so the PEM's newlines survive:
+    //   aws ssm put-parameter --name /seo/<stage>/github-app-key --type SecureString --value file://seopotion.<stage>.private-key.pem
+    // API Lambda only, matching the JWT-secret boundary: the worker never
+    // publishes, so it is never granted a credential that can write to a
+    // customer's repository.
+    const githubAppKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'GithubAppKeyParam',
+      { parameterName: cfg.githubAppKeyParam },
+    );
+
     // LemonSqueezy billing secrets (#13): API key (checkout/portal calls) +
     // webhook signing secret. Same out-of-band SecureString pattern:
     //   aws ssm put-parameter --name /seo/<stage>/lemonsqueezy-api-key --type SecureString --value <ls_api_key>
@@ -117,6 +130,9 @@ export class ApiStack extends Stack {
       LEMONSQUEEZY_STORE_ID: cfg.lemonSqueezyStoreId,
       LEMONSQUEEZY_VARIANT_PAID: cfg.lemonSqueezyVariantPaid,
       LEMONSQUEEZY_VARIANT_EXPERT: cfg.lemonSqueezyVariantExpert,
+      GITHUB_APP_SLUG: cfg.githubAppSlug,
+      GITHUB_APP_CLIENT_ID: cfg.githubAppClientId,
+      GITHUB_APP_KEY_PARAM: cfg.githubAppKeyParam,
     };
 
     // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
@@ -198,6 +214,7 @@ export class ApiStack extends Stack {
     mongoUriParam.grantRead(apiFn);
     lemonSqueezyApiKeyParam.grantRead(apiFn);
     lemonSqueezyWebhookSecretParam.grantRead(apiFn);
+    githubAppKeyParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {

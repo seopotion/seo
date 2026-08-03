@@ -105,6 +105,11 @@ describe('OrgSchema.onboarding', () => {
   });
 
   test('exposes the integration enum values', () => {
-    expect(ONBOARDING_INTEGRATIONS).toEqual(['wordpress', 'wordpress-com', 'framer']);
+    expect(ONBOARDING_INTEGRATIONS).toEqual([
+      'wordpress',
+      'wordpress-com',
+      'framer',
+      'static-site',
+    ]);
   });
 });

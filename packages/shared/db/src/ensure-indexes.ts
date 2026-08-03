@@ -56,6 +56,18 @@ export async function ensureIndexes(): Promise<void> {
   // One GSC connection per org (#12); the unique index makes upsertToken safe
   // under concurrent connect callbacks.
   await db.collection('gsc_connections').createIndex({ org_id: 1 }, { unique: true });
+  // One connection per (org, provider) (#7) — an org is one website, so the
+  // unique index is what makes connectWordPress's upsert safe.
+  await db.collection('integrations').createIndex({ org_id: 1, provider: 1 }, { unique: true });
+  // One GitHub App installation binds to exactly one org
+  // (design/github-app.md § Why `state` is not optional here). Partial so
+  // WordPress rows, which have no installation_id, don't collide on null.
+  await db
+    .collection('integrations')
+    .createIndex(
+      { installation_id: 1 },
+      { unique: true, partialFilterExpression: { provider: 'static-site' } },
+    );
   // Billing (#13). Unique on the provider subscription id makes upsertFromEvent
   // idempotent under at-least-once webhooks; org_id index serves findActiveByOrg.
   await db

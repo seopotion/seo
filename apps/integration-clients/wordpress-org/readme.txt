@@ -59,7 +59,7 @@ Data is sent when:
 - Articles are synced via the SEO Potion API.
 
 External Service:
-- [SEO Potion](https://seopotion.com)
+- [SEO Potion](https://seopotion.co)
 
 == Privacy ==
 

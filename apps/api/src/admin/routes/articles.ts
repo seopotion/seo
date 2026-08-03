@@ -8,6 +8,7 @@ import {
 } from '@shared/schemas';
 import { enqueueImageTask } from '../../clients/sqs';
 import { editWordPressArticle, submitWordPressArticle } from '../../clients/wordpress';
+import { recordWordPressPublication } from '../../lib/publications';
 import { audit } from '../audit';
 import { toAdminArticleDetail, toAdminArticleListItem } from '../dto';
 import type { AdminEnv } from '../middleware';
@@ -247,6 +248,7 @@ const articles = new OpenAPIHono<AdminEnv>()
         if (result.status === 200) {
           const persisted = await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
           if (!persisted) return c.json({ error: 'post_id_not_saved' }, 500);
+          await recordWordPressPublication(article, result.body.post_id);
           await audit(c, {
             action: 'article.wordpress_publish',
             org_id: org.id,
@@ -328,6 +330,7 @@ const articles = new OpenAPIHono<AdminEnv>()
           article,
         );
         if (result.status === 200) {
+          await recordWordPressPublication(article, article.wordpress_post_id);
           await audit(c, {
             action: 'article.wordpress_update',
             org_id: org.id,

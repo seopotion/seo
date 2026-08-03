@@ -65,6 +65,33 @@
     "saving": "Saving...",
     "title": "Connect Google Search Console"
   },
+  "GithubCallback": {
+    "backToSettings": "Back to settings",
+    "branch": "Branch",
+    "branchHint": "The branch your host builds from. Committing anywhere else publishes nothing.",
+    "confirm": "Connect this repository",
+    "contentPath": "Content folder",
+    "contentPathHint": "Where articles are committed, relative to the repository root. Your site reads them from here.",
+    "defaultBranch": "Default branch: {branch}",
+    "errors": {
+      "cancelled": "The GitHub installation was cancelled or did not complete.",
+      "claimed": "That GitHub installation is already connected to another workspace.",
+      "connectFailed": "We couldn't save this connection. Please try again.",
+      "expired": "This setup link has expired. Start again from Settings.",
+      "installationGone": "We can no longer reach that GitHub installation. Install the app again from Settings.",
+      "noAccess": "We can't reach that repository or branch. Check the branch name, and that the repository is still selected in the GitHub app.",
+      "noWriteAccess": "The GitHub app has no write access to that repository. Install it again and allow write access to repository contents.",
+      "redeemFailed": "We couldn't finish the GitHub installation. Please try again from Settings."
+    },
+    "noRepos": "This installation has no repository we can write to. Add one from the GitHub app's settings, then start again.",
+    "pendingApproval": "Your organization's owner has to approve the installation. GitHub will bring you back here once they do.",
+    "pickBody": "We commit Markdown files and a manifest; your existing build and deploy do the rest.",
+    "pickTitle": "Choose the repository to publish into",
+    "private": "Private",
+    "redeeming": "Finishing the GitHub installation...",
+    "saving": "Connecting...",
+    "title": "Connect your site's repository"
+  },
   "HomePage": {
     "articles": {
       "cta": "Visit content planner / Add keywords",
@@ -399,23 +426,29 @@
     "actions": {
       "openArticle": "Open {title}"
     },
+    "articleStatuses": {
+      "deleted": "Deleted",
+      "generated": "Generated",
+      "published": "Published"
+    },
     "articlesCount": "{count, plural, one {# article} other {# articles}}",
     "columns": {
       "articleName": "Article name",
       "difficulty": "Difficulty",
       "keyword": "Keyword",
-      "publishDate": "Publish date",
+      "publishDate": "Date",
+      "status": "Status",
       "volume": "Volume"
     },
-    "description": "Review published articles, their target keywords, and publication dates.",
+    "description": "Review your articles, their target keywords, and publication status.",
     "empty": {
-      "description": "Published articles will appear here once content is published.",
-      "title": "No published articles yet"
+      "description": "Articles will appear here once your content plan starts generating them.",
+      "title": "No articles yet"
     },
-    "listLabel": "Published articles list",
+    "listLabel": "Articles list",
     "pagination": {
       "emptyPage": "No pages",
-      "emptyRange": "No published articles yet",
+      "emptyRange": "No articles yet",
       "label": "Content history pagination",
       "next": "Next",
       "page": "Page {page} of {totalPages}",
@@ -429,15 +462,19 @@
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again."
     },
-    "tableLabel": "Published articles table",
+    "tableLabel": "Articles table",
     "title": "Content history"
   },
   "ArticleDetailPage": {
     "actions": {
       "back": "Back to content history",
+      "publishSite": "Publish to site",
       "publishWordPress": "Send to WordPress",
+      "publishingSite": "Publishing to site...",
       "publishingWordPress": "Sending to WordPress...",
+      "updateSite": "Update site",
       "updateWordPress": "Update WordPress",
+      "updatingSite": "Updating site...",
       "updatingWordPress": "Updating WordPress..."
     },
     "labels": {
@@ -446,6 +483,20 @@
       "notPublished": "Not published",
       "publishedAt": "Published",
       "slug": "Slug"
+    },
+    "site": {
+      "errors": {
+        "branchMoved": "The branch moved while we were publishing. Try again.",
+        "commitRejected": "GitHub refused the commit. Check that the branch is not protected.",
+        "failed": "GitHub could not be reached. Try again.",
+        "imagesIncomplete": "This article's images are not ready yet. Try again once they finish.",
+        "notConnected": "No repository is connected. Connect one in Settings.",
+        "recordFailed": "The commit landed, but we could not save the publish state. Refresh before publishing again.",
+        "slugConflict": "Another article is already published at this slug. Change the slug in the editor, then publish again."
+      },
+      "published": "Committed to your repository. Your site rebuilds on its own.",
+      "publishedBadge": "On your site · {date}",
+      "viewCommit": "View the commit"
     },
     "status": {
       "loadError": "Could not load this article. Try again when the API is available.",
@@ -545,6 +596,22 @@
     },
     "placeholders": {
       "competitorUrl": "https://competitor.com"
+    },
+    "staticSite": {
+      "changeRepository": "Change repository",
+      "connect": "Connect repository",
+      "connectedSuccess": "Your repository is connected. Publish an article to commit it.",
+      "connecting": "Opening GitHub...",
+      "description": "Publish articles as Markdown committed to your repository — Astro, Next.js, Nuxt, Hugo, Vue and friends.",
+      "disconnect": "Disconnect",
+      "disconnectCancel": "Cancel",
+      "disconnectConfirmYes": "Yes, disconnect",
+      "disconnectError": "Could not disconnect. Please try again.",
+      "errors": {
+        "installFailed": "We couldn't start the GitHub installation. Please try again.",
+        "notConfigured": "Publishing to a repository is not available yet. Please try again later."
+      },
+      "provider": "Static site (GitHub)"
     },
     "status": {
       "loadError": "Could not load settings. Try again when the API is available.",
