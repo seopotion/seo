@@ -110,6 +110,47 @@ describe('ArticleRepo (integration)', () => {
     expect((await ArticleRepo.findById(created.id))!.publications).toHaveLength(2);
   });
 
+  test('recordPublication advances status to published and stamps published_at', async () => {
+    const created = await ArticleRepo.create(base({ org_id: 'org_status', slug: 'goes-live' }));
+    expect(created.status).toBe('generated');
+    expect(created.published_at).toBeNull();
+
+    const at = new Date('2026-08-01T10:00:00.000Z');
+    await ArticleRepo.recordPublication(
+      created.id,
+      { provider: 'static-site', ref: 'sha1', slug: 'goes-live' },
+      at,
+    );
+
+    // Nothing used to write this, which left Content History, the published
+    // counter, the GSC title join and the admin count permanently empty.
+    const live = (await ArticleRepo.findById(created.id))!;
+    expect(live.status).toBe('published');
+    expect(live.published_at).toEqual(at);
+
+    // A republish must not move published_at — it means "first went live".
+    const later = new Date('2026-08-02T10:00:00.000Z');
+    await ArticleRepo.recordPublication(
+      created.id,
+      { provider: 'static-site', ref: 'sha2', slug: 'goes-live' },
+      later,
+    );
+    const republished = (await ArticleRepo.findById(created.id))!;
+    expect(republished.status).toBe('published');
+    expect(republished.published_at).toEqual(at);
+
+    // Nor does a SECOND provider going live later reset it.
+    await ArticleRepo.recordPublication(
+      created.id,
+      { provider: 'wordpress', ref: '99', slug: 'goes-live' },
+      later,
+    );
+    expect((await ArticleRepo.findById(created.id))!.published_at).toEqual(at);
+
+    // The flag is what the list surfaces read.
+    expect(await ArticleRepo.countByStatus('org_status', 'published')).toBe(1);
+  });
+
   test('recordPublication reports false for unknown/invalid ids', async () => {
     const entry = { provider: 'wordpress' as const, ref: '1', slug: 's' };
     expect(await ArticleRepo.recordPublication('ffffffffffffffffffffffff', entry)).toBe(false);

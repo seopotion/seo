@@ -80,6 +80,13 @@ export const ArticleRepo = {
    * already wrote into the committed `manifest.json`, so the next rebuild of
    * that file from the database is byte-identical instead of producing a
    * millisecond-wide diff on an untouched article.
+   *
+   * This is also the ONLY place `article.status` advances to `'published'`.
+   * It has to be here rather than in each publish route because every provider
+   * funnels through it, and until it was added `'published'` was a value the
+   * codebase read in four places but never wrote — Content History, the
+   * published counter, the GSC top-pages title join and the admin org detail
+   * were all permanently empty for every customer.
    */
   async recordPublication(
     id: string,
@@ -96,17 +103,29 @@ export const ArticleRepo = {
           'publications.$.ref': entry.ref,
           'publications.$.slug': entry.slug,
           'publications.$.updated_at': at,
+          status: 'published',
         },
       },
     );
-    if (updated.matchedCount > 0) return true;
-    // The cast is the driver's `PushOperator<Document>` wrinkle: on an untyped
-    // collection every field resolves to `undefined`, so no $push value is
-    // assignable. Nothing here is dynamic — the shape is ArticlePublication.
-    const pushed = await col.updateOne({ _id }, {
-      $push: { publications: { ...entry, published_at: at, updated_at: null } },
-    } as unknown as UpdateFilter<Document>);
-    return pushed.matchedCount > 0;
+    let matched = updated.matchedCount > 0;
+    if (!matched) {
+      // The cast is the driver's `PushOperator<Document>` wrinkle: on an untyped
+      // collection every field resolves to `undefined`, so no $push value is
+      // assignable. Nothing here is dynamic — the shape is ArticlePublication.
+      const pushed = await col.updateOne({ _id }, {
+        $set: { status: 'published' },
+        $push: { publications: { ...entry, published_at: at, updated_at: null } },
+      } as unknown as UpdateFilter<Document>);
+      matched = pushed.matchedCount > 0;
+    }
+    if (!matched) return false;
+    // `article.published_at` means "first went live with ANY provider", so it is
+    // stamped once and never moved by a republish or by a second provider going
+    // live later. A separate write because that rule can't be expressed in the
+    // same update as the $set above; `{published_at: null}` also matches the
+    // pre-#7 documents where the field is absent entirely.
+    await col.updateOne({ _id, published_at: null }, { $set: { published_at: at } });
+    return true;
   },
 
   async setWordPressPostId(id: string, postId: number): Promise<boolean> {

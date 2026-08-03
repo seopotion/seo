@@ -8,6 +8,7 @@ export interface MigrationReport {
   date_dupes_resolved: number;
   keyword_dupes_removed: number;
   publications_backfilled: number;
+  status_backfilled: number;
 }
 
 /**
@@ -140,12 +141,46 @@ export async function runMigrations(): Promise<MigrationReport> {
     publicationsBackfilled++;
   }
 
+  // Backfill `status`/`published_at` for articles that went live BEFORE
+  // recordPublication started advancing the status. Until then nothing ever
+  // wrote `'published'`, so these rows are live with a provider yet still read
+  // as `'generated'` — which is what kept Content History, the published
+  // counter, the GSC title join and the admin count empty. Runs after the
+  // publications backfill above on purpose, so WordPress rows seeded from
+  // `wordpress_post_id` in the same pass are picked up here too.
+  //
+  // `published_at` takes the earliest publication rather than `now`: these
+  // articles went live in the past, and stamping today would misdate history.
+  // Anything already carrying a `published_at` keeps it. `$ne: 'deleted'` so a
+  // future unpublish is never silently resurrected.
+  let statusBackfilled = 0;
+  for await (const doc of articles.find({
+    status: { $nin: ['published', 'deleted'] },
+    publications: { $elemMatch: { provider: { $exists: true } } },
+  })) {
+    const pubs = doc.publications as { published_at: Date }[];
+    const earliest = pubs
+      .map((p) => p.published_at)
+      .reduce((a, b) => (a && b && a <= b ? a : (b ?? a)));
+    await articles.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          status: 'published',
+          published_at: (doc.published_at as Date | null) ?? earliest ?? (doc.created_at as Date),
+        },
+      },
+    );
+    statusBackfilled++;
+  }
+
   return {
     audience_target_migrated: audienceRes.modifiedCount,
     normalized_backfilled: normalizedBackfilled,
     date_dupes_resolved: dateDupesResolved,
     keyword_dupes_removed: keywordDupesRemoved,
     publications_backfilled: publicationsBackfilled,
+    status_backfilled: statusBackfilled,
   };
 }
 

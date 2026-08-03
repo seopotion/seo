@@ -426,23 +426,29 @@
     "actions": {
       "openArticle": "{title} makalesini aç"
     },
+    "articleStatuses": {
+      "deleted": "Silindi",
+      "generated": "Oluşturuldu",
+      "published": "Yayınlandı"
+    },
     "articlesCount": "{count} makale",
     "columns": {
       "articleName": "Makale adı",
       "difficulty": "Zorluk",
       "keyword": "Anahtar kelime",
-      "publishDate": "Yayın tarihi",
+      "publishDate": "Tarih",
+      "status": "Durum",
       "volume": "Hacim"
     },
-    "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
+    "description": "Makalelerinizi, hedef anahtar kelimelerini ve yayın durumlarını inceleyin.",
     "empty": {
-      "description": "İçerik yayınlandığında yayınlanan makaleler burada görünecek.",
-      "title": "Henüz yayınlanan makale yok"
+      "description": "İçerik planınız makale oluşturmaya başladığında makaleler burada görünecek.",
+      "title": "Henüz makale yok"
     },
-    "listLabel": "Yayınlanan makaleler listesi",
+    "listLabel": "Makaleler listesi",
     "pagination": {
       "emptyPage": "Sayfa yok",
-      "emptyRange": "Henüz yayınlanan makale yok",
+      "emptyRange": "Henüz makale yok",
       "label": "İçerik geçmişi sayfalaması",
       "next": "Sonraki",
       "page": "Sayfa {page} / {totalPages}",
@@ -456,7 +462,7 @@
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
     },
-    "tableLabel": "Yayınlanan makaleler tablosu",
+    "tableLabel": "Makaleler tablosu",
     "title": "İçerik geçmişi"
   },
   "ArticleDetailPage": {

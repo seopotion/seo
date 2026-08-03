@@ -116,9 +116,32 @@ describe('runMigrations publications backfill (#7, integration)', () => {
     expect((await bySlug('unpublished'))?.publications).toBeUndefined();
   });
 
+  test('backfills status/published_at for rows that are live but read as generated', async () => {
+    // Runs after the publications backfill above, so rows seeded from
+    // wordpress_post_id in the same pass are picked up here too. Until
+    // recordPublication started advancing the flag, nothing ever wrote
+    // 'published' — these rows are live yet still filtered out of every list.
+    const db = await getDb();
+    const bySlug = async (slug: string) => db.collection('articles').findOne({ org_id: ORG, slug });
+
+    expect((await bySlug('published-legacy'))?.status).toBe('published');
+    // An existing published_at wins; history is not re-dated to today.
+    expect((await bySlug('published-legacy'))?.published_at).toEqual(
+      new Date('2026-05-01T00:00:00.000Z'),
+    );
+    // Missing published_at falls back to the earliest publication, not `now`.
+    expect((await bySlug('no-published-at'))?.status).toBe('published');
+    expect((await bySlug('no-published-at'))?.published_at).toEqual(
+      new Date('2026-04-02T00:00:00.000Z'),
+    );
+    // Never published: untouched, so it does not appear as live.
+    expect((await bySlug('unpublished'))?.status).toBeUndefined();
+  });
+
   test('is idempotent: a second run adds nothing', async () => {
     const before = await runMigrations();
     expect(before.publications_backfilled).toBe(0);
+    expect(before.status_backfilled).toBe(0);
 
     const db = await getDb();
     const doc = await db.collection('articles').findOne({ org_id: ORG, slug: 'published-legacy' });
