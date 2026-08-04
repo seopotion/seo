@@ -164,20 +164,22 @@ the preset is the model's choice and can exceed the 1200px cap. `slotKey`'s exte
 worker survives as a small map — it is what keeps the stored key honest (`.png` stays
 `.png`) rather than mislabelling the bytes if the provider ever answers with a format we
 did not ask for. Each store logs `bytes` + `content_type` + dimensions, because fal picks
-the quality: the byte budget (cover ~80 KB, cap 150 KB; inline ~60 KB, cap 100 KB) is the
-acceptance criterion, so it has to stay measurable in production.
+the quality: the byte budget (**cap 250 KB cover, 200 KB inline** — `SLOT_BYTE_CAP`,
+raised from 150/100 KB on the measurement below) is the acceptance criterion, so it has to
+stay measurable in production. Over-cap logs at `warn` and stores anyway: a heavy cover is
+worse than no cover, and there is no second attempt to make — fal has no quality knob.
 
 ### Measured, 2026-08-04 — the byte caps do not hold for photographic styles
 
 Six real generations against `fal-ai/flux-2` at the exact parameters the worker sends:
 
-| Prompt style | Slot | Requested | Returned | Stored | Cap | |
+| Prompt style | Slot | Requested | Returned | Stored | vs. old cap | vs. cap now |
 | --- | --- | --- | --- | --- | --- | --- |
-| flat illustration | cover | 1200×630 | 1216×640 | **63 KB** | 150 KB | pass |
-| detailed photo (open-plan office) | cover | 1200×630 | 1216×640 | **240 KB** | 150 KB | **1.6× over** |
-| worst case (forest canopy) | cover | 1200×630 | 1216×640 | **555 KB** | 150 KB | **3.7× over** |
-| flat illustration | inline | 1200×675 | 1216×704 | **46 KB** | 100 KB | pass |
-| detailed photo (workshop bench) | inline | 1200×675 | 1216×704 | **180 KB** | 100 KB | **1.8× over** |
+| flat illustration | cover | 1200×630 | 1216×640 | **63 KB** | pass (150) | pass (250) |
+| detailed photo (open-plan office) | cover | 1200×630 | 1216×640 | **240 KB** | 1.6× over | pass |
+| worst case (forest canopy) | cover | 1200×630 | 1216×640 | **555 KB** | 3.7× over | **2.2× over** |
+| flat illustration | inline | 1200×675 | 1216×704 | **46 KB** | pass (100) | pass (200) |
+| detailed photo (workshop bench) | inline | 1200×675 | 1216×704 | **180 KB** | 1.8× over | pass |
 | worst case, as PNG | cover | 1200×630 | 1216×640 | 2052 KB | — | the baseline |
 
 Two findings.
@@ -196,15 +198,19 @@ provider-side knob and no retry-at-lower-quality. And `image_style` is
 photography-led client gets photographic covers and there is nothing today that steers
 them. Illustration lands ~2.4× under budget; a plausible business photo is 1.6× over.
 
-Options, none taken here — this needs a product call:
+**Decided 2026-08-04: raise the caps to 250 KB cover / 200 KB inline** (`SLOT_BYTE_CAP`).
+That is what the provider actually gives us for ordinary photographic subjects, still ~8×
+better than PNG, and it keeps the no-encoder architecture. The two alternatives were
+constraining `image_style` toward illustration (keeps the tighter budget but changes
+generated art direction for every client) and encoding locally with `sharp` (the only
+deterministic option, at the packaging cost documented below).
 
-1. **Raise the caps** to ~250 KB cover / ~200 KB inline. Still 8× better than PNG, and
-   honest about what the provider gives us. Cheapest.
-2. **Constrain `image_style`** toward illustration in the scanner prompt or as a preset
-   enum. Keeps the current budget and the no-encoder architecture; changes generated art
-   direction for every client, so it is a product decision, not a technical one.
-3. **Encode locally after all** — the only option that enforces a cap deterministically,
-   at the `sharp` packaging cost documented immediately below.
+**What the raised cap does not cover.** The 555 KB worst case is still 2.2× over. Nothing
+enforces the cap — fal has no quality knob, so there is no second attempt to make — so
+over-cap logs `warn 'image stored over byte cap'` with `bytes` and `cap`, and stores
+anyway. That log is the trigger to revisit: if it fires often in production, the tail is
+real for actual client prompts and option 2 or 3 comes back on the table. If it stays
+quiet, the pathological case was pathological.
 
 **No `sharp`, no Lambda packaging change.** The rejected local-encode path needed
 `nodeModules: ['sharp']` + `forceDockerBundling` on a second bundling object (the shared

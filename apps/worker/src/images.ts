@@ -27,6 +27,15 @@ const SLOT_SIZE = {
 } as const;
 
 /**
+ * Byte budget per slot (#178), raised from 150/100KB once real generations showed
+ * fal's WebP only lands there for illustration styles — photographic subjects run
+ * 1.6-3.7x higher and fal exposes no quality knob to turn down. Over-cap is warned,
+ * never fatal: a heavy cover is worse than no cover, and this is the only signal
+ * that would show the measured tail (~555KB) actually happening in production.
+ */
+const SLOT_BYTE_CAP = { cover: 250 * 1024, inline: 200 * 1024 } as const;
+
+/**
  * Stored content-type -> key extension. fal is asked for WebP (`outputFormat`
  * below), so 'webp' is the expected path; the map keeps the key honest rather
  * than mislabelling the bytes if the provider ever answers with something else.
@@ -173,13 +182,17 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         const url = stored ?? src;
         // The byte budget is the acceptance criterion and fal picks the quality —
         // so log what we actually stored, per slot, to keep it measurable in prod.
-        logger.info('image stored', {
+        const overCap = bytes.byteLength > SLOT_BYTE_CAP[slot.role];
+        const stats = {
           role: slot.role,
           content_type: contentType,
           bytes: bytes.byteLength,
+          cap: SLOT_BYTE_CAP[slot.role],
           width: generated.width,
           height: generated.height,
-        });
+        };
+        if (overCap) logger.warn('image stored over byte cap', stats);
+        else logger.info('image stored', stats);
 
         const newContent =
           slot.role === 'inline' && slot.section_heading

@@ -55,6 +55,7 @@ vi.mock('../src/storage', () => ({ storeImage }));
 
 import type { ArticleImage } from '@shared/schemas';
 import { handler } from '../src/images';
+import { logger } from '../src/logger';
 
 function event(body: unknown): SQSEvent {
   return {
@@ -154,8 +155,11 @@ const filledSlots = (ext = 'webp'): ArticleImage[] =>
     height: 624,
   }));
 
+let warnSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
   // mockReset, not just clearAllMocks: these tests queue `...Once` values, and
   // an unconsumed one would otherwise leak into the next test.
   findArticleById.mockReset();
@@ -175,7 +179,10 @@ beforeEach(() => {
     ),
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  warnSpy.mockRestore();
+});
 
 describe('images worker', () => {
   test('plans, generates all slots, injects inline markdown, completes', async () => {
@@ -253,6 +260,47 @@ describe('images worker', () => {
     expect(storeImage.mock.calls[0]![0]).toBe('articles/a1/cover');
     expect(storeImage.mock.calls[0]![2]).toBe('image/png');
     expect(storeImage.mock.calls[0]![3]).toBe('png');
+  });
+
+  describe('byte cap (#178)', () => {
+    const bigFetch = (bytes: number) =>
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array(bytes), {
+            status: 200,
+            headers: { 'content-type': 'image/webp' },
+          }),
+      );
+
+    test('warns, but still stores, when a slot exceeds its cap', async () => {
+      findArticleById
+        .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+        .mockResolvedValueOnce({ ...article, images: filledSlots() });
+      vi.stubGlobal('fetch', bigFetch(260 * 1024)); // over the 250KB cover cap
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'image stored over byte cap',
+        expect.objectContaining({ role: 'cover', bytes: 260 * 1024, cap: 250 * 1024 }),
+      );
+      // A heavy cover is worse than no cover: over-cap never blocks the pipeline.
+      expect(completeImages).toHaveBeenCalled();
+    });
+
+    test('stays quiet under the cap, and the caps differ by role', async () => {
+      findArticleById
+        .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+        .mockResolvedValueOnce({ ...article, images: filledSlots() });
+      vi.stubGlobal('fetch', bigFetch(210 * 1024)); // under cover's 250KB, over inline's 200KB
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      const roles = (warnSpy.mock.calls as [string, { role: string }][])
+        .filter(([message]) => message === 'image stored over byte cap')
+        .map(([, stats]) => stats.role);
+      expect(roles).toEqual(['inline', 'inline']);
+    });
   });
 
   describe('generated dimensions', () => {
