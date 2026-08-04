@@ -546,7 +546,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       // (or null) when the provider is down — the badge degrades, never errors.
       try {
         const domain = new URL(org.website_url).hostname.replace(/^www\./, '');
-        const { rank } = await getDataForSeoClient().backlinksSummary(domain);
+        const df = await getDataForSeoClient();
+        const { rank } = await df.backlinksSummary(domain);
         const rating = domainRatingFromRank(rank);
         if (rating === null) return c.json({ rating: current?.value ?? null }, 200);
         await OrgRepo.updateDomainRating(org_id, rating);
