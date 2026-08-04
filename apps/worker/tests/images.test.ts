@@ -25,18 +25,30 @@ vi.mock('@shared/db', () => ({
 
 const { llmComplete, imageGenerate } = vi.hoisted(() => ({
   llmComplete: vi.fn(),
-  imageGenerate: vi.fn(async (_params: unknown) => ({
-    images: [{ url: 'https://fal.media/img.webp', width: 1200, height: 624 }],
-    seed: 7,
-  })),
+  // Typed as the provider contract (nullable dimensions), not as the happy-path
+  // literal, so tests can hand back the bad shapes fal is allowed to return.
+  imageGenerate: vi.fn(
+    async (
+      _params: unknown,
+    ): Promise<{
+      images: { url: string; width: number | null; height: number | null }[];
+      seed: number | null;
+    }> => ({
+      images: [{ url: 'https://fal.media/img.webp', width: 1200, height: 624 }],
+      seed: 7,
+    }),
+  ),
 }));
 vi.mock('../src/providers', () => ({
   getImageClients: () => ({ llm: { complete: llmComplete }, image: { generate: imageGenerate } }),
 }));
 
 const { storeImage } = vi.hoisted(() => ({
+  // Content-addressing lives in src/storage.ts and is tested there; here the key
+  // base + extension are what the worker is responsible for.
   storeImage: vi.fn(
-    async (key: string, _bytes: Uint8Array, _contentType: string) => `https://cdn.example/${key}`,
+    async (keyBase: string, _bytes: Uint8Array, _contentType: string, ext: string) =>
+      `https://cdn.example/${keyBase}.${ext}`,
   ),
 }));
 vi.mock('../src/storage', () => ({ storeImage }));
@@ -125,16 +137,33 @@ const slot = (over: Partial<ArticleImage>): ArticleImage => ({
   height: null,
   ...over,
 });
-// Factory, not a shared const: the handler mutates slot.url, which would
-// otherwise leak between tests.
+// Factory, not a shared const, so slot objects never leak between tests.
 const plannedSlots = (): ArticleImage[] => [
   slot({ role: 'cover', prompt: 'cover scene', alt: 'cover alt' }),
   slot({ prompt: 'p1', alt: 'alt one', section_heading: 'First Section' }),
   slot({ prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' }),
 ];
 
+/** What the article looks like once the fills have landed — the worker reloads
+ * before completing, so tests have to model the write, not just the read. */
+const filledSlots = (ext = 'webp'): ArticleImage[] =>
+  plannedSlots().map((s, i) => ({
+    ...s,
+    url: `https://cdn.example/articles/a1/${i === 0 ? 'cover' : `inline-${i}`}.${ext}`,
+    width: 1200,
+    height: 624,
+  }));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // mockReset, not just clearAllMocks: these tests queue `...Once` values, and
+  // an unconsumed one would otherwise leak into the next test.
+  findArticleById.mockReset();
+  fillImageSlot.mockReset().mockResolvedValue(true);
+  imageGenerate.mockReset().mockResolvedValue({
+    images: [{ url: 'https://fal.media/img.webp', width: 1200, height: 624 }],
+    seed: 7,
+  });
   vi.stubGlobal(
     'fetch',
     vi.fn(
@@ -152,7 +181,8 @@ describe('images worker', () => {
   test('plans, generates all slots, injects inline markdown, completes', async () => {
     findArticleById
       .mockResolvedValueOnce({ ...article, images: [] }) // initial load: no plan yet
-      .mockResolvedValueOnce({ ...article, images: plannedSlots() }); // reload after plan
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() }) // reload after plan
+      .mockResolvedValueOnce({ ...article, images: filledSlots() }); // reload before complete
     findOrgById.mockResolvedValue(org);
     llmComplete.mockResolvedValue({
       text: planJson,
@@ -180,13 +210,14 @@ describe('images worker', () => {
       outputFormat: 'webp',
     });
 
-    // deterministic keys, WebP bytes
+    // per-slot key bases + WebP bytes; storage appends the content digest
     expect(storeImage.mock.calls.map((c) => c[0])).toEqual([
-      'articles/a1/cover.webp',
-      'articles/a1/inline-1.webp',
-      'articles/a1/inline-2.webp',
+      'articles/a1/cover',
+      'articles/a1/inline-1',
+      'articles/a1/inline-2',
     ]);
     expect(storeImage.mock.calls[0]![2]).toBe('image/webp');
+    expect(storeImage.mock.calls[0]![3]).toBe('webp');
 
     // inline fills carry injected markdown; cover leaves content alone
     expect(fillImageSlot).toHaveBeenCalledTimes(3);
@@ -203,7 +234,9 @@ describe('images worker', () => {
   });
 
   test('keeps the key extension honest if the provider ignores the WebP request', async () => {
-    findArticleById.mockResolvedValue({ ...article, images: plannedSlots() });
+    findArticleById
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+      .mockResolvedValueOnce({ ...article, images: filledSlots('png') });
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -217,8 +250,87 @@ describe('images worker', () => {
 
     await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
 
-    expect(storeImage.mock.calls[0]![0]).toBe('articles/a1/cover.png');
+    expect(storeImage.mock.calls[0]![0]).toBe('articles/a1/cover');
     expect(storeImage.mock.calls[0]![2]).toBe('image/png');
+    expect(storeImage.mock.calls[0]![3]).toBe('png');
+  });
+
+  describe('generated dimensions', () => {
+    // Published as `<img width height>` (#176), so a wrong value reserves the
+    // wrong box on a client's page — worse than shipping none at all.
+    test.each([
+      ['a null width', { width: null, height: 630 }],
+      ['a null height', { width: 1200, height: null }],
+      ['a zero width', { width: 0, height: 630 }],
+      ['a negative height', { width: 1200, height: -630 }],
+      ['a fractional width', { width: 1200.5, height: 630 }],
+    ])('rejects %s without storing or persisting anything', async (_label, dims) => {
+      findArticleById.mockResolvedValue({ ...article, images: plannedSlots() });
+      // Once, not a persistent implementation: clearAllMocks does not undo those.
+      imageGenerate.mockResolvedValueOnce({
+        images: [{ url: 'https://fal.media/img.webp', ...dims }],
+        seed: 7,
+      });
+
+      await expect(
+        handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {}),
+      ).rejects.toThrow(/invalid (width|height)/);
+
+      expect(storeImage).not.toHaveBeenCalled();
+      expect(fillImageSlot).not.toHaveBeenCalled();
+      expect(completeImages).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('losing a fill race to a concurrent delivery', () => {
+    const WINNER_COVER = 'https://cdn.example/articles/a1/cover-beefbeefbeefbeef.webp';
+
+    test('adopts the persisted slot and content instead of its own image', async () => {
+      const won = plannedSlots();
+      won[0] = { ...won[0]!, url: WINNER_COVER, width: 1200, height: 630 };
+      const complete = filledSlots().map((s, i) => (i === 0 ? { ...s, url: WINNER_COVER } : s));
+      // Still has the H2s, so the next inline injection has somewhere to land.
+      const winnerContent = content.replace('intro', 'WINNER INTRO');
+      findArticleById
+        .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+        .mockResolvedValueOnce({ ...article, images: won, content: winnerContent })
+        .mockResolvedValueOnce({ ...article, images: complete });
+      fillImageSlot.mockResolvedValueOnce(false); // cover: another delivery got there first
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      // The loser's own cover URL is never published...
+      expect(completeImages).toHaveBeenCalledWith('a1', WINNER_COVER);
+      // ...and the next inline injection builds on the winner's content, not
+      // on a local copy that never reached the database.
+      expect(fillImageSlot.mock.calls[1]![3]).toContain('WINNER INTRO');
+    });
+
+    test('throws if the slot is still unfilled after losing', async () => {
+      findArticleById
+        .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+        .mockResolvedValueOnce({ ...article, images: plannedSlots() }); // still empty
+      fillImageSlot.mockResolvedValueOnce(false);
+
+      await expect(
+        handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {}),
+      ).rejects.toThrow(/unfilled after losing the fill race/);
+      expect(completeImages).not.toHaveBeenCalled();
+    });
+  });
+
+  test('completes from the reloaded cover, not the local generated one', async () => {
+    const persistedCover = 'https://cdn.example/articles/a1/cover-0123456789abcdef.webp';
+    findArticleById
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+      .mockResolvedValueOnce({
+        ...article,
+        images: filledSlots().map((s, i) => (i === 0 ? { ...s, url: persistedCover } : s)),
+      });
+
+    await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+    expect(completeImages).toHaveBeenCalledWith('a1', persistedCover);
   });
 
   test('skips when images are already complete', async () => {

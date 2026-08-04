@@ -29,8 +29,8 @@ is separate.
   SSM, queues, Lambdas). A shared bucket would need cross-stack wiring and would mix
   staging and prod assets in one namespace.
 - **CloudFront + OAC, not public-read:** the bucket needs no public access policy;
-  images get edge caching. Objects are immutable at a given key (retries overwrite
-  *before* the URL is stored), so long TTLs need no invalidation story.
+  images get edge caching. Objects are immutable at a given key (the key carries a
+  digest of its own bytes), so long TTLs need no invalidation story.
 - **Embedded image state:** an article's images are small, bounded (3), and never
   queried independently — a separate collection would add a repo and indexes with no
   query need.
@@ -94,11 +94,14 @@ For each slot without a `url`:
    natively): **1200×630** cover, **1200×675** inline.
 2. Fetch the returned image bytes from the fal URL — already WebP, so nothing is
    re-encoded and no PNG is ever downloaded or stored.
-3. Upload to the stage bucket at a **deterministic key**:
-   `articles/{article_id}/{cover|inline-1|inline-2}.webp`, with a one-year immutable
-   `Cache-Control`. Deterministic keys make retries overwrite-idempotent — no orphaned
-   or duplicate assets.
-4. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
+3. Reject the image unless fal reported a positive integer `width` **and** `height`.
+   They are published as `<img width height>` (#176), so a wrong value reserves the
+   wrong box on the client's page — worse than shipping none. Throwing here means
+   nothing is uploaded or persisted and SQS redelivers.
+4. Upload to the stage bucket at a **content-addressed key**:
+   `articles/{article_id}/{cover|inline-N}-{sha256(bytes)}.webp`, with a one-year
+   immutable `Cache-Control` — see [Object keys](#object-keys-content-addressed).
+5. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
    `generated_at`, and the `width` / `height` fal reported.
 
 > **Decide before prod — and this got sharper on 2026-07-30.** Stored URLs bake in the
@@ -182,10 +185,39 @@ and already committed to client repos; out of scope until something needs it.
 
 ### Cache headers
 
-`storeImage` sets `CacheControl: 'public, max-age=31536000, immutable'`. Keys are
-deterministic per slot and a regenerate overwrites the same key with the same subject, so
-a year is safe — and these URLs are committed verbatim into client repos, so a repeat
-visitor should never revalidate. Without it CloudFront falls back to its default TTL.
+`storeImage` sets `CacheControl: 'public, max-age=31536000, immutable'`. These URLs are
+committed verbatim into client repos, so a repeat visitor should never revalidate;
+without it CloudFront falls back to its default TTL.
+
+### Object keys: content-addressed
+
+The key is `articles/{article_id}/{cover|inline-N}-{sha256(bytes)}.webp`, digested from
+the exact bytes uploaded. **A slot key alone is not safe to serve `immutable`.** The S3
+put happens *before* the guarded `fillImageSlot`, so two concurrent deliveries for one
+slot both write, last-put-wins, and the delivery that wins the database guard can end up
+describing bytes the loser overwrote — persisting `width`/`height` that do not match the
+object, cached for a year on someone else's page. Content-addressing gives each distinct
+image its own object, so a URL's bytes can never change under it.
+
+This also *strengthens* the permanence guarantee [#177](https://github.com/seopotion/seo/issues/177)
+was closed on: an object is never overwritten or moved, so a URL already committed to a
+client repo cannot be invalidated by a later regenerate.
+
+**The tradeoff, accepted:** the original deterministic-key design (#51) claimed "retries
+overwrite — no orphaned or duplicate assets", and that is now inverted. Generation is
+non-deterministic (no fixed seed), so a retry that regenerates after a successful put but
+before a successful fill leaves the earlier object behind forever, and the bucket has no
+lifecycle rule. The objects are ~70KB and the path is rare, so this is cheap — but it is
+unbounded, and a sweep of objects no slot references is the fix if it ever matters.
+
+### Losing a fill race
+
+`fillImageSlot` is guarded on the slot still being empty, so exactly one concurrent
+delivery wins. The loser must **not** carry its own image forward: it reloads the article
+and adopts the persisted URL and content, because publishing its own URL would publish
+one the article never recorded, and building the next inline injection on its local
+content would inject a second copy of the image. Completion reloads for the same reason —
+the cover URL handed to `completeImages` is the persisted one, never the local view.
 
 ### Recorded dimensions
 
@@ -291,6 +323,6 @@ is negligible at this volume.
 - Inline placement references stable article sections — plan validated against actual
   H2s; injection anchored to the heading line.
 - Partial failures retryable without regenerating successful assets — per-slot
-  idempotency + deterministic S3 keys + SQS redelivery.
+  idempotency + content-addressed S3 keys + SQS redelivery.
 - Article unpublished until image policy satisfied — `images_status` gate invariant
   for the future publisher.

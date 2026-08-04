@@ -5,6 +5,7 @@ import {
   injectImageAfterHeading,
   parseImagePlan,
 } from '@shared/generation';
+import type { ImageResult } from '@shared/providers';
 import { type ArticleImage, ImageTask } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
@@ -36,9 +37,29 @@ const EXT_BY_TYPE: Record<string, string> = {
   'image/png': 'png',
 };
 
-/** Deterministic S3 key per slot — retries overwrite, never duplicate (#51). */
-function slotKey(articleId: string, role: ArticleImage['role'], index: number, ext: string) {
-  return `articles/${articleId}/${role === 'cover' ? 'cover' : `inline-${index}`}.${ext}`;
+/** Key prefix per slot; `storeImage` appends the content digest + extension. */
+function slotKeyBase(articleId: string, role: ArticleImage['role'], index: number) {
+  return `articles/${articleId}/${role === 'cover' ? 'cover' : `inline-${index}`}`;
+}
+
+type GeneratedImage = ImageResult['images'][number];
+
+const isPositivePixels = (n: number | null): boolean => n !== null && Number.isInteger(n) && n > 0;
+
+/**
+ * Dimensions are published as `<img width height>` to stop CLS (#176), so a
+ * bad value is worse than none: it would reserve the wrong box on a client's
+ * page. Throwing here means nothing is uploaded or persisted and SQS redelivers.
+ */
+function assertImageDimensions(
+  image: GeneratedImage,
+): asserts image is GeneratedImage & { width: number; height: number } {
+  if (!isPositivePixels(image.width)) {
+    throw new Error(`image provider returned an invalid width (${image.width})`);
+  }
+  if (!isPositivePixels(image.height)) {
+    throw new Error(`image provider returned an invalid height (${image.height})`);
+  }
 }
 
 /**
@@ -131,6 +152,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         });
         const generated = res.images[0];
         if (!generated?.url) throw new Error('image provider returned no image');
+        assertImageDimensions(generated);
         const src = generated.url;
 
         const imgRes = await fetch(src);
@@ -139,7 +161,12 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         const ext = EXT_BY_TYPE[contentType] ?? 'webp';
         const bytes = new Uint8Array(await imgRes.arrayBuffer());
 
-        const stored = await storeImage(slotKey(articleId, slot.role, i, ext), bytes, contentType);
+        const stored = await storeImage(
+          slotKeyBase(articleId, slot.role, i),
+          bytes,
+          contentType,
+          ext,
+        );
         if (!stored) logger.warn('IMAGES_BUCKET unset: storing provider URL (local dev only)');
         const url = stored ?? src;
         // The byte budget is the acceptance criterion and fal picks the quality —
@@ -156,7 +183,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
           slot.role === 'inline' && slot.section_heading
             ? injectImageAfterHeading(content, slot.section_heading, slot.alt, url)
             : null;
-        await ArticleRepo.fillImageSlot(
+        const won = await ArticleRepo.fillImageSlot(
           articleId,
           i,
           {
@@ -169,11 +196,27 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
           },
           newContent,
         );
-        if (newContent) content = newContent;
-        slot.url = url; // local view for the completion step below
+        if (won) {
+          if (newContent) content = newContent;
+          continue;
+        }
+        // A concurrent delivery filled this slot first. Its image and its
+        // markdown injection are the persisted truth, so adopt them — carrying
+        // our own `url` forward would publish a URL the article never recorded
+        // and inject a second copy of the image into the next slot's content.
+        const persisted = await ArticleRepo.findById(articleId);
+        const winner = persisted?.images[i];
+        if (!persisted || !winner?.url) {
+          throw new Error(`image slot ${i} unfilled after losing the fill race`);
+        }
+        content = persisted.content;
       }
 
-      const cover = article.images.find((s) => s.role === 'cover');
+      // Reload rather than trusting the local view: any slot in this pass may
+      // have been won by a concurrent delivery, so the database holds the URLs
+      // and dimensions that were actually published.
+      const filled = await ArticleRepo.findById(articleId);
+      const cover = filled?.images.find((s) => s.role === 'cover');
       if (!cover?.url) throw new Error('cover slot missing after fill');
       await ArticleRepo.completeImages(articleId, cover.url);
       logger.info('article images complete');
