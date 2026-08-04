@@ -8,6 +8,10 @@ TypeScript monorepo (npm workspaces). Four apps: Hono backend on AWS Lambda behi
 
 Full design rationale lives in [`design/`](design/) — read it before non-trivial work. Design *plans* go in `design/`, never in this file. Current status and remaining work are tracked in [`PROGRESS.md`](PROGRESS.md) — check it to see what's built vs. stubbed, and update it as you complete work.
 
+## Communication
+
+Keep responses focused, brief, and concise. Keep disclaimers and caveats short, and spend most of the response on the main answer. When asked to explain something, give a high-level summary unless an in-depth explanation is specifically requested.
+
 ## Coding Principles
 
 ### 1. Think Before Coding
