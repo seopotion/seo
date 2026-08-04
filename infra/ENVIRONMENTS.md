@@ -3,7 +3,8 @@
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
 - `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
-- `SeoApiStack-prod` — deployed by publishing a GitHub Release / tag. Deferred, not yet wired — see [#43](https://github.com/seopotion/seo/issues/43).
+- `SeoApiStack-prod` — deployed by publishing a GitHub Release. Termination
+  protection is on. See [Deploying prod](#deploying-prod).
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
 Secret values are provisioned out-of-band and resolved at Lambda runtime.
@@ -56,6 +57,32 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    aws ssm put-parameter --name /seo/prod/admin/jwt-secret    --type SecureString --value "$(openssl rand -base64 32)"
    aws ssm put-parameter --name /seo/prod/admin/operators     --type String       --value 'a@x.com,b@y.com'
    ```
+
+   The **provider API credentials** (#43) are five more SecureStrings per stage.
+   These used to be GitHub Actions secrets baked into the Lambda environment at
+   synth time — shared across both stages and visible in the CloudFormation
+   template. They are now resolved at runtime like everything else, so **each
+   stage needs its own set before its next deploy** (a missing one deploys a
+   worker that calls its provider with an empty key):
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/dataforseo-login    --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/staging/dataforseo-password --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/staging/openrouter-api-key  --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/staging/youtube-api-key     --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/staging/fal-key             --type SecureString --value '<fal_key>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-login       --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-password    --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/prod/openrouter-api-key     --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/prod/youtube-api-key        --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/prod/fal-key                --type SecureString --value '<fal_key>'
+   ```
+
+   Each Lambda is granted only the keys it calls: DataForSEO to the api, admin,
+   scan and strategy functions; OpenRouter to the four workers; YouTube to the
+   generation worker; fal to the images worker. The scheduler and db-init get
+   none. Local dev is unaffected — with no `*_PARAM` set, the plain
+   `DATAFORSEO_LOGIN` / `OPENROUTER_API_KEY` / … vars in the root `.env` are used.
 
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
    clients](#google-oauth-clients) below. Set each as a GitHub Actions repo
@@ -164,8 +191,8 @@ cat > /tmp/trust.json <<'JSON'
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
       "StringLike": { "token.actions.githubusercontent.com:sub": [
-        "repo:seopotion/seo:ref:refs/heads/dev",
-        "repo:seopotion/seo:ref:refs/heads/master"
+        "repo:seopotion/seo:ref:refs/heads/master",
+        "repo:seopotion/seo:environment:prod"
       ]}
     }
   }]
@@ -210,9 +237,10 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the out-of-band items for a stage are actually in
-place. The preflight checks that all seven SSM SecureStrings exist (jwt-secret,
+place. The preflight checks that all twelve SSM SecureStrings exist (jwt-secret,
 mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-lemonsqueezy-webhook-secret, admin/jwt-secret — presence only, it does not
+lemonsqueezy-webhook-secret, admin/jwt-secret, and the five provider
+credentials — presence only, it does not
 decrypt them), that the plain-String `admin/operators` allowlist exists, and
 that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
 `LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
@@ -241,6 +269,57 @@ cd infra && npm ci
 CDK_DEFAULT_ACCOUNT=859998284061 CDK_DEFAULT_REGION=us-east-1 \
   npx cdk deploy SeoApiStack-staging
 ```
+
+## Deploying prod
+
+Prod ships from a **GitHub Release**, never from a branch push. The
+`deploy-prod` job in `.github/workflows/deploy-backend.yml` runs on
+`release: published` and, before it holds any AWS credentials, asserts two
+things about the released commit:
+
+1. it is an ancestor of `master`, and
+2. this workflow has a **successful `push` run for that exact commit** — i.e.
+   staging really deployed it.
+
+Being on `master` is not by itself evidence of a staging deploy: the run could
+have failed or been cancelled, and a `master` commit that touches none of the
+workflow's path filters never triggers a run at all. So a release must point at
+a `master` commit whose staging deploy actually succeeded — otherwise the job
+fails before reaching AWS. Prereleases are ignored.
+
+**There is no approval step.** Publishing the Release *is* the gate: the job
+deploys straight through. Required-reviewer rules on an environment need a paid
+plan for private repos, and this org's plan rejects them — so the `prod`
+environment exists with no protection rules. It is still declared in the
+workflow, because it is what makes the OIDC token's subject
+`repo:seopotion/seo:environment:prod`. Treat publishing a Release as an
+irreversible action.
+
+One-time setup, in addition to the prerequisites above:
+
+1. **The `prod` GitHub Environment exists** (created 2026-08-04, no rules). If
+   the plan is ever upgraded, add a required reviewer at
+   `Settings → Environments → prod → Required reviewers` — the workflow needs no
+   change to start honouring it.
+2. **Add the `environment:prod` subject to the deploy role's trust policy** — a
+   release run's OIDC token is subject `repo:seopotion/seo:environment:prod`,
+   not a `refs/heads/*` one, so without this the job fails at
+   `configure-aws-credentials` before doing anything else. See
+   [GitHub OIDC deploy role](#github-oidc-deploy-role) above.
+
+To ship:
+
+```sh
+git tag v0.1.0 <commit-on-master> && git push origin v0.1.0
+gh release create v0.1.0 --title v0.1.0 --notes 'first prod deploy'
+```
+
+The deploy starts immediately — watch it in the Actions tab. The stack emits `HttpApiUrl` and
+`AdminHttpApiUrl`; the LemonSqueezy prod webhook must be pointed at
+`<HttpApiUrl>` after this first deploy, since the URL does not exist until then.
+
+Prod carries `terminationProtection: true`, so `cdk destroy` / `delete-stack`
+refuse until it is turned off deliberately.
 
 ## Migration note
 

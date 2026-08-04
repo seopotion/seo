@@ -180,12 +180,46 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
     });
 
-    // Provider secret env vars — read from process.env at synth/deploy host.
-    // Deployed-secret provisioning (SSM SecureString) is deferred; the `?? ''`
-    // fallback is intentional until that lands.
-    const providerEnv = {
-      DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN ?? '',
-      DATAFORSEO_PASSWORD: process.env.DATAFORSEO_PASSWORD ?? '',
+    // Provider API credentials (#43). Same out-of-band SecureString pattern as
+    // every other secret — only NAMEs reach this template; @shared/providers
+    // `resolveProviderSecret` fetches + caches the values at runtime. Each
+    // Lambda is granted only the keys it actually calls.
+    //   aws ssm put-parameter --name /seo/<stage>/dataforseo-login --type SecureString --value <login>
+    //   aws ssm put-parameter --name /seo/<stage>/openrouter-api-key --type SecureString --value <key>
+    const dataForSeoLoginParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'DataForSeoLoginParam',
+      { parameterName: cfg.dataForSeoLoginParam },
+    );
+    const dataForSeoPasswordParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'DataForSeoPasswordParam',
+      { parameterName: cfg.dataForSeoPasswordParam },
+    );
+    const openRouterApiKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'OpenRouterApiKeyParam',
+      { parameterName: cfg.openRouterApiKeyParam },
+    );
+    const youtubeApiKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'YoutubeApiKeyParam',
+      { parameterName: cfg.youtubeApiKeyParam },
+    );
+    const falKeyParam = StringParameter.fromSecureStringParameterAttributes(this, 'FalKeyParam', {
+      parameterName: cfg.falKeyParam,
+    });
+
+    /** DataForSEO credential NAMEs — for the Lambdas that query DataForSEO. */
+    const dataForSeoEnv = {
+      DATAFORSEO_LOGIN_PARAM: cfg.dataForSeoLoginParam,
+      DATAFORSEO_PASSWORD_PARAM: cfg.dataForSeoPasswordParam,
+    };
+
+    /** Grants the DataForSEO credentials to a function that queries DataForSEO. */
+    const grantDataForSeo = (fn: NodejsFunction) => {
+      dataForSeoLoginParam.grantRead(fn);
+      dataForSeoPasswordParam.grantRead(fn);
     };
 
     // API Lambda — produces scan tasks.
@@ -200,7 +234,7 @@ export class ApiStack extends Stack {
       environment: {
         ...mongoEnv,
         ...authEnv,
-        ...providerEnv,
+        ...dataForSeoEnv,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
       },
@@ -208,6 +242,7 @@ export class ApiStack extends Stack {
     });
     scanQueue.grantSendMessages(apiFn);
     strategyQueue.grantSendMessages(apiFn);
+    grantDataForSeo(apiFn);
     jwtSecretParam.grantRead(apiFn);
     googleClientSecretParam.grantRead(apiFn);
     gscTokenKeyParam.grantRead(apiFn);
@@ -227,13 +262,15 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        ...providerEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        ...dataForSeoEnv,
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
       },
       bundling,
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(workerFn);
+    grantDataForSeo(workerFn);
+    openRouterApiKeyParam.grantRead(workerFn);
 
     // Strategy worker Lambda — consumes strategy tasks from the queue.
     const strategyWorkerFn = new NodejsFunction(this, 'StrategyWorkerFn', {
@@ -246,13 +283,15 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        ...providerEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        ...dataForSeoEnv,
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
       },
       bundling,
     });
     strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(strategyWorkerFn);
+    grantDataForSeo(strategyWorkerFn);
+    openRouterApiKeyParam.grantRead(strategyWorkerFn);
 
     // Dead-letter queue: generation tasks that fail repeatedly land here.
     const generationDlq = new Queue(this, 'GenerationDlq', {
@@ -307,8 +346,8 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
-        FAL_KEY: process.env.FAL_KEY ?? '',
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
+        FAL_KEY_PARAM: cfg.falKeyParam,
         IMAGES_BUCKET: imagesBucket.bucketName,
         IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
       },
@@ -316,6 +355,8 @@ export class ApiStack extends Stack {
     });
     imagesWorkerFn.addEventSource(new SqsEventSource(imagesQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(imagesWorkerFn);
+    openRouterApiKeyParam.grantRead(imagesWorkerFn);
+    falKeyParam.grantRead(imagesWorkerFn);
     imagesBucket.grantPut(imagesWorkerFn);
 
     // Generation worker Lambda — consumes generation tasks; produces articles.
@@ -329,14 +370,16 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
-        YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
+        YOUTUBE_API_KEY_PARAM: cfg.youtubeApiKeyParam,
         IMAGES_QUEUE_URL: imagesQueue.queueUrl,
       },
       bundling,
     });
     generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(generationWorkerFn);
+    openRouterApiKeyParam.grantRead(generationWorkerFn);
+    youtubeApiKeyParam.grantRead(generationWorkerFn);
     imagesQueue.grantSendMessages(generationWorkerFn);
 
     // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
@@ -439,7 +482,7 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        ...providerEnv, // operator keyword research (DataForSEO, phase 1)
+        ...dataForSeoEnv, // operator keyword research (DataForSEO, phase 1)
         ADMIN_JWT_SECRET_PARAM: cfg.adminJwtSecretParam,
         ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
         GOOGLE_CLIENT_ID: cfg.googleClientId,
@@ -455,6 +498,7 @@ export class ApiStack extends Stack {
     generationQueue.grantSendMessages(adminFn);
     imagesQueue.grantSendMessages(adminFn);
     mongoUriParam.grantRead(adminFn);
+    grantDataForSeo(adminFn);
     adminJwtSecretParam.grantRead(adminFn);
     adminOperatorsParam.grantRead(adminFn);
 

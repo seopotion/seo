@@ -58,7 +58,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       }
 
       const ctx = buildContext(org, keyword);
-      const { llm, youtube } = getGenerationClients();
+      const { llm, youtube } = await getGenerationClients();
       const result = await generateArticle({ ctx, llm });
 
       if (!result.ok) {
