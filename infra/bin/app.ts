@@ -9,4 +9,8 @@ const app = new App();
 const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION };
 
 new ApiStack(app, 'SeoApiStack-staging', { env, stage: 'staging' });
-new ApiStack(app, 'SeoApiStack-prod', { env, stage: 'prod' });
+
+// Termination protection on prod only: deleting this stack drops the customer
+// image bucket's CloudFront distribution and every queue. Staging stays
+// deletable so it can be torn down and rebuilt freely.
+new ApiStack(app, 'SeoApiStack-prod', { env, stage: 'prod', terminationProtection: true });

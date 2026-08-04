@@ -8,5 +8,6 @@ export * from './image/client';
 export type * from './image/types';
 export * from './llm/client';
 export type * from './llm/types';
+export * from './secrets';
 export * from './youtube/client';
 export type * from './youtube/types';

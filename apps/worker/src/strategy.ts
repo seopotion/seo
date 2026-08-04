@@ -61,7 +61,7 @@ async function runStrategy(orgId: string): Promise<void> {
     return;
   }
 
-  const clients = getStrategyClients();
+  const clients = await getStrategyClients();
   const scheduled = await KeywordRepo.listByOrg(orgId);
   const scheduledKeywords = scheduled.map((k) => k.keyword);
   const articleKeywords: string[] = []; // ArticleRepo has none until #55 generates

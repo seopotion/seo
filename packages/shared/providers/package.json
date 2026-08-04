@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@aws-lambda-powertools/parameters": "^2.33.1",
     "@shared/schemas": "*"
   }
 }

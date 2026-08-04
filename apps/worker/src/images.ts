@@ -48,7 +48,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         continue;
       }
 
-      const { llm, image } = getImageClients();
+      const { llm, image } = await getImageClients();
 
       // Plan once (set-if-absent): a redelivery never re-plans or reshuffles slots.
       if (article.images.length === 0) {
