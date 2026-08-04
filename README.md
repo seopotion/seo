@@ -27,14 +27,15 @@ infra/                AWS CDK (standalone, not a workspace)
 We use a three-tier flow mapped to environments. `dev` is the integration branch
 (and the GitHub default) — merging to it **deploys nothing**. `master` is the
 **staging** branch: merging `dev`→`master` deploys the staging backend. **Production**
-deploys when a **GitHub Release is published**, after approval on the `prod`
-environment. Releases are cut from `master`, so prod only ships code staging has run.
+deploys when a **GitHub Release is published** — there is no approval step, so
+publishing is the point of no return. Releases must be cut from `master` (the job
+refuses otherwise), so prod only ships code staging has run.
 
 | Branch / event            | Deploys       |
 | ------------------------- | ------------- |
 | push to `dev`             | nothing       |
 | merge `dev` → `master`    | **staging**   |
-| GitHub Release published  | **prod** (needs approval) |
+| GitHub Release published  | **prod** (immediately) |
 
 - **Never commit or merge directly to `dev` or `master`.** All work goes through a
   pull request.

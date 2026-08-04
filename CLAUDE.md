@@ -76,15 +76,16 @@ Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + El
 Three-tier flow mapped to environments. `dev` is the integration branch and the
 **GitHub default base for PRs** — merging to `dev` **deploys nothing**. `master` is the
 **staging** branch: merging `dev`→`master` deploys `SeoApiStack-staging`. **Production**
-deploys `SeoApiStack-prod` when a **GitHub Release is published**, gated by a required
-reviewer on the `prod` environment; the job refuses a release whose commit is not on
-`master`. Despite the git prelude naming `master`, **PRs target `dev`, not `master`.**
+deploys `SeoApiStack-prod` when a **GitHub Release is published** — no approval step
+(the plan doesn't support required reviewers), so publishing ships prod immediately;
+the job refuses a release whose commit is not on `master`. Despite the git prelude
+naming `master`, **PRs target `dev`, not `master`.**
 
 | Branch / event           | Deploys       |
 | ------------------------ | ------------- |
 | push to `dev`            | nothing       |
 | merge `dev` → `master`   | **staging**   |
-| GitHub Release published | **prod** (approval required) |
+| GitHub Release published | **prod** (immediately) |
 
 - Never commit or merge directly to `dev` or `master` — always go through a PR.
 - Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),

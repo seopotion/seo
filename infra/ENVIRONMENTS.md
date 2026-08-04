@@ -3,8 +3,8 @@
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
 - `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
-- `SeoApiStack-prod` — deployed by publishing a GitHub Release, gated by the `prod`
-  GitHub Environment. Termination protection is on. See [Deploying prod](#deploying-prod).
+- `SeoApiStack-prod` — deployed by publishing a GitHub Release. Termination
+  protection is on. See [Deploying prod](#deploying-prod).
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
 Secret values are provisioned out-of-band and resolved at Lambda runtime.
@@ -278,13 +278,20 @@ Prod ships from a **GitHub Release**, never from a branch push. The
 released commit is an ancestor of `master` — so prod can only ship code staging
 has already run. Prereleases are ignored.
 
+**There is no approval step.** Publishing the Release *is* the gate: the job
+deploys straight through. Required-reviewer rules on an environment need a paid
+plan for private repos, and this org's plan rejects them — so the `prod`
+environment exists with no protection rules. It is still declared in the
+workflow, because it is what makes the OIDC token's subject
+`repo:seopotion/seo:environment:prod`. Treat publishing a Release as an
+irreversible action.
+
 One-time setup, in addition to the prerequisites above:
 
-1. **Create the `prod` GitHub Environment** with a required reviewer — this is
-   the human gate; the job waits on it before deploying:
-   `Settings → Environments → New environment → prod → Required reviewers`.
-   (Referencing it in the workflow creates it *without* protection rules, so
-   adding the reviewer by hand is what actually gates anything.)
+1. **The `prod` GitHub Environment exists** (created 2026-08-04, no rules). If
+   the plan is ever upgraded, add a required reviewer at
+   `Settings → Environments → prod → Required reviewers` — the workflow needs no
+   change to start honouring it.
 2. **Add the `environment:prod` subject to the deploy role's trust policy** — a
    release run's OIDC token is subject `repo:seopotion/seo:environment:prod`,
    not a `refs/heads/*` one, so without this the job fails at
@@ -298,7 +305,7 @@ git tag v0.1.0 <commit-on-master> && git push origin v0.1.0
 gh release create v0.1.0 --title v0.1.0 --notes 'first prod deploy'
 ```
 
-Then approve the run in the Actions tab. The stack emits `HttpApiUrl` and
+The deploy starts immediately — watch it in the Actions tab. The stack emits `HttpApiUrl` and
 `AdminHttpApiUrl`; the LemonSqueezy prod webhook must be pointed at
 `<HttpApiUrl>` after this first deploy, since the URL does not exist until then.
 

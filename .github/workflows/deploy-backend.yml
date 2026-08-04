@@ -87,10 +87,12 @@ jobs:
     # Prereleases are for testing a tag, not for shipping — they must not deploy.
     if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
-    # The `prod` GitHub Environment is the human gate: its required-reviewer rule
-    # holds this job until someone approves. It is also what the deploy role's
-    # OIDC trust policy keys off — the token's subject is
-    # `repo:seopotion/seo:environment:prod` (see infra/ENVIRONMENTS.md).
+    # The `prod` environment carries NO protection rules — required reviewers need
+    # a paid plan for private repos. It is declared for what it does give us: the
+    # OIDC token's subject becomes `repo:seopotion/seo:environment:prod`, which is
+    # what the deploy role's trust policy scopes to (see infra/ENVIRONMENTS.md).
+    # The human gate is the act of publishing the Release itself — there is no
+    # approval step, so a published Release deploys straight through.
     environment: prod
     # One prod deploy at a time; never cancel one mid-flight.
     concurrency:
