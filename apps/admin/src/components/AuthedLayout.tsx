@@ -20,7 +20,7 @@ export function AuthedLayout() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="flex items-center justify-between border-b border-neutral-800 px-6 py-3">
         <Link to="/" className="font-semibold">
-          SEO Admin
+          SeoPotion Admin
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <span className="text-neutral-400">{getOperatorEmail()}</span>

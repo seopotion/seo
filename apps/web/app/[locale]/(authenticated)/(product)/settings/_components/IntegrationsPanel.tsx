@@ -1,20 +1,21 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, ExternalLink } from 'lucide-react';
+import { Download, ExternalLink, GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Input, Label } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
-import { useConnectedIntegrations } from '@/lib/integrations';
+import { GITHUB_RETURN_LOCALE_KEY, useConnectedIntegrations } from '@/lib/integrations';
 import type { ProductOrganization } from '@/lib/organizations';
 import { cn } from '@/lib/utils';
 
 type WordPressErrorKey = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 type FailedStep = 1 | 2 | null;
 type ConnectError = { key: WordPressErrorKey; step: FailedStep };
+type InstallErrorKey = 'installFailed' | 'notConfigured';
 
 const REQUEST_FAILED_ERROR: ConnectError = { key: 'requestFailed', step: 1 };
 
@@ -38,12 +39,20 @@ export function IntegrationsPanel({
   onUnauthorized: () => void;
   organization: ProductOrganization | null;
 }) {
+  // `SettingsPage.wordpress` is the integrations tab's namespace, despite the
+  // name it was given when WordPress was the only thing in it; the static-site
+  // strings are their own namespace rather than nested under a wrong one.
   const t = useTranslations('SettingsPage.wordpress');
+  const staticSiteT = useTranslations('SettingsPage.staticSite');
   const locale = useLocale();
   const queryClient = useQueryClient();
   const [replacing, setReplacing] = useState(false);
   const [token, setToken] = useState('');
   const [connectError, setConnectError] = useState<ConnectError | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installErrorKey, setInstallErrorKey] = useState<InstallErrorKey | null>(null);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  const [justConnectedSite, setJustConnectedSite] = useState(false);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
@@ -54,9 +63,28 @@ export function IntegrationsPanel({
   const wordpressIntegration = connectedQuery.data?.integrations.find(
     (integration) => integration.provider === 'wordpress',
   );
+  const staticSiteIntegration = connectedQuery.data?.integrations.find(
+    (integration) => integration.provider === 'static-site',
+  );
   const isConnected = Boolean(wordpressIntegration);
   const showSetup = !isConnected || replacing;
   const siteUrl = (organization?.website_url ?? '').replace(/\/+$/, '');
+
+  // One-time banner after the install callback redirects back; strip the param
+  // so a refresh or a back-navigation doesn't replay it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') !== 'static-site') return;
+    setJustConnectedSite(true);
+    if (organization) {
+      void queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.connectedIntegrations(organization.id),
+      });
+    }
+    params.delete('connected');
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+  }, [organization, queryClient]);
 
   const connectMutation = useMutation({
     mutationFn: async () => {
@@ -118,6 +146,73 @@ export function IntegrationsPanel({
     },
   });
 
+  const disconnectSiteMutation = useMutation({
+    mutationFn: async () => {
+      if (!organization) throw new Error('organization_required');
+
+      const response = await api.api.v0.dashboard.integrations[':provider'].$delete({
+        param: { provider: 'static-site' },
+        query: { org_id: organization.id },
+      });
+
+      if ((response.status as number) === 401) {
+        onUnauthorized();
+        throw new Error('unauthorized');
+      }
+
+      if (!response.ok) throw new Error('static_site_disconnect_failed');
+    },
+    onSuccess: () => {
+      setConfirmingDisconnect(false);
+      setJustConnectedSite(false);
+      if (!organization) return;
+      void queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.connectedIntegrations(organization.id),
+      });
+    },
+  });
+
+  const disconnectSiteFailed =
+    disconnectSiteMutation.isError &&
+    (disconnectSiteMutation.error as Error | null)?.message !== 'unauthorized';
+
+  /**
+   * Connect and change-repository are the same hand-off: ask for an install URL
+   * and leave for github.com. Reconfiguring an existing installation comes back
+   * through the same callback, so there is nothing extra to do for a change.
+   */
+  async function startInstall() {
+    if (!organization || installing) return;
+
+    setInstalling(true);
+    setInstallErrorKey(null);
+    try {
+      const res = await api.api.v0.dashboard.integrations.github['install-url'].$get({
+        query: { org_id: organization.id },
+      });
+
+      if ((res.status as number) === 401) {
+        onUnauthorized();
+        return;
+      }
+
+      if (!res.ok) {
+        // 503 until the App is registered for this environment — a deployment
+        // gap, not something the user can fix by retrying.
+        setInstallErrorKey((res.status as number) === 503 ? 'notConfigured' : 'installFailed');
+        setInstalling(false);
+        return;
+      }
+
+      window.sessionStorage.setItem(GITHUB_RETURN_LOCALE_KEY, locale);
+      // Full-page navigation to GitHub — keep `installing` set, the page is leaving.
+      window.location.href = (await res.json()).url;
+    } catch {
+      setInstallErrorKey('installFailed');
+      setInstalling(false);
+    }
+  }
+
   function handleConnect() {
     if (!organization || !token.trim() || connectMutation.isPending) return;
 
@@ -143,7 +238,15 @@ export function IntegrationsPanel({
         <p className="font-medium text-sm leading-none">{t('gallery')}</p>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <IntegrationCard
-            logoSrc="/integrations/wordpress-org.svg"
+            logo={
+              <Image
+                alt=""
+                aria-hidden
+                height={20}
+                src="/integrations/wordpress-org.svg"
+                width={20}
+              />
+            }
             name={t('providers.wordpress')}
           >
             {connectedQuery.isLoading ? (
@@ -194,19 +297,134 @@ export function IntegrationsPanel({
             )}
           </IntegrationCard>
 
-          <IntegrationCard logoSrc="/integrations/wordpress.svg" name={t('providers.wordpressCom')}>
+          <IntegrationCard
+            logo={<GitBranch aria-hidden className="size-5 text-slate-700" />}
+            name={staticSiteT('provider')}
+          >
+            {connectedQuery.isLoading ? (
+              <p className="text-slate-500 text-xs">{t('loading')}</p>
+            ) : connectedQuery.isError ? (
+              <p className="text-red-600 text-xs">{t('loadError')}</p>
+            ) : (
+              <>
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'w-fit border-transparent',
+                    staticSiteIntegration
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-200 text-slate-700',
+                  )}
+                >
+                  {t(staticSiteIntegration ? 'badges.connected' : 'badges.notConnected')}
+                </Badge>
+                {staticSiteIntegration ? (
+                  <>
+                    {/* `owner/repo@branch`, built server-side. */}
+                    <p className="truncate font-medium text-slate-950 text-xs">
+                      {staticSiteIntegration.target}
+                    </p>
+                    <p className="text-slate-500 text-xs">
+                      {t('connectedOn', {
+                        date: dateFormatter.format(new Date(staticSiteIntegration.connected_at)),
+                      })}
+                    </p>
+                    {disconnectSiteFailed ? (
+                      <p className="text-red-600 text-xs">{staticSiteT('disconnectError')}</p>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit"
+                        disabled={!organization || installing}
+                        onClick={startInstall}
+                      >
+                        {installing ? staticSiteT('connecting') : staticSiteT('changeRepository')}
+                      </Button>
+                      {confirmingDisconnect ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            disabled={disconnectSiteMutation.isPending}
+                            onClick={() => disconnectSiteMutation.mutate()}
+                          >
+                            {staticSiteT('disconnectConfirmYes')}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={disconnectSiteMutation.isPending}
+                            onClick={() => setConfirmingDisconnect(false)}
+                          >
+                            {staticSiteT('disconnectCancel')}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-fit text-red-600 hover:text-red-700"
+                          onClick={() => setConfirmingDisconnect(true)}
+                        >
+                          {staticSiteT('disconnect')}
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-slate-500 text-xs">{staticSiteT('description')}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-fit"
+                      disabled={!organization || installing}
+                      onClick={startInstall}
+                    >
+                      {installing ? staticSiteT('connecting') : staticSiteT('connect')}
+                    </Button>
+                  </>
+                )}
+                {installErrorKey ? (
+                  <p className="text-red-600 text-xs">{staticSiteT(`errors.${installErrorKey}`)}</p>
+                ) : null}
+              </>
+            )}
+          </IntegrationCard>
+
+          <IntegrationCard
+            logo={
+              <Image alt="" aria-hidden height={20} src="/integrations/wordpress.svg" width={20} />
+            }
+            name={t('providers.wordpressCom')}
+          >
             <Badge variant="secondary" className="w-fit">
               {t('comingSoon')}
             </Badge>
           </IntegrationCard>
 
-          <IntegrationCard logoSrc="/integrations/framer.svg" name={t('providers.framer')}>
+          <IntegrationCard
+            logo={
+              <Image alt="" aria-hidden height={20} src="/integrations/framer.svg" width={20} />
+            }
+            name={t('providers.framer')}
+          >
             <Badge variant="secondary" className="w-fit">
               {t('comingSoon')}
             </Badge>
           </IntegrationCard>
         </div>
       </div>
+
+      {justConnectedSite ? (
+        <StatusPanel tone="success">{staticSiteT('connectedSuccess')}</StatusPanel>
+      ) : null}
 
       {connectMutation.data?.success ? (
         <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel>
@@ -302,21 +520,21 @@ export function IntegrationsPanel({
   );
 }
 
+/** `logo` is a node, not a src: the static site has no brand mark of its own —
+ *  the git host is a field on it, not the provider. */
 function IntegrationCard({
   children,
-  logoSrc,
+  logo,
   name,
 }: {
   children: ReactNode;
-  logoSrc: string;
+  logo: ReactNode;
   name: string;
 }) {
   return (
     <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center">
-          <Image alt="" aria-hidden height={20} src={logoSrc} width={20} />
-        </span>
+        <span className="flex size-9 items-center justify-center">{logo}</span>
         <p className="font-semibold text-slate-950 text-sm">{name}</p>
       </div>
       {children}

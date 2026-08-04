@@ -20,7 +20,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       logger.appendKeys({ org_id });
       logger.info('scanning website', { website_url });
 
-      const clients = getScanClients();
+      const clients = await getScanClients();
       const presets = await scanWebsite(website_url, clients);
       await OrgRepo.completeScan(org_id, presets);
 

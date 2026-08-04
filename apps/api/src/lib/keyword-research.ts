@@ -23,7 +23,7 @@ export async function researchKeyword(
   seed: string,
   loc: { locationName?: string; languageName?: string },
 ): Promise<{ seed: KeywordMetric; similar: KeywordMetric[] }> {
-  const df = getDataForSeoClient();
+  const df = await getDataForSeoClient();
   const [seedMetrics, ideas] = await Promise.all([
     df.bulkKeywordDifficulty({ keywords: [seed], ...loc }),
     df.keywordIdeas({ keywords: [seed], limit: RESEARCH_LIMIT, ...loc }),

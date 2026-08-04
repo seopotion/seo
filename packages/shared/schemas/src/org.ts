@@ -7,8 +7,15 @@ import {
 import { z } from 'zod';
 import { SetupPresetsSchema } from './presets';
 
-/** Publishing platforms a user can select during onboarding (#73). */
-export const ONBOARDING_INTEGRATIONS = ['wordpress', 'wordpress-com', 'framer'] as const;
+/** Publishing platforms a user can select during onboarding (#73). Every
+ * connectable provider (`INTEGRATION_PROVIDERS`, integration.ts) must also be
+ * selectable here; the reverse does not hold. */
+export const ONBOARDING_INTEGRATIONS = [
+  'wordpress',
+  'wordpress-com',
+  'framer',
+  'static-site',
+] as const;
 
 /**
  * Organization entity — the shape app code and the API work with.

@@ -4,6 +4,7 @@ import {
   ArticleVideoSchema,
   GENERATION_STATUSES,
   IMAGES_STATUSES,
+  INTEGRATION_PROVIDERS,
   PublishingPrefsSchema,
   SEARCH_INTENTS,
   SetupPresetsSchema,
@@ -54,10 +55,22 @@ export const ArticleCountResponse = z
 export const ConnectedIntegration = z
   .object({
     id: z.string(),
-    provider: z.literal('wordpress'),
+    provider: z.enum(INTEGRATION_PROVIDERS),
+    // What the settings panel renders after "Connected to": the site URL for
+    // WordPress, `owner/repo@branch` for a static site. Opaque to the client.
+    target: z.string(),
     connected_at: z.string(),
   })
   .openapi('ConnectedIntegration');
+
+// Path param for the one disconnect route that replaces per-provider variants.
+export const IntegrationProviderParams = z
+  .object({
+    provider: z
+      .enum(INTEGRATION_PROVIDERS)
+      .openapi({ param: { name: 'provider', in: 'path' }, example: 'wordpress' }),
+  })
+  .openapi('IntegrationProviderParams');
 
 export const ConnectedIntegrationsResponse = z
   .object({
@@ -215,6 +228,10 @@ export const ArticleDetailResponse = z
     content: z.string(),
     status: z.enum(ARTICLE_STATUSES),
     wordpress_post_id: z.number().int().positive().optional(),
+    // First static-site publish, ISO; null until then. The counterpart of
+    // `wordpress_post_id` for the git target — publish and update are one route,
+    // so the UI needs this only to label the button and badge the article.
+    static_site_published_at: z.string().nullable(),
     images_status: z.enum(IMAGES_STATUSES),
     created_at: z.string(),
     // Last editor save, ISO; null until the article is first edited (#74).
@@ -242,6 +259,23 @@ export const WordPressArticleResponse = z
 export const WordPressArticleErrorResponse = z
   .object({ error: z.string() })
   .openapi('WordPressArticleErrorResponse');
+
+// Static-site publish (#7, design/static-site-integration.md). One commit
+// carrying the article's Markdown and the rebuilt manifest, so there is exactly
+// one sha to report — and it is what `publications[].ref` records.
+export const StaticSitePublishResponse = z
+  .object({
+    commit_sha: z.string(),
+    // Deep link for a "view the commit" affordance; GitHub is the only host today.
+    commit_url: z.string(),
+    // Repo-root-relative path of the committed Markdown file.
+    path: z.string(),
+  })
+  .openapi('StaticSitePublishResponse');
+
+export const StaticSitePublishErrorResponse = z
+  .object({ error: z.string(), code: z.string() })
+  .openapi('StaticSitePublishErrorResponse');
 
 // The editor's five editable fields. Deliberately permissive here: `apps/api`
 // has no `defaultHook`, so a Zod failure would return the library's error shape

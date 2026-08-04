@@ -61,14 +61,22 @@ describe('preflight', () => {
     // Presence check must not decrypt — keeps the CI deploy role free of kms:Decrypt.
     expect(ssmSend).toHaveBeenCalledWith(expect.objectContaining({ WithDecryption: false }));
     // jwt-secret, mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-    // lemonsqueezy-webhook-secret, and the five public env vars.
+    // lemonsqueezy-webhook-secret, the two admin params, the five provider
+    // credentials, and the five public env vars.
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/staging/admin/jwt-secret',
+      '/seo/staging/admin/operators',
+      '/seo/staging/dataforseo-login',
+      '/seo/staging/dataforseo-password',
+      '/seo/staging/fal-key',
       '/seo/staging/google-client-secret',
       '/seo/staging/gsc-token-key',
       '/seo/staging/jwt-secret',
       '/seo/staging/lemonsqueezy-api-key',
       '/seo/staging/lemonsqueezy-webhook-secret',
       '/seo/staging/mongo-uri',
+      '/seo/staging/openrouter-api-key',
+      '/seo/staging/youtube-api-key',
       'GOOGLE_CLIENT_ID_STAGING',
       'LEMONSQUEEZY_STORE_ID_STAGING',
       'LEMONSQUEEZY_VARIANT_EXPERT_STAGING',
@@ -83,12 +91,19 @@ describe('preflight', () => {
     const res = await preflight('prod');
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.checks.map((c) => c.name).sort()).toEqual([
+      '/seo/prod/admin/jwt-secret',
+      '/seo/prod/admin/operators',
+      '/seo/prod/dataforseo-login',
+      '/seo/prod/dataforseo-password',
+      '/seo/prod/fal-key',
       '/seo/prod/google-client-secret',
       '/seo/prod/gsc-token-key',
       '/seo/prod/jwt-secret',
       '/seo/prod/lemonsqueezy-api-key',
       '/seo/prod/lemonsqueezy-webhook-secret',
       '/seo/prod/mongo-uri',
+      '/seo/prod/openrouter-api-key',
+      '/seo/prod/youtube-api-key',
       'GOOGLE_CLIENT_ID_PROD',
       'LEMONSQUEEZY_STORE_ID_PROD',
       'LEMONSQUEEZY_VARIANT_EXPERT_PROD',
@@ -156,6 +171,36 @@ describe('preflight', () => {
     if (!res.ok) throw new Error('expected ok');
     expect(res.data.ready).toBe(false);
     expect(res.data.checks.find((c) => c.name === '/seo/staging/gsc-token-key')).toMatchObject({
+      present: false,
+    });
+  });
+
+  test('not ready when a provider credential is missing', async () => {
+    ssmSend.mockImplementation(async (cmd: { Name: string }) =>
+      cmd.Name === '/seo/prod/openrouter-api-key'
+        ? Promise.reject(Object.assign(new Error('not found'), { name: 'ParameterNotFound' }))
+        : paramValue('present'),
+    );
+
+    const res = await preflight('prod');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === '/seo/prod/openrouter-api-key')).toMatchObject({
+      present: false,
+    });
+  });
+
+  test('not ready when the admin operator allowlist is missing', async () => {
+    ssmSend.mockImplementation(async (cmd: { Name: string }) =>
+      cmd.Name === '/seo/staging/admin/operators'
+        ? Promise.reject(Object.assign(new Error('not found'), { name: 'ParameterNotFound' }))
+        : paramValue('present'),
+    );
+
+    const res = await preflight('staging');
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.ready).toBe(false);
+    expect(res.data.checks.find((c) => c.name === '/seo/staging/admin/operators')).toMatchObject({
       present: false,
     });
   });

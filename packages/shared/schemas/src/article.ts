@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INTEGRATION_PROVIDERS } from './integration';
 
 /** Article lifecycle statuses. */
 export const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
@@ -28,6 +29,11 @@ export const ArticleImageSchema = z.object({
   model: z.string().nullable(),
   seed: z.number().nullable(),
   generated_at: z.date().nullable(),
+  // Intrinsic pixels of the stored object, as reported by the provider (#176).
+  // Nullable like the three above: slots are planned before they are filled, and
+  // articles generated before #178 have no dimensions to read.
+  width: z.number().nullable().default(null),
+  height: z.number().nullable().default(null),
 });
 export type ArticleImage = z.infer<typeof ArticleImageSchema>;
 
@@ -42,6 +48,26 @@ export const ArticleVideoSchema = z.object({
   section_heading: z.string(),
 });
 export type ArticleVideo = z.infer<typeof ArticleVideoSchema>;
+
+/**
+ * Where an article currently stands with one publishing target. Replaces
+ * `wordpress_post_id`, which cannot express a second provider — and which a
+ * static-site publisher could not reuse anyway: there is no post id, and
+ * republishing needs to know what slug we last committed under.
+ * See design/integrations-model.md § Per-article publish state.
+ */
+export const ArticlePublicationSchema = z.object({
+  provider: z.enum(INTEGRATION_PROVIDERS),
+  // The provider's handle on the published object: the WordPress post id as a
+  // string, or the commit sha of the last publish for static-site.
+  ref: z.string(),
+  // The slug this article was ACTUALLY published under — NOT derivable from
+  // `slug` below, which the editor can change after publishing.
+  slug: z.string(),
+  published_at: z.date(),
+  updated_at: z.date().nullable(),
+});
+export type ArticlePublication = z.infer<typeof ArticlePublicationSchema>;
 
 /**
  * Article entity. `title` is the generated SEO title (distinct from `keyword`);
@@ -65,6 +91,11 @@ export const ArticleSchema = z.object({
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),
   published_at: z.date().nullable(),
+  // Per-provider publish state (#7). Defaulted so pre-#7 docs still parse; the
+  // `db migrate` backfill seeds it from `wordpress_post_id`.
+  publications: z.array(ArticlePublicationSchema).default([]),
+  // Deprecated mirror of the `wordpress` entry in `publications`, kept for one
+  // release: it is on the wire in ArticleDetailResponse and read by apps/web.
   wordpress_post_id: z.number().int().positive().optional(),
   // Last editor save (#74). Defaulted so pre-#74 docs still parse; null means
   // never edited since generation.
@@ -79,11 +110,12 @@ export const ArticleSchema = z.object({
 export type Article = z.infer<typeof ArticleSchema>;
 
 /** Input for creating an article — the server assigns `id`, `created_at`,
- * `updated_at`, and `wordpress_post_id`. */
+ * `updated_at`, and the publish state (`publications` / `wordpress_post_id`). */
 export const CreateArticleInput = ArticleSchema.omit({
   id: true,
   created_at: true,
   updated_at: true,
+  publications: true,
   wordpress_post_id: true,
 });
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the

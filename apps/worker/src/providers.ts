@@ -3,42 +3,62 @@ import {
   createFalClient,
   createOpenRouterClient,
   createYouTubeClient,
+  resolveProviderSecret,
 } from '@shared/providers';
 
-/** Build the DataForSEO + LLM clients the strategy pipeline needs, from env. */
-export function getStrategyClients() {
+/**
+ * Provider credentials resolve at runtime: an SSM SecureString named by
+ * `<NAME>_PARAM` when deployed, the plain `<NAME>` env var locally. Powertools
+ * caches each value ~1h, so a warm Lambda pays the fetch once — hence the
+ * factories being async rather than reading `process.env` inline.
+ */
+
+/** Build the DataForSEO + LLM clients the strategy pipeline needs. */
+export async function getStrategyClients() {
+  const [login, password, apiKey] = await Promise.all([
+    resolveProviderSecret('DATAFORSEO_LOGIN'),
+    resolveProviderSecret('DATAFORSEO_PASSWORD'),
+    resolveProviderSecret('OPENROUTER_API_KEY'),
+  ]);
   return {
-    dataForSeo: createDataForSeoClient({
-      login: process.env.DATAFORSEO_LOGIN ?? '',
-      password: process.env.DATAFORSEO_PASSWORD ?? '',
-    }),
-    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
+    dataForSeo: createDataForSeoClient({ login, password }),
+    llm: createOpenRouterClient({ apiKey }),
   };
 }
 
-/** Build the LLM + YouTube clients the generation worker needs, from env (#55/#85). */
-export function getGenerationClients() {
+/** Build the LLM + YouTube clients the generation worker needs (#55/#85). */
+export async function getGenerationClients() {
+  const [apiKey, youtubeKey] = await Promise.all([
+    resolveProviderSecret('OPENROUTER_API_KEY'),
+    resolveProviderSecret('YOUTUBE_API_KEY'),
+  ]);
   return {
-    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
-    youtube: createYouTubeClient({ apiKey: process.env.YOUTUBE_API_KEY ?? '' }),
+    llm: createOpenRouterClient({ apiKey }),
+    youtube: createYouTubeClient({ apiKey: youtubeKey }),
   };
 }
 
-/** Build the LLM (plan) + image (fal) clients the images worker needs, from env (#51). */
-export function getImageClients() {
+/** Build the LLM (plan) + image (fal) clients the images worker needs (#51). */
+export async function getImageClients() {
+  const [apiKey, falKey] = await Promise.all([
+    resolveProviderSecret('OPENROUTER_API_KEY'),
+    resolveProviderSecret('FAL_KEY'),
+  ]);
   return {
-    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
-    image: createFalClient({ apiKey: process.env.FAL_KEY ?? '' }),
+    llm: createOpenRouterClient({ apiKey }),
+    image: createFalClient({ apiKey: falKey }),
   };
 }
 
-/** Build the LLM + DataForSEO clients the scanner worker needs, from env. */
-export function getScanClients() {
+/** Build the LLM + DataForSEO clients the scanner worker needs. */
+export async function getScanClients() {
+  const [login, password, apiKey] = await Promise.all([
+    resolveProviderSecret('DATAFORSEO_LOGIN'),
+    resolveProviderSecret('DATAFORSEO_PASSWORD'),
+    resolveProviderSecret('OPENROUTER_API_KEY'),
+  ]);
   return {
-    llm: createOpenRouterClient({ apiKey: process.env.OPENROUTER_API_KEY ?? '' }),
-    dataForSeo: createDataForSeoClient({
-      login: process.env.DATAFORSEO_LOGIN ?? '',
-      password: process.env.DATAFORSEO_PASSWORD ?? '',
-    }),
+    llm: createOpenRouterClient({ apiKey }),
+    dataForSeo: createDataForSeoClient({ login, password }),
   };
 }

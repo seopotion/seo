@@ -5,7 +5,10 @@ import type { ProductOrganization } from './organizations';
 
 export type ConnectedIntegration = {
   id: string;
-  provider: 'wordpress';
+  provider: 'wordpress' | 'static-site';
+  // What to render after "Connected to": the site URL for WordPress,
+  // `owner/repo@branch` for a static site. Built server-side.
+  target: string;
   connected_at: string;
 };
 
@@ -13,9 +16,24 @@ export type ConnectedIntegrationsResult = {
   integrations: ConnectedIntegration[];
 };
 
+/** A repository the GitHub App installation can reach, as the callback lists it. */
+export type GithubRepoSummary = {
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+};
+
 /**
- * Fetches the org's connected publishing integrations (currently just WordPress).
- * Shared between the settings integrations panel and the article detail page.
+ * sessionStorage key: the Settings panel stores the user's locale before handing
+ * off to github.com. The App's Setup URL is one fixed unprefixed path, so the
+ * user always returns to the default locale — same problem and same fix as
+ * `GSC_RETURN_LOCALE_KEY` (design/github-app.md § Locale).
+ */
+export const GITHUB_RETURN_LOCALE_KEY = 'seo_github_return_locale';
+
+/**
+ * Fetches the org's connected publishing integrations. Shared between the
+ * settings integrations panel and the article detail page.
  */
 export function useConnectedIntegrations(
   organization: ProductOrganization | null,
