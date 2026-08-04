@@ -85,4 +85,19 @@ describe('generate', () => {
       image_size: { width: 1200, height: 630 },
     });
   });
+
+  test('sends outputFormat as fal output_format, and omits it when unset', async () => {
+    // A Response body can only be read once, so build a fresh one per call.
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => imageResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await client().generate({ prompt: 'x', outputFormat: 'webp' });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({
+      prompt: 'x',
+      output_format: 'webp',
+    });
+
+    await client().generate({ prompt: 'x' });
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body as string)).toEqual({ prompt: 'x' });
+  });
 });

@@ -156,7 +156,8 @@ opening a single Markdown file.
   all. Decided 2026-07-31, while the contract was still unshipped and free: putting it off
   until the encoder records dimensions would have meant a `version: 2` and every adapter in
   the wild breaking, for a field that costs nothing to carry now.
-- `cover_width` / `cover_height` are the encoder's actual output
+- `cover_width` / `cover_height` are the stored object's actual pixels, as the image
+  provider reported them
   ([`article-images.md`](article-images.md#recorded-dimensions)) so the `<img>` can
   reserve its space and not shift the layout. **Both may be `null`** on articles
   generated before dimensions were recorded — omit the attributes rather than guess.

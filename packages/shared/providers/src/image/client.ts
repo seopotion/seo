@@ -71,6 +71,7 @@ export function createFalClient(config: ImageConfig): ImageClient {
       const body: Record<string, unknown> = { prompt: params.prompt };
       if (params.size) body.image_size = params.size;
       if (params.seed !== undefined) body.seed = params.seed;
+      if (params.outputFormat) body.output_format = params.outputFormat;
 
       let attempt = 0;
       // Loop: initial try + up to maxRetries retries on retryable categories.

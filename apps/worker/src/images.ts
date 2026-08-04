@@ -14,6 +14,28 @@ import { storeImage } from './storage';
 /** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
 const IMAGE_MODEL = 'fal-ai/flux-2';
 
+/**
+ * Exact pixels per role. The cover is the OG large-card size; inline is the same
+ * 1200px cap at 16:9. Asking for exact dimensions (rather than a named preset)
+ * is what keeps inline images from arriving wider than the cap — fal still snaps
+ * to model-friendly multiples, which is why the *returned* size is what we store.
+ */
+const SLOT_SIZE = {
+  cover: { width: 1200, height: 630 },
+  inline: { width: 1200, height: 675 },
+} as const;
+
+/**
+ * Stored content-type -> key extension. fal is asked for WebP (`outputFormat`
+ * below), so 'webp' is the expected path; the map keeps the key honest rather
+ * than mislabelling the bytes if the provider ever answers with something else.
+ */
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/webp': 'webp',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+};
+
 /** Deterministic S3 key per slot — retries overwrite, never duplicate (#51). */
 function slotKey(articleId: string, role: ArticleImage['role'], index: number, ext: string) {
   return `articles/${articleId}/${role === 'cover' ? 'cover' : `inline-${index}`}.${ext}`;
@@ -78,7 +100,14 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
           await ArticleRepo.failImages(articleId).catch(() => {});
           throw err;
         }
-        const empty = { url: '', model: null, seed: null, generated_at: null };
+        const empty = {
+          url: '',
+          model: null,
+          seed: null,
+          generated_at: null,
+          width: null,
+          height: null,
+        };
         const slots: ArticleImage[] = [
           { role: 'cover', section_heading: null, ...plan.cover, ...empty },
           ...plan.inline.map((img): ArticleImage => ({ role: 'inline', ...img, ...empty })),
@@ -95,20 +124,33 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         const res = await image.generate({
           prompt: slot.prompt,
           model: IMAGE_MODEL,
-          size: slot.role === 'cover' ? { width: 1200, height: 630 } : 'landscape_16_9',
+          size: SLOT_SIZE[slot.role],
+          // fal encodes WebP itself, so no PNG is ever downloaded, stored or
+          // published — and the object we fetch is ~70KB rather than ~1.1MB (#178).
+          outputFormat: 'webp',
         });
-        const src = res.images[0]?.url;
-        if (!src) throw new Error('image provider returned no image');
+        const generated = res.images[0];
+        if (!generated?.url) throw new Error('image provider returned no image');
+        const src = generated.url;
 
         const imgRes = await fetch(src);
         if (!imgRes.ok) throw new Error(`image download failed (${imgRes.status})`);
-        const contentType = imgRes.headers.get('content-type') ?? 'image/png';
-        const ext = contentType === 'image/jpeg' ? 'jpg' : 'png';
+        const contentType = imgRes.headers.get('content-type') ?? 'image/webp';
+        const ext = EXT_BY_TYPE[contentType] ?? 'webp';
         const bytes = new Uint8Array(await imgRes.arrayBuffer());
 
         const stored = await storeImage(slotKey(articleId, slot.role, i, ext), bytes, contentType);
         if (!stored) logger.warn('IMAGES_BUCKET unset: storing provider URL (local dev only)');
         const url = stored ?? src;
+        // The byte budget is the acceptance criterion and fal picks the quality —
+        // so log what we actually stored, per slot, to keep it measurable in prod.
+        logger.info('image stored', {
+          role: slot.role,
+          content_type: contentType,
+          bytes: bytes.byteLength,
+          width: generated.width,
+          height: generated.height,
+        });
 
         const newContent =
           slot.role === 'inline' && slot.section_heading
@@ -117,7 +159,14 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         await ArticleRepo.fillImageSlot(
           articleId,
           i,
-          { url, model: IMAGE_MODEL, seed: res.seed, generated_at: new Date() },
+          {
+            url,
+            model: IMAGE_MODEL,
+            seed: res.seed,
+            generated_at: new Date(),
+            width: generated.width,
+            height: generated.height,
+          },
           newContent,
         );
         if (newContent) content = newContent;

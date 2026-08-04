@@ -45,6 +45,8 @@ function article(over: Partial<Article> = {}): Article {
         model: 'm',
         seed: null,
         generated_at: new Date('2026-07-01T00:00:00.000Z'),
+        width: 1200,
+        height: 630,
       },
     ],
     images_status: 'complete',
@@ -94,8 +96,8 @@ describe('renderArticle', () => {
         'updated_at: null',
         `cover: "${CDN}/cover.webp"`,
         'cover_alt: "A generated outfit"',
-        'cover_width: null',
-        'cover_height: null',
+        'cover_width: 1200',
+        'cover_height: 630',
         'images: []',
         'video: null',
         '---',
@@ -141,6 +143,8 @@ describe('renderArticle', () => {
       model: null,
       seed: null,
       generated_at: null,
+      width: 1200,
+      height: 672,
     });
     const out = renderArticle(
       published({
@@ -160,11 +164,21 @@ describe('renderArticle', () => {
         'images:',
         `  - src: "${CDN}/inline-1.webp"`,
         '    alt: "Step one"',
-        '    width: null',
-        '    height: null',
+        '    width: 1200',
+        '    height: 672',
       ].join('\n'),
     );
     expect(out).not.toContain('Step two');
+  });
+
+  test('falls back to null dimensions for images generated before #178', () => {
+    const legacy = article({
+      images: article().images.map((i) => ({ ...i, width: null, height: null })),
+    });
+    const out = renderArticle(published({ article: legacy }));
+
+    expect(out).toContain('cover_width: null');
+    expect(out).toContain('cover_height: null');
   });
 
   test('emits the video block when there is one', () => {
@@ -203,8 +217,8 @@ describe('renderManifest', () => {
         keyword: 'ai outfit generator',
         cover: `${CDN}/cover.webp`,
         cover_alt: 'A generated outfit',
-        cover_width: null,
-        cover_height: null,
+        cover_width: 1200,
+        cover_height: 630,
         images: [],
         published_at: '2026-07-29T10:15:00.000Z',
         updated_at: null,
@@ -228,6 +242,8 @@ describe('renderManifest', () => {
           model: null,
           seed: null,
           generated_at: null,
+          width: 1200,
+          height: 672,
         },
       ],
     });
@@ -236,7 +252,7 @@ describe('renderManifest', () => {
     );
 
     expect(manifest.articles[0].images).toEqual([
-      { src: `${CDN}/inline-1.webp`, alt: 'Step one', width: null, height: null },
+      { src: `${CDN}/inline-1.webp`, alt: 'Step one', width: 1200, height: 672 },
     ]);
   });
 

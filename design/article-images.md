@@ -12,7 +12,7 @@ is separate.
 | --- | --- |
 | Pipeline shape | Separate **image SQS task** (`ImageTask`), enqueued by the generation worker after the article persists; consumed by a new images worker Lambda |
 | Durable storage | **One private S3 bucket per stage** + **CloudFront distribution** (Origin Access Control); article URLs are CloudFront URLs |
-| Encoding | **WebP at store time** — re-encoded + downscaled in the worker before the S3 put, so every consumer (CDN, WordPress, git) gets the same small bytes |
+| Encoding | **WebP from the provider** — fal is asked for `output_format: 'webp'` at the requested pixel size, so the bytes are already small when they arrive and every consumer (CDN, WordPress, git) gets the same file. Revised 2026-08-04, [#178](https://github.com/seopotion/seo/issues/178) |
 | Image policy | **Cover (1200×630) + 2 inline images, all required** for `images_status: 'complete'`; inline count is a config constant |
 | Placement | Inline images **injected into `article.content` markdown** directly after their target `## heading`; cover stays out of content (`featured_image_url` + metadata) |
 | Image state | **Embedded on the Article document** (`images` array + `images_status`), no new collection |
@@ -48,6 +48,8 @@ const ArticleImageSchema = z.object({
   model: z.string().nullable(),
   seed: z.number().nullable(),
   generated_at: z.date().nullable(),
+  width: z.number().nullable().default(null),   // intrinsic pixels, from fal (#176)
+  height: z.number().nullable().default(null),
 });
 
 // Added to ArticleSchema, defaulted so pre-#51 docs still parse:
@@ -85,17 +87,19 @@ changes slot identity.
 
 For each slot without a `url`:
 
-1. `ImageClient.generate` (fal, FLUX.1 [dev] default). Cover targets **1200×630**: the
-   neutral `ImageGenerateParams.size` union gains a `{ width, height }` variant (fal's
-   `image_size` accepts custom dimensions natively). Inline images use
-   `landscape_16_9`.
-2. Fetch the returned image bytes from the fal URL.
-3. **Re-encode to WebP and downscale** — see [Encoding](#encoding-webp--downscale).
-4. Upload to the stage bucket at a **deterministic key**:
-   `articles/{article_id}/{cover|inline-1|inline-2}.webp`. Deterministic keys make
-   retries overwrite-idempotent — no orphaned or duplicate assets.
-5. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
-   `generated_at`.
+1. `ImageClient.generate` (fal, FLUX.1 [dev] default), asking for
+   **`outputFormat: 'webp'`** — see [Encoding](#encoding-webp-from-the-provider). Both
+   roles target exact pixels via the `{ width, height }` variant of the neutral
+   `ImageGenerateParams.size` union (fal's `image_size` accepts custom dimensions
+   natively): **1200×630** cover, **1200×675** inline.
+2. Fetch the returned image bytes from the fal URL — already WebP, so nothing is
+   re-encoded and no PNG is ever downloaded or stored.
+3. Upload to the stage bucket at a **deterministic key**:
+   `articles/{article_id}/{cover|inline-1|inline-2}.webp`, with a one-year immutable
+   `Cache-Control`. Deterministic keys make retries overwrite-idempotent — no orphaned
+   or duplicate assets.
+4. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
+   `generated_at`, and the `width` / `height` fal reported.
 
 > **Decide before prod — and this got sharper on 2026-07-30.** Stored URLs bake in the
 > CloudFront domain. If we want a custom domain (e.g. `img.seopotion.com`), alias it onto
@@ -111,9 +115,15 @@ For each slot without a `url`:
 > third-party junk in a client's `git diff`, which is a bad first impression for a feature
 > whose pitch is "auditable". **Alias the domain before the first static-site install.**
 
-## Encoding: WebP + downscale
+## Encoding: WebP from the provider
 
-The provider's bytes are stored unmodified today — a 1200×630 FLUX PNG is 1.5–2.5 MB.
+**Revised 2026-08-04 ([#178](https://github.com/seopotion/seo/issues/178)).** The section
+below previously specified a local `sharp` re-encode in the worker. It no longer does —
+fal encodes WebP itself, which removes a native dependency, a Docker-at-synth
+requirement and a whole class of Lambda packaging risk. The original reasoning for
+*why* small bytes matter is unchanged and kept.
+
+The provider's bytes were stored unmodified — a 1200×630 FLUX PNG is 1.1–2.5 MB.
 Across ~50 articles at 4 images each that is ~400 MB of PNG versus ~24 MB of WebP.
 
 The original argument was that this is fatal in git, because the static-site integration
@@ -125,89 +135,75 @@ client's Largest Contentful Paint, on a page we sold them as an SEO asset, and w
 egress for every view of it. What was a one-time storage cost is now a recurring
 performance and bandwidth cost that scales with their traffic.
 
-**Where: between the fetch and the S3 put**, in the images worker — the only point in
-the system where the bytes are already in memory. The alternatives are both worse:
+### Ask the provider, don't re-encode
 
-- *At publish time (API Lambda).* Re-converts on every republish and once per target,
-  needs a re-download, and puts a native module in the request-path Lambda. It also
-  leaves the dashboard preview, `og:image` and the WordPress path still shipping
-  full-size PNG — the problem was never git-specific, which is why the design outlived
-  the git argument that first motivated it.
-- *Ask the provider for WebP.* `ImageGenerateParams` has no format field, fal's support
-  would need re-verifying per model, and it yields no control over quality or
-  dimensions — which is most of the win.
+`fal-ai/flux-2` takes an `output_format` of `jpeg | png | webp` (default `png`) —
+verified against fal's published schema for the endpoint on 2026-08-04:
 
-Converting at store time means there is exactly **one copy of the bytes** and every
-consumer — dashboard, `og:image`, WordPress, and a client's static site linking straight to
-CloudFront — gets the same small file. The API Lambda never needs sharp.
-
-| Slot | Resize | Encode |
-| --- | --- | --- |
-| cover | `1200×630`, `fit: 'cover'` | WebP `quality: 80` |
-| inline | max width `1200`, `withoutEnlargement` | WebP `quality: 80` |
-
-The cover is already *requested* at 1200×630, but FLUX snaps to model-friendly
-dimensions — the resize is what actually guarantees the OG aspect ratio. Metadata is
-stripped (sharp's default): smaller files, and no provider EXIF served from our CDN. `slotKey`'s extension becomes a constant `webp` and `storeImage` gets
-`ContentType: image/webp`, so the content-type-sniffing branch in the worker disappears.
-
-### Packaging sharp on Lambda
-
-sharp ships **platform-specific native binaries** (`@img/sharp-linux-x64` and friends).
-`NodejsFunction` local bundling runs `npm install` on the *developer's* machine, so a Mac
-would ship a `darwin-arm64` binary to a `linux-x64` Lambda and the function would throw
-on import. The fix is a **second bundling object for the images worker only** — the
-shared `bundling` const backs every Lambda in the stack and must not grow a native dep:
-
-```ts
-// Images worker only: sharp is native, so it stays external and is installed
-// inside the Lambda build image. Docker bundling is what makes the binary
-// linux-x64 rather than the build host's platform.
-const imageBundling = { ...bundling, nodeModules: ['sharp'], forceDockerBundling: true };
+```
+GET https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/flux-2
+  → Flux2Input.output_format = { enum: ["jpeg", "png", "webp"], default: "png" }
 ```
 
-plus `sharp` in [`apps/worker/package.json`](../apps/worker/package.json) `dependencies`
-— CDK resolves the version from the package.json nearest the entry, and the root
-`package-lock.json` is already wired in as `depsLockFilePath`.
+So the whole conversion is one field on the generate call, and the worker downloads
+~70 KB from fal instead of ~1.1 MB — generation gets *faster* as a side effect. There is
+exactly one copy of the bytes and every consumer (dashboard, `og:image`, WordPress, a
+client's static site linking straight to CloudFront) gets the same small file.
 
-Consequences, all accepted:
+| Slot | Requested size | Encode |
+| --- | --- | --- |
+| cover | `1200×630` (OG large-card) | fal `output_format: 'webp'` |
+| inline | `1200×675` (same 1200px cap, 16:9) | fal `output_format: 'webp'` |
 
-- **`cdk synth` / `deploy` now needs Docker running**, for the whole stack, since the
-  function lives in it. The repo already requires Docker for local infra
-  (`docker compose up -d`) and the deploy workflow runs on `ubuntu-latest`, which has
-  it. Worth a check in `cli infra preflight`, which already gates deploys.
-- **`architecture` is unset, so it is `X86_64`** — not arm64. CDK derives the Docker
-  build platform from it, giving a correct but emulated (slow) build on Apple Silicon.
-  Moving *this* Lambda to `ARM64` would make local builds native and the function ~20%
-  cheaper; a separate call, not required here.
-- **`memorySize` 512 → 1024.** Lambda scales vCPU with memory and WebP encoding is
-  CPU-bound, so the work finishes proportionally faster at roughly flat GB-ms cost. The
-  10-minute timeout is untouched and generous.
-- **Local dev is unaffected** — `npm run dev -w worker` runs under tsx against the host's
-  own sharp binary.
+Inline images request **exact pixels** rather than the `landscape_16_9` preset, because
+the preset is the model's choice and can exceed the 1200px cap. `slotKey`'s extension is
+`webp` and `storeImage` gets `ContentType: image/webp`. The content-type branch in the
+worker survives as a small map — it is what keeps the stored key honest (`.png` stays
+`.png`) rather than mislabelling the bytes if the provider ever answers with a format we
+did not ask for. Each store logs `bytes` + `content_type` + dimensions, because fal picks
+the quality: the byte budget (cover ~80 KB, cap 150 KB; inline ~60 KB, cap 100 KB) is the
+acceptance criterion, so it has to stay measurable in production.
 
-If Docker-at-synth ever becomes unacceptable, the fallback is a **prebuilt Lambda layer**
-from its own CI job: it removes the synth-time Docker requirement and adds an artifact to
-build, version and publish. More moving parts, so not the first choice.
+**Accepted tradeoff:** fal owns the quality knob, so we cannot enforce the byte caps
+deterministically or retry at a lower quality on overflow. If real generations turn out to
+overshoot, a local encode is the fallback — see below for what that costs.
+
+**No `sharp`, no Lambda packaging change.** The rejected local-encode path needed
+`nodeModules: ['sharp']` + `forceDockerBundling` on a second bundling object (the shared
+`bundling` const backs *every* Lambda and must not grow a native dep), which would have
+made `cdk synth`/`deploy` require Docker for the whole stack, or a prebuilt layer with its
+own CI job. `memorySize` stays 512 MB — nothing CPU-bound happens in the worker now.
 
 **Existing articles are not touched.** They are `images_status: 'complete'`, so the worker
-skips them and their `.png` keys stay valid. A backfill would also have to rewrite the
-URLs already embedded in `article.content`; out of scope until something needs it.
+skips them and their `.png` keys stay valid — which also means published URLs never move,
+so the orphaning risk in [#177](https://github.com/seopotion/seo/issues/177) never
+arises. A backfill would have to rewrite the URLs already embedded in `article.content`
+and already committed to client repos; out of scope until something needs it.
+
+### Cache headers
+
+`storeImage` sets `CacheControl: 'public, max-age=31536000, immutable'`. Keys are
+deterministic per slot and a regenerate overwrites the same key with the same subject, so
+a year is safe — and these URLs are committed verbatim into client repos, so a repeat
+visitor should never revalidate. Without it CloudFront falls back to its default TTL.
 
 ### Recorded dimensions
 
-sharp hands back the final `width` / `height` for free, so both are stored on the slot:
+fal returns the final `width` / `height` on every image it produces, and we were already
+parsing them into `ImageResult` and throwing them away. Both are now stored on the slot
+(closing [#176](https://github.com/seopotion/seo/issues/176)) — and the *returned* size is
+what gets stored, not the requested one, because FLUX snaps to model-friendly multiples.
 
 ```ts
 // article.ts — ArticleImageSchema
-width: z.number().nullable(),
-height: z.number().nullable(),
+width: z.number().nullable().default(null),
+height: z.number().nullable().default(null),
 ```
 
-**Nullable, not required.** Repositories `parse` through Zod at the boundary, so every
-article generated before this lands would fail to *load* if the fields were mandatory —
-this is a read-path break, not just a write-path one. They follow `model` / `seed` /
-`generated_at`, already nullable for the same unfilled-slot reason.
+**Nullable and defaulted, not required.** Repositories `parse` through Zod at the
+boundary, so every article generated before this landed would fail to *load* if the
+fields were mandatory — a read-path break, not just a write-path one. They follow
+`model` / `seed` / `generated_at`, already nullable for the same unfilled-slot reason.
 
 They flow into the static-site contract's manifest and frontmatter so an adapter can set
 explicit `width`/`height` on `<img>` and reserve the space before the image loads.
@@ -228,8 +224,8 @@ Per SQS record:
 1. `ImageTask.parse` → load article; skip if missing or `images_status === 'complete'`.
 2. If `images` is empty: run the image-plan LLM call, validate, persist slots
    (set-if-absent).
-3. For each slot without a `url`: generate → download → **re-encode to WebP** → S3 →
-   update slot (+ inject markdown for inline).
+3. For each slot without a `url`: generate (**WebP**) → download → S3 → update slot with
+   the URL and fal's dimensions (+ inject markdown for inline).
 4. All slots done → `images_status: 'complete'`, `featured_image_url` = cover URL.
 5. On error: log, rethrow → SQS redelivery resumes at the first unfinished slot → DLQ
    after 3 receives → `images_status` left `'pending'` (visible for ops; a manual

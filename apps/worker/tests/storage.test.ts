@@ -20,20 +20,21 @@ afterEach(() => {
 describe('storeImage', () => {
   test('returns null (dev fallback) when IMAGES_BUCKET is unset', async () => {
     vi.stubEnv('IMAGES_BUCKET', '');
-    expect(await storeImage('articles/a/cover.png', new Uint8Array([1]), 'image/png')).toBeNull();
+    expect(await storeImage('articles/a/cover.webp', new Uint8Array([1]), 'image/webp')).toBeNull();
     expect(send).not.toHaveBeenCalled();
   });
 
-  test('uploads and returns the CDN URL', async () => {
+  test('uploads with an immutable Cache-Control and returns the CDN URL', async () => {
     vi.stubEnv('IMAGES_BUCKET', 'bkt');
     vi.stubEnv('IMAGES_CDN_DOMAIN', 'dxyz.cloudfront.net');
-    const url = await storeImage('articles/a/cover.png', new Uint8Array([1]), 'image/png');
-    expect(url).toBe('https://dxyz.cloudfront.net/articles/a/cover.png');
+    const url = await storeImage('articles/a/cover.webp', new Uint8Array([1]), 'image/webp');
+    expect(url).toBe('https://dxyz.cloudfront.net/articles/a/cover.webp');
     expect(send).toHaveBeenCalledTimes(1);
     expect((send.mock.calls[0]![0] as { input: unknown }).input).toMatchObject({
       Bucket: 'bkt',
-      Key: 'articles/a/cover.png',
-      ContentType: 'image/png',
+      Key: 'articles/a/cover.webp',
+      ContentType: 'image/webp',
+      CacheControl: 'public, max-age=31536000, immutable',
     });
   });
 

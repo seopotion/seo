@@ -169,7 +169,14 @@ export const ArticleRepo = {
   async fillImageSlot(
     id: string,
     index: number,
-    fill: { url: string; model: string; seed: number | null; generated_at: Date },
+    fill: {
+      url: string;
+      model: string;
+      seed: number | null;
+      generated_at: Date;
+      width: number | null;
+      height: number | null;
+    },
     newContent: string | null,
   ): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;
@@ -178,6 +185,8 @@ export const ArticleRepo = {
       [`images.${index}.model`]: fill.model,
       [`images.${index}.seed`]: fill.seed,
       [`images.${index}.generated_at`]: fill.generated_at,
+      [`images.${index}.width`]: fill.width,
+      [`images.${index}.height`]: fill.height,
     };
     if (newContent !== null) set.content = newContent;
     const res = await (await collection()).updateOne(

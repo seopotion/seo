@@ -26,7 +26,7 @@ vi.mock('@shared/db', () => ({
 const { llmComplete, imageGenerate } = vi.hoisted(() => ({
   llmComplete: vi.fn(),
   imageGenerate: vi.fn(async (_params: unknown) => ({
-    images: [{ url: 'https://fal.media/img.png', width: 1, height: 1 }],
+    images: [{ url: 'https://fal.media/img.webp', width: 1200, height: 624 }],
     seed: 7,
   })),
 }));
@@ -35,7 +35,9 @@ vi.mock('../src/providers', () => ({
 }));
 
 const { storeImage } = vi.hoisted(() => ({
-  storeImage: vi.fn(async (key: string) => `https://cdn.example/${key}`),
+  storeImage: vi.fn(
+    async (key: string, _bytes: Uint8Array, _contentType: string) => `https://cdn.example/${key}`,
+  ),
 }));
 vi.mock('../src/storage', () => ({ storeImage }));
 
@@ -119,6 +121,8 @@ const slot = (over: Partial<ArticleImage>): ArticleImage => ({
   model: null,
   seed: null,
   generated_at: null,
+  width: null,
+  height: null,
   ...over,
 });
 // Factory, not a shared const: the handler mutates slot.url, which would
@@ -137,7 +141,7 @@ beforeEach(() => {
       async () =>
         new Response(new Uint8Array([1, 2, 3]), {
           status: 200,
-          headers: { 'content-type': 'image/png' },
+          headers: { 'content-type': 'image/webp' },
         }),
     ),
   );
@@ -165,26 +169,56 @@ describe('images worker', () => {
     expect(slots[0]).toMatchObject({ role: 'cover', section_heading: null, url: '' });
     expect(slots[1]).toMatchObject({ role: 'inline', section_heading: 'First Section' });
 
-    // cover uses exact OG pixels; inline uses the preset
+    // exact OG pixels for the cover, the same 1200px cap at 16:9 inline, WebP for both
     expect(imageGenerate).toHaveBeenCalledTimes(3);
-    expect(imageGenerate.mock.calls[0]![0]).toMatchObject({ size: { width: 1200, height: 630 } });
-    expect(imageGenerate.mock.calls[1]![0]).toMatchObject({ size: 'landscape_16_9' });
+    expect(imageGenerate.mock.calls[0]![0]).toMatchObject({
+      size: { width: 1200, height: 630 },
+      outputFormat: 'webp',
+    });
+    expect(imageGenerate.mock.calls[1]![0]).toMatchObject({
+      size: { width: 1200, height: 675 },
+      outputFormat: 'webp',
+    });
 
-    // deterministic keys
+    // deterministic keys, WebP bytes
     expect(storeImage.mock.calls.map((c) => c[0])).toEqual([
-      'articles/a1/cover.png',
-      'articles/a1/inline-1.png',
-      'articles/a1/inline-2.png',
+      'articles/a1/cover.webp',
+      'articles/a1/inline-1.webp',
+      'articles/a1/inline-2.webp',
     ]);
+    expect(storeImage.mock.calls[0]![2]).toBe('image/webp');
 
     // inline fills carry injected markdown; cover leaves content alone
     expect(fillImageSlot).toHaveBeenCalledTimes(3);
     expect(fillImageSlot.mock.calls[0]![3]).toBeNull();
     expect(fillImageSlot.mock.calls[1]![3]).toContain(
-      '![alt one](https://cdn.example/articles/a1/inline-1.png)',
+      '![alt one](https://cdn.example/articles/a1/inline-1.webp)',
     );
 
-    expect(completeImages).toHaveBeenCalledWith('a1', 'https://cdn.example/articles/a1/cover.png');
+    // provider-reported intrinsic pixels are persisted on every slot (#176)
+    expect(fillImageSlot.mock.calls[0]![2]).toMatchObject({ width: 1200, height: 624 });
+    expect(fillImageSlot.mock.calls[2]![2]).toMatchObject({ width: 1200, height: 624 });
+
+    expect(completeImages).toHaveBeenCalledWith('a1', 'https://cdn.example/articles/a1/cover.webp');
+  });
+
+  test('keeps the key extension honest if the provider ignores the WebP request', async () => {
+    findArticleById.mockResolvedValue({ ...article, images: plannedSlots() });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(new Uint8Array([1, 2, 3]), {
+            status: 200,
+            headers: { 'content-type': 'image/png' },
+          }),
+      ),
+    );
+
+    await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+    expect(storeImage.mock.calls[0]![0]).toBe('articles/a1/cover.png');
+    expect(storeImage.mock.calls[0]![2]).toBe('image/png');
   });
 
   test('skips when images are already complete', async () => {
