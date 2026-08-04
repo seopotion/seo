@@ -76,22 +76,24 @@ Local full-stack dev needs infra up: `docker compose up -d` (MongoDB :27017 + El
 Three-tier flow mapped to environments. `dev` is the integration branch and the
 **GitHub default base for PRs** — merging to `dev` **deploys nothing**. `master` is the
 **staging** branch: merging `dev`→`master` deploys `SeoApiStack-staging`. **Production**
-deploys from a **GitHub Release / tag** — chosen but not yet wired (deferred, see
-[#43](https://github.com/seopotion/seo/issues/43)). Despite the git prelude naming
-`master`, **PRs target `dev`, not `master`.**
+deploys `SeoApiStack-prod` when a **GitHub Release is published**, gated by a required
+reviewer on the `prod` environment; the job refuses a release whose commit is not on
+`master`. Despite the git prelude naming `master`, **PRs target `dev`, not `master`.**
 
-| Branch / event         | Deploys       |
-| ---------------------- | ------------- |
-| push to `dev`          | nothing       |
-| merge `dev` → `master` | **staging**   |
-| GitHub Release / tag   | **prod** (deferred, [#43](https://github.com/seopotion/seo/issues/43)) |
+| Branch / event           | Deploys       |
+| ------------------------ | ------------- |
+| push to `dev`            | nothing       |
+| merge `dev` → `master`   | **staging**   |
+| GitHub Release published | **prod** (approval required) |
 
 - Never commit or merge directly to `dev` or `master` — always go through a PR.
 - Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),
   and open the PR into `dev`. Run the checks above before pushing — CI runs the same
   checks and must pass.
 - Only maintainers merge `dev` → `master` (also via PR) — that's what ships **staging**.
-- Prod ships by cutting a GitHub Release / tag, once the prod environment is stood up ([#43](https://github.com/seopotion/seo/issues/43)).
+- Prod ships by publishing a GitHub Release from a `master` commit — see
+  [`infra/ENVIRONMENTS.md`](infra/ENVIRONMENTS.md#deploying-prod). Provisioning the prod
+  environment's secrets is tracked in [#43](https://github.com/seopotion/seo/issues/43).
 
 When filing or triaging issues, follow the tag conventions in [README.md § Issue tracking](README.md#issue-tracking): every title gets an `[area]` prefix, and `backend`/`infra`/`frontend`/`epic` are the labels (`backend` and `infra` are mutually exclusive — code vs. ops).
 
