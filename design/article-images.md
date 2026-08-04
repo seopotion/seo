@@ -148,10 +148,10 @@ GET https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/flux-2
   → Flux2Input.output_format = { enum: ["jpeg", "png", "webp"], default: "png" }
 ```
 
-So the whole conversion is one field on the generate call, and the worker downloads
-~70 KB from fal instead of ~1.1 MB — generation gets *faster* as a side effect. There is
-exactly one copy of the bytes and every consumer (dashboard, `og:image`, WordPress, a
-client's static site linking straight to CloudFront) gets the same small file.
+So the whole conversion is one field on the generate call, and the worker downloads tens
+to hundreds of KB from fal instead of ~2 MB — generation gets *faster* as a side effect.
+There is exactly one copy of the bytes and every consumer (dashboard, `og:image`,
+WordPress, a client's static site linking straight to CloudFront) gets the same file.
 
 | Slot | Requested size | Encode |
 | --- | --- | --- |
@@ -167,9 +167,44 @@ did not ask for. Each store logs `bytes` + `content_type` + dimensions, because 
 the quality: the byte budget (cover ~80 KB, cap 150 KB; inline ~60 KB, cap 100 KB) is the
 acceptance criterion, so it has to stay measurable in production.
 
-**Accepted tradeoff:** fal owns the quality knob, so we cannot enforce the byte caps
-deterministically or retry at a lower quality on overflow. If real generations turn out to
-overshoot, a local encode is the fallback — see below for what that costs.
+### Measured, 2026-08-04 — the byte caps do not hold for photographic styles
+
+Six real generations against `fal-ai/flux-2` at the exact parameters the worker sends:
+
+| Prompt style | Slot | Requested | Returned | Stored | Cap | |
+| --- | --- | --- | --- | --- | --- | --- |
+| flat illustration | cover | 1200×630 | 1216×640 | **63 KB** | 150 KB | pass |
+| detailed photo (open-plan office) | cover | 1200×630 | 1216×640 | **240 KB** | 150 KB | **1.6× over** |
+| worst case (forest canopy) | cover | 1200×630 | 1216×640 | **555 KB** | 150 KB | **3.7× over** |
+| flat illustration | inline | 1200×675 | 1216×704 | **46 KB** | 100 KB | pass |
+| detailed photo (workshop bench) | inline | 1200×675 | 1216×704 | **180 KB** | 100 KB | **1.8× over** |
+| worst case, as PNG | cover | 1200×630 | 1216×640 | 2052 KB | — | the baseline |
+
+Two findings.
+
+**fal snaps dimensions up to a multiple of 32** — 1200→1216, 630→640, 675→704. This is
+why the *returned* size is what gets persisted, and it is load-bearing: the requested
+values would have been wrong on every image. The 1200px cap is therefore exceeded by 16px
+(1.3%). That is the right trade rather than a bug: requesting 1184 to snap under the cap
+would land *below* the 1200px `og:image` floor for large social cards, which is the
+constraint that actually matters.
+
+**The caps hold for illustration and fail for photography.** fal has no quality parameter
+— `Flux2Input` exposes `output_format` but nothing to turn down — so there is no
+provider-side knob and no retry-at-lower-quality. And `image_style` is
+`z.string()` (`presets.ts`), written by the LLM from the org's own site scan, so a
+photography-led client gets photographic covers and there is nothing today that steers
+them. Illustration lands ~2.4× under budget; a plausible business photo is 1.6× over.
+
+Options, none taken here — this needs a product call:
+
+1. **Raise the caps** to ~250 KB cover / ~200 KB inline. Still 8× better than PNG, and
+   honest about what the provider gives us. Cheapest.
+2. **Constrain `image_style`** toward illustration in the scanner prompt or as a preset
+   enum. Keeps the current budget and the no-encoder architecture; changes generated art
+   direction for every client, so it is a product decision, not a technical one.
+3. **Encode locally after all** — the only option that enforces a cap deterministically,
+   at the `sharp` packaging cost documented immediately below.
 
 **No `sharp`, no Lambda packaging change.** The rejected local-encode path needed
 `nodeModules: ['sharp']` + `forceDockerBundling` on a second bundling object (the shared
@@ -207,7 +242,8 @@ client repo cannot be invalidated by a later regenerate.
 overwrite — no orphaned or duplicate assets", and that is now inverted. Generation is
 non-deterministic (no fixed seed), so a retry that regenerates after a successful put but
 before a successful fill leaves the earlier object behind forever, and the bucket has no
-lifecycle rule. The objects are ~70KB and the path is rare, so this is cheap — but it is
+lifecycle rule. The objects are tens to hundreds of KB and the path is rare, so this is
+cheap — but it is
 unbounded, and a sweep of objects no slot references is the fix if it ever matters.
 
 ### Losing a fill race

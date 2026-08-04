@@ -147,7 +147,9 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
           model: IMAGE_MODEL,
           size: SLOT_SIZE[slot.role],
           // fal encodes WebP itself, so no PNG is ever downloaded, stored or
-          // published — and the object we fetch is ~70KB rather than ~1.1MB (#178).
+          // published. Measured 63KB-555KB depending on subject detail, against
+          // ~2MB as PNG; fal has no quality knob, so the spread is not ours to
+          // narrow — see design/article-images.md § Measured (#178).
           outputFormat: 'webp',
         });
         const generated = res.images[0];
