@@ -80,6 +80,20 @@ export const IntegrationRepo = {
     }
   },
 
+  /**
+   * Record (or clear, with `null`) the standing failure on a connection.
+   * Webhooks are inactive in v1, so GitHub only tells us an installation is
+   * gone when we try to use it — a failed publish is the *only* signal the
+   * settings panel ever gets that a connection has died. No upsert: a row that
+   * has since been disconnected has nothing left to annotate.
+   */
+  async setError(orgId: string, provider: IntegrationProvider, code: string | null): Promise<void> {
+    await (await collection()).updateOne(
+      { org_id: orgId, provider },
+      { $set: { last_error: code === null ? null : { code, at: new Date() } } },
+    );
+  },
+
   /** Disconnect. Returns true when a row matched. */
   async deleteByOrgAndProvider(orgId: string, provider: IntegrationProvider): Promise<boolean> {
     const res = await (await collection()).deleteOne({ org_id: orgId, provider });

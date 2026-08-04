@@ -611,7 +611,17 @@
         "installFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar deneyin.",
         "notConfigured": "Depoya yayınlama henüz kullanılabilir değil. Lütfen daha sonra tekrar deneyin."
       },
-      "provider": "Statik site (GitHub)"
+      "needsAttention": "İlgi gerekiyor",
+      "provider": "Statik site (GitHub)",
+      "publishErrors": {
+        "installationGone": "SeoPotion GitHub üzerinden kaldırıldı, bu yüzden yayınlayamıyoruz. Geri yüklemek için yeniden bağlanın.",
+        "suspended": "GitHub kurulumu askıya alınmış. Askı kalktıktan sonra yeniden bağlanın.",
+        "missingPermission": "SeoPotion bu depoya artık yazamıyor. Yeniden bağlanıp izni tekrar verin.",
+        "repoNotFound": "Bu depoya ya da dala artık ulaşamıyoruz — yeniden adlandırılmış, gizli yapılmış veya kurulumdan çıkarılmış olabilir.",
+        "commitRejected": "GitHub son commit'imizi reddetti. Büyük olasılıkla dal korumalı — yazmaya izin verin veya farklı bir dal bağlayın.",
+        "unknown": "Son yayınlama başarısız oldu. Tekrar yayınlamayı deneyin veya depoyu yeniden bağlayın."
+      },
+      "reconnect": "Yeniden bağlan"
     },
     "status": {
       "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",

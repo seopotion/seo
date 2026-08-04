@@ -10,6 +10,10 @@ export type ConnectedIntegration = {
   // `owner/repo@branch` for a static site. Built server-side.
   target: string;
   connected_at: string;
+  // The last publish failure that will still be true on a retry (uninstalled,
+  // repo dropped, branch protected). Webhooks are off in v1, so this is how the
+  // panel learns a connection has died; a successful publish clears it.
+  last_error: { code: string; at: string } | null;
 };
 
 export type ConnectedIntegrationsResult = {
