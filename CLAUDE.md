@@ -78,8 +78,9 @@ Three-tier flow mapped to environments. `dev` is the integration branch and the
 **staging** branch: merging `dev`→`master` deploys `SeoApiStack-staging`. **Production**
 deploys `SeoApiStack-prod` when a **GitHub Release is published** — no approval step
 (the plan doesn't support required reviewers), so publishing ships prod immediately;
-the job refuses a release whose commit is not on `master`. Despite the git prelude
-naming `master`, **PRs target `dev`, not `master`.**
+the job refuses a release whose commit is not on `master` or has no successful
+staging deploy run of its own. Despite the git prelude naming `master`, **PRs target
+`dev`, not `master`.**
 
 | Branch / event           | Deploys       |
 | ------------------------ | ------------- |
@@ -92,7 +93,8 @@ naming `master`, **PRs target `dev`, not `master`.**
   and open the PR into `dev`. Run the checks above before pushing — CI runs the same
   checks and must pass.
 - Only maintainers merge `dev` → `master` (also via PR) — that's what ships **staging**.
-- Prod ships by publishing a GitHub Release from a `master` commit — see
+- Prod ships by publishing a GitHub Release from a `master` commit that staging
+  already deployed successfully — see
   [`infra/ENVIRONMENTS.md`](infra/ENVIRONMENTS.md#deploying-prod). Provisioning the prod
   environment's secrets is tracked in [#43](https://github.com/seopotion/seo/issues/43).
 

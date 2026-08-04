@@ -21,7 +21,10 @@ beforeEach(async () => {
 
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };
-  vi.clearAllMocks();
+  vi.useRealTimers();
+  // resetAllMocks (not clear) so a test's queued `…Once` implementations can't
+  // leak into the next one; vi.fn(impl) keeps the implementation it was born with.
+  vi.resetAllMocks();
 });
 
 describe('getDataForSeoClient', () => {
@@ -66,5 +69,57 @@ describe('getDataForSeoClient', () => {
 
     expect(second).toBe(first);
     expect(createDataForSeoClient).toHaveBeenCalledTimes(1);
+  });
+
+  test('concurrent first calls share one initialization', async () => {
+    process.env.DATAFORSEO_LOGIN_PARAM = '/seo/prod/dataforseo-login';
+    process.env.DATAFORSEO_PASSWORD_PARAM = '/seo/prod/dataforseo-password';
+    getParameter.mockImplementation(async (name: string) => `value-for:${name}`);
+
+    const { getDataForSeoClient } = await import('../src/clients/providers');
+    const [first, second] = await Promise.all([getDataForSeoClient(), getDataForSeoClient()]);
+
+    expect(second).toBe(first);
+    expect(createDataForSeoClient).toHaveBeenCalledTimes(1);
+    // One resolution per credential, not one per caller.
+    expect(getParameter).toHaveBeenCalledTimes(2);
+  });
+
+  test('a failed initialization is not cached — the next call retries', async () => {
+    process.env.DATAFORSEO_LOGIN_PARAM = '/seo/prod/dataforseo-login';
+    process.env.DATAFORSEO_PASSWORD_PARAM = '/seo/prod/dataforseo-password';
+    getParameter
+      .mockRejectedValueOnce(new Error('ssm unavailable'))
+      .mockImplementation(async (name: string) => `value-for:${name}`);
+
+    const { getDataForSeoClient } = await import('../src/clients/providers');
+    await expect(getDataForSeoClient()).rejects.toThrow('ssm unavailable');
+
+    const client = await getDataForSeoClient();
+
+    expect(client).toEqual({ kind: 'dataforseo' });
+    expect(createDataForSeoClient).toHaveBeenCalledWith({
+      login: 'value-for:/seo/prod/dataforseo-login',
+      password: 'value-for:/seo/prod/dataforseo-password',
+    });
+  });
+
+  test('rebuilds the client after the one-hour credential cache expires', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    process.env.DATAFORSEO_LOGIN_PARAM = '/seo/prod/dataforseo-login';
+    process.env.DATAFORSEO_PASSWORD_PARAM = '/seo/prod/dataforseo-password';
+    getParameter.mockImplementation(async (name: string) => `value-for:${name}`);
+
+    const { getDataForSeoClient } = await import('../src/clients/providers');
+    const first = await getDataForSeoClient();
+
+    vi.setSystemTime(new Date('2026-01-01T01:00:01Z'));
+    const second = await getDataForSeoClient();
+
+    expect(second).not.toBe(first);
+    expect(createDataForSeoClient).toHaveBeenCalledTimes(2);
+    // Powertools gets asked again, so it can refresh its own expired SSM cache.
+    expect(getParameter).toHaveBeenCalledTimes(4);
   });
 });

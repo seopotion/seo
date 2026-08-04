@@ -274,9 +274,18 @@ CDK_DEFAULT_ACCOUNT=859998284061 CDK_DEFAULT_REGION=us-east-1 \
 
 Prod ships from a **GitHub Release**, never from a branch push. The
 `deploy-prod` job in `.github/workflows/deploy-backend.yml` runs on
-`release: published` and, before it holds any AWS credentials, asserts the
-released commit is an ancestor of `master` — so prod can only ship code staging
-has already run. Prereleases are ignored.
+`release: published` and, before it holds any AWS credentials, asserts two
+things about the released commit:
+
+1. it is an ancestor of `master`, and
+2. this workflow has a **successful `push` run for that exact commit** — i.e.
+   staging really deployed it.
+
+Being on `master` is not by itself evidence of a staging deploy: the run could
+have failed or been cancelled, and a `master` commit that touches none of the
+workflow's path filters never triggers a run at all. So a release must point at
+a `master` commit whose staging deploy actually succeeded — otherwise the job
+fails before reaching AWS. Prereleases are ignored.
 
 **There is no approval step.** Publishing the Release *is* the gate: the job
 deploys straight through. Required-reviewer rules on an environment need a paid

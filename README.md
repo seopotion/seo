@@ -28,8 +28,9 @@ We use a three-tier flow mapped to environments. `dev` is the integration branch
 (and the GitHub default) — merging to it **deploys nothing**. `master` is the
 **staging** branch: merging `dev`→`master` deploys the staging backend. **Production**
 deploys when a **GitHub Release is published** — there is no approval step, so
-publishing is the point of no return. Releases must be cut from `master` (the job
-refuses otherwise), so prod only ships code staging has run.
+publishing is the point of no return. The job refuses any release whose commit is
+not on `master` *or* has no successful staging deploy run of its own, so prod only
+ships code staging actually deployed.
 
 | Branch / event            | Deploys       |
 | ------------------------- | ------------- |
@@ -43,8 +44,8 @@ refuses otherwise), so prod only ships code staging has run.
   `ozykhan/backend-stuff`).
 - Open the PR **into `dev`**. CI (lint + typecheck + unit tests) must pass.
 - Maintainers periodically merge `dev` → `master` (also via PR) to ship **staging**;
-  publish a GitHub Release from a `master` commit to ship **prod**
-  (see [`infra/ENVIRONMENTS.md`](infra/ENVIRONMENTS.md#deploying-prod)).
+  publish a GitHub Release from a `master` commit whose staging deploy succeeded to
+  ship **prod** (see [`infra/ENVIRONMENTS.md`](infra/ENVIRONMENTS.md#deploying-prod)).
 
 ```bash
 git checkout dev && git pull            # start from latest dev
