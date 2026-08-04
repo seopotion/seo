@@ -115,10 +115,18 @@ jobs:
       # ref, so verify the released commit is actually on master before we hold
       # any AWS credentials.
       - name: Verify the release commit is on master
+        env:
+          # Through env, never `${{ }}` inline: `${{ }}` is substituted into the
+          # script before bash sees it, and a tag name is attacker-shaped — one
+          # like `v1";echo${IFS}pwned;#` is a valid ref. This step already holds
+          # `id-token: write`, so an injected command could mint the prod OIDC
+          # token straight from ACTIONS_ID_TOKEN_REQUEST_URL, long before
+          # configure-aws-credentials runs. Running early is not a defense.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           git fetch --no-tags --quiet origin master
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
-            echo "::error::Release ${{ github.event.release.tag_name }} points at $GITHUB_SHA, which is not an ancestor of master. Cut releases from master so prod ships staging-verified code."
+            echo "::error::Release $RELEASE_TAG points at $GITHUB_SHA, which is not an ancestor of master. Cut releases from master so prod ships staging-verified code."
             exit 1
           fi
           echo "$GITHUB_SHA is on master — proceeding."
@@ -131,7 +139,7 @@ jobs:
       - name: Verify staging deployed this commit successfully
         env:
           GH_TOKEN: ${{ github.token }}
-          # Via env, not `${{ }}` inline: a tag name is attacker-shaped input.
+          # Through env, not `${{ }}` inline — see the step above.
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           run_id=$(gh run list \

@@ -122,4 +122,45 @@ describe('getDataForSeoClient', () => {
     // Powertools gets asked again, so it can refresh its own expired SSM cache.
     expect(getParameter).toHaveBeenCalledTimes(4);
   });
+
+  test('the one-hour window starts when credentials resolve, not when the lookup starts', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    process.env.DATAFORSEO_LOGIN_PARAM = '/seo/prod/dataforseo-login';
+    process.env.DATAFORSEO_PASSWORD_PARAM = '/seo/prod/dataforseo-password';
+    // Both SSM reads hang until released, so resolution lands well after t0 —
+    // Powertools only starts its own TTL once a response is in its cache.
+    let releaseSsm: () => void;
+    const ssm = new Promise<void>((resolve) => {
+      releaseSsm = resolve;
+    });
+    getParameter.mockImplementation(async (name: string) => {
+      await ssm;
+      return `value-for:${name}`;
+    });
+
+    const { getDataForSeoClient } = await import('../src/clients/providers');
+    const inflight = getDataForSeoClient();
+
+    // 30s of SSM latency, then the credentials land: they are good until 01:00:30.
+    vi.setSystemTime(new Date('2026-01-01T00:00:30Z'));
+    releaseSsm!();
+    const first = await inflight;
+
+    // Past t0 + 1h but inside the resolution-based window — Powertools would
+    // still hand back the very same credentials, so rebuilding here would just
+    // re-cache stale values for another hour.
+    vi.setSystemTime(new Date('2026-01-01T01:00:01Z'));
+
+    expect(await getDataForSeoClient()).toBe(first);
+    expect(createDataForSeoClient).toHaveBeenCalledTimes(1);
+
+    // Past resolution + 1h: now Powertools' cache is stale too, so rebuild.
+    vi.setSystemTime(new Date('2026-01-01T01:00:31Z'));
+    const second = await getDataForSeoClient();
+
+    expect(second).not.toBe(first);
+    expect(createDataForSeoClient).toHaveBeenCalledTimes(2);
+    expect(getParameter).toHaveBeenCalledTimes(4);
+  });
 });
