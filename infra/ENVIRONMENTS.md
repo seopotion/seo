@@ -3,7 +3,8 @@
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
 - `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
-- `SeoApiStack-prod` — deployed by publishing a GitHub Release / tag. Deferred, not yet wired — see [#43](https://github.com/seopotion/seo/issues/43).
+- `SeoApiStack-prod` — deployed by publishing a GitHub Release, gated by the `prod`
+  GitHub Environment. Termination protection is on. See [Deploying prod](#deploying-prod).
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
 Secret values are provisioned out-of-band and resolved at Lambda runtime.
@@ -190,8 +191,8 @@ cat > /tmp/trust.json <<'JSON'
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
       "StringLike": { "token.actions.githubusercontent.com:sub": [
-        "repo:seopotion/seo:ref:refs/heads/dev",
-        "repo:seopotion/seo:ref:refs/heads/master"
+        "repo:seopotion/seo:ref:refs/heads/master",
+        "repo:seopotion/seo:environment:prod"
       ]}
     }
   }]
@@ -268,6 +269,41 @@ cd infra && npm ci
 CDK_DEFAULT_ACCOUNT=859998284061 CDK_DEFAULT_REGION=us-east-1 \
   npx cdk deploy SeoApiStack-staging
 ```
+
+## Deploying prod
+
+Prod ships from a **GitHub Release**, never from a branch push. The
+`deploy-prod` job in `.github/workflows/deploy-backend.yml` runs on
+`release: published` and, before it holds any AWS credentials, asserts the
+released commit is an ancestor of `master` — so prod can only ship code staging
+has already run. Prereleases are ignored.
+
+One-time setup, in addition to the prerequisites above:
+
+1. **Create the `prod` GitHub Environment** with a required reviewer — this is
+   the human gate; the job waits on it before deploying:
+   `Settings → Environments → New environment → prod → Required reviewers`.
+   (Referencing it in the workflow creates it *without* protection rules, so
+   adding the reviewer by hand is what actually gates anything.)
+2. **Add the `environment:prod` subject to the deploy role's trust policy** — a
+   release run's OIDC token is subject `repo:seopotion/seo:environment:prod`,
+   not a `refs/heads/*` one, so without this the job fails at
+   `configure-aws-credentials` before doing anything else. See
+   [GitHub OIDC deploy role](#github-oidc-deploy-role) above.
+
+To ship:
+
+```sh
+git tag v0.1.0 <commit-on-master> && git push origin v0.1.0
+gh release create v0.1.0 --title v0.1.0 --notes 'first prod deploy'
+```
+
+Then approve the run in the Actions tab. The stack emits `HttpApiUrl` and
+`AdminHttpApiUrl`; the LemonSqueezy prod webhook must be pointed at
+`<HttpApiUrl>` after this first deploy, since the URL does not exist until then.
+
+Prod carries `terminationProtection: true`, so `cdk destroy` / `delete-stack`
+refuse until it is turned off deliberately.
 
 ## Migration note
 
