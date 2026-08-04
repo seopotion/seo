@@ -52,11 +52,10 @@ const yamlNumber = (value: number | null): string => (value === null ? 'null' : 
 
 function coverOf(article: Article): { alt: string; width: number | null; height: number | null } {
   const slot = article.images.find((i) => i.role === 'cover');
-  // Pixel dimensions are not on ArticleImageSchema yet — they arrive with the
-  // WebP/resize work (design/article-images.md § Recorded dimensions). Until
-  // then the contract's own answer applies: null, and the adapter omits the
-  // attributes rather than guessing.
-  return { alt: slot?.alt ?? '', width: null, height: null };
+  // Intrinsic pixels as the provider reported them at generation (#176). Still
+  // nullable: articles imaged before #178 have none, and the contract's own
+  // answer for that is null — the adapter omits the attributes rather than guess.
+  return { alt: slot?.alt ?? '', width: slot?.width ?? null, height: slot?.height ?? null };
 }
 
 interface InlineImage {
@@ -70,13 +69,13 @@ interface InlineImage {
  * Inline slots, in body order. An unfilled slot would emit a broken `src`, so
  * drop it. Emitted into **both** the frontmatter and the manifest, from this one
  * function, so the two can never disagree — and so an adapter can fix inline CLS
- * from the manifest alone, without parsing YAML. Dimensions are null until the
- * encoder records them (see coverOf).
+ * from the manifest alone, without parsing YAML. Dimensions carry the same
+ * pre-#178 null caveat as the cover (see coverOf).
  */
 function inlineImages(article: Article): InlineImage[] {
   return article.images
     .filter((i) => i.role === 'inline' && i.url)
-    .map((i) => ({ src: i.url, alt: i.alt, width: null, height: null }));
+    .map((i) => ({ src: i.url, alt: i.alt, width: i.width, height: i.height }));
 }
 
 /** One manifest entry, in the order the contract documents. */

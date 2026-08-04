@@ -6,12 +6,16 @@ export type ImageSize =
   | 'portrait_16_9'
   | { width: number; height: number };
 
+/** Encoding the provider emits. fal's `output_format`; unset = the model's default (png). */
+export type ImageOutputFormat = 'jpeg' | 'png' | 'webp';
+
 export interface ImageGenerateParams {
   prompt: string;
   /** Defaults to config.defaultModel. */
   model?: string;
   size?: ImageSize;
   seed?: number;
+  outputFormat?: ImageOutputFormat;
 }
 
 export interface ImageResult {

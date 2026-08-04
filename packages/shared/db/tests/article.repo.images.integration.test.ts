@@ -28,6 +28,8 @@ const slot = (over: Partial<ArticleImage>): ArticleImage => ({
   model: null,
   seed: null,
   generated_at: null,
+  width: null,
+  height: null,
   ...over,
 });
 
@@ -65,11 +67,20 @@ describe('ArticleRepo image slots (integration)', () => {
   test('fillImageSlot fills once and can swap content atomically', async () => {
     const a = await ArticleRepo.create({ ...base, slug: 'fill' });
     await ArticleRepo.setImagePlan(a.id, plan);
-    const fill = { url: 'https://cdn/x.png', model: 'm', seed: 7, generated_at: new Date() };
+    const fill = {
+      url: 'https://cdn/x.webp',
+      model: 'm',
+      seed: 7,
+      generated_at: new Date(),
+      width: 1200,
+      height: 630,
+    };
 
     expect(await ArticleRepo.fillImageSlot(a.id, 1, fill, 'NEW CONTENT')).toBe(true);
     let found = await ArticleRepo.findById(a.id);
-    expect(found!.images[1]!.url).toBe('https://cdn/x.png');
+    expect(found!.images[1]!.url).toBe('https://cdn/x.webp');
+    expect(found!.images[1]!.width).toBe(1200);
+    expect(found!.images[1]!.height).toBe(630);
     expect(found!.content).toBe('NEW CONTENT');
 
     // second fill of the same slot is a no-op (idempotent redelivery)
@@ -86,18 +97,25 @@ describe('ArticleRepo image slots (integration)', () => {
   test('completeImages only fires when every slot is filled', async () => {
     const a = await ArticleRepo.create({ ...base, slug: 'complete' });
     await ArticleRepo.setImagePlan(a.id, plan);
-    const fill = { url: 'https://cdn/c.png', model: 'm', seed: null, generated_at: new Date() };
+    const fill = {
+      url: 'https://cdn/c.webp',
+      model: 'm',
+      seed: null,
+      generated_at: new Date(),
+      width: 1200,
+      height: 630,
+    };
 
-    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.png')).toBe(false); // none filled
+    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.webp')).toBe(false); // none filled
     await ArticleRepo.fillImageSlot(a.id, 0, fill, null);
     await ArticleRepo.fillImageSlot(a.id, 1, fill, null);
-    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.png')).toBe(false); // one empty
+    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.webp')).toBe(false); // one empty
     await ArticleRepo.fillImageSlot(a.id, 2, fill, null);
-    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.png')).toBe(true);
+    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/c.webp')).toBe(true);
 
     const found = await ArticleRepo.findById(a.id);
     expect(found!.images_status).toBe('complete');
-    expect(found!.featured_image_url).toBe('https://cdn/c.png');
+    expect(found!.featured_image_url).toBe('https://cdn/c.webp');
   });
 
   test('failImages marks failed but never downgrades complete; complete recovers from failed', async () => {
@@ -107,11 +125,18 @@ describe('ArticleRepo image slots (integration)', () => {
     expect((await ArticleRepo.findById(a.id))!.images_status).toBe('failed');
 
     // a later successful pass can still complete from 'failed'
-    const fill = { url: 'https://cdn/z.png', model: 'm', seed: null, generated_at: new Date() };
+    const fill = {
+      url: 'https://cdn/z.webp',
+      model: 'm',
+      seed: null,
+      generated_at: new Date(),
+      width: 1200,
+      height: 630,
+    };
     await ArticleRepo.fillImageSlot(a.id, 0, fill, null);
     await ArticleRepo.fillImageSlot(a.id, 1, fill, null);
     await ArticleRepo.fillImageSlot(a.id, 2, fill, null);
-    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/z.png')).toBe(true);
+    expect(await ArticleRepo.completeImages(a.id, 'https://cdn/z.webp')).toBe(true);
 
     await ArticleRepo.failImages(a.id); // must NOT downgrade
     expect((await ArticleRepo.findById(a.id))!.images_status).toBe('complete');

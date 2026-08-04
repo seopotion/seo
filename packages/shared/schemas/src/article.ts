@@ -29,6 +29,11 @@ export const ArticleImageSchema = z.object({
   model: z.string().nullable(),
   seed: z.number().nullable(),
   generated_at: z.date().nullable(),
+  // Intrinsic pixels of the stored object, as reported by the provider (#176).
+  // Nullable like the three above: slots are planned before they are filled, and
+  // articles generated before #178 have no dimensions to read.
+  width: z.number().nullable().default(null),
+  height: z.number().nullable().default(null),
 });
 export type ArticleImage = z.infer<typeof ArticleImageSchema>;
 
