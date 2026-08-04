@@ -206,11 +206,9 @@ export class ApiStack extends Stack {
       'YoutubeApiKeyParam',
       { parameterName: cfg.youtubeApiKeyParam },
     );
-    const falKeyParam = StringParameter.fromSecureStringParameterAttributes(
-      this,
-      'FalKeyParam',
-      { parameterName: cfg.falKeyParam },
-    );
+    const falKeyParam = StringParameter.fromSecureStringParameterAttributes(this, 'FalKeyParam', {
+      parameterName: cfg.falKeyParam,
+    });
 
     /** DataForSEO credential NAMEs — for the Lambdas that query DataForSEO. */
     const dataForSeoEnv = {

@@ -75,11 +75,7 @@ jobs:
           # deliberately does not assert these yet.
           GITHUB_APP_SLUG_STAGING: ${{ vars.GITHUB_APP_SLUG_STAGING }}
           GITHUB_APP_CLIENT_ID_STAGING: ${{ vars.GITHUB_APP_CLIENT_ID_STAGING }}
-          # Provider secrets baked into the worker Lambdas at synth time
-          # (infra/lib/api-stack.ts providerEnv; SSM provisioning deferred — #9/#43).
-          DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
-          DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          FAL_KEY: ${{ secrets.FAL_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          # Provider API keys are no longer passed here: they live in per-stage
+          # SSM SecureStrings resolved at Lambda runtime (#43), and the preflight
+          # above verifies they exist.
         run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never
