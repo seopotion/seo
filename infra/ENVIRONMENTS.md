@@ -57,6 +57,32 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    aws ssm put-parameter --name /seo/prod/admin/operators     --type String       --value 'a@x.com,b@y.com'
    ```
 
+   The **provider API credentials** (#43) are five more SecureStrings per stage.
+   These used to be GitHub Actions secrets baked into the Lambda environment at
+   synth time — shared across both stages and visible in the CloudFormation
+   template. They are now resolved at runtime like everything else, so **each
+   stage needs its own set before its next deploy** (a missing one deploys a
+   worker that calls its provider with an empty key):
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/dataforseo-login    --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/staging/dataforseo-password --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/staging/openrouter-api-key  --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/staging/youtube-api-key     --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/staging/fal-key             --type SecureString --value '<fal_key>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-login       --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-password    --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/prod/openrouter-api-key     --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/prod/youtube-api-key        --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/prod/fal-key                --type SecureString --value '<fal_key>'
+   ```
+
+   Each Lambda is granted only the keys it calls: DataForSEO to the api, admin,
+   scan and strategy functions; OpenRouter to the four workers; YouTube to the
+   generation worker; fal to the images worker. The scheduler and db-init get
+   none. Local dev is unaffected — with no `*_PARAM` set, the plain
+   `DATAFORSEO_LOGIN` / `OPENROUTER_API_KEY` / … vars in the root `.env` are used.
+
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
    clients](#google-oauth-clients) below. Set each as a GitHub Actions repo
    **variable** `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` (public, not
@@ -210,9 +236,10 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the out-of-band items for a stage are actually in
-place. The preflight checks that all seven SSM SecureStrings exist (jwt-secret,
+place. The preflight checks that all twelve SSM SecureStrings exist (jwt-secret,
 mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-lemonsqueezy-webhook-secret, admin/jwt-secret — presence only, it does not
+lemonsqueezy-webhook-secret, admin/jwt-secret, and the five provider
+credentials — presence only, it does not
 decrypt them), that the plain-String `admin/operators` allowlist exists, and
 that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
 `LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
