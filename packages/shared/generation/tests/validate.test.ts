@@ -180,6 +180,29 @@ describe('validateArticle', () => {
     expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
   });
 
+  // A shorter backtick run must not stand in for part of a longer one: `marked`
+  // (what wordpress.ts publishes with) renders these as live links, so treating
+  // them as code spans shipped the very thing #186 exists to stop.
+  test('mismatched backtick runs are not a code span (#186)', () => {
+    const anchor = `${goodBody}\n\nA \` <a href="/invented">y</a> \`\` B\n`;
+    expect(validateArticle({ ...goodArticle, content: anchor }, ctx).map((f) => f.code)).toContain(
+      'illegal_link',
+    );
+    const autolink = `${goodBody}\n\nA \` see <https://evil.example.com/x> \`\` B\n`;
+    expect(
+      validateArticle({ ...goodArticle, content: autolink }, ctx).map((f) => f.code),
+    ).toContain('illegal_link');
+  });
+
+  test('balanced spans still pass, one or several per line (#186)', () => {
+    const one = `${goodBody}\n\nUse \`<a href="x" rel="nofollow">\` here.\n`;
+    expect(validateArticle({ ...goodArticle, content: one }, ctx)).toEqual([]);
+    const two = `${goodBody}\n\nUse \`\`<a href="x">\`\` here.\n`;
+    expect(validateArticle({ ...goodArticle, content: two }, ctx)).toEqual([]);
+    const both = `${goodBody}\n\nUse \`<a href="x">\` and \`<https://e.com/m>\` here.\n`;
+    expect(validateArticle({ ...goodArticle, content: both }, ctx)).toEqual([]);
+  });
+
   test('a fence containing an angle-bracket URL passes (#186)', () => {
     const content = `${goodBody}\n\n\`\`\`\nimport x from <https://example.com/mod>\n\`\`\`\n`;
     expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);

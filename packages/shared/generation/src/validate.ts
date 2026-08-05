@@ -65,7 +65,10 @@ function stripCode(md: string): string {
       fence = null;
     return '';
   });
-  return lines.join('\n').replace(/(`+)[^`\n]*\1/g, '');
+  // Lookarounds keep the run BOUNDED on both sides: without them `\1` matches a
+  // prefix of a longer run, so `` A ` <a href="x">y</a> `` B `` looked like a
+  // span, got blanked, and shipped a live link — fail-open, the #186 bug (#186).
+  return lines.join('\n').replace(/(?<!`)(`+)[^`\n]*\1(?!`)/g, '');
 }
 
 /**
