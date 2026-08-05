@@ -48,4 +48,28 @@ describe('article + humanize prompts', () => {
     expect(msgs.at(-1)!.content).toContain('# Title');
     expect(msgs[0]!.content).toContain('Spanish');
   });
+
+  test('passes the selected URL and its title, and forbids other links (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 2,
+      linkCandidates: [{ title: 'Widget Guide', url: 'https://a.com/blog/widget-guide' }],
+    };
+    const joined = buildArticlePrompt(linked, {
+      ...outline,
+      internal_links: ['https://a.com/blog/widget-guide'],
+    })
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).toContain('https://a.com/blog/widget-guide');
+    expect(joined).toContain('Widget Guide');
+    expect(joined).toContain('no other links');
+  });
+
+  test('forbids hyperlinks outright when nothing was selected (#186)', () => {
+    const joined = buildArticlePrompt(ctx, { ...outline, internal_links: [] })
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).toContain('Do not include any hyperlinks');
+  });
 });
