@@ -60,6 +60,7 @@ export async function cleanLinks(opts: {
     return ok({
       org: org.id,
       apply: opts.apply,
+      allowedUrls: allowedUrls.length,
       scanned: articles.length,
       changed,
       linksRemoved,

@@ -75,7 +75,13 @@ describe('cleanLinks', () => {
 
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.data).toMatchObject({ scanned: 2, changed: 1, linksRemoved: 2, apply: false });
+      expect(res.data).toMatchObject({
+        scanned: 2,
+        changed: 1,
+        linksRemoved: 2,
+        apply: false,
+        allowedUrls: 1,
+      });
     }
     expect(replaceContent).not.toHaveBeenCalled();
   });
@@ -118,6 +124,8 @@ describe('cleanLinks', () => {
     const res = await cleanLinks({ org: 'o1', apply: true });
 
     expect(res.ok).toBe(true);
+    // Reported so an operator can tell "org has no live pages" from "bug".
+    if (res.ok) expect(res.data.allowedUrls).toBe(0);
     const [, content] = replaceContent.mock.calls[0] as unknown as [string, string];
     expect(content).toBe('See features and this and guide.');
   });

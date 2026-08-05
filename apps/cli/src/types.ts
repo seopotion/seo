@@ -102,6 +102,10 @@ export interface PreflightResult {
 export interface CleanLinksData {
   org: string;
   apply: boolean;
+  /** Verified live URLs every link is checked against. 0 means the org has no
+   * reachable published page, so EVERY link is stripped — expected, but it
+   * explains an otherwise alarming `changed` count. */
+  allowedUrls: number;
   scanned: number;
   changed: number;
   linksRemoved: number;

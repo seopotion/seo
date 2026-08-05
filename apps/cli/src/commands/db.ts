@@ -112,7 +112,11 @@ export const dbCommand = defineCommand({
         try {
           const { cleanLinks } = await import('../lib/links');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn(
+            args.apply
+              ? "Writes to whatever MONGODB_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
+              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
+          );
           emitter.step('db:clean-links', 'start');
 
           const result = await cleanLinks({
