@@ -67,4 +67,44 @@ describe('validateArticle', () => {
   test('countWords ignores markdown punctuation', () => {
     expect(countWords('# Hello **world**')).toBe(2);
   });
+
+  test('an unapproved link fails illegal_link (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 1,
+      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+    } as GenerationContext;
+    const content = `${goodBody}\n\nsee [features](/features/invented)\n`;
+    const codes = validateArticle({ ...goodArticle, content }, linked).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('an approved link within the ceiling passes (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 1,
+      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+    } as GenerationContext;
+    const content = `${goodBody}\n\nsee [our guide](https://a.com/blog/one)\n`;
+    expect(validateArticle({ ...goodArticle, content }, linked)).toEqual([]);
+  });
+
+  test('more links than the ceiling fails illegal_link (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 1,
+      linkCandidates: [
+        { title: 'One', url: 'https://a.com/blog/one' },
+        { title: 'Two', url: 'https://a.com/blog/two' },
+      ],
+    } as GenerationContext;
+    const content = `${goodBody}\n\n[a](https://a.com/blog/one) [b](https://a.com/blog/two)\n`;
+    const codes = validateArticle({ ...goodArticle, content }, linked).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('an image URL is not treated as a link (#186)', () => {
+    const content = `${goodBody}\n\n![cover](https://cdn.seopotion.co/x.webp)\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
 });

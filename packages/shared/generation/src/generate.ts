@@ -2,6 +2,7 @@ import type { LlmClient, LlmUsage } from '@shared/providers';
 import { buildArticlePrompt } from './article';
 import { HUMANIZE } from './config';
 import { buildHumanizePrompt } from './humanize';
+import { sanitizeLinks } from './links';
 import { buildOutlinePrompt, parseOutline } from './outline';
 import { buildSemanticCheckPrompt, parseSemanticResult } from './semantic';
 import type { GeneratedArticle, GenerationContext, ValidationFailure } from './types';
@@ -44,6 +45,11 @@ export async function generateArticle(params: {
     track(humanRes.usage);
     content = humanRes.text;
   }
+
+  // Fail closed (#186): the model is asked for approved URLs only, but anything
+  // it invented or over-placed is unwrapped to plain text here — before
+  // validation, which then asserts the invariant as a backstop.
+  content = sanitizeLinks(content, outline.internal_links, ctx.maxInternalLinks);
 
   const failures = validateArticle(
     {

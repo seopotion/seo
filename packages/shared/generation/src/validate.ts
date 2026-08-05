@@ -6,6 +6,7 @@ import {
   MIN_H2,
   WORD_COUNT_FLOOR,
 } from './config';
+import { extractLinks, normalizeUrl } from './links';
 import type { GenerationContext, ValidationFailure } from './types';
 
 export function countWords(md: string): number {
@@ -73,6 +74,21 @@ export function validateArticle(
     failures.push({ code: 'empty_section', message: 'a section has an empty body' });
   if (new Set(bodies).size !== bodies.length)
     failures.push({ code: 'duplicate_section', message: 'two sections share identical bodies' });
+
+  // Backstop for the sanitizer (#186). Reaching either branch means a link
+  // survived sanitizeLinks, so the article must not ship.
+  const approved = new Set(ctx.linkCandidates.map((c) => normalizeUrl(c.url)));
+  const links = extractLinks(article.content);
+  if (links.some((l) => !approved.has(normalizeUrl(l.url))))
+    failures.push({
+      code: 'illegal_link',
+      message: 'link target is not an approved internal link',
+    });
+  else if (links.length > ctx.maxInternalLinks)
+    failures.push({
+      code: 'illegal_link',
+      message: `more than ${ctx.maxInternalLinks} internal links`,
+    });
 
   return failures;
 }
