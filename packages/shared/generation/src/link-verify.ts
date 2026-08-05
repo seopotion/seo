@@ -10,7 +10,13 @@ const VERIFY_TIMEOUT_MS = 5_000;
 const VERIFY_CONCURRENCY = 5;
 const USER_AGENT = 'Mozilla/5.0 (compatible; SeoPotionLinkCheck/1.0; +https://seopotion.co/bot)';
 
-/** One URL, HEAD first (cheap) with a GET retry for servers that refuse HEAD. */
+/**
+ * One URL, HEAD first (cheap) with a GET retry. GET is the authority: any
+ * non-2xx HEAD response — method rejected, or a WAF/CDN blocking HEAD outright
+ * (more likely given the identifying User-Agent below) — falls through to GET
+ * rather than trusting the HEAD status. A URL is only ever "live" via `res.ok`,
+ * so this cannot introduce a false positive, only avoid a false negative.
+ */
 async function isLive(url: string): Promise<boolean> {
   for (const method of ['HEAD', 'GET'] as const) {
     const controller = new AbortController();
@@ -23,7 +29,7 @@ async function isLive(url: string): Promise<boolean> {
         signal: controller.signal,
       });
       if (res.ok) return true;
-      if (method === 'HEAD' && (res.status === 405 || res.status === 501)) continue;
+      if (method === 'HEAD') continue;
       return false;
     } catch {
       return false;

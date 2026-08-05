@@ -3,7 +3,10 @@ import { verifyCandidates } from '../src/link-verify';
 
 const candidate = (n: number) => ({ title: `P${n}`, url: `https://a.com/blog/p${n}` });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 /** Stub global fetch with a per-URL status lookup. */
 function stubFetch(
@@ -58,5 +61,20 @@ describe('verifyCandidates', () => {
     const fetchMock = stubFetch({});
     expect(await verifyCandidates([])).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('a timed-out request drops the candidate', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(new Error('AbortError')));
+        });
+      }),
+    );
+    const result = verifyCandidates([candidate(1)]);
+    await vi.advanceTimersByTimeAsync(5_000); // VERIFY_TIMEOUT_MS in src/link-verify.ts
+    expect(await result).toEqual([]);
   });
 });
