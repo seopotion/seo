@@ -33,7 +33,7 @@ export async function generateArticle(params: {
     responseFormat: 'json',
   });
   track(outlineRes.usage);
-  const outline = parseOutline(outlineRes.text);
+  const outline = parseOutline(outlineRes.text, ctx);
 
   const articleRes = await llm.complete({ messages: buildArticlePrompt(ctx, outline) });
   track(articleRes.usage);
