@@ -59,6 +59,8 @@ export async function generateArticle(params: {
       content,
     },
     ctx,
+    // Same set the sanitizer just enforced, not every candidate (#186).
+    outline.internal_links,
   );
 
   const semRes = await llm.complete({

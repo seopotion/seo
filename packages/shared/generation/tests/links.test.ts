@@ -78,6 +78,15 @@ describe('extractLinks', () => {
       { text: 'two', url: '#' },
     ]);
   });
+
+  test('sees links titled with any CommonMark delimiter (#186)', () => {
+    const md = `[a](/one "T") [b](/two 'T') [c](/three (T))`;
+    expect(extractLinks(md)).toEqual([
+      { text: 'a', url: '/one' },
+      { text: 'b', url: '/two' },
+      { text: 'c', url: '/three' },
+    ]);
+  });
 });
 
 describe('sanitizeLinks', () => {
@@ -116,8 +125,54 @@ describe('sanitizeLinks', () => {
   });
 
   test('matches allowed URLs regardless of a trailing slash', () => {
-    const md = '[a](https://a.com/blog/one/)';
-    expect(sanitizeLinks(md, allowed, 1)).toBe(md);
+    expect(sanitizeLinks('[a](https://a.com/blog/one/)', allowed, 1)).toBe(
+      '[a](https://a.com/blog/one)',
+    );
+  });
+
+  test('re-emits the verified canonical URL, not the model variant (#186)', () => {
+    // Verification proved the no-slash form live; a static host may 404 the other.
+    expect(sanitizeLinks('read [our guide](https://a.com/blog/one/ ) now', allowed, 1)).toBe(
+      'read [our guide](https://a.com/blog/one) now',
+    );
+    // Anchor text survives verbatim, punctuation and all.
+    expect(sanitizeLinks('[**Our** guide, v2](https://a.com/blog/one/)', allowed, 1)).toBe(
+      '[**Our** guide, v2](https://a.com/blog/one)',
+    );
+  });
+
+  test('drops a title in any CommonMark delimiter on a kept link (#186)', () => {
+    expect(sanitizeLinks('[a](https://a.com/blog/one "T")', allowed, 1)).toBe(
+      '[a](https://a.com/blog/one)',
+    );
+    expect(sanitizeLinks("[a](https://a.com/blog/one 'T')", allowed, 1)).toBe(
+      '[a](https://a.com/blog/one)',
+    );
+    expect(sanitizeLinks('[a](https://a.com/blog/one (T))', allowed, 1)).toBe(
+      '[a](https://a.com/blog/one)',
+    );
+  });
+
+  test('unwraps an unapproved link carrying a title in any delimiter (#186)', () => {
+    expect(sanitizeLinks("see [our sizing guide](/guides/sizing 'Sizing Guide')", allowed, 2)).toBe(
+      'see our sizing guide',
+    );
+    expect(sanitizeLinks('see [our sizing guide](/guides/sizing (Sizing))', allowed, 2)).toBe(
+      'see our sizing guide',
+    );
+    expect(sanitizeLinks('see [our sizing guide](/guides/sizing "Sizing")', allowed, 2)).toBe(
+      'see our sizing guide',
+    );
+  });
+
+  test('a titled image is still never touched (#186)', () => {
+    const md = "![cover](https://cdn.com/c.webp 'Cover')";
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+  });
+
+  test('leaves ordinary prose parentheses alone (#186)', () => {
+    const md = 'Widgets (the metal kind) cost more. See [a](https://a.com/blog/one) — 5 (five).';
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
   });
 });
 

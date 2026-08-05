@@ -27,12 +27,23 @@ export interface PublishedArticleInput {
 }
 
 /**
- * Inline Markdown links. Group 1 is the image marker, 2 the anchor text, 3 the
- * href. Reference-style links (`[a][b]`) are deliberately unmatched: the model
- * has never produced them, and an unmatched link is left alone, not approved —
- * `validate.ts` uses this same extractor, so both halves agree on what a link is.
+ * Inline Markdown links — the ONLY form this module sanitizes. Group 1 is the
+ * image marker, 2 the anchor text, 3 the href; the optional CommonMark title is
+ * matched in all three legal delimiters ("double", 'single', (parenthesised))
+ * and dropped. `extractLinks` and `sanitizeLinks` share it, so both halves of
+ * the enforcement agree on what a link is.
+ *
+ * What is NOT matched here is not unwrapped, and "not unwrapped" means it SHIPS
+ * — this regex fails OPEN, so coverage matters:
+ *  - sanitized (unwrapped, anchor text kept) here: inline links, per the above.
+ *  - detected only (whole article fails validation, never rewritten), in
+ *    `validate.ts`: raw HTML anchors `<a …>`, autolinks `<https://…>`, and
+ *    reference-link definitions `[ref]: /path`.
+ *  - unchecked by either: everything else, notably reference-style USES
+ *    (`[text][ref]`) and links whose href contains a `)`. The model has never
+ *    produced these, but nothing stops them if it does.
  */
-const LINK_RE = /(!?)\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
+const LINK_RE = /(!?)\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
 
 /** Compare URLs without tripping over a trailing slash or stray whitespace. */
 export function normalizeUrl(url: string): string {
@@ -93,15 +104,20 @@ export function extractLinks(md: string): MarkdownLink[] {
  * Fail closed: unwrap every link that is not in `allowedUrls`, is a repeat of a
  * target already used, or falls beyond `max`. Unwrapping keeps the anchor text,
  * so the prose still reads — only the dead href goes away.
+ *
+ * A kept link is re-emitted against OUR canonical URL, not the model's variant:
+ * verification proved the canonical form live, and on a static host the
+ * trailing-slash variant it matched loosely may 404. Anchor text is verbatim.
  */
 export function sanitizeLinks(content: string, allowedUrls: string[], max: number): string {
-  const allowed = new Set(allowedUrls.map(normalizeUrl));
+  const allowed = new Map(allowedUrls.map((u) => [normalizeUrl(u), u]));
   const used = new Set<string>();
   return content.replace(LINK_RE, (match, marker: string, text: string, url: string) => {
     if (marker === '!') return match;
     const key = normalizeUrl(url);
-    if (!allowed.has(key) || used.has(key) || used.size >= max) return text;
+    const canonical = allowed.get(key);
+    if (!canonical || used.has(key) || used.size >= max) return text;
     used.add(key);
-    return match;
+    return `[${text}](${canonical})`;
   });
 }

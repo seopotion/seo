@@ -39,9 +39,16 @@ function sectionBodies(lines: string[]): string[] {
   return bodies;
 }
 
+/**
+ * Deterministic article checks. `allowedUrls` is the link set the backstop
+ * validates against and MUST be the same set the sanitizer enforced — pass
+ * `outline.internal_links`, not every candidate, or the backstop is wider than
+ * what it backs (#186). Defaults to every candidate for callers with no outline.
+ */
 export function validateArticle(
   article: { title: string; meta_title: string; meta_description: string; content: string },
   ctx: GenerationContext,
+  allowedUrls: string[] = ctx.linkCandidates.map((c) => c.url),
 ): ValidationFailure[] {
   const failures: ValidationFailure[] = [];
   const lines = article.content.split('\n');
@@ -77,7 +84,7 @@ export function validateArticle(
 
   // Backstop for the sanitizer (#186). Reaching either branch means a link
   // survived sanitizeLinks, so the article must not ship.
-  const approved = new Set(ctx.linkCandidates.map((c) => normalizeUrl(c.url)));
+  const approved = new Set(allowedUrls.map(normalizeUrl));
   const links = extractLinks(article.content);
   if (links.some((l) => !approved.has(normalizeUrl(l.url))))
     failures.push({
@@ -88,6 +95,20 @@ export function validateArticle(
     failures.push({
       code: 'illegal_link',
       message: `more than ${ctx.maxInternalLinks} internal links`,
+    });
+
+  // Link forms `sanitizeLinks` cannot see, so they are detected here and fail
+  // the article outright — never rewritten. Blunt on purpose: no prompt asks for
+  // any of them, and this runs BEFORE the worker injects the YouTube <iframe>
+  // and before the images worker injects `![...](...)`.
+  if (/<a\s/i.test(article.content))
+    failures.push({ code: 'illegal_link', message: 'raw HTML anchor tag is not an allowed link' });
+  if (/<https?:\/\/[^>\s]+>/.test(article.content))
+    failures.push({ code: 'illegal_link', message: 'autolink is not an allowed link' });
+  if (/^\s{0,3}\[[^\]]+\]:\s*\S/m.test(article.content))
+    failures.push({
+      code: 'illegal_link',
+      message: 'reference-link definition is not an allowed link',
     });
 
   return failures;

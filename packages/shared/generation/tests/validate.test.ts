@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { GenerationContext } from '../src/types';
 import { countWords, validateArticle } from '../src/validate';
+import { buildVideoEmbed } from '../src/video';
 
 const ctx = {
   keyword: 'best widgets',
@@ -105,6 +106,58 @@ describe('validateArticle', () => {
 
   test('an image URL is not treated as a link (#186)', () => {
     const content = `${goodBody}\n\n![cover](https://cdn.seopotion.co/x.webp)\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('a single-quoted-title link is seen by the backstop (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 1,
+      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+    } as GenerationContext;
+    const content = `${goodBody}\n\nsee [our sizing guide](/guides/sizing 'Sizing Guide')\n`;
+    const codes = validateArticle({ ...goodArticle, content }, linked).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('a candidate that was not selected fails the narrowed backstop (#186)', () => {
+    const linked = {
+      ...ctx,
+      maxInternalLinks: 2,
+      linkCandidates: [
+        { title: 'One', url: 'https://a.com/blog/one' },
+        { title: 'Two', url: 'https://a.com/blog/two' },
+      ],
+    } as GenerationContext;
+    const content = `${goodBody}\n\nsee [two](https://a.com/blog/two)\n`;
+    // Wide default (every candidate) passes; the set the sanitizer enforced does not.
+    expect(validateArticle({ ...goodArticle, content }, linked)).toEqual([]);
+    const codes = validateArticle({ ...goodArticle, content }, linked, [
+      'https://a.com/blog/one',
+    ]).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('a raw HTML anchor fails illegal_link (#186)', () => {
+    const content = `${goodBody}\n\n<a href="#">click</a>\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('an autolink fails illegal_link (#186)', () => {
+    const content = `${goodBody}\n\nsee <https://example.com/page>\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('a reference-link definition fails illegal_link (#186)', () => {
+    const content = `${goodBody}\n\n[ref]: /guides/sizing\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('the injected YouTube iframe does not trip the anchor check (#186)', () => {
+    const content = `${goodBody}\n\n${buildVideoEmbed('abc123', 'A & B "video"')}\n`;
     expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
   });
 });
