@@ -10,7 +10,7 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     'Use the target keyword naturally; never keyword-stuff.',
     'Do not invent unverifiable facts about the business. Never promote competitors.',
     `Write the entire article in ${ctx.language}.`,
-    ctx.internalLinks && outline.internal_link_opportunities.length
+    ctx.maxInternalLinks > 0 && outline.internal_links.length
       ? 'Where natural, weave in the suggested internal-link topics as descriptive anchor text.'
       : '',
   ]
@@ -22,8 +22,8 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     `H1: ${outline.h1}`,
     `Sections: ${outline.sections.map((s) => s.heading).join(' | ')}`,
     outline.faqs.length ? `FAQs to answer: ${outline.faqs.map((f) => f.question).join(' | ')}` : '',
-    outline.internal_link_opportunities.length
-      ? `Internal-link topics: ${outline.internal_link_opportunities.join(' | ')}`
+    outline.internal_links.length
+      ? `Internal-link topics: ${outline.internal_links.join(' | ')}`
       : '',
     outline.cta ? `Call to action: ${outline.cta}` : '',
     ctx.articleStyle ? `Style: ${ctx.articleStyle}` : '',

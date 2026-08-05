@@ -2,7 +2,11 @@ import { describe, expect, test } from 'vitest';
 import type { GenerationContext } from '../src/types';
 import { countWords, validateArticle } from '../src/validate';
 
-const ctx = { keyword: 'best widgets' } as GenerationContext;
+const ctx = {
+  keyword: 'best widgets',
+  maxInternalLinks: 0,
+  linkCandidates: [],
+} as unknown as GenerationContext;
 
 // Fixture must clear WORD_COUNT_FLOOR (800): 140 intro + 2 x 360 section words = ~868.
 const goodBody = `# Best Widgets For Makers\n\n${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(60)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(60)}\n`;

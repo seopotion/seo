@@ -1,5 +1,10 @@
 export { buildArticlePrompt } from './article';
-export { HUMANIZE, INLINE_IMAGE_COUNT, MAX_GENERATION_ATTEMPTS } from './config';
+export {
+  HUMANIZE,
+  INLINE_IMAGE_COUNT,
+  MAX_GENERATION_ATTEMPTS,
+  MAX_LINK_CANDIDATES,
+} from './config';
 export { buildContext } from './context';
 export { generateArticle } from './generate';
 export { buildHumanizePrompt } from './humanize';
@@ -13,6 +18,15 @@ export {
   parseImagePlan,
 } from './images';
 export { parseJsonObject } from './json';
+export { verifyCandidates } from './link-verify';
+export type { LinkCandidate, MarkdownLink, PublishedArticleInput } from './links';
+export {
+  deriveCandidates,
+  extractLinks,
+  normalizeUrl,
+  publishedArticleUrl,
+  sanitizeLinks,
+} from './links';
 export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
 export type * from './types';

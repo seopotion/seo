@@ -1,4 +1,6 @@
+import type { Keyword, Org } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
+import { buildContext } from '../src/context';
 import {
   deriveCandidates,
   extractLinks,
@@ -116,5 +118,38 @@ describe('sanitizeLinks', () => {
   test('matches allowed URLs regardless of a trailing slash', () => {
     const md = '[a](https://a.com/blog/one/)';
     expect(sanitizeLinks(md, allowed, 1)).toBe(md);
+  });
+});
+
+const org = {
+  id: 'o1',
+  presets: {
+    business: { name: 'Acme', language: 'English', country: 'US', description: 'widgets' },
+    audience: { target: ['makers'], competitors: [] },
+    blog: { sitemap_url: '', main_blog_url: 'https://a.com/blog', best_articles: [] },
+    article_preferences: {
+      content_seo: {
+        article_style: 'practical',
+        internal_links_count: 2,
+        table_of_contents: true,
+        llm_instructions: '',
+      },
+      engagement: { image_style: '', youtube_videos: true },
+      publishing: { auto_publish: false },
+    },
+  },
+} as unknown as Org;
+
+const keyword = { keyword: 'best widgets' } as Keyword;
+
+describe('buildContext link fields', () => {
+  test('carries the raw preset count and the supplied candidates', () => {
+    const ctx = buildContext(org, keyword, [{ title: 'One', url: 'https://a.com/blog/one' }]);
+    expect(ctx.maxInternalLinks).toBe(2);
+    expect(ctx.linkCandidates).toEqual([{ title: 'One', url: 'https://a.com/blog/one' }]);
+  });
+
+  test('defaults to no candidates when none are supplied', () => {
+    expect(buildContext(org, keyword).linkCandidates).toEqual([]);
   });
 });

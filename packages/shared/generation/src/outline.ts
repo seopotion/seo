@@ -10,7 +10,7 @@ export const OutlineSchema = z.object({
   slug: z.string(),
   sections: z.array(z.object({ heading: z.string(), intent: z.string() })).min(1),
   faqs: z.array(z.object({ question: z.string(), answer: z.string() })).default([]),
-  internal_link_opportunities: z.array(z.string()).default([]),
+  internal_links: z.array(z.string()).default([]),
   cta: z.string().default(''),
 });
 
@@ -22,7 +22,7 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     '{ "h1": string, "meta_title": string, "meta_description": string, "slug": string,',
     '  "sections": [{ "heading": string, "intent": string }],',
     '  "faqs": [{ "question": string, "answer": string }],',
-    '  "internal_link_opportunities": string[], "cta": string }',
+    '  "internal_links": string[], "cta": string }',
     'Rules: h1 must NOT be identical to the keyword; meta_title <= 60 chars;',
     'meta_description between 120 and 160 chars; slug is kebab-case; at least 3 sections.',
   ].join('\n');

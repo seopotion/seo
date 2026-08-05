@@ -10,7 +10,8 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: ['rival.com'],
   articleStyle: 'practical',
-  internalLinks: true,
+  maxInternalLinks: 0,
+  linkCandidates: [],
   llmInstructions: 'be concise',
   keyword: 'best widgets',
   articleType: 'listicle',
@@ -55,7 +56,7 @@ describe('outline', () => {
     );
     expect(out.h1).toBe('Best Widgets Ranked');
     expect(out.faqs).toEqual([]);
-    expect(out.internal_link_opportunities).toEqual([]);
+    expect(out.internal_links).toEqual([]);
   });
 
   test('parseOutline rejects an outline with no sections', () => {

@@ -11,7 +11,8 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: ['rival.com'],
   articleStyle: 'practical',
-  internalLinks: true,
+  maxInternalLinks: 0,
+  linkCandidates: [],
   llmInstructions: '',
   keyword: 'mejores widgets',
   articleType: 'listicle',
@@ -26,7 +27,7 @@ const outline: Outline = {
   slug: 's',
   sections: [{ heading: 'Intro', intent: 'i' }],
   faqs: [{ question: '¿Que?', answer: 'a' }],
-  internal_link_opportunities: ['guia de widgets'],
+  internal_links: [],
   cta: 'Compra ya',
 };
 
