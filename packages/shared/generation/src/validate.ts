@@ -39,6 +39,35 @@ function sectionBodies(lines: string[]): string[] {
   return bodies;
 }
 
+const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
+
+/**
+ * Content with fenced blocks and inline code spans blanked out, for the
+ * raw-link detectors below ONLY. An article about anchor tags or `nofollow` is
+ * a plausible topic for this product's own customers, and a code SAMPLE of a
+ * link is not a link — failing the whole article over one would burn a
+ * generation attempt. Line count is preserved so `^`-anchored patterns still
+ * behave. `sanitizeLinks` and `extractLinks` keep seeing the real content.
+ */
+function stripCode(md: string): string {
+  let fence: string | null = null;
+  const lines = md.split('\n').map((line) => {
+    const m = FENCE_RE.exec(line);
+    if (fence === null) {
+      if (!m) return line;
+      fence = m[1] as string;
+      return '';
+    }
+    // Closes only on the same character, at least as long, alone on its line.
+    // An unclosed fence therefore blanks everything to the end of the content.
+    const marker = m?.[1];
+    if (marker && marker[0] === fence[0] && marker.length >= fence.length && !m[2]?.trim())
+      fence = null;
+    return '';
+  });
+  return lines.join('\n').replace(/(`+)[^`\n]*\1/g, '');
+}
+
 /**
  * Deterministic article checks. `allowedUrls` is the link set the backstop
  * validates against and MUST be the same set the sanitizer enforced — pass
@@ -100,12 +129,16 @@ export function validateArticle(
   // Link forms `sanitizeLinks` cannot see, so they are detected here and fail
   // the article outright — never rewritten. Blunt on purpose: no prompt asks for
   // any of them, and this runs BEFORE the worker injects the YouTube <iframe>
-  // and before the images worker injects `![...](...)`.
-  if (/<a\s/i.test(article.content))
+  // and before the images worker injects `![...](...)`. Code samples are
+  // excluded so an article ABOUT links does not fail for demonstrating one.
+  const prose = stripCode(article.content);
+  if (/<a\s/i.test(prose))
     failures.push({ code: 'illegal_link', message: 'raw HTML anchor tag is not an allowed link' });
-  if (/<https?:\/\/[^>\s]+>/.test(article.content))
+  if (/<https?:\/\/[^>\s]+>/.test(prose))
     failures.push({ code: 'illegal_link', message: 'autolink is not an allowed link' });
-  if (/^\s{0,3}\[[^\]]+\]:\s*\S/m.test(article.content))
+  // `[^\]^]` first char skips GFM footnotes (`[^1]: …`), which article.ts asks
+  // for; requiring a link-shaped value skips glossary and timestamp prose.
+  if (/^\s{0,3}\[[^\]^][^\]]*\]:\s*(?:<\S+>|https?:\/\/\S+|\/\S*)/m.test(prose))
     failures.push({
       code: 'illegal_link',
       message: 'reference-link definition is not an allowed link',

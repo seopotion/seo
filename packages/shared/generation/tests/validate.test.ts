@@ -160,4 +160,52 @@ describe('validateArticle', () => {
     const content = `${goodBody}\n\n${buildVideoEmbed('abc123', 'A & B "video"')}\n`;
     expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
   });
+
+  // The detectors must not fire on code SAMPLES — an article about anchor tags
+  // or nofollow is a plausible topic, and failing it burns a generation attempt.
+  test('a fenced html block containing an anchor tag passes (#186)', () => {
+    const content = `${goodBody}\n\n\`\`\`html\n<a href="/pricing">Pricing</a>\n\`\`\`\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('a fence with no language tag, and an unclosed one, pass (#186)', () => {
+    const plain = `${goodBody}\n\n\`\`\`\n<a href="/pricing">Pricing</a>\n\`\`\`\n`;
+    expect(validateArticle({ ...goodArticle, content: plain }, ctx)).toEqual([]);
+    const unclosed = `${goodBody}\n\n\`\`\`jsx\n<a href="/x">go</a>\n`;
+    expect(validateArticle({ ...goodArticle, content: unclosed }, ctx)).toEqual([]);
+  });
+
+  test('an inline code span containing an anchor tag passes (#186)', () => {
+    const content = `${goodBody}\n\nUse \`<a href="x" rel="nofollow">\` for paid links.\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('a fence containing an angle-bracket URL passes (#186)', () => {
+    const content = `${goodBody}\n\n\`\`\`\nimport x from <https://example.com/mod>\n\`\`\`\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('a GFM footnote is not a reference definition (#186)', () => {
+    const content = `${goodBody}\n\n[^1]: According to our 2025 survey.\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('prose after a bracketed label is not a reference definition (#186)', () => {
+    const gloss = `${goodBody}\n\n[Widget]: a small mechanical part.\n`;
+    expect(validateArticle({ ...goodArticle, content: gloss }, ctx)).toEqual([]);
+    const stamp = `${goodBody}\n\n[00:15]: The speaker explains widgets.\n`;
+    expect(validateArticle({ ...goodArticle, content: stamp }, ctx)).toEqual([]);
+  });
+
+  test('the real forms in body prose still fail illegal_link (#186)', () => {
+    const cases = [
+      `${goodBody}\n\n<a href="/pricing">Pricing</a>\n`,
+      `${goodBody}\n\nsee <https://example.com/page>\n`,
+      `${goodBody}\n\n[ref]: /features/invented\n`,
+    ];
+    for (const content of cases) {
+      const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+      expect(codes).toContain('illegal_link');
+    }
+  });
 });
