@@ -41,6 +41,21 @@ describe('article + humanize prompts', () => {
     expect(joined.toLowerCase()).toContain('markdown');
   });
 
+  // internal_links_count = 0 is the only way to turn linking off today (#186 —
+  // there is no internal-linking system, so every generated link is invented).
+  // The outline step emits `internal_link_opportunities` regardless of the
+  // setting, so both prompt halves have to be gated, not just the instruction.
+  test('internalLinks: false keeps link topics out of the prompt entirely', () => {
+    const joined = buildArticlePrompt({ ...ctx, internalLinks: false }, outline)
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).not.toContain('guia de widgets');
+    expect(joined.toLowerCase()).not.toContain('internal-link');
+    // The rest of the outline still has to survive the guard.
+    expect(joined).toContain('Intro');
+    expect(joined).toContain('Compra ya');
+  });
+
   test('buildHumanizePrompt passes the markdown as the user message', () => {
     const msgs = buildHumanizePrompt(ctx, '# Title\n\nbody');
     expect(msgs.at(-1)!.role).toBe('user');

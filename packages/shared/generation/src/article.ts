@@ -22,7 +22,12 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     `H1: ${outline.h1}`,
     `Sections: ${outline.sections.map((s) => s.heading).join(' | ')}`,
     outline.faqs.length ? `FAQs to answer: ${outline.faqs.map((f) => f.question).join(' | ')}` : '',
-    outline.internal_link_opportunities.length
+    // Same guard as the system line above. The outline step always emits
+    // `internal_link_opportunities`, so gating only on its length leaked the
+    // topic list into the prompt even with internal_links_count = 0 — a list
+    // headed "Internal-link topics" is an instruction to link whether or not
+    // one is spelled out, and with no URLs supplied the model invents them.
+    ctx.internalLinks && outline.internal_link_opportunities.length
       ? `Internal-link topics: ${outline.internal_link_opportunities.join(' | ')}`
       : '',
     outline.cta ? `Call to action: ${outline.cta}` : '',
