@@ -483,7 +483,13 @@ Part of #186"
 - Modify: `packages/shared/generation/src/context.ts`
 - Modify: `packages/shared/generation/src/config.ts`
 - Modify: `packages/shared/generation/src/index.ts`
-- Modify (fixtures): `packages/shared/generation/tests/outline.test.ts:5-21`, `packages/shared/generation/tests/prompts.test.ts:6-31`, `packages/shared/generation/tests/generate.test.ts:6-20`, `packages/shared/generation/tests/validate.test.ts:5`
+- Modify (rename only, behaviour unchanged): `packages/shared/generation/src/outline.ts`, `packages/shared/generation/src/article.ts`
+- Modify (fixtures): `packages/shared/generation/tests/outline.test.ts:5-21,58`, `packages/shared/generation/tests/prompts.test.ts:6-31`, `packages/shared/generation/tests/generate.test.ts:6-20`, `packages/shared/generation/tests/validate.test.ts:5`
+
+**Why the rename is in this task:** renaming the `Outline` field breaks every
+reader of it. Tasks 4 and 5 rewrite those readers properly, but this task must
+leave `npm run check:all` green on its own, so it carries the minimal mechanical
+rename and nothing more.
 
 **Interfaces:**
 - Consumes: `LinkCandidate` from `./links` (Task 1).
@@ -676,7 +682,35 @@ export {
 } from './video';
 ```
 
-- [ ] **Step 4: Update the existing test fixtures**
+- [ ] **Step 4: Mechanical rename in the two readers of the renamed field**
+
+These keep the package compiling; Tasks 4 and 5 replace both files properly.
+
+In `packages/shared/generation/src/outline.ts`, rename the schema field (line 13) and the shape line in the system prompt (line 25):
+
+```ts
+  internal_links: z.array(z.string()).default([]),
+```
+
+```ts
+    '  "internal_links": string[], "cta": string }',
+```
+
+In `packages/shared/generation/src/article.ts`, replace the three references to the old names (lines 13, 25-26):
+
+```ts
+    ctx.maxInternalLinks > 0 && outline.internal_links.length
+      ? 'Where natural, weave in the suggested internal-link topics as descriptive anchor text.'
+      : '',
+```
+
+```ts
+    outline.internal_links.length
+      ? `Internal-link topics: ${outline.internal_links.join(' | ')}`
+      : '',
+```
+
+- [ ] **Step 5: Update the existing test fixtures**
 
 Four test files build a `GenerationContext` literal and will no longer typecheck. In each, replace the `internalLinks: <bool>,` line with the two new fields:
 
@@ -705,12 +739,18 @@ const ctx = {
 } as GenerationContext;
 ```
 
-- [ ] **Step 5: Run the generation suite and the typechecker**
+`packages/shared/generation/tests/outline.test.ts` (line 58) — the assertion on the renamed field:
+
+```ts
+    expect(out.internal_links).toEqual([]);
+```
+
+- [ ] **Step 6: Run the generation suite and the typechecker**
 
 Run: `npm test -- packages/shared/generation && npm run check`
-Expected: PASS. `outline.test.ts` still asserts `internal_link_opportunities` — that assertion is rewritten in Task 4, so a failure on THAT line only is expected here; everything else must be green.
+Expected: PASS — the whole generation suite green and the typecheck clean. This task must not leave either red.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/shared/generation && git commit -m "[generation] Replace internalLinks boolean with count + candidates
