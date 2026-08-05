@@ -92,6 +92,47 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'clean-links': defineCommand({
+      meta: {
+        name: 'clean-links',
+        description: 'Unwrap dead internal links in existing articles (#186); dry run by default',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to clean' },
+        apply: {
+          type: 'boolean',
+          description: 'Write the changes (default: dry run)',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { cleanLinks } = await import('../lib/links');
+
+          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.step('db:clean-links', 'start');
+
+          const result = await cleanLinks({
+            org: args.org as string | undefined,
+            apply: args.apply as boolean,
+          });
+          emitter.step('db:clean-links', result.ok ? 'done' : 'fail');
+          if (result.ok && result.data.publishedChanged.length) {
+            emitter.warn(
+              `${result.data.publishedChanged.length} PUBLISHED article(s) changed — republish them so the customer's site picks up the fix.`,
+            );
+          }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'delete-user': defineCommand({
       meta: {
         name: 'delete-user',

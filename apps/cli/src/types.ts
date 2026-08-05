@@ -96,3 +96,14 @@ export interface PreflightResult {
   ready: boolean;
   checks: PrereqCheck[];
 }
+
+/** `db clean-links` report (#186). `publishedChanged` are live articles whose
+ * content changed — republish them so the fix reaches the customer's site. */
+export interface CleanLinksData {
+  org: string;
+  apply: boolean;
+  scanned: number;
+  changed: number;
+  linksRemoved: number;
+  publishedChanged: { id: string; title: string }[];
+}
