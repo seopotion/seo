@@ -49,6 +49,25 @@ describe('outline', () => {
     expect(joined).toContain('a.com');
   });
 
+  // The other half of the internal_links_count = 0 guard (#186): the article
+  // step already discards link topics when linking is off, so asking the model
+  // to invent them here is wasted output. The field is `.default([])`, so an
+  // outline that omits it still parses.
+  test('internalLinks: false stops the outline asking for link opportunities', () => {
+    const joined = buildOutlinePrompt({ ...ctx, internalLinks: false })
+      .map((m) => m.content)
+      .join('\n');
+    expect(joined).not.toContain('internal_link_opportunities');
+    // The rest of the requested shape has to survive the guard.
+    expect(joined).toContain('"cta": string }');
+    expect(joined).toContain('"faqs"');
+    expect(
+      parseOutline(
+        '{"h1":"H","meta_title":"t","meta_description":"d","slug":"s","sections":[{"heading":"H","intent":"i"}],"cta":""}',
+      ).internal_link_opportunities,
+    ).toEqual([]);
+  });
+
   test('parseOutline parses fenced JSON and applies defaults', () => {
     const out = parseOutline(
       '```json\n{"h1":"Best Widgets Ranked","meta_title":"t","meta_description":"d","slug":"best-widgets","sections":[{"heading":"H","intent":"i"}]}\n```',

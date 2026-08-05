@@ -22,7 +22,12 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     '{ "h1": string, "meta_title": string, "meta_description": string, "slug": string,',
     '  "sections": [{ "heading": string, "intent": string }],',
     '  "faqs": [{ "question": string, "answer": string }],',
-    '  "internal_link_opportunities": string[], "cta": string }',
+    // internal_links_count = 0 turns linking off (#186), so don't ask for
+    // topics the article step is then required to discard — the field is
+    // `.default([])`, so leaving it out of the shape parses fine.
+    ctx.internalLinks
+      ? '  "internal_link_opportunities": string[], "cta": string }'
+      : '  "cta": string }',
     'Rules: h1 must NOT be identical to the keyword; meta_title <= 60 chars;',
     'meta_description between 120 and 160 chars; slug is kebab-case; at least 3 sections.',
   ].join('\n');
