@@ -6,6 +6,7 @@ import {
   MIN_H2,
   WORD_COUNT_FLOOR,
 } from './config';
+import { extractLinks, maskCode, maskIndentedCode, normalizeUrl } from './links';
 import type { GenerationContext, ValidationFailure } from './types';
 
 export function countWords(md: string): number {
@@ -38,9 +39,16 @@ function sectionBodies(lines: string[]): string[] {
   return bodies;
 }
 
+/**
+ * Deterministic article checks. `allowedUrls` is the link set the backstop
+ * validates against and MUST be the same set the sanitizer enforced — pass
+ * `outline.internal_links`, not every candidate, or the backstop is wider than
+ * what it backs (#186). Defaults to every candidate for callers with no outline.
+ */
 export function validateArticle(
   article: { title: string; meta_title: string; meta_description: string; content: string },
   ctx: GenerationContext,
+  allowedUrls: string[] = ctx.linkCandidates.map((c) => c.url),
 ): ValidationFailure[] {
   const failures: ValidationFailure[] = [];
   const lines = article.content.split('\n');
@@ -73,6 +81,41 @@ export function validateArticle(
     failures.push({ code: 'empty_section', message: 'a section has an empty body' });
   if (new Set(bodies).size !== bodies.length)
     failures.push({ code: 'duplicate_section', message: 'two sections share identical bodies' });
+
+  // Backstop for the sanitizer (#186). Reaching either branch means a link
+  // survived sanitizeLinks, so the article must not ship.
+  const approved = new Set(allowedUrls.map(normalizeUrl));
+  const links = extractLinks(article.content);
+  if (links.some((l) => !approved.has(normalizeUrl(l.url))))
+    failures.push({
+      code: 'illegal_link',
+      message: 'link target is not an approved internal link',
+    });
+  else if (links.length > ctx.maxInternalLinks)
+    failures.push({
+      code: 'illegal_link',
+      message: `more than ${ctx.maxInternalLinks} internal links`,
+    });
+
+  // Link forms `sanitizeLinks` cannot see, so they are detected here and fail
+  // the article outright — never rewritten. Blunt on purpose: no prompt asks for
+  // any of them, and this runs BEFORE the worker injects the YouTube <iframe>
+  // and before the images worker injects `![...](...)`. Code samples — fenced,
+  // inline, and indented — are excluded so an article ABOUT links does not fail
+  // for demonstrating one. Indented blocks are masked ONLY here, not in the
+  // sanitizer/extractor — see `maskIndentedCode` for why.
+  const prose = maskIndentedCode(maskCode(article.content));
+  if (/<a\s/i.test(prose))
+    failures.push({ code: 'illegal_link', message: 'raw HTML anchor tag is not an allowed link' });
+  if (/<https?:\/\/[^>\s]+>/.test(prose))
+    failures.push({ code: 'illegal_link', message: 'autolink is not an allowed link' });
+  // `[^\]^]` first char skips GFM footnotes (`[^1]: …`), which article.ts asks
+  // for; requiring a link-shaped value skips glossary and timestamp prose.
+  if (/^\s{0,3}\[[^\]^][^\]]*\]:\s*(?:<\S+>|https?:\/\/\S+|\/\S*)/m.test(prose))
+    failures.push({
+      code: 'illegal_link',
+      message: 'reference-link definition is not an allowed link',
+    });
 
   return failures;
 }

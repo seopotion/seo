@@ -12,3 +12,7 @@ export const HUMANIZE = true;
 
 /** Inline images per article (#51); the cover is always additionally required. */
 export const INLINE_IMAGE_COUNT = 2;
+
+/** Published articles considered as internal-link targets per generation (#186).
+ * Bounds both the outline prompt and the HTTP verification fan-out. */
+export const MAX_LINK_CANDIDATES = 25;
