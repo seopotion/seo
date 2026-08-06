@@ -328,3 +328,92 @@ these two. After confirming staging is healthy, remove the old stack manually:
 `npx cdk deploy` will not delete it because it is no longer in `bin/app.ts`.
 Run `aws cloudformation delete-stack --stack-name SeoApiStack` once you are sure
 nothing depends on it.
+
+# Frontend (SeoWebStack)
+
+Two more stacks, same account, deployed by `.github/workflows/deploy-frontend.yml`
+with the same triggers/guards as the backend (push to `master` → staging;
+published Release → prod, gated on the release commit being on `master` with
+its own successful staging run):
+
+- `SeoWebStack-staging` — `https://staging.seopotion.co`
+- `SeoWebStack-prod` — `https://www.seopotion.co`, with the apex
+  `https://seopotion.co` 301-redirecting to `www` (query string preserved)
+
+Each stack is Next.js on OpenNext: a CloudFront distribution in front of a
+server-rendering Lambda (function URL), an image-optimization Lambda, an S3
+asset bucket, and idle ISR machinery (revalidation queue + DynamoDB tag cache).
+Staging serves `X-Robots-Tag`/`robots.txt` disallow-all (`NEXT_PUBLIC_NOINDEX=1`
+baked in at build time); prod does not set it.
+
+## New repo variables
+
+The `NEXT_PUBLIC_*` build args are inlined at build time (OpenNext build runs
+once per stage in CI), so each stage needs its own set as GitHub Actions repo
+**variables**:
+
+- `NEXT_PUBLIC_API_URL_STAGING` / `NEXT_PUBLIC_API_URL_PROD` — the `HttpApiUrl`
+  output of the corresponding `SeoApiStack-<stage>`.
+- `WEB_ORIGIN_STAGING` / `WEB_ORIGIN_PROD` — already exist for the GSC OAuth
+  redirect base (see [prerequisites](#one-time-prerequisites-per-account)
+  above), but now **also** feed the web build's `NEXT_PUBLIC_SITE_URL` and must
+  point at the real frontend hosts: `https://staging.seopotion.co` /
+  `https://www.seopotion.co`. Changing them requires **one backend redeploy**
+  per stage, since they're baked into the API Lambda at synth time for CORS
+  and the GSC OAuth redirect base.
+- `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` — already exist (see
+  above); reused as-is for `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+
+## Deploy-role policy addition
+
+One-time, needed because the workflow invokes the tag-seed Lambda and creates
+CloudFront invalidations after each `cdk deploy`:
+
+```sh
+aws iam put-role-policy --role-name github-actions-seo-deploy \
+  --policy-name frontend-deploy \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      { "Effect": "Allow", "Action": "lambda:InvokeFunction",
+        "Resource": "arn:aws:lambda:us-east-1:'"$AWS_ACCOUNT_ID"':function:SeoWebStack-*" },
+      { "Effect": "Allow", "Action": "cloudfront:CreateInvalidation",
+        "Resource": "arn:aws:cloudfront::'"$AWS_ACCOUNT_ID"':distribution/*" }
+    ]
+  }'
+```
+
+## First-deploy runbook
+
+The first `cdk deploy` of each web stack **pauses** at the `WebCert`
+certificate resource until the ACM validation CNAMEs are added in Cloudflare —
+open the ACM console while the deploy is waiting, find the pending
+certificate, and copy its validation CNAME name/value into Cloudflare as
+**DNS-only** (grey-cloud) records. Once ACM validates, the deploy continues.
+
+Then, once the stack finishes and emits `DistributionDomain`:
+
+1. Add the site CNAMEs in Cloudflare — `staging`, `www`, and the apex
+   (`seopotion.co`) — all **DNS-only** (grey-cloud), targeting the stack's
+   `DistributionDomain` output. (Cloudflare flattens the apex CNAME
+   automatically.)
+2. Register `https://staging.seopotion.co` (and later `https://www.seopotion.co`)
+   as an **Authorized JavaScript origin** on the matching Google OAuth client
+   — see [Google OAuth clients](#google-oauth-clients) above.
+
+## Cutover checklist
+
+Staging first, full smoke against `https://staging.seopotion.co`:
+
+- Locale routing (`en`/`tr`)
+- `_next/image` resizing
+- Docs MDX pages render
+- `robots.txt` disallow-all
+- Sitemap/canonical URLs point at the staging host
+- Google login + both OAuth callbacks (login, GSC)
+- 404 / error pages
+
+Then flip the prod DNS records (§ First-deploy runbook) and re-run the same
+checks against `https://www.seopotion.co`, plus the apex redirect
+(`https://seopotion.co` → `https://www.seopotion.co`, query string preserved).
+Once prod is verified, delete the Vercel project.
