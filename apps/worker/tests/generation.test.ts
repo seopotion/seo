@@ -8,6 +8,7 @@ const {
   linkArticle,
   findOrgById,
   createArticle,
+  listByOrg,
 } = vi.hoisted(() => ({
   claimGeneration: vi.fn(async () => true),
   findKeywordById: vi.fn(),
@@ -15,17 +16,22 @@ const {
   linkArticle: vi.fn(async () => {}),
   findOrgById: vi.fn(),
   createArticle: vi.fn(async (_doc: unknown) => ({ id: 'art1' })),
+  listByOrg: vi.fn(async () => ({ articles: [] as unknown[], total: 0 })),
 }));
 vi.mock('@shared/db', () => ({
   KeywordRepo: { claimGeneration, findById: findKeywordById, failGeneration, linkArticle },
   OrgRepo: { findById: findOrgById },
-  ArticleRepo: { create: createArticle },
+  ArticleRepo: { create: createArticle, listByOrg },
 }));
 
-const { generateArticle } = vi.hoisted(() => ({ generateArticle: vi.fn() }));
+const { generateArticle, verifyCandidates } = vi.hoisted(() => ({
+  generateArticle: vi.fn(),
+  verifyCandidates: vi.fn(async (c: unknown[]) => c),
+}));
 vi.mock('@shared/generation', async (orig) => ({
   ...(await orig<typeof import('@shared/generation')>()),
   generateArticle,
+  verifyCandidates,
 }));
 
 const { llmComplete, searchVideos } = vi.hoisted(() => ({
@@ -260,5 +266,85 @@ describe('generation worker', () => {
     const created = createArticle.mock.calls[0]![0] as { content: string; video: unknown };
     expect(created.content).not.toContain('iframe');
     expect(created.video).toBeNull();
+  });
+
+  const linkingOrg = {
+    ...org,
+    presets: {
+      ...org.presets,
+      blog: { sitemap_url: '', main_blog_url: 'https://acme.com/blog', best_articles: [] },
+      article_preferences: {
+        ...org.presets.article_preferences,
+        content_seo: { ...org.presets.article_preferences.content_seo, internal_links_count: 2 },
+      },
+    },
+  };
+
+  const published = {
+    title: 'Widget Guide',
+    slug: 'edited-later',
+    publications: [{ slug: 'widget-guide', published_at: new Date('2026-01-01') }],
+  };
+
+  test('passes verified candidates from published articles into the context (#186)', async () => {
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({ articles: [published], total: 1 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listByOrg).toHaveBeenCalledWith('o1', expect.objectContaining({ status: 'published' }));
+    expect(verifyCandidates).toHaveBeenCalledWith([
+      { title: 'Widget Guide', url: 'https://acme.com/blog/widget-guide' },
+    ]);
+    const passed = generateArticle.mock.calls[0]![0] as {
+      ctx: { linkCandidates: unknown[]; maxInternalLinks: number };
+    };
+    expect(passed.ctx.maxInternalLinks).toBe(2);
+    expect(passed.ctx.linkCandidates).toEqual([
+      { title: 'Widget Guide', url: 'https://acme.com/blog/widget-guide' },
+    ]);
+  });
+
+  test('a candidate that fails verification never reaches the context (#186)', async () => {
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({ articles: [published], total: 1 });
+    verifyCandidates.mockResolvedValueOnce([]);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const passed = generateArticle.mock.calls[0]![0] as { ctx: { linkCandidates: unknown[] } };
+    expect(passed.ctx.linkCandidates).toEqual([]);
+  });
+
+  test('an org with internal_links_count 0 queries nothing (#186)', async () => {
+    findOrgById.mockResolvedValue(org); // fixture has internal_links_count: 0
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listByOrg).not.toHaveBeenCalled();
+    const passed = generateArticle.mock.calls[0]![0] as { ctx: { linkCandidates: unknown[] } };
+    expect(passed.ctx.linkCandidates).toEqual([]);
+  });
+
+  test('an org with no main_blog_url gets no candidates (#186)', async () => {
+    findOrgById.mockResolvedValue({
+      ...linkingOrg,
+      presets: {
+        ...linkingOrg.presets,
+        blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
+      },
+    });
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listByOrg).not.toHaveBeenCalled();
   });
 });
