@@ -82,7 +82,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ Biome lint/format; CI (`ci.yml`) runs lint + typecheck + tests on PRs
 - ✅ Pre-deploy prereq preflight — `infra preflight --stage` CLI verifies SSM secrets + `GOOGLE_CLIENT_ID`; gates the deploy CI — [#16](https://github.com/seopotion/seo/issues/16). Provisioning of the real values is still by hand — [#9](https://github.com/seopotion/seo/issues/9)
 - ⬜ `cdk synth` PR-gate for `infra/**` (CI runs root gates only) — [#30](https://github.com/seopotion/seo/issues/30)
-- ⬜ Sub-project C — Frontend hosting + previews (OpenNext + CDK); design stub, blocked on SSR answers — [#35](https://github.com/seopotion/seo/issues/35)
+- 🟡 Frontend hosting on AWS (OpenNext + CDK): stacks + deploy workflow implemented; first deploy, DNS records, and Vercel retirement pending — [#35](https://github.com/seopotion/seo/issues/35)
 
 ## Local development
 

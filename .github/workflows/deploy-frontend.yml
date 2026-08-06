@@ -1,0 +1,205 @@
+name: Deploy frontend
+
+# Mirrors deploy-backend.yml: merging `dev` → `master` deploys staging; a
+# published GitHub Release deploys prod after the same two guards (commit on
+# master + this workflow's own successful staging run for that commit). #35.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'apps/integration-clients/wordpress-org/**'
+      - 'scripts/package-wp-plugin.mjs'
+      - 'infra/lib/web-stack.ts'
+      - 'infra/lib/config.ts'
+      - 'infra/bin/app.ts'
+      - '.github/workflows/deploy-frontend.yml'
+  release:
+    types: [published]
+
+permissions:
+  id-token: write # for OIDC
+  contents: read
+
+jobs:
+  deploy-staging:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-frontend-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Preflight — verify frontend build variables
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_STAGING }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_STAGING }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+        run: |
+          for v in NEXT_PUBLIC_API_URL NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Repo variable behind $v is unset — the build would bake a localhost/wrong-domain fallback into the bundle (see infra/ENVIRONMENTS.md § Frontend)."
+              exit 1
+            fi
+          done
+
+      - name: OpenNext build (staging)
+        # NEXT_PUBLIC_* are build-time inlined — every env needs its own build.
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_STAGING }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_STAGING }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+          NEXT_PUBLIC_NOINDEX: '1'
+        run: cd apps/web && npx @opennextjs/aws build
+
+      - name: Install infra deps
+        run: cd infra && npm ci
+
+      - name: CDK deploy
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: us-east-1
+        run: >
+          cd infra && npx cdk deploy SeoWebStack-staging
+          --require-approval never --outputs-file outputs.json
+
+      - name: Seed tag cache
+        run: |
+          fn=$(jq -r '.["SeoWebStack-staging"].TagSeedFunctionName' infra/outputs.json)
+          aws lambda invoke --function-name "$fn" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"type":"initializationFunction","requestType":"create","resourceId":"dynamodb-cache"}' \
+            /dev/null
+
+      - name: Invalidate CloudFront
+        # SSG HTML carries a long s-maxage — without this, deploys don't show.
+        run: |
+          dist=$(jq -r '.["SeoWebStack-staging"].DistributionId' infra/outputs.json)
+          aws cloudfront create-invalidation --distribution-id "$dist" --paths '/*'
+
+  deploy-prod:
+    # Prereleases are for testing a tag, not for shipping — they must not deploy.
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    # Declared for the OIDC subject (repo:seopotion/seo:environment:prod), same
+    # as deploy-backend.yml — no protection rules exist on the environment.
+    environment: prod
+    permissions:
+      id-token: write # for OIDC
+      contents: read
+      actions: read # read this workflow's own run history
+    concurrency:
+      group: deploy-frontend-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the ancestry check below can see master.
+          fetch-depth: 0
+
+      - name: Verify the release commit is on master
+        env:
+          # Through env, never `${{ }}` inline — tag names are attacker-shaped
+          # (see deploy-backend.yml for the full rationale).
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git fetch --no-tags --quiet origin master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Release $RELEASE_TAG points at $GITHUB_SHA, which is not an ancestor of master. Cut releases from master so prod ships staging-verified code."
+            exit 1
+          fi
+          echo "$GITHUB_SHA is on master — proceeding."
+
+      - name: Verify staging deployed this commit successfully
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          run_id=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy-frontend.yml \
+            --event push \
+            --commit "$GITHUB_SHA" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "::error::No successful staging deploy of deploy-frontend.yml exists for $GITHUB_SHA. Release $RELEASE_TAG would ship a frontend staging has not verified."
+            exit 1
+          fi
+          echo "Staging deploy run $run_id succeeded for $GITHUB_SHA — proceeding."
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Preflight — verify frontend build variables
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_PROD }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_PROD }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+        run: |
+          for v in NEXT_PUBLIC_API_URL NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Repo variable behind $v is unset — the build would bake a localhost/wrong-domain fallback into the bundle (see infra/ENVIRONMENTS.md § Frontend)."
+              exit 1
+            fi
+          done
+
+      - name: OpenNext build (prod)
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_PROD }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_PROD }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+        run: cd apps/web && npx @opennextjs/aws build
+
+      - name: Install infra deps
+        run: cd infra && npm ci
+
+      - name: CDK deploy
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: us-east-1
+        run: >
+          cd infra && npx cdk deploy SeoWebStack-prod
+          --require-approval never --outputs-file outputs.json
+
+      - name: Seed tag cache
+        run: |
+          fn=$(jq -r '.["SeoWebStack-prod"].TagSeedFunctionName' infra/outputs.json)
+          aws lambda invoke --function-name "$fn" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"type":"initializationFunction","requestType":"create","resourceId":"dynamodb-cache"}' \
+            /dev/null
+
+      - name: Invalidate CloudFront
+        run: |
+          dist=$(jq -r '.["SeoWebStack-prod"].DistributionId' infra/outputs.json)
+          aws cloudfront create-invalidation --distribution-id "$dist" --paths '/*'
