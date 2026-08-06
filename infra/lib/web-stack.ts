@@ -193,6 +193,9 @@ export class WebStack extends Stack {
       ? `  if (request.headers.host.value === '${config.apexRedirect.from}') {
     var qs = '';
     var keys = Object.keys(request.querystring);
+    // Repeated query params collapse to their first value here — .value
+    // reads only the single (first) instance; CloudFront's multiValue is
+    // ignored, so ?a=1&a=2 redirects with just ?a=1.
     for (var i = 0; i < keys.length; i++) {
       qs += (qs === '' ? '?' : '&') + keys[i] + '=' + request.querystring[keys[i]].value;
     }
@@ -242,15 +245,29 @@ ${apexRedirect}  request.headers['x-forwarded-host'] = { value: request.headers.
     const assetsOrigin = S3BucketOrigin.withOriginAccessControl(bucket, {
       originPath: '/_assets',
     });
+    // The viewer-request function (apex redirect + x-forwarded-host) must run
+    // on every behavior, not just the default one — otherwise apex requests
+    // for static assets or _next/image bypass the 301 and serve 200 directly.
+    // The x-forwarded-host write is harmless on S3/image origins, which don't
+    // read it.
     const staticBehavior: BehaviorOptions = {
       origin: assetsOrigin,
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+      functionAssociations: [
+        { function: viewerRequestFn, eventType: FunctionEventType.VIEWER_REQUEST },
+      ],
     };
 
     // _next/image* must precede the derived _next/* behavior (insertion order
     // is CloudFront precedence). Everything in .open-next/assets gets a static
     // behavior — public/ files (integrations/, downloads/, *.png) included.
+    // `_next/data/*` (present as a top-level assets/ entry) therefore falls
+    // under `_next/*` → S3 here, diverging from open-next.output.json's own
+    // server routing for that path — harmless for this App-Router-only app,
+    // which doesn't use the pages-router data route. Note this also means the
+    // behavior count scales with the number of top-level assets/ entries,
+    // against CloudFront's default 25-behavior-per-distribution limit.
     const additionalBehaviors: Record<string, BehaviorOptions> = {
       '_next/image*': {
         origin: new FunctionUrlOrigin(imageUrl),
@@ -258,6 +275,9 @@ ${apexRedirect}  request.headers['x-forwarded-host'] = { value: request.headers.
         allowedMethods: AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
         cachePolicy: imageCachePolicy,
         originRequestPolicy: OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+        functionAssociations: [
+          { function: viewerRequestFn, eventType: FunctionEventType.VIEWER_REQUEST },
+        ],
       },
     };
     for (const entry of readdirSync(join(OPEN_NEXT_DIR, 'assets'), { withFileTypes: true })) {

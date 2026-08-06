@@ -46,6 +46,19 @@ jobs:
       - name: Install root deps
         run: npm ci
 
+      - name: Preflight — verify frontend build variables
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_STAGING }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_STAGING }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_STAGING }}
+        run: |
+          for v in NEXT_PUBLIC_API_URL NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Repo variable behind $v is unset — the build would bake a localhost/wrong-domain fallback into the bundle (see infra/ENVIRONMENTS.md § Frontend)."
+              exit 1
+            fi
+          done
+
       - name: OpenNext build (staging)
         # NEXT_PUBLIC_* are build-time inlined — every env needs its own build.
         env:
@@ -146,6 +159,19 @@ jobs:
 
       - name: Install root deps
         run: npm ci
+
+      - name: Preflight — verify frontend build variables
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL_PROD }}
+          NEXT_PUBLIC_SITE_URL: ${{ vars.WEB_ORIGIN_PROD }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+        run: |
+          for v in NEXT_PUBLIC_API_URL NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_GOOGLE_CLIENT_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Repo variable behind $v is unset — the build would bake a localhost/wrong-domain fallback into the bundle (see infra/ENVIRONMENTS.md § Frontend)."
+              exit 1
+            fi
+          done
 
       - name: OpenNext build (prod)
         env:

@@ -844,7 +844,7 @@ Same OIDC role and prod guards as deploy-backend.yml. Part of #35"
 Place it after the backend deploy sections, following the file's existing tone. It must contain, concretely:
 
 1. **Stacks:** `SeoWebStack-staging` → `https://staging.seopotion.co`, `SeoWebStack-prod` → `https://www.seopotion.co` (+ apex 301). Deployed by `deploy-frontend.yml` with the same triggers/guards as the backend.
-2. **New repo variables:** `NEXT_PUBLIC_API_URL_STAGING` / `NEXT_PUBLIC_API_URL_PROD` (the `HttpApiUrl` output of the corresponding ApiStack). Note that `WEB_ORIGIN_STAGING/PROD` now also feed the web build's `NEXT_PUBLIC_SITE_URL` and must be set to `https://staging.seopotion.co` / `https://www.seopotion.co` — changing them requires **one backend redeploy** per stage (they're baked into the API Lambda at synth time for CORS + the GSC OAuth redirect base).
+2. **New repo variables:** `NEXT_PUBLIC_API_URL_STAGING` / `NEXT_PUBLIC_API_URL_PROD` (the `HttpApiUrl` output of the corresponding ApiStack). Note that `WEB_ORIGIN_STAGING/PROD` now also feed the web build's `NEXT_PUBLIC_SITE_URL` and must be set to `https://staging.seopotion.co` / `https://www.seopotion.co` — changing them requires **one backend redeploy** per stage (they're baked into the API Lambda at synth time for the GSC OAuth redirect base).
 3. **Deploy-role policy addition** (one-time, needed because the workflow invokes the seed Lambda and creates invalidations):
 
 ```bash

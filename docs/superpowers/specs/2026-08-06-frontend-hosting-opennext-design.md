@@ -128,7 +128,7 @@ New `.github/workflows/deploy-frontend.yml` mirroring `deploy-backend.yml`'s sha
 2. Register `https://staging.seopotion.co` as an authorized JavaScript origin in the Google
    OAuth console (`www.seopotion.co` is already registered).
 3. Set new repo variables (`NEXT_PUBLIC_API_URL_STAGING/PROD` etc.); update
-   `WEB_ORIGIN_STAGING/PROD` to the new origins and redeploy the backend once (CORS + GSC
+   `WEB_ORIGIN_STAGING/PROD` to the new origins and redeploy the backend once (GSC OAuth
    redirect base).
 4. After verification: flip DNS, then retire the Vercel project.
 

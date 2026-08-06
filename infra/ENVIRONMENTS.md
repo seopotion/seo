@@ -343,8 +343,8 @@ its own successful staging run):
 Each stack is Next.js on OpenNext: a CloudFront distribution in front of a
 server-rendering Lambda (function URL), an image-optimization Lambda, an S3
 asset bucket, and idle ISR machinery (revalidation queue + DynamoDB tag cache).
-Staging serves `X-Robots-Tag`/`robots.txt` disallow-all (`NEXT_PUBLIC_NOINDEX=1`
-baked in at build time); prod does not set it.
+Staging serves a `robots.txt` disallow-all (`NEXT_PUBLIC_NOINDEX=1` baked in at
+build time); prod does not set it.
 
 ## New repo variables
 
@@ -385,6 +385,13 @@ aws iam put-role-policy --role-name github-actions-seo-deploy \
 
 ## First-deploy runbook
 
+**Deploy `SeoWebStack-*` only via `deploy-frontend.yml` (CI), never `cdk deploy`
+from a laptop.** `.open-next` bundles native dependencies for the target Lambda
+architecture (`sharp`, used by the image-optimization function), and sharp's
+installer honors the *host* platform, not the requested `linux/arm64` — a
+macOS-built `.open-next` bakes in a darwin binary, so `/_next/image` would 500
+in Lambda. CI runs on `ubuntu-latest` and produces correct linux binaries.
+
 The first `cdk deploy` of each web stack **pauses** at the `WebCert`
 certificate resource until the ACM validation CNAMEs are added in Cloudflare —
 open the ACM console while the deploy is waiting, find the pending
@@ -413,7 +420,7 @@ Staging first, full smoke against `https://staging.seopotion.co`:
 - Google login + both OAuth callbacks (login, GSC)
 - 404 / error pages
 
-Then flip the prod DNS records (§ First-deploy runbook) and re-run the same
+Then flip the prod DNS records (see [First-deploy runbook](#first-deploy-runbook)) and re-run the same
 checks against `https://www.seopotion.co`, plus the apex redirect
 (`https://seopotion.co` → `https://www.seopotion.co`, query string preserved).
 Once prod is verified, delete the Vercel project.
