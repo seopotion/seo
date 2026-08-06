@@ -236,6 +236,12 @@ describe('validateArticle', () => {
     expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
   });
 
+  test('a bracket-nested invented link is caught by the backstop (#186)', () => {
+    const content = `${goodBody}\n\nsee [the [beta] guide](/features/invented)\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
   test('the real forms in body prose still fail illegal_link (#186)', () => {
     const cases = [
       `${goodBody}\n\n<a href="/pricing">Pricing</a>\n`,

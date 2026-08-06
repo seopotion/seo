@@ -211,6 +211,102 @@ describe('code samples are not links', () => {
   });
 });
 
+// CommonMark permits balanced brackets in link text and balanced parens in the
+// destination; the old regex handled neither, so a bracket-nested invented link
+// shipped unchanged — the #186 incident shape — and a paren destination was
+// prefix-matched, corrupting the prose. The scanner must close both.
+describe('bracket-nested links', () => {
+  const allowed = ['https://a.com/blog/one'];
+
+  test('unwraps an invented link whose text contains balanced brackets', () => {
+    expect(sanitizeLinks('see [the [beta] guide](/features/invented) now', allowed, 2)).toBe(
+      'see the [beta] guide now',
+    );
+    expect(sanitizeLinks('[as noted in [1]](/features/invented)', allowed, 2)).toBe(
+      'as noted in [1]',
+    );
+  });
+
+  test('keeps an approved link whose text contains balanced brackets', () => {
+    expect(sanitizeLinks('[the [beta] guide](https://a.com/blog/one)', allowed, 2)).toBe(
+      '[the [beta] guide](https://a.com/blog/one)',
+    );
+  });
+
+  test('a balanced-paren destination is consumed whole, not prefix-matched', () => {
+    // The regex matched `[a](/x(y)` and left `z)` behind: corrupted prose.
+    expect(sanitizeLinks('[a](/x(y)z)', allowed, 2)).toBe('a');
+  });
+
+  test('an angle-bracket destination is a link, not prose', () => {
+    expect(sanitizeLinks('see [x](</docs y>) here', allowed, 2)).toBe('see x here');
+    expect(sanitizeLinks('[x](<https://a.com/blog/one>)', allowed, 2)).toBe(
+      '[x](https://a.com/blog/one)',
+    );
+  });
+
+  test('an empty destination is a link to nowhere and is unwrapped', () => {
+    expect(sanitizeLinks('[a]()', allowed, 2)).toBe('a');
+  });
+
+  test('unwrapping an inner link cannot expose a new unvetted outer link', () => {
+    // CommonMark links cannot nest: the INNER one renders, the outer brackets
+    // are literal. Unwrapping the inner leaves text that re-parses as the outer
+    // link, so sanitization must iterate to a fixpoint.
+    expect(
+      sanitizeLinks('[outer [inner](/features/invented) rest](/also/invented)', allowed, 2),
+    ).toBe('outer inner rest');
+    expect(
+      sanitizeLinks('[outer [inner](/features/invented) rest](https://a.com/blog/one)', allowed, 2),
+    ).toBe('[outer inner rest](https://a.com/blog/one)');
+  });
+
+  test('a link wrapping an image is decided by its own target', () => {
+    const kept = '[see ![alt](https://cdn.com/x.webp) now](https://a.com/blog/one)';
+    expect(sanitizeLinks(kept, allowed, 2)).toBe(kept);
+    expect(sanitizeLinks('[see ![alt](https://cdn.com/x.webp) now](/invented)', allowed, 2)).toBe(
+      'see ![alt](https://cdn.com/x.webp) now',
+    );
+  });
+
+  test('an invented link inside an image alt is unwrapped, the image kept', () => {
+    expect(sanitizeLinks('![alt [x](/invented)](https://cdn.com/i.webp)', allowed, 2)).toBe(
+      '![alt x](https://cdn.com/i.webp)',
+    );
+  });
+
+  test('escaped brackets are literal text, not link structure', () => {
+    const md = 'see \\[not a link\\](/x) here';
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+    expect(sanitizeLinks('[a \\[b\\] c](/features/invented)', allowed, 2)).toBe('a \\[b\\] c');
+  });
+
+  test('extractLinks agrees with the sanitizer on nested brackets', () => {
+    expect(extractLinks('[see [1]](/x)')).toEqual([{ text: 'see [1]', url: '/x' }]);
+  });
+
+  test('does not trigger on brackets in ordinary prose, alt text, tables, or footnotes', () => {
+    const cases = [
+      'The [beta] build (see above) is out.',
+      '![from [studio] shoot](https://cdn.com/x.webp)',
+      '| col | note |\n| --- | --- |\n| [beta] | (soon) |',
+      'as shown[^1] earlier.\n\n[^1]: The 2025 survey.',
+      'a bracket pair [here] and parens (there) far apart',
+    ];
+    for (const md of cases) expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+  });
+
+  test('a code sample of a bracket-nested link is untouched', () => {
+    const md = '```md\n[the [beta] guide](/features/invented)\n```\n';
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+  });
+
+  test('text spanning a blank line is not a link', () => {
+    const md = '[a\n\nb](/features/invented)';
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+  });
+});
+
 const org = {
   id: 'o1',
   presets: {

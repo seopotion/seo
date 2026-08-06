@@ -26,28 +26,6 @@ export interface PublishedArticleInput {
   publications: { slug: string; published_at: Date }[];
 }
 
-/**
- * Inline Markdown links — the ONLY form this module sanitizes. Group 1 is the
- * image marker, 2 the anchor text, 3 the href; the optional CommonMark title is
- * matched in all three legal delimiters ("double", 'single', (parenthesised))
- * and dropped. `extractLinks` and `sanitizeLinks` share it, so both halves of
- * the enforcement agree on what a link is.
- *
- * What is NOT matched here is not unwrapped, and "not unwrapped" means it SHIPS
- * — this regex fails OPEN, so coverage matters:
- *  - sanitized (unwrapped, anchor text kept) here: inline links, per the above.
- *  - detected only (whole article fails validation, never rewritten), in
- *    `validate.ts`: raw HTML anchors `<a …>`, autolinks `<https://…>`, and
- *    reference-link definitions `[ref]: /path`.
- *  - unchecked by either: everything else, notably reference-style USES
- *    (`[text][ref]`) and links whose href contains a `)`. The model has never
- *    produced these, but nothing stops them if it does.
- *
- * Matching runs against `maskCode`d content, so a code SAMPLE of a link — in a
- * fenced block or an inline span — is neither counted nor rewritten.
- */
-const LINK_RE = /(!?)\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)/g;
-
 const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
 
 // Lookarounds keep the run BOUNDED on both sides: without them `\1` matches a
@@ -62,7 +40,8 @@ const SPAN_RE = /(?<!`)(`+)[^`\n]*\1(?!`)/g;
  * character, at least as long, alone on its line — an unclosed fence blanks to
  * the end). Inline spans become NULs: a NUL is neither `)` nor whitespace, so a
  * span nested inside a link DESTINATION (`[a](/x\`y\`z)` — a live link to
- * CommonMark) still matches LINK_RE and fails closed instead of slipping past.
+ * CommonMark) still parses as a destination and fails closed instead of
+ * slipping past.
  */
 export function maskCode(md: string): string {
   let fence: string | null = null;
@@ -154,19 +133,184 @@ export function deriveCandidates(
   return candidates;
 }
 
+/**
+ * An inline link or image located by `scanInlineLinks`, as byte offsets into
+ * the scanned string. `maskCode` is length-preserving, so offsets found on
+ * masked content are valid on the original.
+ */
+interface InlineSpan {
+  start: number; // the '!' for an image, else the '['
+  end: number; // just past the closing ')'
+  textStart: number;
+  textEnd: number; // the matching ']'
+  url: string;
+  isImage: boolean;
+}
+
+/** Is the character at `pos` behind an odd run of backslashes? */
+function isEscaped(s: string, pos: number): boolean {
+  let backslashes = 0;
+  for (let k = pos - 1; k >= 0 && s[k] === '\\'; k--) backslashes++;
+  return backslashes % 2 === 1;
+}
+
+/** Skip spaces/tabs and at most one newline — a blank line ends inline
+ * context. Returns the index after the whitespace, or -1 on a blank line. */
+function skipInlineWhitespace(s: string, from: number): number {
+  let newline = false;
+  let i = from;
+  for (; i < s.length; i++) {
+    const c = s[i];
+    if (c === ' ' || c === '\t') continue;
+    if (c === '\n') {
+      if (newline) return -1;
+      newline = true;
+      continue;
+    }
+    break;
+  }
+  return i;
+}
+
+/**
+ * `(destination "title")` following a `]`, per CommonMark: an `<angle>`
+ * destination (may contain spaces) or a bare one with BALANCED unescaped
+ * parens, then an optional title in any of the three delimiters. Returns null
+ * when it does not parse — the bracket pair was not an inline link. An empty
+ * destination (`[a]()`) is legal and returns `url: ''`, which no allow-list
+ * contains, so it unwraps.
+ */
+function parseDestination(s: string, open: number): { url: string; end: number } | null {
+  if (s[open] !== '(') return null;
+  let i = skipInlineWhitespace(s, open + 1);
+  if (i < 0) return null;
+  let url = '';
+  if (s[i] === '<') {
+    let j = i + 1;
+    while (j < s.length && s[j] !== '>' && s[j] !== '<' && s[j] !== '\n')
+      j += s[j] === '\\' ? 2 : 1;
+    if (s[j] !== '>') return null;
+    url = s.slice(i + 1, j);
+    i = j + 1;
+  } else {
+    const start = i;
+    let depth = 0;
+    while (i < s.length) {
+      const c = s[i];
+      if (c === '\\') {
+        i += 2;
+        continue;
+      }
+      if (c === ' ' || c === '\t' || c === '\n') break;
+      if (c === '(') depth++;
+      else if (c === ')') {
+        if (depth === 0) break;
+        depth--;
+      }
+      i++;
+    }
+    if (depth !== 0) return null;
+    url = s.slice(start, Math.min(i, s.length));
+  }
+  let j = skipInlineWhitespace(s, i);
+  if (j < 0) return null;
+  if (j > i && (s[j] === '"' || s[j] === "'" || s[j] === '(')) {
+    const paren = s[j] === '(';
+    const closer = paren ? ')' : (s[j] as string);
+    let m = j + 1;
+    while (m < s.length && s[m] !== closer) {
+      if (paren && s[m] === '(') return null; // a paren title cannot nest
+      m += s[m] === '\\' ? 2 : 1;
+    }
+    if (m >= s.length) return null;
+    j = skipInlineWhitespace(s, m + 1);
+    if (j < 0) return null;
+  }
+  if (s[j] !== ')') return null;
+  return { url, end: j + 1 };
+}
+
+/**
+ * Every inline link and image in `s`, by walking brackets with a stack the way
+ * CommonMark pairs them: `]` closes the NEAREST open `[`/`![`, so balanced
+ * brackets in anchor text (`[the [beta] guide](/x)`) resolve correctly — the
+ * old regex could not contain `]` in text at all, and a bracket-nested invented
+ * link shipped unchanged, the exact #186 incident shape.
+ *
+ * Approximations, all resolved fail-closed by the sanitizer's fixpoint loop or
+ * the `validate.ts` backstop (which uses this same scanner via `extractLinks`):
+ *  - a completed outer span swallows spans completed inside it (an image keeps
+ *    its bytes verbatim; alt text never renders as live HTML), and a completed
+ *    LINK deactivates every earlier opener — CommonMark's no-links-in-links
+ *    rule, which also means unwrapping an inner link can expose an outer one
+ *    that only the next sanitize pass sees;
+ *  - text containing a blank line is not a link (no CommonMark renderer links
+ *    it either, so leaving it is renderer-aligned);
+ *  - reference-style USES (`[text][ref]`) are still out of scope: their
+ *    definition line is what `validate.ts` rejects, and a use without a
+ *    definition renders as plain text.
+ */
+function scanInlineLinks(s: string): InlineSpan[] {
+  const spans: InlineSpan[] = [];
+  const openers: { pos: number; isImage: boolean }[] = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '\\') {
+      i += 2;
+      continue;
+    }
+    if (c === '[') {
+      const isImage = i > 0 && s[i - 1] === '!' && !isEscaped(s, i - 1);
+      openers.push({ pos: isImage ? i - 1 : i, isImage });
+      i++;
+      continue;
+    }
+    if (c !== ']') {
+      i++;
+      continue;
+    }
+    const opener = openers.pop();
+    i++;
+    if (!opener) continue;
+    const textStart = opener.pos + (opener.isImage ? 2 : 1);
+    const textEnd = i - 1;
+    if (/\n[ \t]*\n/.test(s.slice(textStart, textEnd))) continue;
+    const dest = parseDestination(s, i);
+    if (!dest) continue;
+    while (spans.length && (spans.at(-1) as InlineSpan).start > opener.pos) spans.pop();
+    spans.push({
+      start: opener.pos,
+      end: dest.end,
+      textStart,
+      textEnd,
+      url: dest.url,
+      isImage: opener.isImage,
+    });
+    if (!opener.isImage) openers.length = 0;
+    i = dest.end;
+  }
+  return spans;
+}
+
 /** Every inline link in the Markdown, in document order. Images and code
- * samples excluded. Anchor text is read back from the original (a span inside
- * it would otherwise surface as `maskCode` filler). */
+ * samples excluded. Anchor text is read back from the original (a code span
+ * inside it would otherwise surface as `maskCode` filler). */
 export function extractLinks(md: string): MarkdownLink[] {
   const links: MarkdownLink[] = [];
-  for (const match of maskCode(md).matchAll(LINK_RE)) {
-    const [, marker = '', text = '', url = ''] = match;
-    if (marker === '!') continue;
-    const textStart = match.index + marker.length + 1;
-    links.push({ text: md.slice(textStart, textStart + text.length), url });
+  for (const span of scanInlineLinks(maskCode(md))) {
+    if (span.isImage) continue;
+    links.push({ text: md.slice(span.textStart, span.textEnd), url: span.url });
   }
   return links;
 }
+
+/** Unwrapping `[inner](x)` inside `[outer [inner](x) rest](y)` leaves text
+ * that re-parses as the outer link, so one pass is not enough. Each changed
+ * pass removes at least one link, so this terminates well under the cap for
+ * real content; anything a capped-out pathological input leaves behind is
+ * caught by `validateArticle` and fails the article. */
+const MAX_SANITIZE_PASSES = 10;
 
 /**
  * Fail closed: unwrap every link that is not in `allowedUrls`, is a repeat of a
@@ -177,26 +321,33 @@ export function extractLinks(md: string): MarkdownLink[] {
  * verification proved the canonical form live, and on a static host the
  * trailing-slash variant it matched loosely may 404. Anchor text is verbatim.
  *
- * Matches come from `maskCode`d content — a code sample of a link is left
+ * Spans come from `maskCode`d content — a code sample of a link is left
  * exactly as written — and are resolved back to the original by offset, which
  * `maskCode` preserves.
  */
 export function sanitizeLinks(content: string, allowedUrls: string[], max: number): string {
+  for (let pass = 0; pass < MAX_SANITIZE_PASSES; pass++) {
+    const next = sanitizePass(content, allowedUrls, max);
+    if (next === content) break;
+    content = next;
+  }
+  return content;
+}
+
+function sanitizePass(content: string, allowedUrls: string[], max: number): string {
   const allowed = new Map(allowedUrls.map((u) => [normalizeUrl(u), u]));
   const used = new Set<string>();
   let out = '';
   let last = 0;
-  for (const match of maskCode(content).matchAll(LINK_RE)) {
-    const [full, marker = '', text = '', url = ''] = match;
-    out += content.slice(last, match.index);
-    last = match.index + full.length;
-    if (marker === '!') {
-      out += content.slice(match.index, last);
+  for (const span of scanInlineLinks(maskCode(content))) {
+    out += content.slice(last, span.start);
+    last = span.end;
+    if (span.isImage) {
+      out += content.slice(span.start, span.end);
       continue;
     }
-    const textStart = match.index + marker.length + 1;
-    const originalText = content.slice(textStart, textStart + text.length);
-    const key = normalizeUrl(url);
+    const originalText = content.slice(span.textStart, span.textEnd);
+    const key = normalizeUrl(span.url);
     const canonical = allowed.get(key);
     if (!canonical || used.has(key) || used.size >= max) {
       out += originalText;
