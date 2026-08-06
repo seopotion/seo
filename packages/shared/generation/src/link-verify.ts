@@ -28,6 +28,9 @@ async function isLive(url: string): Promise<boolean> {
         headers: { 'User-Agent': USER_AGENT },
         signal: controller.signal,
       });
+      // Only the status matters; cancel the body so undici releases the
+      // connection now instead of holding it until GC.
+      await res.body?.cancel().catch(() => {});
       if (res.ok) return true;
       if (method === 'HEAD') continue;
       return false;

@@ -63,6 +63,16 @@ describe('verifyCandidates', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  test('cancels the response body so the connection is released', async () => {
+    const cancel = vi.fn(async () => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, body: { cancel } }) as unknown as Response),
+    );
+    expect(await verifyCandidates([candidate(1)])).toEqual([candidate(1)]);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   test('a timed-out request drops the candidate', async () => {
     vi.useFakeTimers();
     vi.stubGlobal(
