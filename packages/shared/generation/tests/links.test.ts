@@ -32,6 +32,12 @@ describe('publishedArticleUrl', () => {
     expect(publishedArticleUrl('not a url', 'my-post')).toBeNull();
     expect(publishedArticleUrl('ftp://a.com', 'my-post')).toBeNull();
   });
+
+  test('returns null when the base carries a query or fragment', () => {
+    // Appending a slug to these yields `…?page=2/my-post` — not a page URL.
+    expect(publishedArticleUrl('https://a.com/blog?page=2', 'my-post')).toBeNull();
+    expect(publishedArticleUrl('https://a.com/blog#latest', 'my-post')).toBeNull();
+  });
 });
 
 describe('deriveCandidates', () => {

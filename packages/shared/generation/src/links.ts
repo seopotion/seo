@@ -62,6 +62,8 @@ export function publishedArticleUrl(mainBlogUrl: string, slug: string): string |
     return null;
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  // A query or fragment can't have a slug appended (`…?page=2/my-post`).
+  if (parsed.search || parsed.hash) return null;
   return `${base.replace(/\/+$/, '')}/${path}`;
 }
 
