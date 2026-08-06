@@ -32,6 +32,22 @@ describe('IntegrationRepo (integration)', () => {
     expect(found?.last_error).toBeNull();
   });
 
+  // The stored shape has to survive the Zod parse on read, and a reconnect has
+  // to wipe the failure — otherwise a repaired install still reads as broken.
+  test('setError records and clears the standing failure', async () => {
+    await IntegrationRepo.connectWordPress('org_err', 'https://c.com', 'ciphertext');
+
+    await IntegrationRepo.setError('org_err', 'wordpress', 'repo_not_found');
+    const failed = await IntegrationRepo.findByOrgAndProvider('org_err', 'wordpress');
+    expect(failed?.last_error?.code).toBe('repo_not_found');
+    expect(failed?.last_error?.at).toBeInstanceOf(Date);
+
+    await IntegrationRepo.setError('org_err', 'wordpress', null);
+    expect((await IntegrationRepo.findByOrgAndProvider('org_err', 'wordpress'))?.last_error).toBe(
+      null,
+    );
+  });
+
   test('reconnecting replaces the token instead of adding a second row', async () => {
     await IntegrationRepo.connectWordPress('org_re', 'https://a.com', 'first');
     await IntegrationRepo.connectWordPress('org_re', 'https://b.com', 'second');
