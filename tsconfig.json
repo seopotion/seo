@@ -14,8 +14,9 @@
     "**/dist",
     "infra",
     "cdk.out",
-    // Browser app with its own DOM/JSX tsconfig — `npm run check:admin` covers
-    // it. (apps/web needs no entry here only because it has no src/ directory.)
-    "apps/admin"
+    // Browser apps with their own tsconfigs (including their test files) — run via
+    // `npm run check:admin` and `npm run check:web` respectively.
+    "apps/admin",
+    "apps/web"
   ]
 }

@@ -611,7 +611,17 @@
         "installFailed": "We couldn't start the GitHub installation. Please try again.",
         "notConfigured": "Publishing to a repository is not available yet. Please try again later."
       },
-      "provider": "Static site (GitHub)"
+      "needsAttention": "Needs attention",
+      "provider": "Static site (GitHub)",
+      "publishErrors": {
+        "installationGone": "SeoPotion was removed from GitHub, so we can't publish. Reconnect to restore it.",
+        "suspended": "The GitHub installation is suspended. Reconnect once it has been restored.",
+        "missingPermission": "SeoPotion no longer has write access to this repository. Reconnect and grant it again.",
+        "repoNotFound": "We can't reach this repository or branch anymore — it may have been renamed, made private, or removed from the installation.",
+        "commitRejected": "GitHub refused our last commit. The branch is most likely protected — allow writes to it, or connect a different branch.",
+        "unknown": "The last publish failed. Try publishing again, or reconnect the repository."
+      },
+      "reconnect": "Reconnect"
     },
     "status": {
       "loadError": "Could not load settings. Try again when the API is available.",

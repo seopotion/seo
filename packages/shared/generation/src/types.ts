@@ -1,4 +1,5 @@
 import type { SerpCompetitor } from '@shared/schemas';
+import type { LinkCandidate } from './links';
 
 export interface GenerationContext {
   businessName: string;
@@ -8,7 +9,13 @@ export interface GenerationContext {
   audience: string;
   competitors: string[];
   articleStyle: string;
-  internalLinks: boolean;
+  // Ceiling on internal links, never a quota (#186). The pre-#186 `internalLinks`
+  // boolean collapsed the 0-3 preset to yes/no, which is why a preset of 1 shipped
+  // 3-6 links.
+  maxInternalLinks: number;
+  // Link targets already proven live. Empty means the article ships with no
+  // internal links, whatever `maxInternalLinks` says.
+  linkCandidates: LinkCandidate[];
   llmInstructions: string;
   keyword: string;
   articleType: string | null;
@@ -23,7 +30,11 @@ export interface Outline {
   slug: string;
   sections: { heading: string; intent: string }[];
   faqs: { question: string; answer: string }[];
-  internal_link_opportunities: string[];
+  // URLs chosen from `ctx.linkCandidates` — already filtered and capped by
+  // `parseOutline`, so everything here is approved (#186). Replaces the
+  // pre-#186 `internal_link_opportunities`, which were topics the model invented
+  // for itself and then had to invent hrefs for.
+  internal_links: string[];
   cta: string;
 }
 

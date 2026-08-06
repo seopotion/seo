@@ -81,6 +81,7 @@ function toConnectedIntegration(i: Integration) {
     provider: i.provider,
     target: i.provider === 'wordpress' ? i.site_url : `${i.repo}@${i.branch}`,
     connected_at: i.connected_at.toISOString(),
+    last_error: i.last_error && { code: i.last_error.code, at: i.last_error.at.toISOString() },
   };
 }
 
@@ -475,6 +476,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
           provider: 'wordpress',
           target: org.website_url,
           connected_at: org.wordpress_connected_at.toISOString(),
+          last_error: null,
         });
       }
       return c.json({ integrations: rows }, 200);
@@ -934,7 +936,17 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       } catch (err) {
         const fail = publishFailure(err);
         if (fail.status === 409) return c.json(fail.body, 409);
-        if (fail.status === 422) return c.json(fail.body, 422);
+        if (fail.status === 422) {
+          // A 422 is GitHub refusing us for a reason that is still true on the
+          // next attempt — uninstalled, suspended, repo dropped, branch
+          // protected. Stick it on the connection so the settings panel can say
+          // "connected but broken" instead of leaving a dead install looking
+          // healthy until someone tries to publish again. A lost push race
+          // (409) and an unreachable GitHub (502) are transient and must not.
+          // Best-effort: a write failure here must not mask the publish error.
+          await IntegrationRepo.setError(org.id, 'static-site', fail.body.code).catch(() => {});
+          return c.json(fail.body, 422);
+        }
         return c.json(fail.body, 502);
       }
 
@@ -950,6 +962,12 @@ const dashboard = new OpenAPIHono<AuthEnv>()
           { error: 'Committed, but the publish state could not be saved', code: 'record_failed' },
           500,
         );
+      }
+
+      // The commit proves the connection works again. Guarded so the common
+      // path (nothing was ever wrong) does not pay for an extra write.
+      if (integration.last_error) {
+        await IntegrationRepo.setError(org.id, 'static-site', null).catch(() => {});
       }
 
       return c.json(

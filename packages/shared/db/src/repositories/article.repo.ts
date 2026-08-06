@@ -151,6 +151,19 @@ export const ArticleRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  /**
+   * Overwrite `content` alone, leaving `updated_at` untouched — that field means
+   * "last editor save", and the one-off internal-link cleanup (#186) is not one.
+   */
+  async replaceContent(id: string, content: string): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { content } },
+    );
+    return res.matchedCount > 0;
+  },
+
   /** Persist the image plan once (set-if-absent) — a retry never re-plans (#51). */
   async setImagePlan(id: string, images: ArticleImage[]): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;

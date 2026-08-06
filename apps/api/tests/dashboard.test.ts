@@ -524,6 +524,10 @@ vi.mock('@shared/db', () => {
       listByOrgId: vi.fn(async (orgId: string) =>
         [...integrations.values()].filter((i) => i.org_id === orgId),
       ),
+      setError: vi.fn(async (orgId: string, provider: string, code: string | null) => {
+        const row = integrations.get(`${orgId}:${provider}`);
+        if (row) row.last_error = code === null ? null : { code, at: new Date() };
+      }),
       findByOrgAndProvider: vi.fn(
         async (orgId: string, provider: string) => integrations.get(`${orgId}:${provider}`) ?? null,
       ),
@@ -827,6 +831,7 @@ describe('dashboard WordPress integration', () => {
         provider: 'wordpress',
         target: 'https://clewas.com',
         connected_at: expect.any(String),
+        last_error: null,
       },
     ]);
     expect(JSON.stringify(body)).not.toContain('never-return-this-token');
@@ -863,6 +868,7 @@ describe('dashboard WordPress integration', () => {
         provider: 'wordpress',
         target: 'https://clewas.com',
         connected_at: expect.any(String),
+        last_error: null,
       },
     ]);
   });
@@ -1384,6 +1390,60 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
 
     expect(res.status).toBe(500);
     if (res.status === 500) expect((await res.json()).code).toBe('record_failed');
+  });
+
+  // Webhooks are inactive in v1, so a failed publish is the only way the
+  // settings panel ever learns an installation has died.
+  test('sticks a permanent GitHub refusal on the connection', async () => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError('installation_not_found', 'Gone'));
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(integrations.get('org_1:static-site')?.last_error).toMatchObject({
+      code: 'installation_not_found',
+    });
+  });
+
+  test.each([
+    ['ref_conflict', 'a lost push race'],
+    ['github_request_failed', 'an unreachable GitHub'],
+  ])('does not record %s — %s is transient', async (code) => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError(code, 'boom'));
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(integrations.get('org_1:static-site')?.last_error).toBeNull();
+  });
+
+  test('a successful publish clears a standing failure', async () => {
+    connectStaticSite({ last_error: { code: 'repo_not_found', at: new Date() } });
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(integrations.get('org_1:static-site')?.last_error).toBeNull();
+  });
+
+  test('GET /integrations/connected surfaces the standing failure', async () => {
+    connectStaticSite({ last_error: { code: 'missing_write_permission', at: new Date() } });
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const row = (await res.json()).integrations.find((i) => i.provider === 'static-site');
+      expect(row?.last_error?.code).toBe('missing_write_permission');
+    }
   });
 });
 

@@ -19,6 +19,40 @@ type InstallErrorKey = 'installFailed' | 'notConfigured';
 
 const REQUEST_FAILED_ERROR: ConnectError = { key: 'requestFailed', step: 1 };
 
+/**
+ * `integration.last_error.code` -> a message key. These are the GithubError
+ * codes the publish route persists (its 422 bucket); anything else falls back
+ * to `unknown`, so a new code added server-side degrades to a generic line
+ * rather than rendering a raw identifier.
+ */
+type PublishErrorKey =
+  | 'publishErrors.installationGone'
+  | 'publishErrors.suspended'
+  | 'publishErrors.missingPermission'
+  | 'publishErrors.repoNotFound'
+  | 'publishErrors.commitRejected'
+  | 'publishErrors.unknown';
+
+const PUBLISH_ERROR_KEYS: Record<string, PublishErrorKey> = {
+  installation_not_found: 'publishErrors.installationGone',
+  installation_suspended: 'publishErrors.suspended',
+  missing_write_permission: 'publishErrors.missingPermission',
+  repo_not_found: 'publishErrors.repoNotFound',
+  commit_rejected: 'publishErrors.commitRejected',
+};
+
+/**
+ * Of those, the ones the user fixes by reinstalling rather than retrying.
+ * `commit_rejected` is deliberately absent: the connection is healthy, the
+ * branch is protected — reinstalling would change nothing.
+ */
+const RECONNECT_CODES = new Set([
+  'installation_not_found',
+  'installation_suspended',
+  'missing_write_permission',
+  'repo_not_found',
+]);
+
 function mapErrorCode(errorCode: string | undefined): ConnectError {
   switch (errorCode) {
     case 'wordpress_request_failed':
@@ -66,6 +100,8 @@ export function IntegrationsPanel({
   const staticSiteIntegration = connectedQuery.data?.integrations.find(
     (integration) => integration.provider === 'static-site',
   );
+  const staticSiteError = staticSiteIntegration?.last_error ?? null;
+  const needsReconnect = Boolean(staticSiteError && RECONNECT_CODES.has(staticSiteError.code));
   const isConnected = Boolean(wordpressIntegration);
   const showSetup = !isConnected || replacing;
   const siteUrl = (organization?.website_url ?? '').replace(/\/+$/, '');
@@ -311,12 +347,18 @@ export function IntegrationsPanel({
                   variant="secondary"
                   className={cn(
                     'w-fit border-transparent',
-                    staticSiteIntegration
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'bg-slate-200 text-slate-700',
+                    !staticSiteIntegration
+                      ? 'bg-slate-200 text-slate-700'
+                      : staticSiteError
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-700',
                   )}
                 >
-                  {t(staticSiteIntegration ? 'badges.connected' : 'badges.notConnected')}
+                  {staticSiteIntegration
+                    ? staticSiteError
+                      ? staticSiteT('needsAttention')
+                      : t('badges.connected')
+                    : t('badges.notConnected')}
                 </Badge>
                 {staticSiteIntegration ? (
                   <>
@@ -329,19 +371,33 @@ export function IntegrationsPanel({
                         date: dateFormatter.format(new Date(staticSiteIntegration.connected_at)),
                       })}
                     </p>
+                    {staticSiteError ? (
+                      <p className="text-amber-700 text-xs">
+                        {staticSiteT(
+                          PUBLISH_ERROR_KEYS[staticSiteError.code] ?? 'publishErrors.unknown',
+                        )}
+                      </p>
+                    ) : null}
                     {disconnectSiteFailed ? (
                       <p className="text-red-600 text-xs">{staticSiteT('disconnectError')}</p>
                     ) : null}
                     <div className="flex flex-wrap items-center gap-2">
+                      {/* Same hand-off either way — only the label and the
+                          emphasis change, because a dead installation is not
+                          something the user should have to guess is fixable. */}
                       <Button
                         type="button"
-                        variant="outline"
+                        variant={needsReconnect ? 'default' : 'outline'}
                         size="sm"
                         className="w-fit"
                         disabled={!organization || installing}
                         onClick={startInstall}
                       >
-                        {installing ? staticSiteT('connecting') : staticSiteT('changeRepository')}
+                        {installing
+                          ? staticSiteT('connecting')
+                          : needsReconnect
+                            ? staticSiteT('reconnect')
+                            : staticSiteT('changeRepository')}
                       </Button>
                       {confirmingDisconnect ? (
                         <>
@@ -532,7 +588,7 @@ function IntegrationCard({
   name: string;
 }) {
   return (
-    <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-4">
+    <div className="grid content-start gap-2 rounded-md border border-slate-200 bg-white p-4">
       <div className="flex items-center gap-3">
         <span className="flex size-9 items-center justify-center">{logo}</span>
         <p className="font-semibold text-slate-950 text-sm">{name}</p>

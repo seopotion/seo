@@ -17,6 +17,16 @@ const privatePaths = [
 ];
 
 export default function robots(): MetadataRoute.Robots {
+  // Non-prod builds (staging) must never be indexed — the deploy workflow sets
+  // NEXT_PUBLIC_NOINDEX=1 there. Metadata routes are prerendered, so this is
+  // resolved at build time.
+  if (process.env.NEXT_PUBLIC_NOINDEX === '1') {
+    return {
+      rules: { userAgent: '*', disallow: '/' },
+      host: SITE_URL,
+    };
+  }
+
   return {
     rules: {
       userAgent: '*',

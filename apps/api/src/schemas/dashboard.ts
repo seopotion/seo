@@ -60,6 +60,11 @@ export const ConnectedIntegration = z
     // WordPress, `owner/repo@branch` for a static site. Opaque to the client.
     target: z.string(),
     connected_at: z.string(),
+    // Set when a publish failed for a reason that will still be true next time
+    // — uninstalled, suspended, repo dropped from the selection, branch
+    // protected. Webhooks are off in v1, so this is the only way the panel
+    // learns a connection has died; cleared by the next successful publish.
+    last_error: z.object({ code: z.string(), at: z.string() }).nullable(),
   })
   .openapi('ConnectedIntegration');
 

@@ -11,7 +11,8 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: [],
   articleStyle: 'practical',
-  internalLinks: false,
+  maxInternalLinks: 0,
+  linkCandidates: [],
   llmInstructions: '',
   keyword: 'best widgets',
   articleType: 'listicle',
@@ -86,5 +87,41 @@ describe('generateArticle', () => {
       }),
     };
     await expect(generateArticle({ ctx, llm })).rejects.toThrow('rate limited');
+  });
+
+  test('strips a link the model invented despite the prompt (#186)', async () => {
+    const linked: GenerationContext = {
+      ...ctx,
+      maxInternalLinks: 1,
+      linkCandidates: [{ title: 'Guide', url: 'https://a.com/blog/guide' }],
+    };
+    const outlineWithLink = JSON.stringify({
+      ...JSON.parse(outlineJson),
+      internal_links: ['https://a.com/blog/guide'],
+    });
+    const md = `${articleMd}\nRead our [guide](https://a.com/blog/guide) and our [pricing](/pricing/invented).\n`;
+    const llm = mockLlm([outlineWithLink, md, md, '{"pass":true,"reasons":[]}']);
+
+    const result = await generateArticle({ ctx: linked, llm });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.article.content).toContain('[guide](https://a.com/blog/guide)');
+      expect(result.article.content).not.toContain('/pricing/invented');
+      expect(result.article.content).toContain('pricing');
+    }
+  });
+
+  test('with no candidates every link is stripped (#186)', async () => {
+    const md = `${articleMd}\nSee [features](/features/invented) and [this](#).\n`;
+    const llm = mockLlm([outlineJson, md, md, '{"pass":true,"reasons":[]}']);
+
+    const result = await generateArticle({ ctx, llm });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.article.content).not.toContain('](');
+      expect(result.article.content).toContain('features');
+    }
   });
 });

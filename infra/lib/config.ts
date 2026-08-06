@@ -84,3 +84,19 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     falKeyParam: '/seo/prod/fal-key',
   },
 };
+
+// ---------------------------------------------------------------------------
+// Frontend (SeoWebStack) — #35. First domainNames entry is the certificate
+// primary and canonical host; the rest are SANs.
+export interface WebStageConfig {
+  domainNames: string[];
+  apexRedirect?: { from: string; to: string };
+}
+
+export const WEB_STAGE_CONFIG: Record<Stage, WebStageConfig> = {
+  staging: { domainNames: ['staging.seopotion.co'] },
+  prod: {
+    domainNames: ['www.seopotion.co', 'seopotion.co'],
+    apexRedirect: { from: 'seopotion.co', to: 'www.seopotion.co' },
+  },
+};
