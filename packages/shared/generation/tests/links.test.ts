@@ -182,6 +182,35 @@ describe('sanitizeLinks', () => {
   });
 });
 
+// A code SAMPLE of a link is not a link: rewriting one mangles the demo the
+// article exists to show. Same reasoning as validate.ts's detector masking.
+describe('code samples are not links', () => {
+  const allowed = ['https://a.com/blog/one'];
+
+  test('sanitizeLinks leaves a Markdown-link demo in a fenced block untouched', () => {
+    const md = 'See [bad](/invented).\n\n```md\n[example](/some/url)\n```\n';
+    expect(sanitizeLinks(md, allowed, 2)).toBe('See bad.\n\n```md\n[example](/some/url)\n```\n');
+  });
+
+  test('sanitizeLinks leaves a Markdown-link demo in an inline code span untouched', () => {
+    const md = 'Write `[text](/url)` to make a link.';
+    expect(sanitizeLinks(md, allowed, 2)).toBe(md);
+  });
+
+  test('a link whose anchor text contains a code span is still enforced', () => {
+    expect(sanitizeLinks('see [the `config` guide](/invented) now', allowed, 2)).toBe(
+      'see the `config` guide now',
+    );
+    const kept = 'see [the `config` guide](https://a.com/blog/one) now';
+    expect(sanitizeLinks(kept, allowed, 2)).toBe(kept);
+  });
+
+  test('extractLinks ignores links inside fences and spans', () => {
+    const md = '[real](/x)\n\n```\n[demo](/y)\n```\n\nUse `[demo](/z)` here.';
+    expect(extractLinks(md)).toEqual([{ text: 'real', url: '/x' }]);
+  });
+});
+
 const org = {
   id: 'o1',
   presets: {

@@ -6,7 +6,7 @@ import {
   MIN_H2,
   WORD_COUNT_FLOOR,
 } from './config';
-import { extractLinks, normalizeUrl } from './links';
+import { extractLinks, maskCode, maskIndentedCode, normalizeUrl } from './links';
 import type { GenerationContext, ValidationFailure } from './types';
 
 export function countWords(md: string): number {
@@ -37,38 +37,6 @@ function sectionBodies(lines: string[]): string[] {
   }
   if (current) bodies.push(current.join('\n').trim());
   return bodies;
-}
-
-const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
-
-/**
- * Content with fenced blocks and inline code spans blanked out, for the
- * raw-link detectors below ONLY. An article about anchor tags or `nofollow` is
- * a plausible topic for this product's own customers, and a code SAMPLE of a
- * link is not a link — failing the whole article over one would burn a
- * generation attempt. Line count is preserved so `^`-anchored patterns still
- * behave. `sanitizeLinks` and `extractLinks` keep seeing the real content.
- */
-function stripCode(md: string): string {
-  let fence: string | null = null;
-  const lines = md.split('\n').map((line) => {
-    const m = FENCE_RE.exec(line);
-    if (fence === null) {
-      if (!m) return line;
-      fence = m[1] as string;
-      return '';
-    }
-    // Closes only on the same character, at least as long, alone on its line.
-    // An unclosed fence therefore blanks everything to the end of the content.
-    const marker = m?.[1];
-    if (marker && marker[0] === fence[0] && marker.length >= fence.length && !m[2]?.trim())
-      fence = null;
-    return '';
-  });
-  // Lookarounds keep the run BOUNDED on both sides: without them `\1` matches a
-  // prefix of a longer run, so `` A ` <a href="x">y</a> `` B `` looked like a
-  // span, got blanked, and shipped a live link — fail-open, the #186 bug (#186).
-  return lines.join('\n').replace(/(?<!`)(`+)[^`\n]*\1(?!`)/g, '');
 }
 
 /**
@@ -132,9 +100,11 @@ export function validateArticle(
   // Link forms `sanitizeLinks` cannot see, so they are detected here and fail
   // the article outright — never rewritten. Blunt on purpose: no prompt asks for
   // any of them, and this runs BEFORE the worker injects the YouTube <iframe>
-  // and before the images worker injects `![...](...)`. Code samples are
-  // excluded so an article ABOUT links does not fail for demonstrating one.
-  const prose = stripCode(article.content);
+  // and before the images worker injects `![...](...)`. Code samples — fenced,
+  // inline, and indented — are excluded so an article ABOUT links does not fail
+  // for demonstrating one. Indented blocks are masked ONLY here, not in the
+  // sanitizer/extractor — see `maskIndentedCode` for why.
+  const prose = maskIndentedCode(maskCode(article.content));
   if (/<a\s/i.test(prose))
     failures.push({ code: 'illegal_link', message: 'raw HTML anchor tag is not an allowed link' });
   if (/<https?:\/\/[^>\s]+>/.test(prose))

@@ -220,6 +220,22 @@ describe('validateArticle', () => {
     expect(validateArticle({ ...goodArticle, content: stamp }, ctx)).toEqual([]);
   });
 
+  test('an indented code block containing an anchor tag passes (#186)', () => {
+    const content = `${goodBody}\n\n    <a href="/pricing">Pricing</a>\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
+  test('an indented list item is not an indented code block (#186)', () => {
+    const content = `${goodBody}\n\n    - point one <a href="/x">go</a>\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toContain('illegal_link');
+  });
+
+  test('a Markdown-link demo in a fenced block does not fail the backstop (#186)', () => {
+    const content = `${goodBody}\n\n\`\`\`md\n[example](/some/url)\n\`\`\`\n`;
+    expect(validateArticle({ ...goodArticle, content }, ctx)).toEqual([]);
+  });
+
   test('the real forms in body prose still fail illegal_link (#186)', () => {
     const cases = [
       `${goodBody}\n\n<a href="/pricing">Pricing</a>\n`,
