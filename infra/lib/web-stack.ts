@@ -9,8 +9,8 @@ import {
   CacheHeaderBehavior,
   CachePolicy,
   CacheQueryStringBehavior,
-  Distribution,
   Function as CfFunction,
+  Distribution,
   FunctionCode,
   FunctionEventType,
   OriginRequestPolicy,
@@ -21,8 +21,8 @@ import { AttributeType, BillingMode, ProjectionType, Table } from 'aws-cdk-lib/a
 import {
   Architecture,
   Code,
-  Function as LambdaFunction,
   FunctionUrlAuthType,
+  Function as LambdaFunction,
   Runtime,
 } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
@@ -69,7 +69,9 @@ export class WebStack extends Stack {
     new BucketDeployment(this, 'HashedAssets', {
       destinationBucket: bucket,
       destinationKeyPrefix: '_assets',
-      sources: [Source.asset(join(OPEN_NEXT_DIR, 'assets'), { exclude: ['*', '!_next/**'] })],
+      sources: [
+        Source.asset(join(OPEN_NEXT_DIR, 'assets'), { exclude: ['*', '!_next', '!_next/**'] }),
+      ],
       prune: false,
       cacheControl: [CacheControl.fromString('public,max-age=31536000,immutable')],
     });
@@ -189,10 +191,15 @@ export class WebStack extends Stack {
     // 301s the apex to www here.
     const apexRedirect = config.apexRedirect
       ? `  if (request.headers.host.value === '${config.apexRedirect.from}') {
+    var qs = '';
+    var keys = Object.keys(request.querystring);
+    for (var i = 0; i < keys.length; i++) {
+      qs += (qs === '' ? '?' : '&') + keys[i] + '=' + request.querystring[keys[i]].value;
+    }
     return {
       statusCode: 301,
       statusDescription: 'Moved Permanently',
-      headers: { location: { value: 'https://${config.apexRedirect.to}' + request.uri } },
+      headers: { location: { value: 'https://${config.apexRedirect.to}' + request.uri + qs } },
     };
   }
 `
