@@ -359,8 +359,8 @@ once per stage in CI), so each stage needs its own set as GitHub Actions repo
   above), but now **also** feed the web build's `NEXT_PUBLIC_SITE_URL` and must
   point at the real frontend hosts: `https://staging.seopotion.co` /
   `https://www.seopotion.co`. Changing them requires **one backend redeploy**
-  per stage, since they're baked into the API Lambda at synth time for CORS
-  and the GSC OAuth redirect base.
+  per stage, since they're baked into the API Lambda at synth time to build
+  the GSC OAuth redirect base.
 - `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` — already exist (see
   above); reused as-is for `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
 
