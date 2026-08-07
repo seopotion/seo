@@ -558,6 +558,10 @@
   },
   "SettingsPage": {
     "actions": {
+      "close": "Kapat",
+      "closeDialog": "İletişim kutusunu kapat",
+      "connect": "Bağlan",
+      "manage": "Yönet",
       "save": "Kaydet",
       "saving": "Kaydediliyor..."
     },
@@ -598,6 +602,7 @@
       "competitorUrl": "https://rakip.com"
     },
     "staticSite": {
+      "beforeRedirect": "github.com üzerinden devam edip SeoPotion'ın yazabileceği depoları seçeceksiniz, sonra dal ve klasör seçmek için buraya döneceksiniz.",
       "changeRepository": "Depoyu değiştir",
       "connect": "Depo bağla",
       "connectedSuccess": "Deponuz bağlandı. Bir makaleyi yayınlayarak commit edin.",
@@ -644,12 +649,12 @@
         "connected": "Bağlı",
         "notConnected": "Bağlı değil"
       },
-      "cancel": "İptal",
       "comingSoon": "Çok yakında",
       "connectAndTest": "Bağlan ve test et",
       "connectedOn": "{date} tarihinde bağlandı",
       "connectedSuccess": "WordPress bağlantısı başarıyla kuruldu ve test edildi.",
       "connecting": "Bağlanıyor...",
+      "dialogDescription": "Eklentiyi sitenize kurun, ardından size verdiği anahtarı yapıştırın.",
       "downloadPlugin": "Eklentiyi indir (.zip)",
       "errors": {
         "connectFailed": "WordPress bağlantısı kurulamadı. Token'ı kontrol edip tekrar deneyin.",
@@ -666,7 +671,6 @@
         "wordpressCom": "WordPress.com"
       },
       "replaceNote": "Yeniden bağlanmak yeni token'ı sitenizde test eder ve kayıtlı token'ın yerine geçer.",
-      "replaceToken": "Token'ı değiştir",
       "setupTitle": "WordPress sitenizi bağlayın",
       "step1Action": "Eklenti yükleme sayfasını aç",
       "step1Body": "SEO Potion eklentisini indirin, ardından WordPress yönetim panelinizden yükleyip etkinleştirin.",
