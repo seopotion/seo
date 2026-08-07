@@ -212,6 +212,10 @@ export default function SettingsPage() {
         data,
       );
 
+      // The patch writes organization.name, which the topbar renders off the
+      // cached org.
+      void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.organizations() });
+
       if (editRevisionRef.current === saveRevision) {
         setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
         setSaveState('saved');
