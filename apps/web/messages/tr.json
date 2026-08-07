@@ -617,7 +617,7 @@
         "notConfigured": "Depoya yayınlama henüz kullanılabilir değil. Lütfen daha sonra tekrar deneyin."
       },
       "needsAttention": "İlgi gerekiyor",
-      "provider": "Statik site (GitHub)",
+      "provider": "Özel site (GitHub)",
       "publishErrors": {
         "installationGone": "SeoPotion GitHub üzerinden kaldırıldı, bu yüzden yayınlayamıyoruz. Geri yüklemek için yeniden bağlanın.",
         "suspended": "GitHub kurulumu askıya alınmış. Askı kalktıktan sonra yeniden bağlanın.",

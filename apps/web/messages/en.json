@@ -617,7 +617,7 @@
         "notConfigured": "Publishing to a repository is not available yet. Please try again later."
       },
       "needsAttention": "Needs attention",
-      "provider": "Static site (GitHub)",
+      "provider": "Custom site (GitHub)",
       "publishErrors": {
         "installationGone": "SeoPotion was removed from GitHub, so we can't publish. Reconnect to restore it.",
         "suspended": "The GitHub installation is suspended. Reconnect once it has been restored.",

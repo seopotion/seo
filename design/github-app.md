@@ -73,9 +73,13 @@ rather than linking to a github.com 404:
 
 1. Create the App with the table above; save.
 2. Note the **App slug** (from the URL) and **Client ID** (from the settings page) — both
-   public. Set them as GitHub Actions repo *variables* `GITHUB_APP_SLUG_<STAGE>` /
-   `GITHUB_APP_CLIENT_ID_<STAGE>`, which [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml)
-   already passes to synth, and in the root `.env` for local dev.
+   public. Set them as GitHub Actions repo *variables* `GH_APP_SLUG_<STAGE>` /
+   `GH_APP_CLIENT_ID_<STAGE>`, which [`deploy-backend.yml`](../.github/workflows/deploy-backend.yml)
+   already passes to synth, and in the root `.env` for local dev. **`GH_APP_`, not
+   `GITHUB_APP_`:** GitHub 422s any Actions variable whose name starts with `GITHUB_`, so
+   the original names could never exist — the workflow read them as `''` and shipped an
+   empty slug on a green deploy. Only the *Actions variable* names carry this constraint;
+   the Lambda runtime env vars below keep their `GITHUB_APP_*` names.
 3. **Generate a private key.** GitHub shows the `.pem` once and keeps only a fingerprint.
 4. Put it in SSM (see [The private key](#the-private-key)).
 5. Add `/seo/<stage>/github-app-key` to the SSM list in

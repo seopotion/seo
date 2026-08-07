@@ -79,11 +79,14 @@ jobs:
           LEMONSQUEEZY_VARIANT_PAID_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_STAGING }}
           LEMONSQUEEZY_VARIANT_EXPERT_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_STAGING }}
           # GitHub App public config (#7), baked into the API Lambda at synth
-          # time. Unset until the App is registered by hand (design/github-app.md
-          # § Registration) — the install-url route 503s until then, so preflight
-          # deliberately does not assert these yet.
-          GITHUB_APP_SLUG_STAGING: ${{ vars.GITHUB_APP_SLUG_STAGING }}
-          GITHUB_APP_CLIENT_ID_STAGING: ${{ vars.GITHUB_APP_CLIENT_ID_STAGING }}
+          # time. `GH_APP_*`, not `GITHUB_APP_*`: GitHub rejects any Actions
+          # variable whose name starts with `GITHUB_` (422), so the original
+          # names could never be set and always resolved to '' — the install-url
+          # route 503d on a successful deploy. Empty is still tolerated (the
+          # route 503s rather than sending anyone to a github.com 404), which is
+          # why preflight does not assert these.
+          GH_APP_SLUG_STAGING: ${{ vars.GH_APP_SLUG_STAGING }}
+          GH_APP_CLIENT_ID_STAGING: ${{ vars.GH_APP_CLIENT_ID_STAGING }}
           # Provider API keys are no longer passed here: they live in per-stage
           # SSM SecureStrings resolved at Lambda runtime (#43), and the preflight
           # above verifies they exist.
@@ -204,8 +207,8 @@ jobs:
           LEMONSQUEEZY_STORE_ID_PROD: ${{ vars.LEMONSQUEEZY_STORE_ID_PROD }}
           LEMONSQUEEZY_VARIANT_PAID_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_PROD }}
           LEMONSQUEEZY_VARIANT_EXPERT_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_PROD }}
-          # GitHub App public config (#7) — unset until the App is registered by
-          # hand; the install-url route 503s until then.
-          GITHUB_APP_SLUG_PROD: ${{ vars.GITHUB_APP_SLUG_PROD }}
-          GITHUB_APP_CLIENT_ID_PROD: ${{ vars.GITHUB_APP_CLIENT_ID_PROD }}
+          # GitHub App public config (#7) — `GH_APP_*` for the same reason as
+          # staging above; the install-url route 503s while these are empty.
+          GH_APP_SLUG_PROD: ${{ vars.GH_APP_SLUG_PROD }}
+          GH_APP_CLIENT_ID_PROD: ${{ vars.GH_APP_CLIENT_ID_PROD }}
         run: cd infra && npx cdk deploy SeoApiStack-prod --require-approval never
