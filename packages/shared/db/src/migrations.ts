@@ -1,5 +1,5 @@
 import { normalizeKeyword } from '@shared/schemas';
-import type { ObjectId } from 'mongodb';
+import type { Document, ObjectId, UpdateFilter } from 'mongodb';
 import { getDb } from './client';
 
 export interface MigrationReport {
@@ -7,6 +7,8 @@ export interface MigrationReport {
   normalized_backfilled: number;
   date_dupes_resolved: number;
   keyword_dupes_removed: number;
+  publications_backfilled: number;
+  status_backfilled: number;
 }
 
 /**
@@ -111,11 +113,74 @@ export async function runMigrations(): Promise<MigrationReport> {
     }
   }
 
+  // #7: seed articles.publications[] from the deprecated wordpress_post_id
+  // mirror. The $not/$elemMatch filter also matches docs with no `publications`
+  // field at all, and skips anything already carrying a wordpress entry — that
+  // is what makes a re-run a no-op. `slug` is a best-effort reconstruction: an
+  // article published and THEN renamed records its current slug, not the
+  // published one. Only WordPress is affected (it addresses by post id and does
+  // not care); static-site articles all postdate this change, so they are exact.
+  const articles = db.collection('articles');
+  let publicationsBackfilled = 0;
+  for await (const doc of articles.find({
+    wordpress_post_id: { $exists: true, $ne: null },
+    publications: { $not: { $elemMatch: { provider: 'wordpress' } } },
+  })) {
+    // See ArticleRepo.recordPublication for why $push needs the cast.
+    await articles.updateOne({ _id: doc._id }, {
+      $push: {
+        publications: {
+          provider: 'wordpress',
+          ref: String(doc.wordpress_post_id),
+          slug: doc.slug as string,
+          published_at: (doc.published_at as Date | null) ?? (doc.created_at as Date),
+          updated_at: null,
+        },
+      },
+    } as unknown as UpdateFilter<Document>);
+    publicationsBackfilled++;
+  }
+
+  // Backfill `status`/`published_at` for articles that went live BEFORE
+  // recordPublication started advancing the status. Until then nothing ever
+  // wrote `'published'`, so these rows are live with a provider yet still read
+  // as `'generated'` — which is what kept Content History, the published
+  // counter, the GSC title join and the admin count empty. Runs after the
+  // publications backfill above on purpose, so WordPress rows seeded from
+  // `wordpress_post_id` in the same pass are picked up here too.
+  //
+  // `published_at` takes the earliest publication rather than `now`: these
+  // articles went live in the past, and stamping today would misdate history.
+  // Anything already carrying a `published_at` keeps it. `$ne: 'deleted'` so a
+  // future unpublish is never silently resurrected.
+  let statusBackfilled = 0;
+  for await (const doc of articles.find({
+    status: { $nin: ['published', 'deleted'] },
+    publications: { $elemMatch: { provider: { $exists: true } } },
+  })) {
+    const pubs = doc.publications as { published_at: Date }[];
+    const earliest = pubs
+      .map((p) => p.published_at)
+      .reduce((a, b) => (a && b && a <= b ? a : (b ?? a)));
+    await articles.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          status: 'published',
+          published_at: (doc.published_at as Date | null) ?? earliest ?? (doc.created_at as Date),
+        },
+      },
+    );
+    statusBackfilled++;
+  }
+
   return {
     audience_target_migrated: audienceRes.modifiedCount,
     normalized_backfilled: normalizedBackfilled,
     date_dupes_resolved: dateDupesResolved,
     keyword_dupes_removed: keywordDupesRemoved,
+    publications_backfilled: publicationsBackfilled,
+    status_backfilled: statusBackfilled,
   };
 }
 

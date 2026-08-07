@@ -3,7 +3,8 @@
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
 - `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
-- `SeoApiStack-prod` — deployed by publishing a GitHub Release / tag. Deferred, not yet wired — see [#43](https://github.com/seopotion/seo/issues/43).
+- `SeoApiStack-prod` — deployed by publishing a GitHub Release. Termination
+  protection is on. See [Deploying prod](#deploying-prod).
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
 Secret values are provisioned out-of-band and resolved at Lambda runtime.
@@ -43,6 +44,45 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    aws ssm put-parameter --name /seo/prod/lemonsqueezy-api-key            --type SecureString --value '<ls_api_key>'
    aws ssm put-parameter --name /seo/prod/lemonsqueezy-webhook-secret     --type SecureString --value '<ls_webhook_secret>'
    ```
+
+   The admin panel (#150) needs two more per stage: its **own** HS256 signing
+   secret (granted to the admin Lambda alone — never the customer one) and the
+   **operator allowlist**, a *plain String* of comma-separated emails. The
+   allowlist is re-read every ~5 min at runtime, so editing it takes effect
+   without a redeploy; the signing secret rotates only by redeploy.
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/admin/jwt-secret --type SecureString --value "$(openssl rand -base64 32)"
+   aws ssm put-parameter --name /seo/staging/admin/operators  --type String       --value 'a@x.com,b@y.com'
+   aws ssm put-parameter --name /seo/prod/admin/jwt-secret    --type SecureString --value "$(openssl rand -base64 32)"
+   aws ssm put-parameter --name /seo/prod/admin/operators     --type String       --value 'a@x.com,b@y.com'
+   ```
+
+   The **provider API credentials** (#43) are five more SecureStrings per stage.
+   These used to be GitHub Actions secrets baked into the Lambda environment at
+   synth time — shared across both stages and visible in the CloudFormation
+   template. They are now resolved at runtime like everything else, so **each
+   stage needs its own set before its next deploy** (a missing one deploys a
+   worker that calls its provider with an empty key):
+
+   ```sh
+   aws ssm put-parameter --name /seo/staging/dataforseo-login    --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/staging/dataforseo-password --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/staging/openrouter-api-key  --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/staging/youtube-api-key     --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/staging/fal-key             --type SecureString --value '<fal_key>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-login       --type SecureString --value '<df_login>'
+   aws ssm put-parameter --name /seo/prod/dataforseo-password    --type SecureString --value '<df_password>'
+   aws ssm put-parameter --name /seo/prod/openrouter-api-key     --type SecureString --value '<or_key>'
+   aws ssm put-parameter --name /seo/prod/youtube-api-key        --type SecureString --value '<yt_key>'
+   aws ssm put-parameter --name /seo/prod/fal-key                --type SecureString --value '<fal_key>'
+   ```
+
+   Each Lambda is granted only the keys it calls: DataForSEO to the api, admin,
+   scan and strategy functions; OpenRouter to the four workers; YouTube to the
+   generation worker; fal to the images worker. The scheduler and db-init get
+   none. Local dev is unaffected — with no `*_PARAM` set, the plain
+   `DATAFORSEO_LOGIN` / `OPENROUTER_API_KEY` / … vars in the root `.env` are used.
 
 3. **Two Google OAuth client IDs** (staging vs prod) — see [Google OAuth
    clients](#google-oauth-clients) below. Set each as a GitHub Actions repo
@@ -151,8 +191,8 @@ cat > /tmp/trust.json <<'JSON'
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
       "StringLike": { "token.actions.githubusercontent.com:sub": [
-        "repo:seopotion/seo:ref:refs/heads/dev",
-        "repo:seopotion/seo:ref:refs/heads/master"
+        "repo:seopotion/seo:ref:refs/heads/master",
+        "repo:seopotion/seo:environment:prod"
       ]}
     }
   }]
@@ -197,9 +237,11 @@ the API still requires. Finally set `AWS_DEPLOY_ROLE_ARN` (step 4).
 ## Verify prerequisites (preflight)
 
 Before deploying, confirm the out-of-band items for a stage are actually in
-place. The preflight checks that all six SSM SecureStrings exist (jwt-secret,
+place. The preflight checks that all twelve SSM SecureStrings exist (jwt-secret,
 mongo-uri, google-client-secret, gsc-token-key, lemonsqueezy-api-key,
-lemonsqueezy-webhook-secret — presence only, it does not decrypt them) and
+lemonsqueezy-webhook-secret, admin/jwt-secret, and the five provider
+credentials — presence only, it does not
+decrypt them), that the plain-String `admin/operators` allowlist exists, and
 that `GOOGLE_CLIENT_ID_<STAGE>`, `WEB_ORIGIN_<STAGE>`,
 `LEMONSQUEEZY_STORE_ID_<STAGE>`, `LEMONSQUEEZY_VARIANT_PAID_<STAGE>`, and
 `LEMONSQUEEZY_VARIANT_EXPERT_<STAGE>` are set — the same names the stack reads
@@ -228,6 +270,57 @@ CDK_DEFAULT_ACCOUNT=859998284061 CDK_DEFAULT_REGION=us-east-1 \
   npx cdk deploy SeoApiStack-staging
 ```
 
+## Deploying prod
+
+Prod ships from a **GitHub Release**, never from a branch push. The
+`deploy-prod` job in `.github/workflows/deploy-backend.yml` runs on
+`release: published` and, before it holds any AWS credentials, asserts two
+things about the released commit:
+
+1. it is an ancestor of `master`, and
+2. this workflow has a **successful `push` run for that exact commit** — i.e.
+   staging really deployed it.
+
+Being on `master` is not by itself evidence of a staging deploy: the run could
+have failed or been cancelled, and a `master` commit that touches none of the
+workflow's path filters never triggers a run at all. So a release must point at
+a `master` commit whose staging deploy actually succeeded — otherwise the job
+fails before reaching AWS. Prereleases are ignored.
+
+**There is no approval step.** Publishing the Release *is* the gate: the job
+deploys straight through. Required-reviewer rules on an environment need a paid
+plan for private repos, and this org's plan rejects them — so the `prod`
+environment exists with no protection rules. It is still declared in the
+workflow, because it is what makes the OIDC token's subject
+`repo:seopotion/seo:environment:prod`. Treat publishing a Release as an
+irreversible action.
+
+One-time setup, in addition to the prerequisites above:
+
+1. **The `prod` GitHub Environment exists** (created 2026-08-04, no rules). If
+   the plan is ever upgraded, add a required reviewer at
+   `Settings → Environments → prod → Required reviewers` — the workflow needs no
+   change to start honouring it.
+2. **Add the `environment:prod` subject to the deploy role's trust policy** — a
+   release run's OIDC token is subject `repo:seopotion/seo:environment:prod`,
+   not a `refs/heads/*` one, so without this the job fails at
+   `configure-aws-credentials` before doing anything else. See
+   [GitHub OIDC deploy role](#github-oidc-deploy-role) above.
+
+To ship:
+
+```sh
+git tag v0.1.0 <commit-on-master> && git push origin v0.1.0
+gh release create v0.1.0 --title v0.1.0 --notes 'first prod deploy'
+```
+
+The deploy starts immediately — watch it in the Actions tab. The stack emits `HttpApiUrl` and
+`AdminHttpApiUrl`; the LemonSqueezy prod webhook must be pointed at
+`<HttpApiUrl>` after this first deploy, since the URL does not exist until then.
+
+Prod carries `terminationProtection: true`, so `cdk destroy` / `delete-stack`
+refuse until it is turned off deliberately.
+
 ## Migration note
 
 The pre-split single `SeoApiStack` (if it was ever deployed) is superseded by
@@ -235,3 +328,99 @@ these two. After confirming staging is healthy, remove the old stack manually:
 `npx cdk deploy` will not delete it because it is no longer in `bin/app.ts`.
 Run `aws cloudformation delete-stack --stack-name SeoApiStack` once you are sure
 nothing depends on it.
+
+# Frontend (SeoWebStack)
+
+Two more stacks, same account, deployed by `.github/workflows/deploy-frontend.yml`
+with the same triggers/guards as the backend (push to `master` → staging;
+published Release → prod, gated on the release commit being on `master` with
+its own successful staging run):
+
+- `SeoWebStack-staging` — `https://staging.seopotion.co`
+- `SeoWebStack-prod` — `https://www.seopotion.co`, with the apex
+  `https://seopotion.co` 301-redirecting to `www` (query string preserved)
+
+Each stack is Next.js on OpenNext: a CloudFront distribution in front of a
+server-rendering Lambda (function URL), an image-optimization Lambda, an S3
+asset bucket, and idle ISR machinery (revalidation queue + DynamoDB tag cache).
+Staging serves a `robots.txt` disallow-all (`NEXT_PUBLIC_NOINDEX=1` baked in at
+build time); prod does not set it.
+
+## New repo variables
+
+The `NEXT_PUBLIC_*` build args are inlined at build time (OpenNext build runs
+once per stage in CI), so each stage needs its own set as GitHub Actions repo
+**variables**:
+
+- `NEXT_PUBLIC_API_URL_STAGING` / `NEXT_PUBLIC_API_URL_PROD` — the `HttpApiUrl`
+  output of the corresponding `SeoApiStack-<stage>`.
+- `WEB_ORIGIN_STAGING` / `WEB_ORIGIN_PROD` — already exist for the GSC OAuth
+  redirect base (see [prerequisites](#one-time-prerequisites-per-account)
+  above), but now **also** feed the web build's `NEXT_PUBLIC_SITE_URL` and must
+  point at the real frontend hosts: `https://staging.seopotion.co` /
+  `https://www.seopotion.co`. Changing them requires **one backend redeploy**
+  per stage, since they're baked into the API Lambda at synth time to build
+  the GSC OAuth redirect base.
+- `GOOGLE_CLIENT_ID_STAGING` / `GOOGLE_CLIENT_ID_PROD` — already exist (see
+  above); reused as-is for `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+
+## Deploy-role policy addition
+
+One-time, needed because the workflow invokes the tag-seed Lambda and creates
+CloudFront invalidations after each `cdk deploy`:
+
+```sh
+aws iam put-role-policy --role-name github-actions-seo-deploy \
+  --policy-name frontend-deploy \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      { "Effect": "Allow", "Action": "lambda:InvokeFunction",
+        "Resource": "arn:aws:lambda:us-east-1:'"$AWS_ACCOUNT_ID"':function:SeoWebStack-*" },
+      { "Effect": "Allow", "Action": "cloudfront:CreateInvalidation",
+        "Resource": "arn:aws:cloudfront::'"$AWS_ACCOUNT_ID"':distribution/*" }
+    ]
+  }'
+```
+
+## First-deploy runbook
+
+**Deploy `SeoWebStack-*` only via `deploy-frontend.yml` (CI), never `cdk deploy`
+from a laptop.** `.open-next` bundles native dependencies for the target Lambda
+architecture (`sharp`, used by the image-optimization function), and sharp's
+installer honors the *host* platform, not the requested `linux/arm64` — a
+macOS-built `.open-next` bakes in a darwin binary, so `/_next/image` would 500
+in Lambda. CI runs on `ubuntu-latest` and produces correct linux binaries.
+
+The first `cdk deploy` of each web stack **pauses** at the `WebCert`
+certificate resource until the ACM validation CNAMEs are added in Cloudflare —
+open the ACM console while the deploy is waiting, find the pending
+certificate, and copy its validation CNAME name/value into Cloudflare as
+**DNS-only** (grey-cloud) records. Once ACM validates, the deploy continues.
+
+Then, once the stack finishes and emits `DistributionDomain`:
+
+1. Add the site CNAMEs in Cloudflare — `staging`, `www`, and the apex
+   (`seopotion.co`) — all **DNS-only** (grey-cloud), targeting the stack's
+   `DistributionDomain` output. (Cloudflare flattens the apex CNAME
+   automatically.)
+2. Register `https://staging.seopotion.co` (and later `https://www.seopotion.co`)
+   as an **Authorized JavaScript origin** on the matching Google OAuth client
+   — see [Google OAuth clients](#google-oauth-clients) above.
+
+## Cutover checklist
+
+Staging first, full smoke against `https://staging.seopotion.co`:
+
+- Locale routing (`en`/`tr`)
+- `_next/image` resizing
+- Docs MDX pages render
+- `robots.txt` disallow-all
+- Sitemap/canonical URLs point at the staging host
+- Google login + both OAuth callbacks (login, GSC)
+- 404 / error pages
+
+Then flip the prod DNS records (see [First-deploy runbook](#first-deploy-runbook)) and re-run the same
+checks against `https://www.seopotion.co`, plus the apex redirect
+(`https://seopotion.co` → `https://www.seopotion.co`, query string preserved).
+Once prod is verified, delete the Vercel project.

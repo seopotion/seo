@@ -28,6 +28,7 @@ const article: Article = {
   published_at: null,
   images: [],
   images_status: 'complete',
+  publications: [],
   video: null,
 };
 

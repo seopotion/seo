@@ -65,6 +65,33 @@
     "saving": "Kaydediliyor...",
     "title": "Google Search Console'u Bağla"
   },
+  "GithubCallback": {
+    "backToSettings": "Ayarlara dön",
+    "branch": "Dal",
+    "branchHint": "Sunucunuzun derlediği dal. Başka bir dala commit etmek hiçbir şey yayınlamaz.",
+    "confirm": "Bu depoyu bağla",
+    "contentPath": "İçerik klasörü",
+    "contentPathHint": "Makalelerin depo köküne göre commit edileceği yer. Siteniz makaleleri buradan okur.",
+    "defaultBranch": "Varsayılan dal: {branch}",
+    "errors": {
+      "cancelled": "GitHub kurulumu iptal edildi veya tamamlanmadı.",
+      "claimed": "Bu GitHub kurulumu başka bir çalışma alanına bağlı.",
+      "connectFailed": "Bu bağlantı kaydedilemedi. Lütfen tekrar deneyin.",
+      "expired": "Bu kurulum bağlantısının süresi doldu. Ayarlar'dan yeniden başlayın.",
+      "installationGone": "Bu GitHub kurulumuna artık erişemiyoruz. Uygulamayı Ayarlar'dan yeniden kurun.",
+      "noAccess": "Bu depoya veya dala erişemiyoruz. Dal adını ve deponun GitHub uygulamasında hâlâ seçili olduğunu kontrol edin.",
+      "noWriteAccess": "GitHub uygulamasının bu depoda yazma izni yok. Uygulamayı yeniden kurup depo içeriği için yazma izni verin.",
+      "redeemFailed": "GitHub kurulumu tamamlanamadı. Lütfen Ayarlar'dan tekrar deneyin."
+    },
+    "noRepos": "Bu kurulumda yazabileceğimiz bir depo yok. GitHub uygulamasının ayarlarından bir depo ekleyip yeniden başlayın.",
+    "pendingApproval": "Kurulumun kuruluş sahibiniz tarafından onaylanması gerekiyor. Onayladığında GitHub sizi buraya geri getirecek.",
+    "pickBody": "Markdown dosyalarını ve bir manifest dosyasını commit ederiz; gerisini mevcut derleme ve dağıtım akışınız yapar.",
+    "pickTitle": "Yayınlanacak depoyu seçin",
+    "private": "Özel",
+    "redeeming": "GitHub kurulumu tamamlanıyor...",
+    "saving": "Bağlanıyor...",
+    "title": "Sitenizin deposunu bağlayın"
+  },
   "HomePage": {
     "articles": {
       "cta": "İçerik planlayıcıya git / Anahtar kelime ekle",
@@ -252,8 +279,8 @@
       "type": "Makale tipi"
     },
     "metrics": {
-      "difficulty": "Difficulty",
-      "volume": "Volume"
+      "difficulty": "Zorluk",
+      "volume": "Hacim"
     },
     "oneArticlePerDay": "Günde 1 makale",
     "researchKeywords": {
@@ -399,23 +426,29 @@
     "actions": {
       "openArticle": "{title} makalesini aç"
     },
+    "articleStatuses": {
+      "deleted": "Silindi",
+      "generated": "Oluşturuldu",
+      "published": "Yayınlandı"
+    },
     "articlesCount": "{count} makale",
     "columns": {
       "articleName": "Makale adı",
-      "difficulty": "Difficulty",
+      "difficulty": "Zorluk",
       "keyword": "Anahtar kelime",
-      "publishDate": "Yayın tarihi",
-      "volume": "Volume"
+      "publishDate": "Tarih",
+      "status": "Durum",
+      "volume": "Hacim"
     },
-    "description": "Yayınlanan makaleleri, hedef anahtar kelimelerini ve yayın tarihlerini inceleyin.",
+    "description": "Makalelerinizi, hedef anahtar kelimelerini ve yayın durumlarını inceleyin.",
     "empty": {
-      "description": "İçerik yayınlandığında yayınlanan makaleler burada görünecek.",
-      "title": "Henüz yayınlanan makale yok"
+      "description": "İçerik planınız makale oluşturmaya başladığında makaleler burada görünecek.",
+      "title": "Henüz makale yok"
     },
-    "listLabel": "Yayınlanan makaleler listesi",
+    "listLabel": "Makaleler listesi",
     "pagination": {
       "emptyPage": "Sayfa yok",
-      "emptyRange": "Henüz yayınlanan makale yok",
+      "emptyRange": "Henüz makale yok",
       "label": "İçerik geçmişi sayfalaması",
       "next": "Sonraki",
       "page": "Sayfa {page} / {totalPages}",
@@ -429,15 +462,19 @@
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
     },
-    "tableLabel": "Yayınlanan makaleler tablosu",
+    "tableLabel": "Makaleler tablosu",
     "title": "İçerik geçmişi"
   },
   "ArticleDetailPage": {
     "actions": {
       "back": "İçerik geçmişine dön",
+      "publishSite": "Siteye yayınla",
       "publishWordPress": "WordPress'e gönder",
+      "publishingSite": "Siteye yayınlanıyor...",
       "publishingWordPress": "WordPress'e gönderiliyor...",
+      "updateSite": "Siteyi güncelle",
       "updateWordPress": "WordPress'i güncelle",
+      "updatingSite": "Site güncelleniyor...",
       "updatingWordPress": "WordPress güncelleniyor..."
     },
     "labels": {
@@ -446,6 +483,20 @@
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
       "slug": "Slug"
+    },
+    "site": {
+      "errors": {
+        "branchMoved": "Yayınlama sırasında dal değişti. Tekrar deneyin.",
+        "commitRejected": "GitHub commit'i reddetti. Dalın korumalı olmadığını kontrol edin.",
+        "failed": "GitHub'a ulaşılamadı. Tekrar deneyin.",
+        "imagesIncomplete": "Bu makalenin görselleri henüz hazır değil. Tamamlandığında tekrar deneyin.",
+        "notConnected": "Bağlı bir depo yok. Ayarlar'dan bir depo bağlayın.",
+        "recordFailed": "Commit yapıldı ancak yayın durumu kaydedilemedi. Yeniden yayınlamadan önce sayfayı yenileyin.",
+        "slugConflict": "Bu slug ile başka bir makale zaten yayınlanmış. Düzenleyicide slug'ı değiştirip tekrar yayınlayın."
+      },
+      "published": "Deponuza commit edildi. Siteniz kendi kendine yeniden derlenecek.",
+      "publishedBadge": "Sitenizde · {date}",
+      "viewCommit": "Commit'i görüntüle"
     },
     "status": {
       "loadError": "Bu makale yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
@@ -545,6 +596,32 @@
     },
     "placeholders": {
       "competitorUrl": "https://rakip.com"
+    },
+    "staticSite": {
+      "changeRepository": "Depoyu değiştir",
+      "connect": "Depo bağla",
+      "connectedSuccess": "Deponuz bağlandı. Bir makaleyi yayınlayarak commit edin.",
+      "connecting": "GitHub açılıyor...",
+      "description": "Makaleleri deponuza commit edilen Markdown dosyaları olarak yayınlayın — Astro, Next.js, Nuxt, Hugo, Vue ve benzerleri.",
+      "disconnect": "Bağlantıyı kes",
+      "disconnectCancel": "İptal",
+      "disconnectConfirmYes": "Evet, bağlantıyı kes",
+      "disconnectError": "Bağlantı kesilemedi. Lütfen tekrar deneyin.",
+      "errors": {
+        "installFailed": "GitHub kurulumu başlatılamadı. Lütfen tekrar deneyin.",
+        "notConfigured": "Depoya yayınlama henüz kullanılabilir değil. Lütfen daha sonra tekrar deneyin."
+      },
+      "needsAttention": "İlgi gerekiyor",
+      "provider": "Statik site (GitHub)",
+      "publishErrors": {
+        "installationGone": "SeoPotion GitHub üzerinden kaldırıldı, bu yüzden yayınlayamıyoruz. Geri yüklemek için yeniden bağlanın.",
+        "suspended": "GitHub kurulumu askıya alınmış. Askı kalktıktan sonra yeniden bağlanın.",
+        "missingPermission": "SeoPotion bu depoya artık yazamıyor. Yeniden bağlanıp izni tekrar verin.",
+        "repoNotFound": "Bu depoya ya da dala artık ulaşamıyoruz — yeniden adlandırılmış, gizli yapılmış veya kurulumdan çıkarılmış olabilir.",
+        "commitRejected": "GitHub son commit'imizi reddetti. Büyük olasılıkla dal korumalı — yazmaya izin verin veya farklı bir dal bağlayın.",
+        "unknown": "Son yayınlama başarısız oldu. Tekrar yayınlamayı deneyin veya depoyu yeniden bağlayın."
+      },
+      "reconnect": "Yeniden bağlan"
     },
     "status": {
       "loadError": "Ayarlar yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
@@ -708,7 +785,8 @@
     "homeLabel": "Seopotion ana sayfa",
     "links": {
       "features": "Özellikler",
-      "pricing": "Fiyatlandırma"
+      "pricing": "Fiyatlandırma",
+      "docs": "Dokümanlar"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"
@@ -1029,7 +1107,7 @@
   },
   "PrivateMetadata": {
     "home": "Ana Sayfa",
-    "onboarding": "Onboarding"
+    "onboarding": "Kurulum"
   },
   "ProductPlaceholderPage": {
     "description": "Bu özellik yakında yayınlanacak. Eğer acil olarak ihtiyacınız varsa yada başka bir isteğiniz olursa support@seopotıo.co üzerinden yazabilirsiniz.",
@@ -1077,5 +1155,29 @@
       }
     },
     "organizationFallback": "Organizasyonunuz"
+  },
+  "DocsMetadata": {
+    "title": "Dokümantasyon | Seopotion",
+    "description": "Seopotion'ı nasıl kuracağınızı, bir aylık SEO içeriği planlamayı, makale üretmeyi ve bunları blogunuzda yayınlamayı öğrenin.",
+    "openGraphTitle": "Seopotion Dokümantasyonu"
+  },
+  "Docs": {
+    "sidebarLabel": "Dokümantasyon menüsü",
+    "breadcrumbLabel": "Sayfa yolu",
+    "pagerLabel": "Rehber gezinmesi",
+    "home": "Dokümantasyon",
+    "previous": "Önceki",
+    "next": "Sonraki",
+    "updated": "Son güncelleme {date}",
+    "groups": {
+      "getting-started": "Başlangıç",
+      "content": "İçerik",
+      "publishing": "Yayınlama"
+    },
+    "index": {
+      "eyebrow": "Dokümantasyon",
+      "title": "Seopotion ile SEO içeriği yayınlamaya başlayın",
+      "subtitle": "Çalışma alanınızı kurun, bir aylık içerik planlayın ve blogunuzda yayınlayın — her adımın nasıl çalıştığı burada."
+    }
   }
 }

@@ -1,11 +1,23 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { CLIENT_NAMESPACES } from '@/i18n/client-namespaces';
 import { routing } from '@/i18n/routing';
 import { languageAlternates } from '@/i18n/urls';
-import { SITE_NAME, SOCIAL_IMAGE } from '@/lib/seo';
+import { SITE_NAME, SITE_URL, SOCIAL_IMAGE } from '@/lib/seo';
+import '../globals.css';
+
+/**
+ * This is the app's root layout — it owns `<html>`/`<body>`. It lives inside
+ * `[locale]` on purpose: a layout above this segment has no locale in its URL,
+ * so the only way for it to fill in `<html lang>` would be to ask a request-time
+ * API, and a dynamic API in the outermost layout makes *every* route in the app
+ * render on demand. Reading the locale from the segment keeps the whole tree
+ * statically renderable. Every page lives under `[locale]`, so nothing is
+ * orphaned by there being no `app/layout.tsx`.
+ */
 
 type LocaleLayoutProps = {
   children: ReactNode;
@@ -26,7 +38,12 @@ export async function generateMetadata({ params }: Pick<LocaleLayoutProps, 'para
   const t = await getTranslations({ locale, namespace: 'Metadata' });
 
   return {
+    metadataBase: new URL(SITE_URL),
     applicationName: SITE_NAME,
+    icons: {
+      icon: '/favicon.ico',
+      apple: '/android-chrome-192x192.png',
+    },
     title: {
       default: t('defaultTitle'),
       template: `%s | ${SITE_NAME}`,
@@ -67,5 +84,16 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   setRequestLocale(locale);
 
-  return <NextIntlClientProvider>{children}</NextIntlClientProvider>;
+  const messages = await getMessages({ locale });
+  const clientMessages = Object.fromEntries(
+    CLIENT_NAMESPACES.map((namespace) => [namespace, messages[namespace]]),
+  );
+
+  return (
+    <html lang={locale} data-scroll-behavior="smooth">
+      <body>
+        <NextIntlClientProvider messages={clientMessages}>{children}</NextIntlClientProvider>
+      </body>
+    </html>
+  );
 }

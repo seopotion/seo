@@ -80,6 +80,19 @@ export class ApiStack extends Stack {
       { parameterName: cfg.gscTokenKeyParam },
     );
 
+    // GitHub App private key (#7): the PKCS#1 PEM GitHub issues once at
+    // registration, minting per-publish installation tokens. Same out-of-band
+    // SecureString pattern — `file://` so the PEM's newlines survive:
+    //   aws ssm put-parameter --name /seo/<stage>/github-app-key --type SecureString --value file://seopotion.<stage>.private-key.pem
+    // API Lambda only, matching the JWT-secret boundary: the worker never
+    // publishes, so it is never granted a credential that can write to a
+    // customer's repository.
+    const githubAppKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'GithubAppKeyParam',
+      { parameterName: cfg.githubAppKeyParam },
+    );
+
     // LemonSqueezy billing secrets (#13): API key (checkout/portal calls) +
     // webhook signing secret. Same out-of-band SecureString pattern:
     //   aws ssm put-parameter --name /seo/<stage>/lemonsqueezy-api-key --type SecureString --value <ls_api_key>
@@ -117,6 +130,9 @@ export class ApiStack extends Stack {
       LEMONSQUEEZY_STORE_ID: cfg.lemonSqueezyStoreId,
       LEMONSQUEEZY_VARIANT_PAID: cfg.lemonSqueezyVariantPaid,
       LEMONSQUEEZY_VARIANT_EXPERT: cfg.lemonSqueezyVariantExpert,
+      GITHUB_APP_SLUG: cfg.githubAppSlug,
+      GITHUB_APP_CLIENT_ID: cfg.githubAppClientId,
+      GITHUB_APP_KEY_PARAM: cfg.githubAppKeyParam,
     };
 
     // ESM output: esbuild rewrites CommonJS `require` into a shim that throws for
@@ -155,21 +171,55 @@ export class ApiStack extends Stack {
       retentionPeriod: Duration.days(14),
     });
 
-    // Strategy task queue. Visibility timeout >= worker timeout so an
-    // in-flight message isn't redelivered while the worker is still
-    // processing it. After maxReceiveCount failed deliveries the message
-    // moves to the DLQ.
+    // Strategy task queue. Visibility timeout > worker timeout (below: 15 min,
+    // the Lambda max) so an in-flight message isn't redelivered while the worker
+    // is still processing it. After maxReceiveCount failed deliveries the
+    // message moves to the DLQ.
     const strategyQueue = new Queue(this, 'StrategyQueue', {
-      visibilityTimeout: Duration.minutes(15),
+      visibilityTimeout: Duration.minutes(16),
       deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
     });
 
-    // Provider secret env vars — read from process.env at synth/deploy host.
-    // Deployed-secret provisioning (SSM SecureString) is deferred; the `?? ''`
-    // fallback is intentional until that lands.
-    const providerEnv = {
-      DATAFORSEO_LOGIN: process.env.DATAFORSEO_LOGIN ?? '',
-      DATAFORSEO_PASSWORD: process.env.DATAFORSEO_PASSWORD ?? '',
+    // Provider API credentials (#43). Same out-of-band SecureString pattern as
+    // every other secret — only NAMEs reach this template; @shared/providers
+    // `resolveProviderSecret` fetches + caches the values at runtime. Each
+    // Lambda is granted only the keys it actually calls.
+    //   aws ssm put-parameter --name /seo/<stage>/dataforseo-login --type SecureString --value <login>
+    //   aws ssm put-parameter --name /seo/<stage>/openrouter-api-key --type SecureString --value <key>
+    const dataForSeoLoginParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'DataForSeoLoginParam',
+      { parameterName: cfg.dataForSeoLoginParam },
+    );
+    const dataForSeoPasswordParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'DataForSeoPasswordParam',
+      { parameterName: cfg.dataForSeoPasswordParam },
+    );
+    const openRouterApiKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'OpenRouterApiKeyParam',
+      { parameterName: cfg.openRouterApiKeyParam },
+    );
+    const youtubeApiKeyParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'YoutubeApiKeyParam',
+      { parameterName: cfg.youtubeApiKeyParam },
+    );
+    const falKeyParam = StringParameter.fromSecureStringParameterAttributes(this, 'FalKeyParam', {
+      parameterName: cfg.falKeyParam,
+    });
+
+    /** DataForSEO credential NAMEs — for the Lambdas that query DataForSEO. */
+    const dataForSeoEnv = {
+      DATAFORSEO_LOGIN_PARAM: cfg.dataForSeoLoginParam,
+      DATAFORSEO_PASSWORD_PARAM: cfg.dataForSeoPasswordParam,
+    };
+
+    /** Grants the DataForSEO credentials to a function that queries DataForSEO. */
+    const grantDataForSeo = (fn: NodejsFunction) => {
+      dataForSeoLoginParam.grantRead(fn);
+      dataForSeoPasswordParam.grantRead(fn);
     };
 
     // API Lambda — produces scan tasks.
@@ -184,7 +234,7 @@ export class ApiStack extends Stack {
       environment: {
         ...mongoEnv,
         ...authEnv,
-        ...providerEnv,
+        ...dataForSeoEnv,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
       },
@@ -192,12 +242,14 @@ export class ApiStack extends Stack {
     });
     scanQueue.grantSendMessages(apiFn);
     strategyQueue.grantSendMessages(apiFn);
+    grantDataForSeo(apiFn);
     jwtSecretParam.grantRead(apiFn);
     googleClientSecretParam.grantRead(apiFn);
     gscTokenKeyParam.grantRead(apiFn);
     mongoUriParam.grantRead(apiFn);
     lemonSqueezyApiKeyParam.grantRead(apiFn);
     lemonSqueezyWebhookSecretParam.grantRead(apiFn);
+    githubAppKeyParam.grantRead(apiFn);
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {
@@ -210,13 +262,15 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        ...providerEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        ...dataForSeoEnv,
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
       },
       bundling,
     });
     workerFn.addEventSource(new SqsEventSource(scanQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(workerFn);
+    grantDataForSeo(workerFn);
+    openRouterApiKeyParam.grantRead(workerFn);
 
     // Strategy worker Lambda — consumes strategy tasks from the queue.
     const strategyWorkerFn = new NodejsFunction(this, 'StrategyWorkerFn', {
@@ -225,17 +279,19 @@ export class ApiStack extends Stack {
       depsLockFilePath,
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
-      timeout: Duration.minutes(10),
+      timeout: Duration.minutes(15),
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        ...providerEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
+        ...dataForSeoEnv,
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
       },
       bundling,
     });
     strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(strategyWorkerFn);
+    grantDataForSeo(strategyWorkerFn);
+    openRouterApiKeyParam.grantRead(strategyWorkerFn);
 
     // Dead-letter queue: generation tasks that fail repeatedly land here.
     const generationDlq = new Queue(this, 'GenerationDlq', {
@@ -290,8 +346,8 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
-        FAL_KEY: process.env.FAL_KEY ?? '',
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
+        FAL_KEY_PARAM: cfg.falKeyParam,
         IMAGES_BUCKET: imagesBucket.bucketName,
         IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
       },
@@ -299,6 +355,8 @@ export class ApiStack extends Stack {
     });
     imagesWorkerFn.addEventSource(new SqsEventSource(imagesQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(imagesWorkerFn);
+    openRouterApiKeyParam.grantRead(imagesWorkerFn);
+    falKeyParam.grantRead(imagesWorkerFn);
     imagesBucket.grantPut(imagesWorkerFn);
 
     // Generation worker Lambda — consumes generation tasks; produces articles.
@@ -312,14 +370,16 @@ export class ApiStack extends Stack {
       memorySize: 512,
       environment: {
         ...mongoEnv,
-        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? '',
-        YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
+        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
+        YOUTUBE_API_KEY_PARAM: cfg.youtubeApiKeyParam,
         IMAGES_QUEUE_URL: imagesQueue.queueUrl,
       },
       bundling,
     });
     generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
     mongoUriParam.grantRead(generationWorkerFn);
+    openRouterApiKeyParam.grantRead(generationWorkerFn);
+    youtubeApiKeyParam.grantRead(generationWorkerFn);
     imagesQueue.grantSendMessages(generationWorkerFn);
 
     // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
@@ -388,6 +448,70 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'HttpApiUrl', {
       value: httpApi.apiEndpoint,
       description: 'Base URL of the HTTP API — set as NEXT_PUBLIC_API_URL for the web app',
+    });
+
+    // Admin API (epic #150) — its own Lambda + HTTP API: separate URL, separate
+    // secret, separate bundle. The customer Lambda contains zero admin code and
+    // the admin Lambda is granted ONLY its own secrets — never the customer JWT
+    // secret, GSC token key, Google client secret, or LemonSqueezy params.
+    //
+    // Admin signing secret, created out-of-band like the others:
+    //   aws ssm put-parameter --name /seo/<stage>/admin/jwt-secret --type SecureString --value <secret>
+    const adminJwtSecretParam = StringParameter.fromSecureStringParameterAttributes(
+      this,
+      'AdminJwtSecretParam',
+      { parameterName: cfg.adminJwtSecretParam },
+    );
+
+    // Operator allowlist: a PLAIN String parameter (comma-separated emails —
+    // not secret), short-cached at runtime so edits apply without a redeploy:
+    //   aws ssm put-parameter --name /seo/<stage>/admin/operators --type String --value "a@x.com,b@y.com"
+    const adminOperatorsParam = StringParameter.fromStringParameterName(
+      this,
+      'AdminOperatorsParam',
+      cfg.adminOperatorsParam,
+    );
+
+    const adminFn = new NodejsFunction(this, 'AdminFn', {
+      entry: join(projectRoot, 'apps/api/src/admin-index.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.seconds(30),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        ...dataForSeoEnv, // operator keyword research (DataForSEO, phase 1)
+        ADMIN_JWT_SECRET_PARAM: cfg.adminJwtSecretParam,
+        ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
+        GOOGLE_CLIENT_ID: cfg.googleClientId,
+        SCAN_QUEUE_URL: scanQueue.queueUrl,
+        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+        GENERATION_QUEUE_URL: generationQueue.queueUrl,
+        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
+      },
+      bundling,
+    });
+    scanQueue.grantSendMessages(adminFn);
+    strategyQueue.grantSendMessages(adminFn);
+    generationQueue.grantSendMessages(adminFn);
+    imagesQueue.grantSendMessages(adminFn);
+    mongoUriParam.grantRead(adminFn);
+    grantDataForSeo(adminFn);
+    adminJwtSecretParam.grantRead(adminFn);
+    adminOperatorsParam.grantRead(adminFn);
+
+    const adminHttpApi = new HttpApi(this, 'AdminHttpApi');
+    adminHttpApi.addRoutes({
+      path: '/{proxy+}',
+      methods: [HttpMethod.ANY],
+      integration: new HttpLambdaIntegration('AdminApiIntegration', adminFn),
+    });
+
+    new CfnOutput(this, 'AdminHttpApiUrl', {
+      value: adminHttpApi.apiEndpoint,
+      description: 'Base URL of the admin HTTP API — point apps/admin at this',
     });
 
     // Image CDN domain — the base of every stored article-image URL.

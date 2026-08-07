@@ -3,13 +3,17 @@ import {
   buildContext,
   buildVideoEmbed,
   buildVideoPickPrompt,
+  deriveCandidates,
   extractH2s,
   generateArticle,
   injectBlockAfterHeading,
+  type LinkCandidate,
   languageCodeFromName,
+  MAX_LINK_CANDIDATES,
   parseVideoPick,
+  verifyCandidates,
 } from '@shared/generation';
-import type { ArticleVideo } from '@shared/schemas';
+import type { ArticleVideo, Org } from '@shared/schemas';
 import { GenerateTask, isPaid } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
@@ -23,6 +27,30 @@ import { enqueueImageTask } from './queue';
  * failures are recorded on the keyword (not published); provider errors are
  * recorded and rethrown so SQS redelivers (-> DLQ). See design & epic #56 / #55.
  */
+
+/**
+ * Internal-link targets for this org: its own published articles, each derived
+ * to a URL and then proven live (#186). Anything unproven is dropped — an org
+ * with nothing published, or no blog URL to build one from, gets no links at
+ * all, whatever `internal_links_count` says.
+ */
+async function resolveLinkCandidates(org: Org): Promise<LinkCandidate[]> {
+  const max = org.presets?.article_preferences.content_seo.internal_links_count ?? 0;
+  const mainBlogUrl = org.presets?.blog.main_blog_url ?? '';
+  if (max <= 0 || !mainBlogUrl.trim()) return [];
+  const { articles } = await ArticleRepo.listByOrg(org.id, {
+    status: 'published',
+    limit: MAX_LINK_CANDIDATES,
+    offset: 0,
+  });
+  const candidates = await verifyCandidates(deriveCandidates(mainBlogUrl, articles));
+  logger.info('internal link candidates resolved', {
+    derived: articles.length,
+    verified: candidates.length,
+  });
+  return candidates;
+}
+
 export const handler: SQSHandler = async (event, context): Promise<void> => {
   if (context?.awsRequestId) logger.addContext(context);
 
@@ -57,8 +85,8 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         continue;
       }
 
-      const ctx = buildContext(org, keyword);
-      const { llm, youtube } = getGenerationClients();
+      const ctx = buildContext(org, keyword, await resolveLinkCandidates(org));
+      const { llm, youtube } = await getGenerationClients();
       const result = await generateArticle({ ctx, llm });
 
       if (!result.ok) {

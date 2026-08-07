@@ -26,6 +26,17 @@ export const config = {
   GSC_TOKEN_KEY: process.env.GSC_TOKEN_KEY ?? '',
   /** Web app origin — builds the GSC OAuth redirect URI (<origin>/dashboard/gsc/callback). */
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  /** GitHub App slug (public, per-env) — builds the install URL. One App per
+   * environment, because the Setup URL is a single field on the registration.
+   * See design/github-app.md. */
+  GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG ?? '',
+  /** GitHub App client id (public, per-env) — the `iss` claim of the App JWT. */
+  GITHUB_APP_CLIENT_ID: process.env.GITHUB_APP_CLIENT_ID ?? '',
+  /** Name of the SSM SecureString holding the GitHub App private key (deployed,
+   * API Lambda only). Unset locally — GITHUB_APP_KEY below is used directly. */
+  GITHUB_APP_KEY_PARAM: process.env.GITHUB_APP_KEY_PARAM ?? '',
+  /** Local-dev GitHub App private key: the PKCS#1 PEM GitHub hands you. */
+  GITHUB_APP_KEY: process.env.GITHUB_APP_KEY ?? '',
   /** Name of the SSM SecureString holding the LemonSqueezy API key (deployed).
    * Unset locally — LEMONSQUEEZY_API_KEY below is used directly. */
   LEMONSQUEEZY_API_KEY_PARAM: process.env.LEMONSQUEEZY_API_KEY_PARAM ?? '',
@@ -42,4 +53,18 @@ export const config = {
   LEMONSQUEEZY_VARIANT_EXPERT: process.env.LEMONSQUEEZY_VARIANT_EXPERT ?? '',
   /** Session token lifetime. */
   JWT_TTL_SECONDS: 60 * 60 * 24 * 7,
+  /** Name of the SSM SecureString holding the admin HS256 signing secret in
+   * deployed envs (granted to the admin Lambda ONLY). Unset locally —
+   * ADMIN_JWT_SECRET below is used directly. See admin/secret.ts. */
+  ADMIN_JWT_SECRET_PARAM: process.env.ADMIN_JWT_SECRET_PARAM ?? '',
+  /** Local-dev admin signing secret. Deliberately different from JWT_SECRET's
+   * default so customer/admin cross-token tests are meaningful locally. */
+  ADMIN_JWT_SECRET: process.env.ADMIN_JWT_SECRET ?? 'dev-admin-secret-change-me',
+  /** Name of the SSM String parameter holding the comma-separated operator
+   * email allowlist in deployed envs. Unset locally — ADMIN_OPERATORS is used. */
+  ADMIN_OPERATORS_PARAM: process.env.ADMIN_OPERATORS_PARAM ?? '',
+  /** Local-dev operator allowlist (comma-separated emails). */
+  ADMIN_OPERATORS: process.env.ADMIN_OPERATORS ?? '',
+  /** Admin session token lifetime. */
+  ADMIN_JWT_TTL_SECONDS: 60 * 60 * 12,
 };

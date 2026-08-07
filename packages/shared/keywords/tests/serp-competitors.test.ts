@@ -32,7 +32,7 @@ const config = {
   duplicateSerpOverlap: 0.9,
 } as unknown as ResolvedConfig;
 
-test('accepted candidates carry the top-K SERP domains', async () => {
+test('accepted candidates carry the top-K SERP entries', async () => {
   const dataForSeo = {
     serpGoogleOrganic: vi.fn(async () => [
       { rank: 1, url: 'https://a.com/1', domain: 'a.com', title: 'A' },
@@ -66,5 +66,9 @@ test('accepted candidates carry the top-K SERP domains', async () => {
     presets,
     config,
   });
-  expect(accepted[0]!.serp_competitors).toEqual(['a.com', 'b.com', 'c.com']);
+  expect(accepted[0]!.serp_competitors).toEqual([
+    { rank: 1, url: 'https://a.com/1', domain: 'a.com', title: 'A' },
+    { rank: 2, url: 'https://b.com/1', domain: 'b.com', title: 'B' },
+    { rank: 3, url: 'https://c.com/1', domain: 'c.com', title: 'C' },
+  ]);
 });

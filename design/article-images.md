@@ -12,6 +12,7 @@ is separate.
 | --- | --- |
 | Pipeline shape | Separate **image SQS task** (`ImageTask`), enqueued by the generation worker after the article persists; consumed by a new images worker Lambda |
 | Durable storage | **One private S3 bucket per stage** + **CloudFront distribution** (Origin Access Control); article URLs are CloudFront URLs |
+| Encoding | **WebP from the provider** — fal is asked for `output_format: 'webp'` at the requested pixel size, so the bytes are already small when they arrive and every consumer (CDN, WordPress, git) gets the same file. Revised 2026-08-04, [#178](https://github.com/seopotion/seo/issues/178) |
 | Image policy | **Cover (1200×630) + 2 inline images, all required** for `images_status: 'complete'`; inline count is a config constant |
 | Placement | Inline images **injected into `article.content` markdown** directly after their target `## heading`; cover stays out of content (`featured_image_url` + metadata) |
 | Image state | **Embedded on the Article document** (`images` array + `images_status`), no new collection |
@@ -28,8 +29,8 @@ is separate.
   SSM, queues, Lambdas). A shared bucket would need cross-stack wiring and would mix
   staging and prod assets in one namespace.
 - **CloudFront + OAC, not public-read:** the bucket needs no public access policy;
-  images get edge caching. Objects are immutable at a given key (retries overwrite
-  *before* the URL is stored), so long TTLs need no invalidation story.
+  images get edge caching. Objects are immutable at a given key (the key carries a
+  digest of its own bytes), so long TTLs need no invalidation story.
 - **Embedded image state:** an article's images are small, bounded (3), and never
   queried independently — a separate collection would add a repo and indexes with no
   query need.
@@ -47,6 +48,8 @@ const ArticleImageSchema = z.object({
   model: z.string().nullable(),
   seed: z.number().nullable(),
   generated_at: z.date().nullable(),
+  width: z.number().nullable().default(null),   // intrinsic pixels, from fal (#176)
+  height: z.number().nullable().default(null),
 });
 
 // Added to ArticleSchema, defaulted so pre-#51 docs still parse:
@@ -84,20 +87,202 @@ changes slot identity.
 
 For each slot without a `url`:
 
-1. `ImageClient.generate` (fal, FLUX.1 [dev] default). Cover targets **1200×630**: the
-   neutral `ImageGenerateParams.size` union gains a `{ width, height }` variant (fal's
-   `image_size` accepts custom dimensions natively). Inline images use
-   `landscape_16_9`.
-2. Fetch the returned image bytes from the fal URL.
-3. Upload to the stage bucket at a **deterministic key**:
-   `articles/{article_id}/{cover|inline-1|inline-2}.{ext}`. Deterministic keys make
-   retries overwrite-idempotent — no orphaned or duplicate assets.
-4. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
-   `generated_at`.
+1. `ImageClient.generate` (fal, FLUX.1 [dev] default), asking for
+   **`outputFormat: 'webp'`** — see [Encoding](#encoding-webp-from-the-provider). Both
+   roles target exact pixels via the `{ width, height }` variant of the neutral
+   `ImageGenerateParams.size` union (fal's `image_size` accepts custom dimensions
+   natively): **1200×630** cover, **1200×675** inline.
+2. Fetch the returned image bytes from the fal URL — already WebP, so nothing is
+   re-encoded and no PNG is ever downloaded or stored.
+3. Reject the image unless fal reported a positive integer `width` **and** `height`.
+   They are published as `<img width height>` (#176), so a wrong value reserves the
+   wrong box on the client's page — worse than shipping none. Throwing here means
+   nothing is uploaded or persisted and SQS redelivers.
+4. Upload to the stage bucket at a **content-addressed key**:
+   `articles/{article_id}/{cover|inline-N}-{sha256(bytes)}.webp`, with a one-year
+   immutable `Cache-Control` — see [Object keys](#object-keys-content-addressed).
+5. Store `https://<distribution-domain>/<key>` on the slot, with `model`, `seed`,
+   `generated_at`, and the `width` / `height` fal reported.
 
-> **Decide before prod:** stored URLs bake in the CloudFront domain. If we want a
-> custom domain (e.g. `img.seopotion.com`), alias it onto the distribution **before**
-> real articles exist, or accept the default `*.cloudfront.net` domain permanently.
+> **Decide before prod — and this got sharper on 2026-07-30.** Stored URLs bake in the
+> CloudFront domain. If we want a custom domain (e.g. `img.seopotion.com`), alias it onto
+> the distribution **before** real articles exist, or accept the default
+> `*.cloudfront.net` domain permanently.
+>
+> The static-site integration now leaves images on the CDN and commits the absolute URL
+> into the client's repo, so these strings escape our systems entirely: they land in
+> someone else's **permanent git history** and render on their live pages. Changing the
+> domain afterwards is no longer a database migration — it is a rewrite-and-republish
+> across every customer repository, and a period of 404s on published articles for anyone
+> who does not accept the republish. A raw `d1234.cloudfront.net` also reads as
+> third-party junk in a client's `git diff`, which is a bad first impression for a feature
+> whose pitch is "auditable". **Alias the domain before the first static-site install.**
+
+## Encoding: WebP from the provider
+
+**Revised 2026-08-04 ([#178](https://github.com/seopotion/seo/issues/178)).** The section
+below previously specified a local `sharp` re-encode in the worker. It no longer does —
+fal encodes WebP itself, which removes a native dependency, a Docker-at-synth
+requirement and a whole class of Lambda packaging risk. The original reasoning for
+*why* small bytes matter is unchanged and kept.
+
+The provider's bytes were stored unmodified — a 1200×630 FLUX PNG is 1.1–2.5 MB.
+Across ~50 articles at 4 images each that is ~400 MB of PNG versus ~24 MB of WebP.
+
+The original argument was that this is fatal in git, because the static-site integration
+committed images into the client's repo and git history is permanent. **That integration
+now leaves images on our CDN** ([`static-site-integration.md`](static-site-integration.md),
+revised 2026-07-30), so the git argument is gone — and the case is, if anything, stronger
+without it. Those URLs render on *someone else's* pages now: a 2 MB PNG cover is the
+client's Largest Contentful Paint, on a page we sold them as an SEO asset, and we pay the
+egress for every view of it. What was a one-time storage cost is now a recurring
+performance and bandwidth cost that scales with their traffic.
+
+### Ask the provider, don't re-encode
+
+`fal-ai/flux-2` takes an `output_format` of `jpeg | png | webp` (default `png`) —
+verified against fal's published schema for the endpoint on 2026-08-04:
+
+```
+GET https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=fal-ai/flux-2
+  → Flux2Input.output_format = { enum: ["jpeg", "png", "webp"], default: "png" }
+```
+
+So the whole conversion is one field on the generate call, and the worker downloads tens
+to hundreds of KB from fal instead of ~2 MB — generation gets *faster* as a side effect.
+There is exactly one copy of the bytes and every consumer (dashboard, `og:image`,
+WordPress, a client's static site linking straight to CloudFront) gets the same file.
+
+| Slot | Requested size | Encode |
+| --- | --- | --- |
+| cover | `1200×630` (OG large-card) | fal `output_format: 'webp'` |
+| inline | `1200×675` (same 1200px cap, 16:9) | fal `output_format: 'webp'` |
+
+Inline images request **exact pixels** rather than the `landscape_16_9` preset, because
+the preset is the model's choice and can exceed the 1200px cap. `slotKey`'s extension is
+`webp` and `storeImage` gets `ContentType: image/webp`. The content-type branch in the
+worker survives as a small map — it is what keeps the stored key honest (`.png` stays
+`.png`) rather than mislabelling the bytes if the provider ever answers with a format we
+did not ask for. Each store logs `bytes` + `content_type` + dimensions, because fal picks
+the quality: the byte budget (**cap 250 KB cover, 200 KB inline** — `SLOT_BYTE_CAP`,
+raised from 150/100 KB on the measurement below) is the acceptance criterion, so it has to
+stay measurable in production. Over-cap logs at `warn` and stores anyway: a heavy cover is
+worse than no cover, and there is no second attempt to make — fal has no quality knob.
+
+### Measured, 2026-08-04 — the byte caps do not hold for photographic styles
+
+Six real generations against `fal-ai/flux-2` at the exact parameters the worker sends:
+
+| Prompt style | Slot | Requested | Returned | Stored | vs. old cap | vs. cap now |
+| --- | --- | --- | --- | --- | --- | --- |
+| flat illustration | cover | 1200×630 | 1216×640 | **63 KB** | pass (150) | pass (250) |
+| detailed photo (open-plan office) | cover | 1200×630 | 1216×640 | **240 KB** | 1.6× over | pass |
+| worst case (forest canopy) | cover | 1200×630 | 1216×640 | **555 KB** | 3.7× over | **2.2× over** |
+| flat illustration | inline | 1200×675 | 1216×704 | **46 KB** | pass (100) | pass (200) |
+| detailed photo (workshop bench) | inline | 1200×675 | 1216×704 | **180 KB** | 1.8× over | pass |
+| worst case, as PNG | cover | 1200×630 | 1216×640 | 2052 KB | — | the baseline |
+
+Two findings.
+
+**fal snaps dimensions up to a multiple of 32** — 1200→1216, 630→640, 675→704. This is
+why the *returned* size is what gets persisted, and it is load-bearing: the requested
+values would have been wrong on every image. The 1200px cap is therefore exceeded by 16px
+(1.3%). That is the right trade rather than a bug: requesting 1184 to snap under the cap
+would land *below* the 1200px `og:image` floor for large social cards, which is the
+constraint that actually matters.
+
+**The caps hold for illustration and fail for photography.** fal has no quality parameter
+— `Flux2Input` exposes `output_format` but nothing to turn down — so there is no
+provider-side knob and no retry-at-lower-quality. And `image_style` is
+`z.string()` (`presets.ts`), written by the LLM from the org's own site scan, so a
+photography-led client gets photographic covers and there is nothing today that steers
+them. Illustration lands ~2.4× under budget; a plausible business photo is 1.6× over.
+
+**Decided 2026-08-04: raise the caps to 250 KB cover / 200 KB inline** (`SLOT_BYTE_CAP`).
+That is what the provider actually gives us for ordinary photographic subjects, still ~8×
+better than PNG, and it keeps the no-encoder architecture. The two alternatives were
+constraining `image_style` toward illustration (keeps the tighter budget but changes
+generated art direction for every client) and encoding locally with `sharp` (the only
+deterministic option, at the packaging cost documented below).
+
+**What the raised cap does not cover.** The 555 KB worst case is still 2.2× over. Nothing
+enforces the cap — fal has no quality knob, so there is no second attempt to make — so
+over-cap logs `warn 'image stored over byte cap'` with `bytes` and `cap`, and stores
+anyway. That log is the trigger to revisit: if it fires often in production, the tail is
+real for actual client prompts and option 2 or 3 comes back on the table. If it stays
+quiet, the pathological case was pathological.
+
+**No `sharp`, no Lambda packaging change.** The rejected local-encode path needed
+`nodeModules: ['sharp']` + `forceDockerBundling` on a second bundling object (the shared
+`bundling` const backs *every* Lambda and must not grow a native dep), which would have
+made `cdk synth`/`deploy` require Docker for the whole stack, or a prebuilt layer with its
+own CI job. `memorySize` stays 512 MB — nothing CPU-bound happens in the worker now.
+
+**Existing articles are not touched.** They are `images_status: 'complete'`, so the worker
+skips them and their `.png` keys stay valid — which also means published URLs never move,
+so the orphaning risk in [#177](https://github.com/seopotion/seo/issues/177) never
+arises. A backfill would have to rewrite the URLs already embedded in `article.content`
+and already committed to client repos; out of scope until something needs it.
+
+### Cache headers
+
+`storeImage` sets `CacheControl: 'public, max-age=31536000, immutable'`. These URLs are
+committed verbatim into client repos, so a repeat visitor should never revalidate;
+without it CloudFront falls back to its default TTL.
+
+### Object keys: content-addressed
+
+The key is `articles/{article_id}/{cover|inline-N}-{sha256(bytes)}.webp`, digested from
+the exact bytes uploaded. **A slot key alone is not safe to serve `immutable`.** The S3
+put happens *before* the guarded `fillImageSlot`, so two concurrent deliveries for one
+slot both write, last-put-wins, and the delivery that wins the database guard can end up
+describing bytes the loser overwrote — persisting `width`/`height` that do not match the
+object, cached for a year on someone else's page. Content-addressing gives each distinct
+image its own object, so a URL's bytes can never change under it.
+
+This also *strengthens* the permanence guarantee [#177](https://github.com/seopotion/seo/issues/177)
+was closed on: an object is never overwritten or moved, so a URL already committed to a
+client repo cannot be invalidated by a later regenerate.
+
+**The tradeoff, accepted:** the original deterministic-key design (#51) claimed "retries
+overwrite — no orphaned or duplicate assets", and that is now inverted. Generation is
+non-deterministic (no fixed seed), so a retry that regenerates after a successful put but
+before a successful fill leaves the earlier object behind forever, and the bucket has no
+lifecycle rule. The objects are tens to hundreds of KB and the path is rare, so this is
+cheap — but it is
+unbounded, and a sweep of objects no slot references is the fix if it ever matters.
+
+### Losing a fill race
+
+`fillImageSlot` is guarded on the slot still being empty, so exactly one concurrent
+delivery wins. The loser must **not** carry its own image forward: it reloads the article
+and adopts the persisted URL and content, because publishing its own URL would publish
+one the article never recorded, and building the next inline injection on its local
+content would inject a second copy of the image. Completion reloads for the same reason —
+the cover URL handed to `completeImages` is the persisted one, never the local view.
+
+### Recorded dimensions
+
+fal returns the final `width` / `height` on every image it produces, and we were already
+parsing them into `ImageResult` and throwing them away. Both are now stored on the slot
+(closing [#176](https://github.com/seopotion/seo/issues/176)) — and the *returned* size is
+what gets stored, not the requested one, because FLUX snaps to model-friendly multiples.
+
+```ts
+// article.ts — ArticleImageSchema
+width: z.number().nullable().default(null),
+height: z.number().nullable().default(null),
+```
+
+**Nullable and defaulted, not required.** Repositories `parse` through Zod at the
+boundary, so every article generated before this landed would fail to *load* if the
+fields were mandatory — a read-path break, not just a write-path one. They follow
+`model` / `seed` / `generated_at`, already nullable for the same unfilled-slot reason.
+
+They flow into the static-site contract's manifest and frontmatter so an adapter can set
+explicit `width`/`height` on `<img>` and reserve the space before the image loads.
+CLS is a ranking signal, which makes it our problem and not only the client's. Consumers
+that ignore the fields are unaffected, so the contract stays `version: 1`.
 
 ## Placement
 
@@ -113,8 +298,8 @@ Per SQS record:
 1. `ImageTask.parse` → load article; skip if missing or `images_status === 'complete'`.
 2. If `images` is empty: run the image-plan LLM call, validate, persist slots
    (set-if-absent).
-3. For each slot without a `url`: generate → download → S3 → update slot (+ inject
-   markdown for inline).
+3. For each slot without a `url`: generate (**WebP**) → download → S3 → update slot with
+   the URL and fal's dimensions (+ inject markdown for inline).
 4. All slots done → `images_status: 'complete'`, `featured_image_url` = cover URL.
 5. On error: log, rethrow → SQS redelivery resumes at the first unfinished slot → DLQ
    after 3 receives → `images_status` left `'pending'` (visible for ops; a manual
@@ -180,6 +365,6 @@ is negligible at this volume.
 - Inline placement references stable article sections — plan validated against actual
   H2s; injection anchored to the heading line.
 - Partial failures retryable without regenerating successful assets — per-slot
-  idempotency + deterministic S3 keys + SQS redelivery.
+  idempotency + content-addressed S3 keys + SQS redelivery.
 - Article unpublished until image policy satisfied — `images_status` gate invariant
   for the future publisher.

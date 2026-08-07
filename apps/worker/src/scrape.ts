@@ -1,6 +1,6 @@
 const FETCH_TIMEOUT_MS = 10_000;
 const SCRAPE_CHAR_BUDGET = 8_000;
-const USER_AGENT = 'Mozilla/5.0 (compatible; SeoPotionScanner/1.0; +https://seopotion.com/bot)';
+const USER_AGENT = 'Mozilla/5.0 (compatible; SeoPotionScanner/1.0; +https://seopotion.co/bot)';
 const MAX_BEST_ARTICLES = 5;
 const MAX_SITEMAP_URLS = 200;
 const MAX_RESPONSE_BYTES = 5_000_000; // 5 MB cap on fetched homepage/sitemap bodies

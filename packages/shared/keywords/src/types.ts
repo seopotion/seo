@@ -5,6 +5,7 @@ import type {
   CandidateStatus,
   RejectionReason,
   SearchIntent,
+  SerpCompetitor,
   SetupPresets,
 } from '@shared/schemas';
 
@@ -25,7 +26,7 @@ export interface WorkingCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
-  serp_competitors: string[] | null;
+  serp_competitors: SerpCompetitor[] | null;
 }
 
 /** Pipeline output — assignable to `CreateCandidateInput` (repo derives normalized_keyword). */
@@ -45,7 +46,7 @@ export interface EnrichedCandidate {
   article_type: ArticleType | null;
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
-  serp_competitors: string[] | null;
+  serp_competitors: SerpCompetitor[] | null;
 }
 
 export interface ScoreWeights {
@@ -91,6 +92,12 @@ export interface PipelineInput {
   existingArticleKeywords: string[];
   clients: { dataForSeo: DataForSeoClient; llm: LlmClient };
   config?: Partial<PipelineConfig>;
+  /**
+   * Optional per-stage progress hook. Called at the entry of each async stage so
+   * a mid-stage hang (e.g. a slow provider) is attributable to the last stage
+   * logged. The strategy worker wires this to its structured logger.
+   */
+  onProgress?: (stage: string, meta?: Record<string, unknown>) => void;
 }
 
 export interface PipelineStats {

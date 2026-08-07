@@ -7,5 +7,16 @@
     "packages/shared/*/tests/**/*",
     "scripts/**/*.ts"
   ],
-  "exclude": ["node_modules", "**/node_modules", "dist", "**/dist", "infra", "cdk.out"]
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "dist",
+    "**/dist",
+    "infra",
+    "cdk.out",
+    // Browser apps with their own tsconfigs (including their test files) — run via
+    // `npm run check:admin` and `npm run check:web` respectively.
+    "apps/admin",
+    "apps/web"
+  ]
 }

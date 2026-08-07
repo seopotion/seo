@@ -25,6 +25,21 @@ vi.mock('../src/clients/wordpress', () => ({
   testWordPressIntegration,
 }));
 
+// The static-site publisher (#7). GithubError has to be the same class the route
+// does `instanceof` against, so it is declared here and handed to both.
+const { commitFiles, GithubError } = vi.hoisted(() => {
+  class GithubError extends Error {
+    constructor(
+      readonly code: string,
+      message: string,
+    ) {
+      super(message);
+    }
+  }
+  return { commitFiles: vi.fn(), GithubError };
+});
+vi.mock('../src/clients/github', () => ({ commitFiles, GithubError }));
+
 const { backlinksSummary } = vi.hoisted(() => ({
   backlinksSummary: vi.fn(async (_target: string) => ({ rank: 730 })),
 }));
@@ -40,6 +55,12 @@ vi.mock('../src/clients/gsc', () => ({ querySearchAnalytics, GscAuthRevokedError
 
 const gscKey = vi.hoisted(() => Buffer.alloc(32, 7));
 vi.mock('../src/lib/secrets', () => ({ getGscTokenKey: vi.fn(async () => gscKey) }));
+
+// #7: connections keyed `${org_id}:${provider}`, matching the collection's
+// unique index. Hoisted so tests can reset it between cases.
+const { integrations } = vi.hoisted(() => ({
+  integrations: new Map<string, Record<string, unknown>>(),
+}));
 
 const { gscConnections, markRefreshFailed } = vi.hoisted(() => ({
   gscConnections: new Map<string, Record<string, unknown>>(),
@@ -212,6 +233,97 @@ vi.mock('@shared/db', () => {
       wordpress_post_id: 555,
       video: null,
     },
+    // Static-site fixtures (#7). Unlike the rows above these carry `images` and
+    // `publications`, because the publisher reads both — the repo defaults them
+    // through Zod, which this hand-rolled mock does not do.
+    {
+      id: 'art_7',
+      org_id: 'org_1',
+      keyword_id: 'kw_7',
+      title: 'Never Published',
+      meta_title: 'Never Published',
+      slug: 'never-published',
+      keyword: 'never published',
+      meta_description: 'm',
+      featured_image_url: 'https://cdn.example/7/cover.webp',
+      content: '## Section\n\nBody.',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      images: [
+        {
+          role: 'cover',
+          section_heading: null,
+          prompt: 'p',
+          alt: 'Cover alt',
+          url: 'https://cdn.example/7/cover.webp',
+          model: null,
+          seed: null,
+          generated_at: now,
+        },
+      ],
+      images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      publications: [] as Record<string, unknown>[],
+      video: null,
+    },
+    // Published to the static site, then renamed in the editor: the repo still
+    // holds `old-guide.md`, so republishing must delete it in the same commit.
+    {
+      id: 'art_8',
+      org_id: 'org_1',
+      keyword_id: 'kw_8',
+      title: 'Renamed Guide',
+      meta_title: 'Renamed Guide',
+      slug: 'renamed-guide',
+      keyword: 'renamed guide',
+      meta_description: 'm',
+      featured_image_url: 'https://cdn.example/8/cover.webp',
+      content: '## Section\n\nBody.',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      images: [],
+      images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      publications: [
+        {
+          provider: 'static-site',
+          ref: 'sha-old',
+          slug: 'old-guide',
+          published_at: new Date('2026-07-01T00:00:00.000Z'),
+          updated_at: null,
+        },
+      ] as Record<string, unknown>[],
+      video: null,
+    },
+    // Collides with art_8's committed filename.
+    {
+      id: 'art_9',
+      org_id: 'org_1',
+      keyword_id: 'kw_9',
+      title: 'Slug Twin',
+      meta_title: 'Slug Twin',
+      slug: 'old-guide',
+      keyword: 'slug twin',
+      meta_description: 'm',
+      featured_image_url: 'https://cdn.example/9/cover.webp',
+      content: '## Section\n\nBody.',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      images: [],
+      images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      publications: [] as Record<string, unknown>[],
+      video: null,
+    },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
     [
@@ -330,6 +442,13 @@ vi.mock('@shared/db', () => {
     OrgRepo: {
       findById: vi.fn(async (id: string) => orgs.get(id) ?? null),
       saveWordPressConnection,
+      clearWordPressConnection: vi.fn(async (id: string) => {
+        const org = orgs.get(id);
+        if (!org) return false;
+        org.wordpress_token = undefined;
+        org.wordpress_connected_at = undefined;
+        return true;
+      }),
       updatePresets: vi.fn(async (id: string, presets: unknown) => {
         const o = orgs.get(id);
         if (o) o.presets = presets;
@@ -367,12 +486,65 @@ vi.mock('@shared/db', () => {
           articles.filter((a) => a.org_id === orgId && a.status === status).length,
       ),
       setWordPressPostId,
+      listPublishedTo: vi.fn(async (orgId: string, provider: string) =>
+        articles.filter((a) => {
+          const rows = (a as { publications?: { provider: string }[] }).publications ?? [];
+          return (
+            a.org_id === orgId &&
+            a.status !== 'deleted' &&
+            rows.some((p) => p.provider === provider)
+          );
+        }),
+      ),
+      recordPublication: vi.fn(
+        async (
+          id: string,
+          entry: { provider: string; ref: string; slug: string },
+          at: Date = new Date(),
+        ) => {
+          const found = articles.find((a) => a.id === id) as
+            | { publications?: Record<string, unknown>[] }
+            | undefined;
+          if (!found) return false;
+          if (!found.publications) found.publications = [];
+          const existing = found.publications.find((p) => p.provider === entry.provider);
+          if (existing) Object.assign(existing, entry, { updated_at: at });
+          else found.publications.push({ ...entry, published_at: at, updated_at: null });
+          return true;
+        },
+      ),
       updateContent: vi.fn(async (id: string, patch: Record<string, string>) => {
         const article = articles.find((a) => a.id === id);
         if (!article) return null;
         Object.assign(article, patch, { updated_at: new Date() });
         return article;
       }),
+    },
+    IntegrationRepo: {
+      listByOrgId: vi.fn(async (orgId: string) =>
+        [...integrations.values()].filter((i) => i.org_id === orgId),
+      ),
+      setError: vi.fn(async (orgId: string, provider: string, code: string | null) => {
+        const row = integrations.get(`${orgId}:${provider}`);
+        if (row) row.last_error = code === null ? null : { code, at: new Date() };
+      }),
+      findByOrgAndProvider: vi.fn(
+        async (orgId: string, provider: string) => integrations.get(`${orgId}:${provider}`) ?? null,
+      ),
+      connectWordPress: vi.fn(async (orgId: string, siteUrl: string, tokenEnc: string) => {
+        integrations.set(`${orgId}:wordpress`, {
+          id: `int_${orgId}_wordpress`,
+          org_id: orgId,
+          provider: 'wordpress',
+          site_url: siteUrl,
+          token_enc: tokenEnc,
+          connected_at: new Date(),
+          last_error: null,
+        });
+      }),
+      deleteByOrgAndProvider: vi.fn(async (orgId: string, provider: string) =>
+        integrations.delete(`${orgId}:${provider}`),
+      ),
     },
     GscConnectionRepo: {
       findByOrgId: vi.fn(async (orgId: string) => gscConnections.get(orgId) ?? null),
@@ -383,7 +555,7 @@ vi.mock('@shared/db', () => {
 
 import { ArticleRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
-import { encryptSecret } from '../src/lib/crypto';
+import { decryptSecret, encryptSecret } from '../src/lib/crypto';
 import { logger } from '../src/logger';
 import app, { type AppType } from '../src/routes';
 
@@ -401,12 +573,52 @@ beforeEach(async () => {
   });
   testWordPressIntegration.mockReset();
   testWordPressIntegration.mockResolvedValue({ success: true });
-  // The setWordPressPostId mock persists onto the shared article fixture, so
-  // clear the one field create tests mutate to keep each test isolated (the
-  // create dup-guard rejects an article that already has a WordPress post ID).
-  const seededCreateArticle = await ArticleRepo.findById('art_1');
-  if (seededCreateArticle) delete seededCreateArticle.wordpress_post_id;
+  commitFiles.mockReset();
+  commitFiles.mockResolvedValue('sha-new');
+  // Connections persist across cases like the article fixture does; reset so a
+  // test that connects cannot change what the next one reads.
+  integrations.clear();
+  // The setWordPressPostId/recordPublication mocks persist onto the shared
+  // article fixture, so clear the fields create tests mutate to keep each test
+  // isolated (the create dup-guard rejects an article that already has a
+  // WordPress post ID).
+  const seededCreateArticle = (await ArticleRepo.findById('art_1')) as unknown as {
+    wordpress_post_id?: number;
+    publications?: unknown[];
+  } | null;
+  if (seededCreateArticle) {
+    delete seededCreateArticle.wordpress_post_id;
+    // Empty, not absent: the repo parses `publications` through a `.default([])`,
+    // so an entity that reached a handler always has the array.
+    seededCreateArticle.publications = [];
+  }
+  // Same reason, for the static-site fixtures: publishing writes onto them.
+  await resetStaticSiteFixtures();
 });
+
+/** Restore the static-site fixtures' publish state to their seeded values. */
+async function resetStaticSiteFixtures() {
+  const seed: Record<string, Record<string, unknown>[]> = {
+    art_7: [],
+    art_8: [
+      {
+        provider: 'static-site',
+        ref: 'sha-old',
+        slug: 'old-guide',
+        published_at: new Date('2026-07-01T00:00:00.000Z'),
+        updated_at: null,
+      },
+    ],
+    art_9: [],
+  };
+  for (const [id, publications] of Object.entries(seed)) {
+    const article = (await ArticleRepo.findById(id)) as unknown as {
+      slug: string;
+      publications: unknown[];
+    } | null;
+    if (article) article.publications = publications;
+  }
+}
 
 /** A body that passes every editor rule (meta_description inside 120-160). */
 const validArticleUpdate = {
@@ -615,14 +827,83 @@ describe('dashboard WordPress integration', () => {
     const body = await res.json();
     expect(body.integrations).toEqual([
       {
-        id: 'wordpress',
+        id: 'int_org_1_wordpress',
         provider: 'wordpress',
+        target: 'https://clewas.com',
         connected_at: expect.any(String),
+        last_error: null,
       },
     ]);
     expect(JSON.stringify(body)).not.toContain('never-return-this-token');
     expect(body.integrations[0]).not.toHaveProperty('token');
     expect(body.integrations[0]).not.toHaveProperty('wordpress_token');
+  });
+
+  test('stores the token encrypted on the integration, never in plaintext', async () => {
+    const opts = await auth();
+    await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_1', token: 'plaintext-wp-token' } },
+      opts,
+    );
+
+    const stored = integrations.get('org_1:wordpress');
+    expect(stored).toMatchObject({ org_id: 'org_1', site_url: 'https://clewas.com' });
+    expect(stored?.token_enc).not.toBe('plaintext-wp-token');
+    expect(decryptSecret(stored?.token_enc as string, gscKey)).toBe('plaintext-wp-token');
+  });
+
+  test('falls back to the org mirror for an operator-made connection', async () => {
+    // org_1 carries wordpress_token from the fixture with no integration row —
+    // exactly the state the admin connect lever leaves behind.
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    expect((await res.json()).integrations).toEqual([
+      {
+        id: 'wordpress',
+        provider: 'wordpress',
+        target: 'https://clewas.com',
+        connected_at: expect.any(String),
+        last_error: null,
+      },
+    ]);
+  });
+
+  test('DELETE disconnects, clearing both the integration and the mirror', async () => {
+    const opts = await auth();
+    await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_2', token: 'to-be-removed' } },
+      opts,
+    );
+
+    const res = await client.api.v0.dashboard.integrations[':provider'].$delete(
+      { param: { provider: 'wordpress' }, query: { org_id: 'org_2' } },
+      opts,
+    );
+
+    expect(res.status).toBe(204);
+    expect(integrations.has('org_2:wordpress')).toBe(false);
+    // Without clearing the mirror the fallback above would resurrect it.
+    const after = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_2' } },
+      opts,
+    );
+    expect(after.status).toBe(200);
+    if (after.status !== 200) return;
+    expect((await after.json()).integrations).toEqual([]);
+  });
+
+  test('DELETE 404s for a foreign org', async () => {
+    const res = await client.api.v0.dashboard.integrations[':provider'].$delete(
+      { param: { provider: 'wordpress' }, query: { org_id: 'org_3' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
   });
 
   test.each([
@@ -680,6 +961,30 @@ describe('dashboard WordPress article routes', () => {
         wordpress_post_id: 321,
       });
     }
+  });
+
+  test('records the publish in publications[] alongside the deprecated mirror', async () => {
+    const opts = await auth();
+    await client.api.v0.dashboard.articles[':id'].wordpress.$post({ param: { id: 'art_1' } }, opts);
+
+    const article = (await ArticleRepo.findById('art_1')) as unknown as {
+      publications?: Record<string, unknown>[];
+    };
+    expect(article.publications).toEqual([
+      {
+        provider: 'wordpress',
+        // The WordPress post id as a string — one `ref` shape across providers.
+        ref: '321',
+        slug: 'landing-pages',
+        published_at: expect.any(Date),
+        updated_at: null,
+      },
+    ]);
+
+    // A re-publish stamps updated_at instead of pushing a second entry.
+    await client.api.v0.dashboard.articles[':id'].wordpress.$put({ param: { id: 'art_1' } }, opts);
+    expect(article.publications).toHaveLength(1);
+    expect(article.publications?.[0]).toMatchObject({ updated_at: expect.any(Date) });
   });
 
   test('rejects create until article images are complete', async () => {
@@ -832,6 +1137,316 @@ describe('dashboard WordPress article routes', () => {
   });
 });
 
+describe('POST /dashboard/articles/{id}/publish (static site)', () => {
+  // The repo mocks are module-scoped and the suite has no global clearMocks, so
+  // the WordPress cases above would otherwise leave calls on this one.
+  beforeEach(() => {
+    vi.mocked(ArticleRepo.recordPublication).mockClear();
+  });
+
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  function connectStaticSite(over: Record<string, unknown> = {}) {
+    integrations.set('org_1:static-site', {
+      id: 'int_static',
+      org_id: 'org_1',
+      provider: 'static-site',
+      host: 'github',
+      installation_id: 4242,
+      repo: 'client/site',
+      branch: 'main',
+      content_path: 'seopotion/',
+      connected_at: new Date(),
+      last_error: null,
+      ...over,
+    });
+  }
+
+  /** The single commitFiles call, as `{ path: content }`. */
+  function committed() {
+    const [opts] = commitFiles.mock.calls[0] as [
+      { files: { path: string; content: string | null }[]; message: string; branch: string },
+    ];
+    return {
+      ...opts,
+      byPath: Object.fromEntries(opts.files.map((f) => [f.path, f.content])),
+    };
+  }
+
+  test('requires authentication', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post({
+      param: { id: 'art_7' },
+    });
+
+    expect(res.status).toBe(401);
+    expect(commitFiles).not.toHaveBeenCalled();
+  });
+
+  test("404s on another user's article without revealing it exists", async () => {
+    connectStaticSite();
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_3' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(commitFiles).not.toHaveBeenCalled();
+  });
+
+  test('409s when no static site is connected', async () => {
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) expect((await res.json()).code).toBe('not_connected');
+    expect(commitFiles).not.toHaveBeenCalled();
+  });
+
+  test('409s while images are still generating', async () => {
+    connectStaticSite();
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_5' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) expect((await res.json()).code).toBe('images_incomplete');
+    expect(commitFiles).not.toHaveBeenCalled();
+  });
+
+  test('commits the Markdown and the rebuilt manifest in one commit', async () => {
+    connectStaticSite();
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      expect(await res.json()).toEqual({
+        commit_sha: 'sha-new',
+        commit_url: 'https://github.com/client/site/commit/sha-new',
+        path: 'seopotion/articles/never-published.md',
+      });
+    }
+
+    expect(commitFiles).toHaveBeenCalledTimes(1);
+    const commit = committed();
+    expect(commit.branch).toBe('main');
+    expect(commit.message).toBe('seopotion: publish "Never Published"');
+    expect(Object.keys(commit.byPath).sort()).toEqual([
+      'seopotion/articles/never-published.md',
+      'seopotion/manifest.json',
+    ]);
+
+    const markdown = commit.byPath['seopotion/articles/never-published.md'] as string;
+    expect(markdown).toContain('slug: "never-published"');
+    expect(markdown).toContain('cover_alt: "Cover alt"');
+    expect(markdown.endsWith('## Section\n\nBody.\n')).toBe(true);
+
+    // The manifest is rebuilt from everything live, not patched: art_8 was
+    // already published and must survive art_7's commit.
+    const manifest = JSON.parse(commit.byPath['seopotion/manifest.json'] as string);
+    expect(manifest.version).toBe(1);
+    expect(manifest.articles.map((a: { slug: string }) => a.slug).sort()).toEqual([
+      'never-published',
+      'old-guide',
+    ]);
+  });
+
+  test('records the commit sha and the slug it published under', async () => {
+    connectStaticSite();
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(ArticleRepo.recordPublication).toHaveBeenCalledWith(
+      'art_7',
+      { provider: 'static-site', ref: 'sha-new', slug: 'never-published' },
+      expect.any(Date),
+    );
+  });
+
+  test('writes the same timestamp into the manifest that it stores', async () => {
+    connectStaticSite();
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    const manifest = JSON.parse(committed().byPath['seopotion/manifest.json'] as string);
+    const entry = manifest.articles.find((a: { slug: string }) => a.slug === 'never-published');
+    const storedAt = vi.mocked(ArticleRepo.recordPublication).mock.calls[0]![2] as Date;
+
+    // Otherwise the next rebuild of this file — triggered by a different
+    // article — produces a millisecond-wide diff on an untouched entry.
+    expect(entry.published_at).toBe(storedAt.toISOString());
+  });
+
+  test('deletes the old file in the same commit when the slug was renamed', async () => {
+    connectStaticSite();
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_8' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    const commit = committed();
+    expect(commit.message).toBe('seopotion: update "Renamed Guide"');
+    expect(commit.byPath).toEqual({
+      'seopotion/articles/renamed-guide.md': expect.any(String),
+      'seopotion/manifest.json': expect.any(String),
+      // A null content is the tree API's deletion.
+      'seopotion/articles/old-guide.md': null,
+    });
+
+    // `published_at` keeps meaning "first went live"; the republish stamps updated_at.
+    const markdown = commit.byPath['seopotion/articles/renamed-guide.md'] as string;
+    expect(markdown).toContain('published_at: "2026-07-01T00:00:00.000Z"');
+    expect(markdown).not.toContain('updated_at: null');
+  });
+
+  test('409s rather than overwriting another article published at the same slug', async () => {
+    connectStaticSite();
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_9' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) {
+      const body = await res.json();
+      expect(body.code).toBe('slug_conflict');
+      expect(body.error).toContain('old-guide');
+    }
+    expect(commitFiles).not.toHaveBeenCalled();
+  });
+
+  test('honours a custom content_path', async () => {
+    connectStaticSite({ content_path: 'src/content' });
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(Object.keys(committed().byPath).sort()).toEqual([
+      'src/content/articles/never-published.md',
+      'src/content/manifest.json',
+    ]);
+  });
+
+  test('422s when GitHub refuses the commit', async () => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError('commit_rejected', 'Branch is protected'));
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(422);
+    if (res.status === 422) {
+      expect(await res.json()).toEqual({ error: 'Branch is protected', code: 'commit_rejected' });
+    }
+    expect(ArticleRepo.recordPublication).not.toHaveBeenCalled();
+  });
+
+  test('409s when the branch moved under us — the caller retries', async () => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError('ref_conflict', 'Ref moved'));
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) expect((await res.json()).code).toBe('ref_conflict');
+  });
+
+  test('502s when GitHub could not be reached', async () => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new Error('socket hang up'));
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(502);
+    if (res.status === 502) expect((await res.json()).code).toBe('github_request_failed');
+  });
+
+  test('500s when the commit landed but the publish state could not be saved', async () => {
+    connectStaticSite();
+    vi.mocked(ArticleRepo.recordPublication).mockResolvedValueOnce(false);
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(500);
+    if (res.status === 500) expect((await res.json()).code).toBe('record_failed');
+  });
+
+  // Webhooks are inactive in v1, so a failed publish is the only way the
+  // settings panel ever learns an installation has died.
+  test('sticks a permanent GitHub refusal on the connection', async () => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError('installation_not_found', 'Gone'));
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(integrations.get('org_1:static-site')?.last_error).toMatchObject({
+      code: 'installation_not_found',
+    });
+  });
+
+  test.each([
+    ['ref_conflict', 'a lost push race'],
+    ['github_request_failed', 'an unreachable GitHub'],
+  ])('does not record %s — %s is transient', async (code) => {
+    connectStaticSite();
+    commitFiles.mockRejectedValue(new GithubError(code, 'boom'));
+    await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(integrations.get('org_1:static-site')?.last_error).toBeNull();
+  });
+
+  test('a successful publish clears a standing failure', async () => {
+    connectStaticSite({ last_error: { code: 'repo_not_found', at: new Date() } });
+    const res = await client.api.v0.dashboard.articles[':id'].publish.$post(
+      { param: { id: 'art_7' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(integrations.get('org_1:static-site')?.last_error).toBeNull();
+  });
+
+  test('GET /integrations/connected surfaces the standing failure', async () => {
+    connectStaticSite({ last_error: { code: 'missing_write_permission', at: new Date() } });
+    const res = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const row = (await res.json()).integrations.find((i) => i.provider === 'static-site');
+      expect(row?.last_error?.code).toBe('missing_write_permission');
+    }
+  });
+});
+
 describe('dashboard planner / history / settings routes (mock data)', () => {
   async function auth() {
     const token = await login();
@@ -959,6 +1574,29 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       expect(body.images_status).toBe('complete');
       // Never edited since generation.
       expect(body.updated_at).toBeNull();
+    }
+  });
+
+  test('GET /articles/:id reports the static-site publish state', async () => {
+    const opts = await auth();
+    const never = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_1' } },
+      opts,
+    );
+    expect(never.status).toBe(200);
+    if (never.status === 200) {
+      expect((await never.json()).static_site_published_at).toBeNull();
+    }
+
+    // art_8 was published under a slug it has since been renamed away from —
+    // the date is still the first publish, which is what the badge shows.
+    const published = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_8' } },
+      opts,
+    );
+    expect(published.status).toBe(200);
+    if (published.status === 200) {
+      expect((await published.json()).static_site_published_at).toBe('2026-07-01T00:00:00.000Z');
     }
   });
 

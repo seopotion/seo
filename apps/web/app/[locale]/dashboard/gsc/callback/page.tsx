@@ -1,10 +1,11 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useLocale, useTranslations } from 'next-intl';
+import { hasLocale, useLocale, useTranslations } from 'next-intl';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Badge, Button } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
+import { routing } from '@/i18n/routing';
 import { api } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
 import { GSC_RETURN_LOCALE_KEY, type GscSite, matchGscProperty } from '@/lib/gsc';
@@ -98,7 +99,10 @@ function CallbackInner() {
       setErrorKey('siteFailed');
       return;
     }
-    const returnLocale = window.sessionStorage.getItem(GSC_RETURN_LOCALE_KEY) ?? currentLocale;
+    // sessionStorage is user-writable and can outlive a locale rename, so treat
+    // anything we don't recognise as absent rather than routing to a dead prefix.
+    const stored = window.sessionStorage.getItem(GSC_RETURN_LOCALE_KEY);
+    const returnLocale = hasLocale(routing.locales, stored) ? stored : currentLocale;
     window.sessionStorage.removeItem(GSC_RETURN_LOCALE_KEY);
     router.replace(`${SETTINGS_HREF}&connected=1`, { locale: returnLocale });
   }

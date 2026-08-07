@@ -9,26 +9,15 @@ import {
 } from '@shared/db';
 import { DataForSeoError } from '@shared/providers';
 import { type Candidate, isPaid, type Keyword } from '@shared/schemas';
-import { getDataForSeoClient } from '../clients/providers';
+import { researchKeyword } from '../lib/keyword-research';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { loadOwnedPaidOrg, type OwnedPaidResult } from '../lib/load-owned-paid-org';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/keywords';
 
-const RESEARCH_LIMIT = 20;
-
 /** Map a loadOwnedPaidOrg failure to its HTTP status. */
 function gateStatus(reason: Exclude<OwnedPaidResult, { ok: true }>['reason']): 404 | 403 | 402 {
   return reason === 'not_found' ? 404 : reason === 'not_owner' ? 403 : 402;
-}
-
-/** Normalize provider metrics at the API boundary: volume/difficulty are ints (#99). */
-function normMetric(m: schemas.KeywordMetric): schemas.KeywordMetric {
-  return {
-    ...m,
-    search_volume: m.search_volume === null ? null : Math.round(m.search_volume),
-    difficulty: m.difficulty === null ? null : Math.round(m.difficulty),
-  };
 }
 
 /** Map a Candidate entity to the pool-read row (#99). */
@@ -122,27 +111,9 @@ const keywords = new OpenAPIHono<AuthEnv>()
         locationName: gate.org.presets?.business.country,
         languageName: gate.org.presets?.business.language,
       };
-      const df = getDataForSeoClient();
       try {
-        const [seedMetrics, ideas] = await Promise.all([
-          df.bulkKeywordDifficulty({ keywords: [seed], ...loc }),
-          df.keywordIdeas({ keywords: [seed], limit: RESEARCH_LIMIT, ...loc }),
-        ]);
-        const seedMetric = seedMetrics[0] ?? {
-          keyword: seed,
-          search_volume: null,
-          difficulty: null,
-          cpc: null,
-          competition: null,
-          trend: null,
-          intent: null,
-        };
-        const norm = seed.trim().toLowerCase();
-        const similar = ideas
-          .filter((m) => m.keyword.trim().toLowerCase() !== norm)
-          .slice(0, RESEARCH_LIMIT)
-          .map(normMetric);
-        return c.json({ seed: normMetric(seedMetric), similar }, 200);
+        const { seed: seedMetric, similar } = await researchKeyword(seed, loc);
+        return c.json({ seed: seedMetric, similar }, 200);
       } catch (err) {
         if (err instanceof DataForSeoError)
           return c.json({ error: 'keyword provider failed' }, 502);

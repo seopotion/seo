@@ -2,6 +2,7 @@ import type { LlmClient, LlmUsage } from '@shared/providers';
 import { buildArticlePrompt } from './article';
 import { HUMANIZE } from './config';
 import { buildHumanizePrompt } from './humanize';
+import { sanitizeLinks } from './links';
 import { buildOutlinePrompt, parseOutline } from './outline';
 import { buildSemanticCheckPrompt, parseSemanticResult } from './semantic';
 import type { GeneratedArticle, GenerationContext, ValidationFailure } from './types';
@@ -33,7 +34,7 @@ export async function generateArticle(params: {
     responseFormat: 'json',
   });
   track(outlineRes.usage);
-  const outline = parseOutline(outlineRes.text);
+  const outline = parseOutline(outlineRes.text, ctx);
 
   const articleRes = await llm.complete({ messages: buildArticlePrompt(ctx, outline) });
   track(articleRes.usage);
@@ -45,6 +46,11 @@ export async function generateArticle(params: {
     content = humanRes.text;
   }
 
+  // Fail closed (#186): the model is asked for approved URLs only, but anything
+  // it invented or over-placed is unwrapped to plain text here — before
+  // validation, which then asserts the invariant as a backstop.
+  content = sanitizeLinks(content, outline.internal_links, ctx.maxInternalLinks);
+
   const failures = validateArticle(
     {
       title: outline.h1,
@@ -53,6 +59,8 @@ export async function generateArticle(params: {
       content,
     },
     ctx,
+    // Same set the sanitizer just enforced, not every candidate (#186).
+    outline.internal_links,
   );
 
   const semRes = await llm.complete({

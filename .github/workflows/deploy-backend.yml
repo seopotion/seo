@@ -1,8 +1,10 @@
 name: Deploy backend
 
-# Branch → environment: merging `dev` → `master` deploys staging. Pushes to `dev`
-# deploy nothing (integration only). Production deploys from a GitHub Release / tag
-# and is not wired here yet — deferred (see issue #43).
+# Branch/event → environment: merging `dev` → `master` deploys staging. Pushes to
+# `dev` deploy nothing (integration only). Publishing a GitHub Release deploys
+# prod (#43) — before touching AWS, the prod job asserts both that the released
+# commit is on `master` and that this workflow already deployed that exact commit
+# to staging successfully.
 on:
   push:
     branches: [master]
@@ -13,19 +15,26 @@ on:
       - 'scripts/lambda-db-init.ts'
       - 'infra/**'
       - '.github/workflows/deploy-backend.yml'
-
-# One staging deploy at a time.
-concurrency:
-  group: deploy-backend-staging
-  cancel-in-progress: false
+  release:
+    types: [published]
+  # Manual staging re-trigger (run from master) — exists because a GitHub
+  # Actions outage can swallow the dev→master merge push event entirely
+  # (happened 2026-08-06), leaving no run to re-run. Prod stays Release-only.
+  # Dispatching from any other ref fails closed at the OIDC assume-role step.
+  workflow_dispatch:
 
 permissions:
   id-token: write # for OIDC
   contents: read
 
 jobs:
-  deploy:
+  deploy-staging:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # One staging deploy at a time.
+    concurrency:
+      group: deploy-backend-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -69,11 +78,134 @@ jobs:
           LEMONSQUEEZY_STORE_ID_STAGING: ${{ vars.LEMONSQUEEZY_STORE_ID_STAGING }}
           LEMONSQUEEZY_VARIANT_PAID_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_STAGING }}
           LEMONSQUEEZY_VARIANT_EXPERT_STAGING: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_STAGING }}
-          # Provider secrets baked into the worker Lambdas at synth time
-          # (infra/lib/api-stack.ts providerEnv; SSM provisioning deferred — #9/#43).
-          DATAFORSEO_LOGIN: ${{ secrets.DATAFORSEO_LOGIN }}
-          DATAFORSEO_PASSWORD: ${{ secrets.DATAFORSEO_PASSWORD }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          FAL_KEY: ${{ secrets.FAL_KEY }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          # GitHub App public config (#7), baked into the API Lambda at synth
+          # time. Unset until the App is registered by hand (design/github-app.md
+          # § Registration) — the install-url route 503s until then, so preflight
+          # deliberately does not assert these yet.
+          GITHUB_APP_SLUG_STAGING: ${{ vars.GITHUB_APP_SLUG_STAGING }}
+          GITHUB_APP_CLIENT_ID_STAGING: ${{ vars.GITHUB_APP_CLIENT_ID_STAGING }}
+          # Provider API keys are no longer passed here: they live in per-stage
+          # SSM SecureStrings resolved at Lambda runtime (#43), and the preflight
+          # above verifies they exist.
         run: cd infra && npx cdk deploy SeoApiStack-staging --require-approval never
+
+  deploy-prod:
+    # Prereleases are for testing a tag, not for shipping — they must not deploy.
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    # The `prod` environment carries NO protection rules — required reviewers need
+    # a paid plan for private repos. It is declared for what it does give us: the
+    # OIDC token's subject becomes `repo:seopotion/seo:environment:prod`, which is
+    # what the deploy role's trust policy scopes to (see infra/ENVIRONMENTS.md).
+    # The human gate is the act of publishing the Release itself — there is no
+    # approval step, so a published Release deploys straight through.
+    environment: prod
+    # Job-level permissions replace the workflow-level block, so restate those
+    # two; `actions: read` is the extra grant the staging-run lookup below needs.
+    permissions:
+      id-token: write # for OIDC
+      contents: read
+      actions: read # read this workflow's own run history
+    # One prod deploy at a time; never cancel one mid-flight.
+    concurrency:
+      group: deploy-backend-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the ancestry check below can see master.
+          fetch-depth: 0
+
+      # Prod ships only code staging has already run. GitHub will happily tag any
+      # ref, so verify the released commit is actually on master before we hold
+      # any AWS credentials.
+      - name: Verify the release commit is on master
+        env:
+          # Through env, never `${{ }}` inline: `${{ }}` is substituted into the
+          # script before bash sees it, and a tag name is attacker-shaped — one
+          # like `v1";echo${IFS}pwned;#` is a valid ref. This step already holds
+          # `id-token: write`, so an injected command could mint the prod OIDC
+          # token straight from ACTIONS_ID_TOKEN_REQUEST_URL, long before
+          # configure-aws-credentials runs. Running early is not a defense.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git fetch --no-tags --quiet origin master
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/master; then
+            echo "::error::Release $RELEASE_TAG points at $GITHUB_SHA, which is not an ancestor of master. Cut releases from master so prod ships staging-verified code."
+            exit 1
+          fi
+          echo "$GITHUB_SHA is on master — proceeding."
+
+      # Ancestry only proves the commit sits on master, not that staging ever
+      # ran it: the deploy could have failed or been cancelled, and the path
+      # filters above mean a master commit touching no deployed path never
+      # starts this workflow at all. So require a *successful* push run for this
+      # exact SHA — releases must target a master commit staging really shipped.
+      - name: Verify staging deployed this commit successfully
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Through env, not `${{ }}` inline — see the step above.
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          run_id=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy-backend.yml \
+            --event push \
+            --commit "$GITHUB_SHA" \
+            --status success \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "::error::No successful staging deploy of deploy-backend.yml exists for $GITHUB_SHA. Release $RELEASE_TAG would ship code staging has not verified. Cut the release from a master commit whose staging deploy succeeded."
+            exit 1
+          fi
+          echo "Staging deploy run $run_id succeeded for $GITHUB_SHA — proceeding."
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install root deps (for preflight CLI)
+        run: npm ci
+
+      - name: Preflight — verify deploy prerequisites
+        env:
+          AWS_REGION: us-east-1
+          GOOGLE_CLIENT_ID_PROD: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+          WEB_ORIGIN_PROD: ${{ vars.WEB_ORIGIN_PROD }}
+          LEMONSQUEEZY_STORE_ID_PROD: ${{ vars.LEMONSQUEEZY_STORE_ID_PROD }}
+          LEMONSQUEEZY_VARIANT_PAID_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_PROD }}
+          LEMONSQUEEZY_VARIANT_EXPERT_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_PROD }}
+        run: npm run cli -- infra preflight --stage prod --output json
+
+      - name: Install infra deps
+        run: cd infra && npm ci
+
+      - name: CDK deploy
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: us-east-1
+          GOOGLE_CLIENT_ID_PROD: ${{ vars.GOOGLE_CLIENT_ID_PROD }}
+          # GSC OAuth redirect URI base, baked into the API Lambda at synth time
+          # (infra/lib/config.ts webOrigin; preflight above verifies it's set).
+          # Points at the intended prod origin even though the frontend is not
+          # hosted yet (#35) — GSC OAuth stays unexercisable until it is.
+          WEB_ORIGIN_PROD: ${{ vars.WEB_ORIGIN_PROD }}
+          # LemonSqueezy public config (#13), baked into the API Lambda at synth
+          # time (infra/lib/config.ts; preflight above verifies they're set).
+          LEMONSQUEEZY_STORE_ID_PROD: ${{ vars.LEMONSQUEEZY_STORE_ID_PROD }}
+          LEMONSQUEEZY_VARIANT_PAID_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_PAID_PROD }}
+          LEMONSQUEEZY_VARIANT_EXPERT_PROD: ${{ vars.LEMONSQUEEZY_VARIANT_EXPERT_PROD }}
+          # GitHub App public config (#7) — unset until the App is registered by
+          # hand; the install-url route 503s until then.
+          GITHUB_APP_SLUG_PROD: ${{ vars.GITHUB_APP_SLUG_PROD }}
+          GITHUB_APP_CLIENT_ID_PROD: ${{ vars.GITHUB_APP_CLIENT_ID_PROD }}
+        run: cd infra && npx cdk deploy SeoApiStack-prod --require-approval never
