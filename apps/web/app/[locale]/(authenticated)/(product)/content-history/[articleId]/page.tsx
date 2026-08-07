@@ -2,9 +2,11 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { ArticleContentPreview } from '@/components/article/ArticleContentPreview';
 import { Badge, Button, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
@@ -411,9 +413,18 @@ export default function ArticleDetailPage() {
 
           <Separator />
 
-          <article className="whitespace-pre-wrap text-slate-700 text-sm leading-7">
-            {article.content}
-          </article>
+          {article.featured_image_url ? (
+            <Image
+              src={article.featured_image_url}
+              alt=""
+              width={1280}
+              height={720}
+              unoptimized
+              className="aspect-video w-full rounded-md border border-slate-200 object-cover"
+            />
+          ) : null}
+
+          <ArticleContentPreview content={article.content} />
         </section>
       ) : null}
     </div>

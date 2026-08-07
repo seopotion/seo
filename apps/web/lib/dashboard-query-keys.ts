@@ -2,6 +2,7 @@ import type { CandidateStatus } from '@shared/schemas';
 
 export const dashboardQueryKeys = {
   all: ['dashboard'] as const,
+  organizations: () => [...dashboardQueryKeys.all, 'organizations'] as const,
   organization: (organizationId: string) =>
     [...dashboardQueryKeys.all, 'organization', organizationId] as const,
   home: (organizationId: string) =>

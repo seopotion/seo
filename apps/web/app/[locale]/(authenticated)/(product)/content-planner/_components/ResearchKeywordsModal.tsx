@@ -5,7 +5,7 @@ import { Check, LoaderCircle, Search, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { FormEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Input, Label } from '@/components/ui';
+import { Button, Input, Label, Modal } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -24,7 +24,6 @@ import type {
   KeywordResearchApiError,
   ResearchSeedError,
 } from '../types';
-import { PlannerDialog } from './PlannerDialog';
 
 type ResearchError =
   | ResearchSeedError
@@ -240,12 +239,7 @@ export function ResearchKeywordsModal({
   const titleId = 'research-keywords-dialog-title';
 
   return (
-    <PlannerDialog
-      closeLabel={t('actions.close')}
-      labelledBy={titleId}
-      onClose={handleClose}
-      open={open}
-    >
+    <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
       <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
         <div className="min-w-0">
           <h2 id={titleId} className="font-semibold text-lg text-slate-950">
@@ -285,7 +279,7 @@ export function ResearchKeywordsModal({
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="research-keyword-seed"
-                data-planner-dialog-initial-focus
+                data-modal-initial-focus
                 value={seedInput}
                 maxLength={RESEARCH_SEED_MAX_LENGTH}
                 placeholder={t('form.placeholder')}
@@ -350,7 +344,7 @@ export function ResearchKeywordsModal({
           </div>
         </>
       )}
-    </PlannerDialog>
+    </Modal>
   );
 }
 
@@ -397,7 +391,7 @@ function ResearchResults({
 
               return (
                 <tr key={keywordKey}>
-                  <td className="break-words px-4 py-3 font-medium text-slate-950">
+                  <td className="wrap-break-words px-4 py-3 font-medium text-slate-950">
                     {metric.keyword.trim()}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
@@ -436,7 +430,7 @@ function ResearchResults({
               key={keywordKey}
               className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
             >
-              <h4 className="break-words font-semibold text-slate-950 text-sm">
+              <h4 className="wrap-break-words font-semibold text-slate-950 text-sm">
                 {metric.keyword.trim()}
               </h4>
               <dl className="grid grid-cols-3 gap-3">

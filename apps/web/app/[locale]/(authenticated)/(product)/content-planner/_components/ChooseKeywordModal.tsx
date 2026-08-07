@@ -5,7 +5,7 @@ import { LoaderCircle, Search, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -17,7 +17,6 @@ import {
   isCandidateScheduleSuccess,
 } from '../planner-utils';
 import type { CandidateKeywordResponse, CandidateScheduleError } from '../types';
-import { PlannerDialog } from './PlannerDialog';
 
 class CandidateScheduleApiError extends Error {
   reason: CandidateScheduleError | 'unauthorized';
@@ -195,12 +194,7 @@ export function ChooseKeywordModal({
   const showUpgrade = !canSchedule || upgradeRequired;
 
   return (
-    <PlannerDialog
-      closeLabel={t('actions.close')}
-      labelledBy={titleId}
-      onClose={handleClose}
-      open={open}
-    >
+    <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
       <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
         <div className="min-w-0">
           <h2 id={titleId} className="font-semibold text-lg text-slate-950">
@@ -296,7 +290,7 @@ export function ChooseKeywordModal({
           ) : null}
         </div>
       )}
-    </PlannerDialog>
+    </Modal>
   );
 }
 

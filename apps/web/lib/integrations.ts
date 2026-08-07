@@ -28,6 +28,40 @@ export type GithubRepoSummary = {
 };
 
 /**
+ * `integration.last_error.code` -> a message key. These are the GithubError
+ * codes the publish route persists (its 422 bucket); anything else falls back
+ * to `unknown`, so a new code added server-side degrades to a generic line
+ * rather than rendering a raw identifier.
+ */
+export type PublishErrorKey =
+  | 'publishErrors.installationGone'
+  | 'publishErrors.suspended'
+  | 'publishErrors.missingPermission'
+  | 'publishErrors.repoNotFound'
+  | 'publishErrors.commitRejected'
+  | 'publishErrors.unknown';
+
+export const PUBLISH_ERROR_KEYS: Record<string, PublishErrorKey> = {
+  installation_not_found: 'publishErrors.installationGone',
+  installation_suspended: 'publishErrors.suspended',
+  missing_write_permission: 'publishErrors.missingPermission',
+  repo_not_found: 'publishErrors.repoNotFound',
+  commit_rejected: 'publishErrors.commitRejected',
+};
+
+/**
+ * Of those, the ones the user fixes by reinstalling rather than retrying.
+ * `commit_rejected` is deliberately absent: the connection is healthy, the
+ * branch is protected — reinstalling would change nothing.
+ */
+export const RECONNECT_CODES = new Set([
+  'installation_not_found',
+  'installation_suspended',
+  'missing_write_permission',
+  'repo_not_found',
+]);
+
+/**
  * sessionStorage key: the Settings panel stores the user's locale before handing
  * off to github.com. The App's Setup URL is one fixed unprefixed path, so the
  * user always returns to the default locale — same problem and same fix as

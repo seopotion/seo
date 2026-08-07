@@ -9,7 +9,7 @@ export function DashboardQueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            gcTime: 30 * 60 * 1000,
+            gcTime: 60 * 60 * 1000,
             retry: false,
           },
         },

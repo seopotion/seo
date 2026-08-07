@@ -49,8 +49,8 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     // One GitHub App per environment (#7, design/github-app.md § Registration).
     // Empty until the App is registered by hand — the install-url route 503s
     // rather than sending anyone to a github.com 404.
-    githubAppSlug: process.env.GITHUB_APP_SLUG_STAGING ?? '',
-    githubAppClientId: process.env.GITHUB_APP_CLIENT_ID_STAGING ?? '',
+    githubAppSlug: process.env.GH_APP_SLUG_STAGING ?? '',
+    githubAppClientId: process.env.GH_APP_CLIENT_ID_STAGING ?? '',
     githubAppKeyParam: '/seo/staging/github-app-key',
     dataForSeoLoginParam: '/seo/staging/dataforseo-login',
     dataForSeoPasswordParam: '/seo/staging/dataforseo-password',
@@ -74,8 +74,8 @@ export const STAGE_CONFIG: Record<Stage, StageConfig> = {
     lemonSqueezyVariantExpert: process.env.LEMONSQUEEZY_VARIANT_EXPERT_PROD ?? '',
     adminJwtSecretParam: '/seo/prod/admin/jwt-secret',
     adminOperatorsParam: '/seo/prod/admin/operators',
-    githubAppSlug: process.env.GITHUB_APP_SLUG_PROD ?? '',
-    githubAppClientId: process.env.GITHUB_APP_CLIENT_ID_PROD ?? '',
+    githubAppSlug: process.env.GH_APP_SLUG_PROD ?? '',
+    githubAppClientId: process.env.GH_APP_CLIENT_ID_PROD ?? '',
     githubAppKeyParam: '/seo/prod/github-app-key',
     dataForSeoLoginParam: '/seo/prod/dataforseo-login',
     dataForSeoPasswordParam: '/seo/prod/dataforseo-password',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,6 +8,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/u
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import {
   getActiveOrganization,
   OrganizationsApiError,
@@ -43,6 +44,7 @@ function delay(ms: number) {
 export default function BillingPage() {
   const t = useTranslations('BillingPage');
   const router = useRouter();
+  const queryClient = useQueryClient();
   const {
     error: organizationError,
     loading: organizationLoading,
@@ -72,6 +74,11 @@ export default function BillingPage() {
           if (isCancelled()) return;
 
           if (activeOrganization?.capabilities.keyword_research) {
+            // The poll reads the API directly, so the cached org still carries
+            // the pre-purchase capabilities — drop it before /home renders.
+            await queryClient.invalidateQueries({
+              queryKey: dashboardQueryKeys.organizations(),
+            });
             router.replace('/home');
             return;
           }
@@ -92,7 +99,7 @@ export default function BillingPage() {
 
       if (!isCancelled()) setActivationState('timeout');
     },
-    [goToLogin, router],
+    [goToLogin, queryClient, router],
   );
 
   // The LemonSqueezy checkout redirect returns here with ?checkout=success; the
