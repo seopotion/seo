@@ -17,6 +17,11 @@ on:
       - '.github/workflows/deploy-backend.yml'
   release:
     types: [published]
+  # Manual staging re-trigger (run from master) — exists because a GitHub
+  # Actions outage can swallow the dev→master merge push event entirely
+  # (happened 2026-08-06), leaving no run to re-run. Prod stays Release-only.
+  # Dispatching from any other ref fails closed at the OIDC assume-role step.
+  workflow_dispatch:
 
 permissions:
   id-token: write # for OIDC
@@ -24,7 +29,7 @@ permissions:
 
 jobs:
   deploy-staging:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # One staging deploy at a time.
     concurrency:
