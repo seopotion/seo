@@ -558,6 +558,10 @@
   },
   "SettingsPage": {
     "actions": {
+      "close": "Close",
+      "closeDialog": "Close dialog",
+      "connect": "Connect",
+      "manage": "Manage",
       "save": "Save",
       "saving": "Saving..."
     },
@@ -598,6 +602,7 @@
       "competitorUrl": "https://competitor.com"
     },
     "staticSite": {
+      "beforeRedirect": "You'll continue on github.com to choose which repositories SeoPotion can write to, then come back here to pick a branch and folder.",
       "changeRepository": "Change repository",
       "connect": "Connect repository",
       "connectedSuccess": "Your repository is connected. Publish an article to commit it.",
@@ -612,7 +617,7 @@
         "notConfigured": "Publishing to a repository is not available yet. Please try again later."
       },
       "needsAttention": "Needs attention",
-      "provider": "Static site (GitHub)",
+      "provider": "Custom site (GitHub)",
       "publishErrors": {
         "installationGone": "SeoPotion was removed from GitHub, so we can't publish. Reconnect to restore it.",
         "suspended": "The GitHub installation is suspended. Reconnect once it has been restored.",
@@ -644,12 +649,12 @@
         "connected": "Connected",
         "notConnected": "Not connected"
       },
-      "cancel": "Cancel",
       "comingSoon": "Coming soon",
       "connectAndTest": "Connect & test",
       "connectedOn": "Connected on {date}",
       "connectedSuccess": "WordPress connected and tested successfully.",
       "connecting": "Connecting...",
+      "dialogDescription": "Install the plugin on your site, then paste the token it gives you.",
       "downloadPlugin": "Download plugin (.zip)",
       "errors": {
         "connectFailed": "WordPress could not be connected. Check the token and try again.",
@@ -666,7 +671,6 @@
         "wordpressCom": "WordPress.com"
       },
       "replaceNote": "Connecting again tests the new token against your site and replaces the saved one.",
-      "replaceToken": "Replace token",
       "setupTitle": "Connect your WordPress site",
       "step1Action": "Open Upload Plugin page",
       "step1Body": "Download the SEO Potion plugin, then upload and activate it from your WordPress admin.",

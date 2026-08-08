@@ -45,6 +45,13 @@ const settingsTabs = [
 
 type SettingsTab = (typeof settingsTabs)[number];
 
+/**
+ * The tabs whose fields `saveSettings` actually posts. The others connect and
+ * disconnect through their own panels, so a Save button on them submits an
+ * unchanged payload and reads as a control the user forgot to press.
+ */
+const SAVEABLE_TABS = new Set<SettingsTab>(['business', 'audienceCompetitors']);
+
 type SettingsForm = {
   businessDescription: string;
   businessName: string;
@@ -211,6 +218,10 @@ export default function SettingsPage() {
         dashboardQueryKeys.generalSettings(organizationId),
         data,
       );
+
+      // The patch writes organization.name, which the topbar renders off the
+      // cached org.
+      void queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.organizations() });
 
       if (editRevisionRef.current === saveRevision) {
         setSettings((currentSettings) => mergeGeneralSettings(data, currentSettings));
@@ -519,11 +530,13 @@ export default function SettingsPage() {
         <BillingPanel onUnauthorized={handleUnauthorized} organization={organization} />
       </div>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
-          {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
-        </Button>
-      </div>
+      {SAVEABLE_TABS.has(activeTab) ? (
+        <div className="flex justify-end">
+          <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
+            {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
+          </Button>
+        </div>
+      ) : null}
     </form>
   );
 }

@@ -2,7 +2,7 @@
 
 import type { ReactNode, RefObject } from 'react';
 import { useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '../../lib/utils';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -14,7 +14,7 @@ const FOCUSABLE_SELECTOR = [
 ].join(',');
 let chainedDialogReturnFocus: HTMLElement | null = null;
 
-export function PlannerDialog({
+export function Modal({
   children,
   className,
   closeLabel,
@@ -31,7 +31,7 @@ export function PlannerDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  usePlannerDialogFocusManagement({ dialogRef, onClose, open });
+  useModalFocusManagement({ dialogRef, onClose, open });
 
   if (!open) {
     return null;
@@ -65,7 +65,7 @@ export function PlannerDialog({
   );
 }
 
-function usePlannerDialogFocusManagement({
+function useModalFocusManagement({
   dialogRef,
   onClose,
   open,
@@ -99,9 +99,7 @@ function usePlannerDialogFocusManagement({
         return;
       }
 
-      const preferredElement = dialog.querySelector<HTMLElement>(
-        '[data-planner-dialog-initial-focus]',
-      );
+      const preferredElement = dialog.querySelector<HTMLElement>('[data-modal-initial-focus]');
       const focusTarget =
         preferredElement && isElementFocusable(preferredElement)
           ? preferredElement

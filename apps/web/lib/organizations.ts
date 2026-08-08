@@ -1,17 +1,12 @@
 'use client';
 
 import type { SetupStatus } from '@shared/schemas';
-import {
-  createContext,
-  createElement,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { api } from './api';
 import { clearToken } from './auth';
+import { dashboardQueryKeys } from './dashboard-query-keys';
 import { clearWorkspaceStatusCache } from './session';
 
 export type ProductOrganization = {
@@ -72,68 +67,46 @@ export async function getActiveOrganization(): Promise<ProductOrganization | nul
   return selectActiveOrganization(await getOrganizations());
 }
 
-const ActiveOrganizationContext = createContext<ActiveOrganizationState | null>(null);
-
-function useActiveOrganizationState(): ActiveOrganizationState {
-  const router = useRouter();
-  const [organization, setOrganization] = useState<ProductOrganization | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ActiveOrganizationError | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      setLoading(true);
-
-      try {
-        const activeOrganization = await getActiveOrganization();
-
-        if (cancelled) return;
-
-        setOrganization(activeOrganization);
-        setError(activeOrganization ? null : 'no_organization');
-      } catch (caughtError) {
-        if (cancelled) return;
-
-        setOrganization(null);
-
-        if (caughtError instanceof OrganizationsApiError && caughtError.reason === 'unauthorized') {
-          clearToken();
-          clearWorkspaceStatusCache();
-          setError('unauthorized');
-          router.replace('/');
-          return;
-        }
-
-        setError('unavailable');
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  return { error, loading, organization };
-}
-
-export function ActiveOrganizationProvider({ children }: { children: ReactNode }) {
-  const state = useActiveOrganizationState();
-
-  return createElement(ActiveOrganizationContext.Provider, { value: state }, children);
-}
-
+/**
+ * The active org, cached by react-query so a client navigation reuses it instead
+ * of refetching. `loading` is `isPending` — true only when there is no data at
+ * all, so a background refetch never blanks a page that already rendered.
+ *
+ * Called by both `ProductShell` and the page; react-query dedupes the two
+ * observers into one request, which is why there is no context/provider.
+ */
 export function useActiveOrganization(): ActiveOrganizationState {
-  const context = useContext(ActiveOrganizationContext);
+  const router = useRouter();
 
-  if (!context) {
-    throw new Error('useActiveOrganization must be used within ActiveOrganizationProvider');
-  }
+  const query = useQuery({
+    queryKey: dashboardQueryKeys.organizations(),
+    queryFn: getOrganizations,
+    select: selectActiveOrganization,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  return context;
+  const organization = query.data ?? null;
+  // `null` (not `undefined`) is what distinguishes "loaded, user has no org"
+  // from "not loaded yet" — `select` returns `null` for an empty list.
+  const error: ActiveOrganizationError | null =
+    query.error instanceof OrganizationsApiError
+      ? query.error.reason
+      : query.error
+        ? 'unavailable'
+        : query.data === null
+          ? 'no_organization'
+          : null;
+
+  // A 401 on the org list means the session is gone. Deliberately does NOT call
+  // queryClient.clear() — clearing while this query has observers would refetch,
+  // 401 again, and loop. Token + workspace-status are what the login flow reads.
+  useEffect(() => {
+    if (error !== 'unauthorized') return;
+
+    clearToken();
+    clearWorkspaceStatusCache();
+    router.replace('/');
+  }, [error, router]);
+
+  return { error, loading: query.isPending, organization };
 }
