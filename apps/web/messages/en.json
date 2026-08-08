@@ -603,6 +603,7 @@
     },
     "staticSite": {
       "beforeRedirect": "You'll continue on github.com to choose which repositories SeoPotion can write to, then come back here to pick a branch and folder.",
+      "setupGuide": "How to render published articles on your site →",
       "changeRepository": "Change repository",
       "connect": "Connect repository",
       "connectedSuccess": "Your repository is connected. Publish an article to commit it.",

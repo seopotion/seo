@@ -603,6 +603,7 @@
     },
     "staticSite": {
       "beforeRedirect": "github.com üzerinden devam edip SeoPotion'ın yazabileceği depoları seçeceksiniz, sonra dal ve klasör seçmek için buraya döneceksiniz.",
+      "setupGuide": "Yayınlanan makaleleri sitenizde nasıl gösterirsiniz →",
       "changeRepository": "Depoyu değiştir",
       "connect": "Depo bağla",
       "connectedSuccess": "Deponuz bağlandı. Bir makaleyi yayınlayarak commit edin.",

@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { Button, Modal } from '@/components/ui';
+import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import {
@@ -177,6 +178,17 @@ export function StaticSiteDialog({
             <p className="text-slate-500 text-sm">{staticSiteT('beforeRedirect')}</p>
           </>
         )}
+        {/* Connecting only gets the files into their repo — rendering them is
+            code they have to write, so the guide belongs in both states. */}
+        <p className="text-slate-500 text-sm">
+          <Link
+            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
+            href="/docs/custom-site"
+            target="_blank"
+          >
+            {staticSiteT('setupGuide')}
+          </Link>
+        </p>
         {installErrorKey ? (
           <StatusPanel tone="error">{staticSiteT(`errors.${installErrorKey}`)}</StatusPanel>
         ) : null}
