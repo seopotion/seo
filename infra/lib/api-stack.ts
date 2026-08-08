@@ -318,19 +318,30 @@ export class ApiStack extends Stack {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
     });
+    // Customer sites embed these URLs, and image components across Astro, Next
+    // and Nuxt routinely set `crossorigin="anonymous"` on the <img>. That makes
+    // the browser fetch in CORS mode and discard a response carrying no
+    // `Access-Control-Allow-Origin` — the image downloads fine and still
+    // renders blank.
+    //
+    // This is a plain custom header rather than the managed SimpleCORS policy
+    // (or any `corsBehavior`): CloudFront's CORS handling inspects the request
+    // and skips the header for requests it doesn't classify as simple. Chrome
+    // sends `priority: i` on every image fetch, which trips exactly that — the
+    // managed policy answers curl with `*` and answers Chrome with nothing.
+    // A custom header is emitted unconditionally, so there is no classifier to
+    // trip. A static `*` needs no `Vary` and adds nothing to the cache key.
+    const imagesCorsPolicy = new ResponseHeadersPolicy(this, 'ImagesCorsPolicy', {
+      customHeadersBehavior: {
+        customHeaders: [{ header: 'Access-Control-Allow-Origin', value: '*', override: true }],
+      },
+    });
     const imagesCdn = new Distribution(this, 'ImagesCdn', {
       defaultBehavior: {
         origin: S3BucketOrigin.withOriginAccessControl(imagesBucket),
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: CachePolicy.CACHING_OPTIMIZED,
-        // Customer sites embed these URLs, and image components across Astro,
-        // Next and Nuxt routinely set `crossorigin="anonymous"` on the <img>.
-        // That makes the browser fetch in CORS mode and discard a response
-        // carrying no `Access-Control-Allow-Origin` — the image downloads
-        // fine and still renders blank. SimpleCORS answers with a static
-        // `*`, so it adds nothing to the cache key. No preflight variant
-        // needed: image GETs never send one.
-        responseHeadersPolicy: ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS,
+        responseHeadersPolicy: imagesCorsPolicy,
       },
     });
 
