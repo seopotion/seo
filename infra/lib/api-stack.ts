@@ -11,8 +11,11 @@ import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import {
   CachePolicy,
+  Function as CloudFrontFunction,
   Distribution,
-  ResponseHeadersPolicy,
+  FunctionCode,
+  FunctionEventType,
+  FunctionRuntime,
   ViewerProtocolPolicy,
 } from 'aws-cdk-lib/aws-cloudfront';
 import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
@@ -324,24 +327,31 @@ export class ApiStack extends Stack {
     // `Access-Control-Allow-Origin` — the image downloads fine and still
     // renders blank.
     //
-    // This is a plain custom header rather than the managed SimpleCORS policy
-    // (or any `corsBehavior`): CloudFront's CORS handling inspects the request
-    // and skips the header for requests it doesn't classify as simple. Chrome
-    // sends `priority: i` on every image fetch, which trips exactly that — the
-    // managed policy answers curl with `*` and answers Chrome with nothing.
-    // A custom header is emitted unconditionally, so there is no classifier to
-    // trip. A static `*` needs no `Vary` and adds nothing to the cache key.
-    const imagesCorsPolicy = new ResponseHeadersPolicy(this, 'ImagesCorsPolicy', {
-      customHeadersBehavior: {
-        customHeaders: [{ header: 'Access-Control-Allow-Origin', value: '*', override: true }],
-      },
+    // A viewer-response function rather than a response headers policy: the
+    // managed SimpleCORS policy withholds the header for requests CloudFront
+    // doesn't classify as simple, and Chrome sends `priority: i` on every image
+    // fetch, which trips exactly that. Same object, same edge — it answers curl
+    // with `*` and answers Chrome with nothing. Functions run on every viewer
+    // response, cache hits included, with no request classifier in the path.
+    // A static `*` needs no `Vary` and adds nothing to the cache key.
+    const imagesCorsFn = new CloudFrontFunction(this, 'ImagesCorsFn', {
+      runtime: FunctionRuntime.JS_2_0,
+      code: FunctionCode.fromInline(
+        'function handler(event) {\n' +
+          '  var response = event.response;\n' +
+          "  response.headers['access-control-allow-origin'] = { value: '*' };\n" +
+          '  return response;\n' +
+          '}',
+      ),
     });
     const imagesCdn = new Distribution(this, 'ImagesCdn', {
       defaultBehavior: {
         origin: S3BucketOrigin.withOriginAccessControl(imagesBucket),
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: CachePolicy.CACHING_OPTIMIZED,
-        responseHeadersPolicy: imagesCorsPolicy,
+        functionAssociations: [
+          { function: imagesCorsFn, eventType: FunctionEventType.VIEWER_RESPONSE },
+        ],
       },
     });
 
