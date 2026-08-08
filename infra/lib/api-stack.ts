@@ -9,7 +9,12 @@ import {
 } from 'aws-cdk-lib';
 import { HttpApi, HttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
-import { CachePolicy, Distribution, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import {
+  CachePolicy,
+  Distribution,
+  ResponseHeadersPolicy,
+  ViewerProtocolPolicy,
+} from 'aws-cdk-lib/aws-cloudfront';
 import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
@@ -318,6 +323,14 @@ export class ApiStack extends Stack {
         origin: S3BucketOrigin.withOriginAccessControl(imagesBucket),
         viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: CachePolicy.CACHING_OPTIMIZED,
+        // Customer sites embed these URLs, and image components across Astro,
+        // Next and Nuxt routinely set `crossorigin="anonymous"` on the <img>.
+        // That makes the browser fetch in CORS mode and discard a response
+        // carrying no `Access-Control-Allow-Origin` — the image downloads
+        // fine and still renders blank. SimpleCORS answers with a static
+        // `*`, so it adds nothing to the cache key. No preflight variant
+        // needed: image GETs never send one.
+        responseHeadersPolicy: ResponseHeadersPolicy.CORS_ALLOW_ALL_ORIGINS,
       },
     });
 
