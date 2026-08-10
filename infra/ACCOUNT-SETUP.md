@@ -4,17 +4,34 @@ One-time foundation for the AWS organization that replaces the current single
 personal account (`859998284061`). Run this once, in order. Migrating the
 workload itself is **not** part of this document — see [Follow-on work](#follow-on-work).
 
-Target end state:
-
-| Account | Purpose | Root user |
-| ------- | ------- | --------- |
-| `seopotion-mgmt` | Organization management. Billing + identity only, **no workloads**. | Alper's, MFA-protected |
-| `seopotion-staging` | `SeoApiStack-staging` | none (removed) |
-| `seopotion-prod` | `SeoApiStack-prod` | none (removed) |
-
 Human access is via **IAM Identity Center**: users `alper` and `faruk`, both in
 an `Administrators` group holding `AdministratorAccess` on all three accounts.
 No IAM users, no long-lived access keys.
+
+## Provisioned values
+
+As built. Account IDs are not secrets, but the portal URL is the sign-in
+entry point — treat it as internal.
+
+| Account | ID | Root email | Purpose |
+| ------- | -- | ---------- | ------- |
+| `clewas` (management) | `849445096310` | `alperyazagan@clewas.com` | Org management, billing, identity. **No workloads.** |
+| `seo-staging` | `977476318001` | `aws-staging@clewas.com` | `SeoApiStack-staging` |
+| `seo-prod` | `672093561569` | `aws-prod@clewas.com` | `SeoApiStack-prod` |
+
+Member accounts have no root credentials and cannot perform root password
+recovery. Only the management account has a root user.
+
+| Resource | Value |
+| -------- | ----- |
+| Organization | `o-snqpg05rx9` (all features) |
+| Org root | `r-dk83` |
+| `Workloads` OU | `ou-dk83-s7pgj1xb` |
+| Identity Center instance | `arn:aws:sso:::instance/ssoins-7223ea23c7fac212` |
+| Identity store | `d-90667b5695` |
+| Access portal | `https://d-90667b5695.awsapps.com/start` |
+| `AdministratorAccess` permission set | `ps-7223eab484e622ea` (12h sessions) |
+| `Administrators` group | `b4e83418-c031-70f2-3147-efa275d5b772` |
 
 Region is `us-east-1` throughout — it matches the existing stacks, and Identity
 Center is a single-region service whose region can't be changed later without
@@ -187,7 +204,12 @@ Center is ever misconfigured — leave it in place.
 This removes root credentials from the two member accounts entirely, so there is
 no member-account root user to secure, leak, or MFA-protect.
 
-**IAM console (management account) → Root access management → Enable.** Or:
+Trusted access for IAM must be enabled **first**, or the next command fails with
+`ServiceAccessNotEnabledException`:
+
+```bash
+aws organizations enable-aws-service-access --service-principal iam.amazonaws.com
+```
 
 ```bash
 aws iam enable-organizations-root-credentials-management
@@ -196,12 +218,17 @@ aws iam enable-organizations-root-credentials-management
 Expected output:
 
 ```json
-{ "EnabledFeatures": ["RootCredentialsManagement"], "OrganizationId": "o-aa111bb222" }
+{ "EnabledFeatures": ["RootCredentialsManagement"], "OrganizationId": "o-snqpg05rx9" }
 ```
 
-Accounts created through Organizations after this have **no root credentials by
-default**. If either member account was created before you enabled this, delete
-its root credentials explicitly from the same console page.
+Accounts created through Organizations have **no root credentials by default** —
+this holds whether they were created before or after enabling the feature, so
+there is nothing to clean up for accounts created in 1.1. Only accounts
+*invited* into the organization, having existed standalone first, carry root
+credentials worth deleting from **IAM → Root access management**.
+
+With the feature on, member accounts also cannot perform root password recovery,
+so no root user can be resurrected behind your back.
 
 Recovery is still available if ever needed: the management account can run the
 **Allow password recovery** privileged task, after which whoever controls that
@@ -220,8 +247,12 @@ INSTANCE_ARN=$(aws sso-admin list-instances --query 'Instances[0].InstanceArn' -
 IDENTITY_STORE_ID=$(aws sso-admin list-instances --query 'Instances[0].IdentityStoreId' --output text)
 ```
 
+`--alternate-identifier` must be **JSON**. The CLI's shorthand syntax fails here
+with `Shorthand syntax does not support document types`, because `AttributeValue`
+is a document type:
+
 ```bash
-GROUP_ID=$(aws identitystore get-group-id --identity-store-id "$IDENTITY_STORE_ID" --alternate-identifier 'UniqueAttribute={AttributePath=displayName,AttributeValue=Administrators}' --query GroupId --output text)
+GROUP_ID=$(aws identitystore get-group-id --identity-store-id "$IDENTITY_STORE_ID" --alternate-identifier '{"UniqueAttribute":{"AttributePath":"displayName","AttributeValue":"Administrators"}}' --query GroupId --output text)
 ```
 
 ```bash
@@ -280,17 +311,32 @@ this setup deliberately does not have.
 
 ## Verification checklist
 
-- [ ] Root user has MFA and no access keys
-- [ ] Root is not used for anything after Phase 0
+State as of the initial build:
+
+- [ ] **Management account root has MFA** — *outstanding.*
+      `aws iam get-account-summary` reports `AccountMFAEnabled: 0` and no MFA
+      device is registered. This root user controls the whole organization and
+      is currently password-only. Fix in **IAM → Security credentials** while
+      signed in as root.
+- [x] Root has no access keys (`AccountAccessKeysPresent: 0`)
+- [x] No IAM users in the management account (`Users: 0`)
+- [x] Organization created with **all features** (`o-snqpg05rx9`)
+- [x] Three accounts; staging and prod in the `Workloads` OU
+- [x] Trusted access for IAM enabled
+- [x] Centralized root access enabled (`RootCredentialsManagement`)
+- [x] `Administrators` group assigned `AdministratorAccess` on all three accounts
+- [x] `alper` and `faruk` both in the `Administrators` group
+- [x] `aws sso login` verified for the management account
+
+Still to confirm by hand:
+
+- [ ] `IAM user and role access to Billing information` is **activated** — no
+      API exposes this; confirm by opening the Billing console as an
+      Identity Center admin
 - [ ] Alternate contacts set
-- [ ] `IAM user and role access to Billing information` is **activated**
-- [ ] Organization created with **all features**
-- [ ] Three accounts, staging and prod in the `Workloads` OU
-- [ ] Centralized root access enabled; member accounts have no root credentials
-- [ ] `alper` and `faruk` both sign in with MFA
-- [ ] Both reach `AdministratorAccess` on all three accounts
-- [ ] Both can open the Billing console in the management account
-- [ ] `aws sso login` works for all three profiles
+- [ ] Both admins sign in with MFA enforced
+- [ ] `aws sso login` works for the staging and prod profiles
+- [ ] Root not used for anything after Phase 0
 
 ## Follow-on work
 
