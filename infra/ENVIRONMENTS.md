@@ -1,5 +1,9 @@
 # Backend environments
 
+> Migrating to a new multi-account AWS organization. The account/identity
+> foundation is set up separately — see [`ACCOUNT-SETUP.md`](ACCOUNT-SETUP.md).
+> This document still describes the current single-account setup.
+
 Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
 
 - `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
