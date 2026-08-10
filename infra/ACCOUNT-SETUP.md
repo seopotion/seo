@@ -22,17 +22,23 @@ deleting the instance.
 
 ## Phase ordering
 
-Root is used **once**, in Phase 0, and then never again. Phase 0 is
-**console-only**: the root user would need access keys to use the CLI, and
-creating those defeats the purpose. By the end of Phase 0 both admins can sign
-in, so Phases 1–3 run as an Identity Center admin over the CLI.
+Root is used **once**, in Phase 0, and then never again. By the end of Phase 0
+both admins can sign in, so Phases 1–3 run as an Identity Center admin.
+
+Phase 0 is written as console steps because several of them — assigning root
+MFA, the billing toggle in 0.3, and enabling Identity Center — have no API and
+can only be done in the console. The rest could be scripted: `aws login` issues
+temporary credentials for the **root** user as well, so driving root over the
+CLI does **not** require creating root access keys. Given it is a handful of
+one-time steps and you are already signed in to the console to do the
+console-only ones, doing all of Phase 0 there is simplest.
 
 ---
 
 ## Phase 0 — Root-only bootstrap
 
-**Who:** Alper, signed in as the root user of the fresh account.
-**Where:** AWS console only.
+**Who:** signed in as the root user of the fresh account.
+**Where:** AWS console.
 
 ### 0.1 Secure the root user
 
@@ -87,7 +93,7 @@ to join AWS IAM Identity Center" email, and the API does not.
 
 | Username | Email | Notes |
 | -------- | ----- | ----- |
-| `alper` | Alper's address | |
+| `alper` | `alperyazagan@gmail.com` | |
 | `faruk` | `fcanozkan@gmail.com` | |
 
 - **Username** is what you type at sign-in and **cannot be changed later**.
@@ -139,7 +145,7 @@ aws configure sso
 ### 1.1 Create the OU and member accounts
 
 Every AWS account needs a **globally unique root email address**. Gmail
-plus-addressing (`alper+aws-staging@gmail.com`) satisfies this without creating
+plus-addressing (`alperyazagan+aws-staging@gmail.com`) satisfies this without creating
 new mailboxes — the mail still lands in Alper's inbox.
 
 ```bash
@@ -151,11 +157,11 @@ OU_ID=$(aws organizations create-organizational-unit --parent-id "$ROOT_ID" --na
 ```
 
 ```bash
-aws organizations create-account --account-name seopotion-staging --email 'alper+aws-staging@gmail.com'
+aws organizations create-account --account-name seopotion-staging --email 'alperyazagan+aws-staging@gmail.com'
 ```
 
 ```bash
-aws organizations create-account --account-name seopotion-prod --email 'alper+aws-prod@gmail.com'
+aws organizations create-account --account-name seopotion-prod --email 'alperyazagan+aws-prod@gmail.com'
 ```
 
 `create-account` is **asynchronous**. Poll until both report `SUCCEEDED`, and
