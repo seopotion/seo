@@ -4,7 +4,6 @@ import { domainRatingFromRank } from '@shared/providers';
 import {
   type Article,
   type Integration,
-  isGscConnected,
   META_DESCRIPTION_MAX,
   META_DESCRIPTION_MIN,
   META_TITLE_MAX,
@@ -17,7 +16,8 @@ import {
   submitWordPressArticle,
   testWordPressIntegration,
 } from '../clients/wordpress';
-import { decryptSecret, encryptSecret } from '../lib/crypto';
+import { encryptSecret } from '../lib/crypto';
+import { gscAccess } from '../lib/gsc-access';
 import { matchArticleByPage } from '../lib/gsc-urls';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
@@ -162,19 +162,6 @@ function analyticsWindow(): { startDate: string; endDate: string } {
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
-  };
-}
-
-/**
- * The GSC gate (#12): decrypt the org's refresh token when a healthy, finalized
- * connection exists; null keeps the caller on the gated response shape.
- */
-async function gscAccess(org_id: string): Promise<{ token: string; siteUrl: string } | null> {
-  const conn = await GscConnectionRepo.findByOrgId(org_id);
-  if (!isGscConnected(conn)) return null;
-  return {
-    token: decryptSecret(conn.refresh_token_enc, await getGscTokenKey()),
-    siteUrl: conn.site_url,
   };
 }
 
