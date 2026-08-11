@@ -4,7 +4,6 @@ import { domainRatingFromRank } from '@shared/providers';
 import {
   type Article,
   type Integration,
-  isGscConnected,
   META_DESCRIPTION_MAX,
   META_DESCRIPTION_MIN,
   META_TITLE_MAX,
@@ -17,7 +16,9 @@ import {
   submitWordPressArticle,
   testWordPressIntegration,
 } from '../clients/wordpress';
-import { decryptSecret, encryptSecret } from '../lib/crypto';
+import { encryptSecret } from '../lib/crypto';
+import { gscAccess } from '../lib/gsc-access';
+import { matchArticleByPage } from '../lib/gsc-urls';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { recordWordPressPublication } from '../lib/publications';
@@ -164,19 +165,6 @@ function analyticsWindow(): { startDate: string; endDate: string } {
   };
 }
 
-/**
- * The GSC gate (#12): decrypt the org's refresh token when a healthy, finalized
- * connection exists; null keeps the caller on the gated response shape.
- */
-async function gscAccess(org_id: string): Promise<{ token: string; siteUrl: string } | null> {
-  const conn = await GscConnectionRepo.findByOrgId(org_id);
-  if (!isGscConnected(conn)) return null;
-  return {
-    token: decryptSecret(conn.refresh_token_enc, await getGscTokenKey()),
-    siteUrl: conn.site_url,
-  };
-}
-
 /** Domain ratings refresh at most weekly — older values re-fetch inline on read (#12). */
 const DOMAIN_RATING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -230,7 +218,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         });
         const articles = rows.map((row) => {
           const url = row.keys[0] ?? '';
-          const match = published.find((a: Article) => url.includes(`/${a.slug}`));
+          const match = matchArticleByPage(url, published);
           return { url, clicks: Math.round(row.clicks), title: match?.title ?? null };
         });
         return c.json({ articles, gated: false }, 200);
