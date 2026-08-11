@@ -31,6 +31,9 @@ jobs:
   deploy-staging:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Scopes AWS_ACCOUNT_ID / AWS_DEPLOY_ROLE_ARN to the staging account and makes
+    # the OIDC subject `repo:seopotion/seo:environment:staging`. See deploy-backend.yml.
+    environment: staging
     concurrency:
       group: deploy-frontend-staging
       cancel-in-progress: false
