@@ -180,4 +180,28 @@ describe('querySearchAnalytics', () => {
       querySearchAnalytics('rt-1', 'x', { startDate: '2026-06-17', endDate: '2026-07-15' }),
     ).rejects.toThrow(/500/);
   });
+
+  test('passes dimensionFilterGroups through to the POST body', async () => {
+    getAccessToken.mockResolvedValue({ token: 'at-1' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ rows: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await querySearchAnalytics('rt-1', 'sc-domain:clewas.com', {
+      startDate: '2026-06-17',
+      endDate: '2026-07-15',
+      dimensions: ['date'],
+      dimensionFilterGroups: [
+        {
+          filters: [{ dimension: 'page', operator: 'equals', expression: 'https://x.com/blog/a' }],
+        },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse(init.body as string).dimensionFilterGroups).toEqual([
+      { filters: [{ dimension: 'page', operator: 'equals', expression: 'https://x.com/blog/a' }] },
+    ]);
+  });
 });
