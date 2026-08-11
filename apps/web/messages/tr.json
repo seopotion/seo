@@ -207,72 +207,9 @@
       "title": "İçerik Takvimi"
     },
     "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
-    "editor": {
-      "actions": {
-        "close": "Editörü kapat",
-        "continueEditing": "Düzenlemeye devam et",
-        "discard": "Değişiklikleri at",
-        "retry": "Yeniden dene",
-        "save": "Kaydet",
-        "saved": "Kaydedildi"
-      },
-      "articleStatuses": {
-        "deleted": "Silindi",
-        "generated": "Oluşturuldu",
-        "published": "Yayınlandı"
-      },
-      "closeConfirmation": {
-        "description": "Kaydedilmemiş değişiklikler var. Değişiklikleri atın veya düzenlemeye devam edin."
-      },
-      "fields": {
-        "content": "Markdown içerik",
-        "featuredImage": "Öne çıkan görsel",
-        "featuredImagePlaceholder": "Öne çıkan görsel önizlemesi burada görünecek",
-        "metaDescription": "Meta açıklama",
-        "metaTitle": "Meta başlık",
-        "slug": "Slug",
-        "title": "Makale başlığı"
-      },
-      "imageStatuses": {
-        "complete": "Görsel tamamlandı",
-        "failed": "Görsel başarısız",
-        "pending": "Görsel bekliyor"
-      },
-      "preview": {
-        "empty": "Önizlenecek içerik yok."
-      },
-      "sections": {
-        "context": "Bağlam"
-      },
-      "status": {
-        "loadError": "Bu makale yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
-        "loading": "Makale yükleniyor…",
-        "notFound": "Bu makale artık mevcut değil. Silinmiş olabilir.",
-        "notGenerated": "Bu makale henüz oluşturulmadı.",
-        "saveError": "Değişiklikleriniz kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
-        "saveFailed": "Kaydedilmedi",
-        "saveInvalid": "Bazı alanlar reddedildi. İşaretlenen alanları düzeltip yeniden kaydedin.",
-        "saveNotFound": "Bu makale artık mevcut olmadığı için değişiklikleriniz kaydedilmedi.",
-        "saving": "Kaydediliyor…",
-        "unsavedChanges": "Kaydedilmemiş değişiklikler",
-        "updatedAt": "Son güncelleme {date}"
-      },
-      "tabs": {
-        "editor": "Editör",
-        "label": "Makale editörü modu",
-        "preview": "Önizleme"
-      },
-      "title": "Makale editörü",
-      "validation": {
-        "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
-        "metaDescriptionTarget": "Hedef: 120-160 karakter.",
-        "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
-        "required": "Zorunlu",
-        "serverRejected": "Sunucu tarafından reddedildi."
-      }
-    },
     "modal": {
       "keyword": "Anahtar kelime",
+      "notGenerated": "Bu makale henüz oluşturulmadı.",
       "scheduledDate": "Planlanan tarih",
       "status": "Durum",
       "title": "Makale detayları",
@@ -468,6 +405,8 @@
   "ArticleDetailPage": {
     "actions": {
       "back": "İçerik geçmişine dön",
+      "cancelEdit": "Vazgeç",
+      "edit": "Makaleyi düzenle",
       "publishSite": "Siteye yayınla",
       "publishWordPress": "WordPress'e gönder",
       "publishingSite": "Siteye yayınlanıyor...",
@@ -479,6 +418,7 @@
     },
     "labels": {
       "createdAt": "Oluşturulma",
+      "keyword": "Anahtar kelime",
       "keywordId": "Anahtar kelime ID",
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
@@ -499,6 +439,7 @@
       "viewCommit": "Commit'i görüntüle"
     },
     "status": {
+      "editingBlocksPublish": "Yayınlamadan önce değişikliklerinizi kaydedin veya geri alın.",
       "loadError": "Bu makale yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "Makale yükleniyor...",
       "notFound": "Makale bulunamadı."
@@ -517,6 +458,69 @@
       "sentBadge": "WordPress'e gönderildi · #{id}",
       "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
       "warnings": "WordPress isteği uyarılarla tamamladı:"
+    }
+  },
+  "ArticleEditor": {
+    "actions": {
+      "close": "Editörü kapat",
+      "continueEditing": "Düzenlemeye devam et",
+      "discard": "Değişiklikleri at",
+      "retry": "Yeniden dene",
+      "save": "Kaydet",
+      "saved": "Kaydedildi"
+    },
+    "articleStatuses": {
+      "deleted": "Silindi",
+      "generated": "Oluşturuldu",
+      "published": "Yayınlandı"
+    },
+    "closeConfirmation": {
+      "description": "Kaydedilmemiş değişiklikler var. Değişiklikleri atın veya düzenlemeye devam edin."
+    },
+    "fields": {
+      "content": "Markdown içerik",
+      "featuredImage": "Öne çıkan görsel",
+      "featuredImagePlaceholder": "Öne çıkan görsel önizlemesi burada görünecek",
+      "metaDescription": "Meta açıklama",
+      "metaTitle": "Meta başlık",
+      "slug": "Slug",
+      "title": "Makale başlığı"
+    },
+    "imageStatuses": {
+      "complete": "Görsel tamamlandı",
+      "failed": "Görsel başarısız",
+      "pending": "Görsel bekliyor"
+    },
+    "preview": {
+      "empty": "Önizlenecek içerik yok."
+    },
+    "sections": {
+      "context": "Bağlam"
+    },
+    "status": {
+      "loadError": "Bu makale yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+      "loading": "Makale yükleniyor…",
+      "notFound": "Bu makale artık mevcut değil. Silinmiş olabilir.",
+      "saveError": "Değişiklikleriniz kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+      "saveFailed": "Kaydedilmedi",
+      "saveInvalid": "Bazı alanlar reddedildi. İşaretlenen alanları düzeltip yeniden kaydedin.",
+      "saveNotFound": "Bu makale artık mevcut olmadığı için değişiklikleriniz kaydedilmedi.",
+      "saving": "Kaydediliyor…",
+      "unsavedChanges": "Kaydedilmemiş değişiklikler",
+      "updatedAt": "Son güncelleme {date}"
+    },
+    "tabs": {
+      "editor": "Editör",
+      "label": "Makale editörü modu",
+      "preview": "Önizleme"
+    },
+    "title": "Makale editörü",
+    "validation": {
+      "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
+      "metaDescriptionTarget": "Hedef: 120-160 karakter.",
+      "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
+      "required": "Zorunlu",
+      "serverRejected": "Sunucu tarafından reddedildi."
     }
   },
   "ArticleSettingsPage": {
@@ -574,7 +578,10 @@
       "upgradeCta": "Planları görüntüle"
     },
     "googleSearchConsole": {
-      "badges": { "connected": "Bağlı", "notConnected": "Bağlı değil" },
+      "badges": {
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil"
+      },
       "benefit1": "Son 28 günün tıklama, gösterim, TO ve ortalama konum verileri",
       "benefit2": "Gerçek Google Arama tıklamalarına göre en iyi performans gösteren makaleleriniz",
       "changeConnection": "Hesabı veya mülkü değiştir",

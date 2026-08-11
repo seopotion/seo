@@ -207,72 +207,9 @@
       "title": "Content Calendar"
     },
     "description": "Plan one article per day across the next 45 days.",
-    "editor": {
-      "actions": {
-        "close": "Close editor",
-        "continueEditing": "Continue editing",
-        "discard": "Discard changes",
-        "retry": "Try again",
-        "save": "Save",
-        "saved": "Saved"
-      },
-      "articleStatuses": {
-        "deleted": "Deleted",
-        "generated": "Generated",
-        "published": "Published"
-      },
-      "closeConfirmation": {
-        "description": "You have unsaved changes. Discard them or continue editing."
-      },
-      "fields": {
-        "content": "Markdown content",
-        "featuredImage": "Featured image",
-        "featuredImagePlaceholder": "Featured image preview will appear here",
-        "metaDescription": "Meta description",
-        "metaTitle": "Meta title",
-        "slug": "Slug",
-        "title": "Article title"
-      },
-      "imageStatuses": {
-        "complete": "Image complete",
-        "failed": "Image failed",
-        "pending": "Image pending"
-      },
-      "preview": {
-        "empty": "Nothing to preview yet."
-      },
-      "sections": {
-        "context": "Context"
-      },
-      "status": {
-        "loadError": "We couldn't load this article. Check your connection and try again.",
-        "loading": "Loading article…",
-        "notFound": "This article no longer exists. It may have been deleted.",
-        "notGenerated": "This article has not been generated yet.",
-        "saveError": "We couldn't save your changes. Check your connection and try again.",
-        "saveFailed": "Not saved",
-        "saveInvalid": "Some fields were rejected. Fix the highlighted fields and save again.",
-        "saveNotFound": "This article no longer exists, so your changes were not saved.",
-        "saving": "Saving…",
-        "unsavedChanges": "Unsaved changes",
-        "updatedAt": "Last updated {date}"
-      },
-      "tabs": {
-        "editor": "Editor",
-        "label": "Article editor mode",
-        "preview": "Preview"
-      },
-      "title": "Article editor",
-      "validation": {
-        "metaDescriptionRange": "Outside the 120-160 character target.",
-        "metaDescriptionTarget": "Target: 120-160 characters.",
-        "metaTitleTooLong": "Over the 60 character target.",
-        "required": "Required",
-        "serverRejected": "Rejected by the server."
-      }
-    },
     "modal": {
       "keyword": "Keyword",
+      "notGenerated": "This article has not been generated yet.",
       "scheduledDate": "Scheduled date",
       "status": "Status",
       "title": "Article details",
@@ -468,6 +405,8 @@
   "ArticleDetailPage": {
     "actions": {
       "back": "Back to content history",
+      "cancelEdit": "Cancel",
+      "edit": "Edit article",
       "publishSite": "Publish to site",
       "publishWordPress": "Send to WordPress",
       "publishingSite": "Publishing to site...",
@@ -479,6 +418,7 @@
     },
     "labels": {
       "createdAt": "Created",
+      "keyword": "Keyword",
       "keywordId": "Keyword ID",
       "notPublished": "Not published",
       "publishedAt": "Published",
@@ -499,6 +439,7 @@
       "viewCommit": "View the commit"
     },
     "status": {
+      "editingBlocksPublish": "Save or discard your changes before publishing.",
       "loadError": "Could not load this article. Try again when the API is available.",
       "loading": "Loading article...",
       "notFound": "Article not found."
@@ -517,6 +458,69 @@
       "sentBadge": "Sent to WordPress · #{id}",
       "updated": "The WordPress post was updated from the stored article.",
       "warnings": "WordPress completed the request with warnings:"
+    }
+  },
+  "ArticleEditor": {
+    "actions": {
+      "close": "Close editor",
+      "continueEditing": "Continue editing",
+      "discard": "Discard changes",
+      "retry": "Try again",
+      "save": "Save",
+      "saved": "Saved"
+    },
+    "articleStatuses": {
+      "deleted": "Deleted",
+      "generated": "Generated",
+      "published": "Published"
+    },
+    "closeConfirmation": {
+      "description": "You have unsaved changes. Discard them or continue editing."
+    },
+    "fields": {
+      "content": "Markdown content",
+      "featuredImage": "Featured image",
+      "featuredImagePlaceholder": "Featured image preview will appear here",
+      "metaDescription": "Meta description",
+      "metaTitle": "Meta title",
+      "slug": "Slug",
+      "title": "Article title"
+    },
+    "imageStatuses": {
+      "complete": "Image complete",
+      "failed": "Image failed",
+      "pending": "Image pending"
+    },
+    "preview": {
+      "empty": "Nothing to preview yet."
+    },
+    "sections": {
+      "context": "Context"
+    },
+    "status": {
+      "loadError": "We couldn't load this article. Check your connection and try again.",
+      "loading": "Loading article…",
+      "notFound": "This article no longer exists. It may have been deleted.",
+      "saveError": "We couldn't save your changes. Check your connection and try again.",
+      "saveFailed": "Not saved",
+      "saveInvalid": "Some fields were rejected. Fix the highlighted fields and save again.",
+      "saveNotFound": "This article no longer exists, so your changes were not saved.",
+      "saving": "Saving…",
+      "unsavedChanges": "Unsaved changes",
+      "updatedAt": "Last updated {date}"
+    },
+    "tabs": {
+      "editor": "Editor",
+      "label": "Article editor mode",
+      "preview": "Preview"
+    },
+    "title": "Article editor",
+    "validation": {
+      "metaDescriptionRange": "Outside the 120-160 character target.",
+      "metaDescriptionTarget": "Target: 120-160 characters.",
+      "metaTitleTooLong": "Over the 60 character target.",
+      "required": "Required",
+      "serverRejected": "Rejected by the server."
     }
   },
   "ArticleSettingsPage": {
@@ -574,7 +578,10 @@
       "upgradeCta": "View plans"
     },
     "googleSearchConsole": {
-      "badges": { "connected": "Connected", "notConnected": "Not connected" },
+      "badges": {
+        "connected": "Connected",
+        "notConnected": "Not connected"
+      },
       "benefit1": "Clicks, impressions, CTR and average position for the last 28 days",
       "benefit2": "Your best-performing articles, ranked by real Google Search clicks",
       "changeConnection": "Change account or property",

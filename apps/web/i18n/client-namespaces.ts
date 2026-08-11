@@ -13,6 +13,7 @@
  */
 export const CLIENT_NAMESPACES = [
   'ArticleDetailPage',
+  'ArticleEditor',
   'ArticleSettingsPage',
   'AuthGuard',
   'BillingPage',
