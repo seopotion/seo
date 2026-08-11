@@ -63,8 +63,19 @@ export function buildRelevancePrompt(keywords: string[], presets: SetupPresets):
   ];
 }
 
-export function parseRelevance(text: string, keywords: string[]): Map<string, number> {
+/**
+ * Score every keyword, seeding 0 for the ones the model did not echo back
+ * verbatim. `returned` counts the ones it did: a large gap between it and
+ * `keywords.length` means a truncated or re-cased response rather than
+ * genuinely irrelevant keywords, which is otherwise indistinguishable from a
+ * real 0 (#211).
+ */
+export function parseRelevance(
+  text: string,
+  keywords: string[],
+): { scores: Map<string, number>; returned: number } {
   const out = new Map<string, number>(keywords.map((k) => [k, 0]));
+  const matched = new Set<string>();
   const parsed = tryParse(text) as {
     scores?: Array<{ keyword?: unknown; relevance?: unknown }>;
   } | null;
@@ -75,9 +86,10 @@ export function parseRelevance(text: string, keywords: string[]): Map<string, nu
       out.has(row.keyword)
     ) {
       out.set(row.keyword, clamp01(row.relevance));
+      matched.add(row.keyword);
     }
   }
-  return out;
+  return { scores: out, returned: matched.size };
 }
 
 // ---- SERP judgment ----

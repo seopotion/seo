@@ -77,6 +77,10 @@ async function runStrategy(orgId: string): Promise<void> {
     onProgress: (stage, meta) => logger.info('strategy stage', { stage, ...meta }),
   });
 
+  // Funnel counts per run, including relevance coverage — a batch the LLM only
+  // partly scored is what makes ranking collapse to volume + ease (#211).
+  logger.info('strategy pipeline stats', { ...result.stats });
+
   const inserted = await addCandidates(orgId, result.candidates);
   const storedByNormalized = new Map(inserted.map((c) => [c.normalized_keyword, c]));
 

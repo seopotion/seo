@@ -88,7 +88,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Local development
 
 - ✅ `npm run dev` runs api + worker + web (concurrently); local API server, ElasticMQ SQS, `db:init` — all verified live
-- ✅ Management CLI (`apps/cli`, citty) — `npm run cli -- <infra check | db init | db set-plan>`, `--output json` for agents. `db set-plan --org|--user <email> --plan free|paid|expert` remains a dev/staging override alongside real (LemonSqueezy) billing ([#13](https://github.com/seopotion/seo/issues/13))
+- ✅ Management CLI (`apps/cli`, citty) — `npm run cli -- <infra check | db init | db set-plan>`, `--output json` for agents. `db set-plan --org|--user <email> --plan free|paid|expert` remains a dev/staging override alongside real (LemonSqueezy) billing ([#13](https://github.com/seopotion/seo/issues/13)). `db strategy-audit --org|--user` is a read-only report on why the 30-day plan scheduled what it did — pool histograms, the plan, backfill/relevance diagnostics; `db strategy-dryrun --org` runs the pipeline and reports the result without persisting anything, with `--snapshot`/`--replay` of provider responses for free iteration ([#211](https://github.com/seopotion/seo/issues/211))
 
 ## Always-green gates
 

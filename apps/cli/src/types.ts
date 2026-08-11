@@ -4,6 +4,7 @@
  * Every lib function returns Result<T>. Errors are structured and
  * machine-readable. Commands translate Results into output + exit codes.
  */
+import type { PipelineStats, ResolvedConfig } from '@shared/keywords';
 
 export interface CliError {
   code: string;
@@ -95,6 +96,152 @@ export interface PreflightResult {
   stage: Stage;
   ready: boolean;
   checks: PrereqCheck[];
+}
+
+/** Half-open `[min, max)` range used to bucket a numeric distribution. */
+export interface Bucket {
+  label: string;
+  min: number;
+  max: number;
+}
+
+export interface BucketCount {
+  label: string;
+  count: number;
+}
+
+/** Five-number summary over the non-null values, plus how many were null. */
+export interface NumericStats {
+  /** Non-null values summarized. */
+  count: number;
+  nulls: number;
+  min: number | null;
+  p25: number | null;
+  median: number | null;
+  p75: number | null;
+  max: number | null;
+}
+
+/** Whole-pool histograms — every candidate for the org, all statuses. */
+export interface AuditPool {
+  total: number;
+  by_source: Record<string, number>;
+  by_status: Record<string, number>;
+  /** `(none)` counts candidates with a null rejection_reason. */
+  by_rejection_reason: Record<string, number>;
+  relevance_score: {
+    nulls: number;
+    /** Exactly 0 — the parseRelevance seed value, not necessarily a real score. */
+    exact_zero: number;
+    stats: NumericStats;
+    /** Ten 0.1-wide buckets over the non-null values. */
+    histogram: BucketCount[];
+  };
+  opportunity_score: NumericStats;
+  difficulty: { nulls: number; exact_zero: number; one_to_45: number; above_45: number };
+  search_volume: { nulls: number; zero: number; buckets: BucketCount[] };
+  /** Candidates with serp_competitors != null, i.e. actually SERP-validated. */
+  serp_validated: number;
+}
+
+/** One scheduled planner entry, joined to its candidate via `candidate_id`. */
+export interface AuditPlanRow {
+  scheduled_date: string;
+  keyword: string;
+  search_volume: number;
+  difficulty: number;
+  opportunity_score: number | null;
+  article_type: string | null;
+  /** From the joined candidate; null when no candidate could be found. */
+  relevance_score: number | null;
+  source: string | null;
+  /** How the candidate was found: by `candidate_id`, or by normalized keyword
+   * for pre-#99 entries that carry no linkage. */
+  candidate_join: 'candidate_id' | 'normalized_keyword' | 'none';
+  serp_validated: boolean;
+}
+
+export interface AuditDiagnostics {
+  /** Scheduled entries that never went through SERP validation. */
+  backfill_count: number;
+  backfill_fraction: number;
+  relevance_exact_zero: { scored: number; exact_zero: number; fraction: number };
+  kd_zero_scheduled: number;
+  scheduled_by_source: Record<string, number>;
+  pool_source_share: Record<string, number>;
+  scheduled_source_share: Record<string, number>;
+}
+
+/** `db strategy-audit` report (#211) — read-only diagnostics for the 30-day plan. */
+export interface StrategyAuditData {
+  org: {
+    id: string;
+    website_url: string;
+    plan: string;
+    strategy_status: string;
+    setup_status: string;
+    business: { name: string; country: string; language: string } | null;
+    audience_target: string[];
+    competitors: string[];
+    /** No competitors disables the ranked_keywords branch of gather.ts entirely. */
+    competitors_empty: boolean;
+  };
+  pool: AuditPool;
+  plan: AuditPlanRow[];
+  diagnostics: AuditDiagnostics;
+  /** Full candidate records matching `--keyword`; empty when the flag is unused. */
+  keyword_matches: unknown[];
+  notes: string[];
+}
+
+/** One candidate as the dry-run report shows it. */
+export interface DryRunCandidateRow {
+  keyword: string;
+  source: string;
+  search_volume: number | null;
+  difficulty: number | null;
+  relevance_score: number | null;
+  opportunity_score: number | null;
+  article_type: string | null;
+  rejection_reason: string | null;
+}
+
+export interface DryRunPlanRow extends DryRunCandidateRow {
+  scheduled_date: string;
+  /** Scored but never SERP-validated or classified — today's silent backfill. */
+  from_below_n: boolean;
+}
+
+/** `db strategy-dryrun` report (#211) — one pipeline run, persisted nowhere. */
+export interface StrategyDryRunData {
+  mode: 'live' | 'replay';
+  org: {
+    id: string;
+    website_url: string;
+    business: { name: string; country: string; language: string };
+    competitors: string[];
+  };
+  config: ResolvedConfig;
+  stats: PipelineStats;
+  /** The known failure: relevance the LLM never scored keeps parseRelevance's 0 seed. */
+  relevance: {
+    sent: number;
+    returned: number;
+    missing: number;
+    zero: number;
+    zero_fraction: number;
+  };
+  sections: {
+    /** SERP-validated and classified. */
+    accepted: DryRunCandidateRow[];
+    /** Below serpTopN: scored, never SERP-validated, still schedulable. */
+    below_n: DryRunCandidateRow[];
+    rejected: { reason: string; candidates: DryRunCandidateRow[] }[];
+  };
+  /** What strategy.ts would schedule for a first run of this org. */
+  plan: DryRunPlanRow[];
+  snapshot: { wrote: string | null; replayed: string | null; config_drift: string[] };
+  notes: string[];
 }
 
 /** `db clean-links` report (#186). `publishedChanged` are live articles whose

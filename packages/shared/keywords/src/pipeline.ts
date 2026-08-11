@@ -88,14 +88,14 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
 
   // 7 relevance → 8 score
   progress('relevance', { candidates: ceiling.survivors.length });
-  const withRelevance = await applyRelevance(ceiling.survivors, {
+  const relevance = await applyRelevance(ceiling.survivors, {
     llm: input.clients.llm,
     presets: input.presets,
   });
   const cannibalSet = new Set(
     [...input.existingKeywords, ...input.existingArticleKeywords].map(normalizeKeyword),
   );
-  const scored = scoreCandidates(withRelevance, { cannibalSet, config });
+  const scored = scoreCandidates(relevance.candidates, { cannibalSet, config });
 
   // 9 rank + split top-N
   const ranked = [...scored].sort(rankKey);
@@ -134,6 +134,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
       serpValidated: topN.length,
       accepted: classified.length,
       rejectedByReason,
+      relevance: relevance.coverage,
     },
   };
 }

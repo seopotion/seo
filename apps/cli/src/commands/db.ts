@@ -2,7 +2,7 @@
  * db command — database management.
  */
 import { defineCommand } from 'citty';
-import { EXIT, type OutputMode } from '../types';
+import { EXIT, fail, type OutputMode } from '../types';
 import { createEmitter } from '../utils/emitter';
 import { emitInternal, outputOption, verboseOption } from './shared';
 
@@ -85,6 +85,130 @@ export const dbCommand = defineCommand({
           });
           emitter.step('db:set-plan', result.ok ? 'done' : 'fail');
           emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'strategy-audit': defineCommand({
+      meta: {
+        name: 'strategy-audit',
+        description:
+          'Read-only report on why the 30-day plan scheduled what it did (#211): candidate-pool histograms, the scheduled plan, and named diagnostics. NOTE: the pool is the union of every strategy run for the org, so if the job has been re-run the histograms are approximate.',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to audit' },
+        user: { type: 'string', description: "Owner's email; resolves to their single org" },
+        keyword: {
+          type: 'string',
+          description:
+            'Dump full candidate records whose normalized_keyword contains this substring (case-insensitive). Repeatable or comma-separated.',
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { strategyAudit } = await import('../lib/db');
+          const { renderStrategyAudit } = await import('../lib/strategy-audit');
+
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const raw = args.keyword as string | string[] | undefined;
+          const keywords = (Array.isArray(raw) ? raw : raw ? [raw] : [])
+            .flatMap((k) => k.split(','))
+            .map((k) => k.trim())
+            .filter(Boolean);
+
+          emitter.step('db:strategy-audit', 'start');
+
+          const result = await strategyAudit({
+            org: args.org as string | undefined,
+            user: args.user as string | undefined,
+            keywords,
+          });
+          emitter.step('db:strategy-audit', result.ok ? 'done' : 'fail');
+
+          // The report is a page of tables, so text mode renders it instead of
+          // dumping the raw JSON the default emitter would print.
+          if (result.ok && args.output !== 'json') {
+            process.stdout.write(renderStrategyAudit(result.data));
+          } else {
+            emitter.result(result);
+          }
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'strategy-dryrun': defineCommand({
+      meta: {
+        name: 'strategy-dryrun',
+        description:
+          'Run the real keyword pipeline for one org and report the result (#211). Persists NOTHING — no candidates, no planner entries, no strategy_status. Record provider responses with --snapshot, then iterate for free with --replay.',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to run for' },
+        user: { type: 'string', description: "Owner's email; resolves to their single org" },
+        'serp-top-n': {
+          type: 'string',
+          description: 'Override config.serpTopN — live SERP calls dominate the cost',
+        },
+        snapshot: {
+          type: 'string',
+          description: 'Run live and record every provider response to this JSON file',
+        },
+        replay: {
+          type: 'string',
+          description: 'Replay a recorded snapshot; makes no network calls at all',
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { strategyDryRun } = await import('../lib/db');
+          const { renderStrategyDryRun } = await import('../lib/strategy-dryrun');
+          const { DEFAULT_CONFIG } = await import('@shared/keywords');
+
+          const rawTopN = args['serp-top-n'] as string | undefined;
+          const serpTopN = rawTopN === undefined ? undefined : Number(rawTopN);
+          if (serpTopN !== undefined && !Number.isInteger(serpTopN)) {
+            emitter.result(fail('BAD_ARGS', `--serp-top-n must be an integer, got "${rawTopN}".`));
+            process.exit(EXIT.USER_ERROR);
+          }
+
+          const replay = args.replay as string | undefined;
+          if (replay) {
+            emitter.info(`Replaying ${replay} — no network calls, no provider credits spent.`);
+          } else {
+            emitter.warn(
+              `LIVE RUN — real DataForSEO + OpenRouter credits will be spent: up to ${serpTopN ?? DEFAULT_CONFIG.serpTopN} SERP calls (serpTopN) plus the gather/difficulty calls, and up to ${(serpTopN ?? DEFAULT_CONFIG.serpTopN) + 3} LLM calls. Pass --snapshot <path> to record it, then --replay <path> to iterate for free.`,
+            );
+          }
+          emitter.step('db:strategy-dryrun', 'start');
+
+          const result = await strategyDryRun({
+            org: args.org as string | undefined,
+            user: args.user as string | undefined,
+            serpTopN,
+            snapshotPath: args.snapshot as string | undefined,
+            replayPath: replay,
+          });
+          emitter.step('db:strategy-dryrun', result.ok ? 'done' : 'fail');
+
+          // The report is a page of tables, so text mode renders it instead of
+          // dumping the raw JSON the default emitter would print.
+          if (result.ok && args.output !== 'json') {
+            process.stdout.write(renderStrategyDryRun(result.data));
+          } else {
+            emitter.result(result);
+          }
 
           process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
         } catch (e) {

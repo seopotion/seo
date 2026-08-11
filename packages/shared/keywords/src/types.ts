@@ -100,6 +100,17 @@ export interface PipelineInput {
   onProgress?: (stage: string, meta?: Record<string, unknown>) => void;
 }
 
+/**
+ * How much of the relevance batch the LLM actually scored. `sent - returned`
+ * keywords kept parseRelevance's 0 seed without the model ever judging them.
+ */
+export interface RelevanceCoverage {
+  sent: number;
+  returned: number;
+  /** Candidates whose final relevance_score is exactly 0 — real zeros plus seeds. */
+  zero: number;
+}
+
 export interface PipelineStats {
   gathered: number;
   afterDedupe: number;
@@ -110,6 +121,7 @@ export interface PipelineStats {
   serpValidated: number;
   accepted: number;
   rejectedByReason: Record<RejectionReason, number>;
+  relevance: RelevanceCoverage;
 }
 
 export interface PipelineResult {

@@ -1,23 +1,39 @@
 import type { LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
 import { buildRelevancePrompt, parseRelevance } from './llm-prompts';
-import type { ResolvedConfig, WorkingCandidate } from './types';
+import type { RelevanceCoverage, ResolvedConfig, WorkingCandidate } from './types';
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
+/**
+ * Score relevance for the whole batch in one LLM call. Returns the coverage
+ * alongside the candidates: relevance carries the largest scoring weight, so a
+ * response that covers only part of the batch silently degrades ranking to
+ * volume + ease, and the counts are the only way to see it (#211).
+ */
 export async function applyRelevance(
   candidates: WorkingCandidate[],
   deps: { llm: LlmClient; presets: SetupPresets },
-): Promise<WorkingCandidate[]> {
-  if (candidates.length === 0) return candidates;
+): Promise<{ candidates: WorkingCandidate[]; coverage: RelevanceCoverage }> {
+  if (candidates.length === 0) {
+    return { candidates, coverage: { sent: 0, returned: 0, zero: 0 } };
+  }
   const keywords = candidates.map((c) => c.keyword);
   const res = await deps.llm.complete({
     messages: buildRelevancePrompt(keywords, deps.presets),
     temperature: 0,
     responseFormat: 'json',
   });
-  const scores = parseRelevance(res.text, keywords);
-  return candidates.map((c) => ({ ...c, relevance_score: scores.get(c.keyword) ?? 0 }));
+  const { scores, returned } = parseRelevance(res.text, keywords);
+  const scored = candidates.map((c) => ({ ...c, relevance_score: scores.get(c.keyword) ?? 0 }));
+  return {
+    candidates: scored,
+    coverage: {
+      sent: keywords.length,
+      returned,
+      zero: scored.filter((c) => c.relevance_score === 0).length,
+    },
+  };
 }
 
 export function scoreCandidates(

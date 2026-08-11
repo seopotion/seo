@@ -54,14 +54,26 @@ const llmReturning = (text: string): LlmClient => ({
 describe('applyRelevance', () => {
   it('sets relevance_score from the LLM response', async () => {
     const llm = llmReturning('{"scores":[{"keyword":"dog food","relevance":0.8}]}');
-    const [out] = await applyRelevance([cand({})], { llm, presets });
-    expect(out!.relevance_score).toBe(0.8);
+    const { candidates, coverage } = await applyRelevance([cand({})], { llm, presets });
+    expect(candidates[0]!.relevance_score).toBe(0.8);
+    expect(coverage).toEqual({ sent: 1, returned: 1, zero: 0 });
+  });
+
+  it('reports keywords the LLM skipped, which keep the 0 seed', async () => {
+    const llm = llmReturning('{"scores":[{"keyword":"dog food","relevance":0.8}]}');
+    const { candidates, coverage } = await applyRelevance(
+      [cand({}), cand({ keyword: 'cat food', normalized: 'cat food' })],
+      { llm, presets },
+    );
+    expect(candidates[1]!.relevance_score).toBe(0);
+    expect(coverage).toEqual({ sent: 2, returned: 1, zero: 1 });
   });
 
   it('does not call the LLM for an empty batch', async () => {
     const llm = llmReturning('{}');
-    await applyRelevance([], { llm, presets });
+    const { coverage } = await applyRelevance([], { llm, presets });
     expect(llm.complete).not.toHaveBeenCalled();
+    expect(coverage).toEqual({ sent: 0, returned: 0, zero: 0 });
   });
 });
 

@@ -54,12 +54,14 @@ describe('parseSeeds', () => {
 
 describe('parseRelevance', () => {
   it('maps and clamps scores, defaulting missing to 0', () => {
-    const m = parseRelevance('{"scores":[{"keyword":"dog food","relevance":1.4}]}', [
-      'dog food',
-      'x',
-    ]);
-    expect(m.get('dog food')).toBe(1);
-    expect(m.get('x')).toBe(0);
+    const { scores, returned } = parseRelevance(
+      '{"scores":[{"keyword":"dog food","relevance":1.4}]}',
+      ['dog food', 'x'],
+    );
+    expect(scores.get('dog food')).toBe(1);
+    expect(scores.get('x')).toBe(0);
+    // "x" was never judged — it only has the seed, which `returned` excludes.
+    expect(returned).toBe(1);
   });
 });
 
