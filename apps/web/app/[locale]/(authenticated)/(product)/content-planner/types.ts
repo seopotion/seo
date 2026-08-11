@@ -99,43 +99,7 @@ export type TargetKeyword = {
   volume: number | null;
 };
 
-export type ArticleDetailResponse = {
-  content: string;
-  created_at: string;
-  featured_image_url: string;
-  id: string;
-  images_status: 'pending' | 'complete' | 'failed';
-  keyword: string;
-  meta_description: string;
-  meta_title: string;
-  published_at: string | null;
-  slug: string;
-  status: 'generated' | 'published' | 'deleted';
-  title: string;
-  updated_at: string | null;
-};
-
-export type ArticleEditorDraft = {
-  id: string;
-  keyword: string;
-  title: string;
-  metaTitle: string;
-  slug: string;
-  metaDescription: string;
-  featuredImageUrl: string;
-  content: string;
-  status: 'generated' | 'published' | 'deleted';
-  imagesStatus: 'pending' | 'complete' | 'failed';
-  createdAt: string;
-  updatedAt: string | null;
-  publishedAt: string | null;
-};
-
-/** The five fields the editor can change. */
-export type EditableArticleField = 'content' | 'metaDescription' | 'metaTitle' | 'slug' | 'title';
-
 export type ArticleLoadApiError = 'generic' | 'not_found';
-export type ArticleSaveApiError = 'generic' | 'invalid' | 'not_found' | 'unauthorized';
 
 export type CalendarDay = {
   date: Date;

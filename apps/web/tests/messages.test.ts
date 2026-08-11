@@ -25,9 +25,9 @@ const REFERENCE_LOCALE = routing.defaultLocale;
  */
 const SAME_IN_EVERY_LOCALE = new Set([
   'ArticleDetailPage.labels.slug',
+  'ArticleEditor.fields.slug',
   'BillingPage.tiers.expert.name',
   'BillingPage.tiers.paid.name',
-  'ContentPlannerPage.editor.fields.slug',
   'ContentPlannerPage.researchKeywords.form.characterCount',
   'ContentPlannerPage.targetKeywords.notAvailable',
   'LandingPage.footer.blog',

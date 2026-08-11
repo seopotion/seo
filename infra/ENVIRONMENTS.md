@@ -106,8 +106,8 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    the same way:
 
    ```sh
-   gh variable set WEB_ORIGIN_STAGING --repo seopotion/seo --body 'https://app-staging.seopotion.co'
-   gh variable set WEB_ORIGIN_PROD    --repo seopotion/seo --body 'https://app.seopotion.co'
+   gh variable set WEB_ORIGIN_STAGING --repo seopotion/seo --body 'https://staging.seopotion.co'
+   gh variable set WEB_ORIGIN_PROD    --repo seopotion/seo --body 'https://www.seopotion.co'
    ```
 
    The resulting `<web origin>/dashboard/gsc/callback` redirect URI must also
@@ -156,13 +156,13 @@ per environment (`console.cloud.google.com` → APIs & Services → Credentials)
 | Field                        | Staging                                            |
 | ---------------------------- | -------------------------------------------------- |
 | Name (internal)              | `SEO Potion — staging (web)`                        |
-| Authorized JS origins        | `http://localhost:3000`, `https://app-staging.seopotion.co` |
-| Authorized redirect URIs     | `http://localhost:3000/dashboard/gsc/callback`, `https://app-staging.seopotion.co/dashboard/gsc/callback` |
+| Authorized JS origins        | `http://localhost:3000`, `https://staging.seopotion.co` |
+| Authorized redirect URIs     | `http://localhost:3000/dashboard/gsc/callback`, `https://staging.seopotion.co/dashboard/gsc/callback` |
 
 - Origins are `scheme://host[:port]` — **no trailing slash, no path**; HTTPS
   except `localhost`. Add the generated CloudFront origin once the frontend
   sub-project (C) deploys staging — origins are editable without recreating the
-  client. Prod mirrors this with `app.seopotion.co`.
+  client. Prod mirrors this with `www.seopotion.co`.
 - If the **OAuth consent screen** is in *Testing* mode, only listed test users
   can sign in — add your test accounts or publish the app.
 - The same client id is also the frontend's `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (#21).

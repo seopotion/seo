@@ -24,6 +24,7 @@ export const DOCS: readonly DocEntry[] = [
   { slug: 'quickstart', group: 'getting-started' },
   { slug: 'content-planner', group: 'content' },
   { slug: 'wordpress', group: 'publishing' },
+  { slug: 'custom-site', group: 'publishing' },
 ];
 
 export const DOC_SLUGS: readonly string[] = DOCS.map((doc) => doc.slug);
