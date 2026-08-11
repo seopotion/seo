@@ -69,7 +69,7 @@ Command names live in `package.json` (root + per-app). What isn't obvious from t
 - `npm run test:integration` — repository tests vs real Mongo; needs `docker compose up -d mongo`.
 - `npm run dev` — full stack via `concurrently`; `-w api` serves the Lambda app over HTTP on :8787 (Node adapter), `-w worker` is the SQS poller, `-w web` is Next.js.
 - `npm run db:init` — one-off MongoDB index creation; needs Mongo running.
-- `npm run cli -- <infra|db> …` — `seo-dev` management CLI (`apps/cli`, citty), built for humans **and agents**: `infra` runs local-infra checks, `db` handles database management. `npm run cli -- --help` lists commands.
+- `npm run cli -- <infra|db> …` — `seo-dev` management CLI (`apps/cli`, citty), built for humans **and agents**: `infra` runs local-infra checks, `db` handles database management. `npm run cli -- --help` lists commands. With `--output json`, run it as `npm run --silent cli -- …`: npm prints its `> pkg@ver script` banner to **stdout**, which corrupts the JSON payload (the CLI warns on stderr when it detects this).
 
 Always run `npm run lint`, `npm run check:all`, and `npm test` before claiming work is done.
 

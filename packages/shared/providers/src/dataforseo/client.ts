@@ -5,10 +5,12 @@ import type {
   BacklinksSummary,
   DataForSeoConfig,
   KeywordMetric,
+  LabsQueryShape,
   SeedKeywordsParams,
   SerpParams,
   SerpResult,
   SiteKeywordsParams,
+  SuggestionKeywordsParams,
 } from './types';
 
 const DEFAULT_BASE_URL = 'https://api.dataforseo.com/v3';
@@ -56,6 +58,16 @@ function toKeywordMetric(item: Record<string, unknown>): KeywordMetric {
   };
 }
 
+/**
+ * `ranked_keywords` wraps the metrics one level deeper than its siblings — the
+ * `keyword_info` / `keyword_properties` objects live under `keyword_data`.
+ * Unwrap it before normalizing, or every metric (including the keyword itself)
+ * reads as missing.
+ */
+function toRankedKeywordMetric(item: Record<string, unknown>): KeywordMetric {
+  return toKeywordMetric((item.keyword_data ?? item) as Record<string, unknown>);
+}
+
 /** Normalize one SERP `items[]` organic entry. */
 function toSerpResult(item: Record<string, unknown>): SerpResult {
   return {
@@ -79,6 +91,7 @@ export type DataForSeoClient = {
   keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   rankedKeywords(params: SiteKeywordsParams): Promise<KeywordMetric[]>;
   keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
+  keywordSuggestions(params: SuggestionKeywordsParams): Promise<KeywordMetric[]>;
   bulkKeywordDifficulty(params: SeedKeywordsParams): Promise<KeywordMetric[]>;
   serpGoogleOrganic(params: SerpParams): Promise<SerpResult[]>;
   backlinksSummary(target: string): Promise<BacklinksSummary>;
@@ -184,13 +197,23 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     });
   }
 
+  /** Apply the shared Labs result-shaping params to a task payload. */
+  function shape(task: Record<string, unknown>, params: LabsQueryShape): Record<string, unknown> {
+    if (params.limit) task.limit = params.limit;
+    if (params.orderBy?.length) task.order_by = params.orderBy;
+    if (params.filters?.length) task.filters = params.filters;
+    return task;
+  }
+
   return {
     async keywordsForSite(params: SiteKeywordsParams): Promise<KeywordMetric[]> {
       const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
-      if (params.limit) task.limit = params.limit;
-      const result = await request('/dataforseo_labs/google/keywords_for_site/live', task);
+      const result = await request(
+        '/dataforseo_labs/google/keywords_for_site/live',
+        shape(task, params),
+      );
       return itemsOf(result).map(toKeywordMetric);
     },
 
@@ -198,17 +221,37 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       const task: Record<string, unknown> = { target: bareDomain(params.target) };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
-      if (params.limit) task.limit = params.limit;
-      const result = await request('/dataforseo_labs/google/ranked_keywords/live', task);
-      return itemsOf(result).map(toKeywordMetric);
+      const result = await request(
+        '/dataforseo_labs/google/ranked_keywords/live',
+        shape(task, params),
+      );
+      return itemsOf(result).map(toRankedKeywordMetric);
     },
 
     async keywordIdeas(params: SeedKeywordsParams): Promise<KeywordMetric[]> {
       const task: Record<string, unknown> = { keywords: params.keywords };
       if (params.locationName) task.location_name = params.locationName;
       if (params.languageName) task.language_name = params.languageName;
-      if (params.limit) task.limit = params.limit;
-      const result = await request('/dataforseo_labs/google/keyword_ideas/live', task);
+      const result = await request(
+        '/dataforseo_labs/google/keyword_ideas/live',
+        shape(task, params),
+      );
+      return itemsOf(result).map(toKeywordMetric);
+    },
+
+    /**
+     * Long-tail phrases CONTAINING the seed. `keyword_ideas` returns
+     * category-adjacent terms instead, which is how a niche B2B pool drifted
+     * into consumer topics (#211). One seed per call — fan out at the caller.
+     */
+    async keywordSuggestions(params: SuggestionKeywordsParams): Promise<KeywordMetric[]> {
+      const task: Record<string, unknown> = { keyword: params.keyword };
+      if (params.locationName) task.location_name = params.locationName;
+      if (params.languageName) task.language_name = params.languageName;
+      const result = await request(
+        '/dataforseo_labs/google/keyword_suggestions/live',
+        shape(task, params),
+      );
       return itemsOf(result).map(toKeywordMetric);
     },
 

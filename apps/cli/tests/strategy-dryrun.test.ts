@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import type { EnrichedCandidate } from '@shared/keywords';
 import type { DataForSeoClient, KeywordMetric, LlmClient, SerpResult } from '@shared/providers';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { simulatePlan, splitSections } from '../src/lib/strategy-dryrun';
+import { simulatePlan, sourceFunnel, splitSections } from '../src/lib/strategy-dryrun';
 import type { StrategyDryRunData } from '../src/types';
 
 const metric = (keyword: string, over: Partial<KeywordMetric> = {}): KeywordMetric => ({
@@ -121,7 +121,9 @@ vi.mock('@shared/providers', async (importOriginal) => ({
         providerCalls.dataforseo++;
         return [metric('dog food delivery', { search_volume: 400 })];
       },
-      keywordIdeas: async () => {
+      // Retired from gather in #211 — present only to satisfy the client type.
+      keywordIdeas: async () => [],
+      keywordSuggestions: async () => {
         providerCalls.dataforseo++;
         return [
           metric('acme login', { difficulty: 5 }),
@@ -379,6 +381,37 @@ describe('splitSections', () => {
       ['serp_intent', 2],
       ['brand_navigation', 1],
     ]);
+  });
+});
+
+describe('sourceFunnel', () => {
+  const empty = {
+    keywords_for_site: 0,
+    ranked_keywords: 0,
+    keyword_ideas: 0,
+    keyword_suggestions: 0,
+    serp: 0,
+    manual: 0,
+    seed: 0,
+  } as const;
+
+  test('reports what dedupe dropped per source, busiest first', () => {
+    const rows = sourceFunnel(
+      [
+        candidate({ keyword: 'a', source: 'keywords_for_site' }),
+        candidate({ keyword: 'b', source: 'keyword_suggestions' }),
+        candidate({ keyword: 'c', source: 'keyword_suggestions' }),
+      ],
+      { ...empty, keywords_for_site: 5, keyword_suggestions: 3 },
+    );
+    expect(rows).toEqual([
+      { source: 'keywords_for_site', gathered: 5, after_dedupe: 1 },
+      { source: 'keyword_suggestions', gathered: 3, after_dedupe: 2 },
+    ]);
+  });
+
+  test('omits sources that contributed nothing', () => {
+    expect(sourceFunnel([], empty)).toEqual([]);
   });
 });
 

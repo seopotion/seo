@@ -1,5 +1,6 @@
 import type { DataForSeoClient, LlmClient, SerpResult } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
+import { mapWithConcurrency } from './concurrency';
 import { reject } from './filters';
 import { buildSerpJudgmentPrompt, parseSerpJudgment } from './llm-prompts';
 import type { ResolvedConfig, WorkingCandidate } from './types';
@@ -16,25 +17,10 @@ interface SerpDeps {
 // pushed the strategy Lambda past its timeout, so fetch them with bounded
 // concurrency. Kept small to stay under the provider's rate limits.
 const SERP_FETCH_CONCURRENCY = 6;
-
-/** Map with bounded concurrency, preserving input order in the output. */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const out = new Array<R>(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i] as T, i);
-    }
-  }
-  const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
-  await Promise.all(workers);
-  return out;
-}
+// The per-keyword intent judgment used to run serially behind the fetches,
+// which made the whole stage O(serpTopN) round-trips — the reason serpTopN
+// could not be raised past 40 (#211).
+const SERP_JUDGE_CONCURRENCY = 6;
 
 function authorityFraction(serp: SerpResult[], topK: number, authority: Set<string>): number {
   const top = serp.slice(0, topK);
@@ -64,10 +50,7 @@ export async function validateSerp(
   const accepted: WorkingCandidate[] = [];
   const rejected: WorkingCandidate[] = [];
 
-  // Phase 1: fetch every SERP concurrently (order-preserving). Phase 2 keeps the
-  // accept/dedup/LLM decision sequential — a candidate only joins acceptedSerps
-  // after passing the LLM judgment, so the duplicate check depends on the order
-  // of prior acceptances and must stay serial.
+  // Phase 1: fetch every SERP concurrently (order-preserving).
   const serps = await mapWithConcurrency(candidates, SERP_FETCH_CONCURRENCY, (c) =>
     deps.dataForSeo.serpGoogleOrganic({
       keyword: c.keyword,
@@ -77,11 +60,33 @@ export async function validateSerp(
     }),
   );
 
+  // Phase 2: the authority check is pure, so it can gate the LLM calls up front.
+  const authorityRejected = serps.map(
+    (serp) => authorityFraction(serp, config.serpTopK, authority) >= config.authorityThreshold,
+  );
+
+  // Phase 3: judge intent/locality concurrently. Independent per keyword — the
+  // duplicate-overlap check is the only order-dependent step, and it is applied
+  // in phase 4. A candidate phase 4 later rejects as serp_duplicate has its
+  // judgment discarded; that reason has never fired, so nothing is wasted in
+  // practice and the decision order stays identical to the serial version.
+  const judgments = await mapWithConcurrency(candidates, SERP_JUDGE_CONCURRENCY, async (c, i) => {
+    if (authorityRejected[i]) return null;
+    const res = await deps.llm.complete({
+      messages: buildSerpJudgmentPrompt(c.keyword, serps[i] as SerpResult[], deps.presets),
+      temperature: 0,
+      responseFormat: 'json',
+    });
+    return parseSerpJudgment(res.text);
+  });
+
+  // Phase 4: accept in input order — acceptedSerps grows as we go, so the
+  // duplicate check sees exactly the prior acceptances the serial loop saw.
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i] as WorkingCandidate;
     const serp = serps[i] as SerpResult[];
 
-    if (authorityFraction(serp, config.serpTopK, authority) >= config.authorityThreshold) {
+    if (authorityRejected[i]) {
       rejected.push(reject(c, 'serp_authority'));
       continue;
     }
@@ -92,12 +97,7 @@ export async function validateSerp(
       continue;
     }
 
-    const res = await deps.llm.complete({
-      messages: buildSerpJudgmentPrompt(c.keyword, serp, deps.presets),
-      temperature: 0,
-      responseFormat: 'json',
-    });
-    const judgment = parseSerpJudgment(res.text);
+    const judgment = judgments[i] as ReturnType<typeof parseSerpJudgment>;
     if (!judgment.intentSuitable) {
       rejected.push(reject(c, 'serp_intent'));
       continue;

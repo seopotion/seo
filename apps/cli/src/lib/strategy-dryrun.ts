@@ -16,6 +16,13 @@ import type { DryRunCandidateRow, DryRunPlanRow, StrategyDryRunData } from '../t
 /** Mirrors PLAN_DAYS in apps/worker/src/strategy.ts. */
 export const PLAN_DAYS = 30;
 
+/**
+ * What the strategy Lambda actually gets: its 15-minute timeout less the
+ * DEADLINE_BUFFER_MS it reserves to mark the org failed (apps/worker/src/strategy.ts).
+ * A dry run slower than this would be killed in production.
+ */
+export const LAMBDA_BUDGET_MS = 15 * 60_000 - 20_000;
+
 function toRow(c: EnrichedCandidate): DryRunCandidateRow {
   return {
     keyword: c.keyword,
@@ -115,6 +122,28 @@ export function relevanceDistribution(
   });
 }
 
+/**
+ * Gathered-vs-surviving per source. The pipeline output holds every candidate
+ * that survived dedupe (rejects included), so counting it by source gives the
+ * post-dedupe half without threading another counter through the pipeline.
+ */
+export function sourceFunnel(
+  candidates: EnrichedCandidate[],
+  gatheredBySource: PipelineStats['gatheredBySource'],
+): StrategyDryRunData['sources'] {
+  const surviving = new Map<string, number>();
+  for (const c of candidates) surviving.set(c.source, (surviving.get(c.source) ?? 0) + 1);
+  const names = new Set([...Object.keys(gatheredBySource), ...surviving.keys()]);
+  return [...names]
+    .map((source) => ({
+      source,
+      gathered: gatheredBySource[source as keyof typeof gatheredBySource] ?? 0,
+      after_dedupe: surviving.get(source) ?? 0,
+    }))
+    .filter((r) => r.gathered > 0 || r.after_dedupe > 0)
+    .sort((a, b) => b.gathered - a.gathered || a.source.localeCompare(b.source));
+}
+
 export function buildDryRunReport(input: {
   org: Org;
   candidates: EnrichedCandidate[];
@@ -122,6 +151,7 @@ export function buildDryRunReport(input: {
   config: ResolvedConfig;
   mode: 'live' | 'replay';
   startDate: Date;
+  timing: StrategyDryRunData['timing'];
   snapshot: StrategyDryRunData['snapshot'];
 }): StrategyDryRunData {
   const { org, candidates, stats, config, mode, snapshot } = input;
@@ -173,6 +203,8 @@ export function buildDryRunReport(input: {
     },
     config,
     stats,
+    timing: input.timing,
+    sources: sourceFunnel(candidates, stats.gatheredBySource),
     relevance: {
       sent,
       returned,
@@ -271,6 +303,13 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
       .map(([k, v]) => `${k} ${v}`)
       .join('  ')}`,
   );
+  out.push(
+    `  gather   minSearchVolume ${d.config.minSearchVolume}   limits ${Object.entries(
+      d.config.endpointLimits,
+    )
+      .map(([k, v]) => `${k} ${v}`)
+      .join('  ')}`,
+  );
   out.push(`  geo      ${d.config.locationName ?? '—'} / ${d.config.languageName ?? '—'}`);
   if (d.snapshot.replayed) out.push(`  snapshot replayed from ${d.snapshot.replayed}`);
   if (d.snapshot.wrote) out.push(`  snapshot written to ${d.snapshot.wrote}`);
@@ -296,6 +335,32 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
       .filter(([, v]) => v > 0)
       .map(([k, v]) => `${k} ${v}`)
       .join('  ')}`,
+  );
+  out.push('');
+
+  const t = d.timing;
+  const secs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+  out.push(
+    `TIMING  ${secs(t.total_ms)} of the strategy Lambda's ${secs(t.budget_ms)} budget (${pct(
+      t.total_ms / t.budget_ms,
+    )})${t.total_ms > t.budget_ms ? ' — OVER BUDGET, the worker would abort' : ''}`,
+  );
+  if (d.mode === 'replay') out.push('  (replay: no network, so these are not real latencies)');
+  out.push(`  ${t.stages.map((s) => `${s.stage} ${secs(s.ms)}`).join('   ')}`);
+  out.push('');
+
+  out.push('SOURCES  (dropped = collapsed into an earlier source by dedupe)');
+  out.push(
+    ...table(
+      ['source', 'gathered', 'after_dedupe', 'dropped'],
+      d.sources.map((r) => [
+        r.source,
+        String(r.gathered),
+        String(r.after_dedupe),
+        String(r.gathered - r.after_dedupe),
+      ]),
+      new Set([1, 2, 3]),
+    ).map((l) => `  ${l}`),
   );
   out.push('');
 

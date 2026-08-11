@@ -24,6 +24,18 @@ function tryParse(text: string): unknown {
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
 // ---- seeds ----
+/**
+ * Seeds are expanded by `keyword_suggestions`, which returns long-tail phrases
+ * CONTAINING the seed verbatim — so the seed's vocabulary decides the whole
+ * pool, and its LENGTH decides whether there is a pool at all. Two forces pull
+ * against each other, both measured on clewas (#211):
+ *  - too generic ("water treatment", the pre-#211 wording's output) expands into
+ *    the consumer market sitting next to a niche B2B;
+ *  - too long ("SWRO energy recovery", "high RO energy consumption") matches
+ *    nothing — those seeds returned 0 suggestions each, while the two-word
+ *    "antiscalant dosing" and "membrane fouling" returned 20 and 60.
+ * Hence: industry vocabulary, but the SHORT head of it.
+ */
 export function buildSeedPrompt(presets: SetupPresets, competitorWins: string[]): LlmMessage[] {
   const wins =
     competitorWins.length > 0
@@ -33,8 +45,21 @@ export function buildSeedPrompt(presets: SetupPresets, competitorWins: string[])
     {
       role: 'system',
       content:
-        'You generate SEO seed keywords. Respond ONLY with JSON: {"seeds": string[]}. ' +
-        'Return 10-20 short, generic topic seeds relevant to the business. No brand names.',
+        'You generate SEO seed keywords for a content strategy. Respond ONLY with JSON: ' +
+        '{"seeds": string[]}. Return 15-20 seeds written in the technical vocabulary a ' +
+        'qualified buyer or practitioner in this field would actually type — the words used ' +
+        'inside the industry, not the words an outsider would use to describe it. Draw them ' +
+        'from: the processes, equipment, materials and methods the business deals with; the ' +
+        'operational problems, symptoms and failure modes its customers hit; and the ' +
+        'measurements, standards or specifications they work to. Aim for roughly half core ' +
+        'domain/process terms and half problem or symptom terms. ' +
+        'Each seed MUST be a noun phrase of exactly 2 or 3 words that appears verbatim ' +
+        'inside real search queries — a named thing, process or fault, not a description ' +
+        'of one. Longer compound phrases match nothing and are wasted. ' +
+        'Each seed must also stand alone unambiguously: single words and terms that would ' +
+        'mean something else in another industry pull in unrelated markets, so include the ' +
+        'word that anchors the term to this field. Never return a broad category or ' +
+        'umbrella term. No brand names.',
     },
     { role: 'user', content: `${businessContext(presets)}${wins}` },
   ];

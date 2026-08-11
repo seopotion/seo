@@ -235,6 +235,29 @@ describe('rankedKeywords', () => {
     expect(fetchMock.mock.calls[0]![0]).toContain('/dataforseo_labs/google/ranked_keywords/live');
   });
 
+  test('unwraps the keyword_data nesting this endpoint alone uses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      labsResponse([
+        {
+          keyword_data: {
+            keyword: 'membrane fouling',
+            keyword_info: { search_volume: 70, cpc: 3 },
+            keyword_properties: { keyword_difficulty: 12 },
+          },
+          ranked_serp_element: { serp_item: { rank_group: 4 } },
+        },
+      ]),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await client().rankedKeywords({ target: 'x.com' });
+    expect(out[0]).toMatchObject({
+      keyword: 'membrane fouling',
+      search_volume: 70,
+      difficulty: 12,
+      cpc: 3,
+    });
+  });
+
   test('normalizes a full URL target to a bare domain', async () => {
     const fetchMock = vi.fn().mockResolvedValue(labsResponse([]));
     vi.stubGlobal('fetch', fetchMock);
@@ -242,6 +265,72 @@ describe('rankedKeywords', () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual([
       { target: 'competitor.io' },
     ]);
+  });
+});
+
+describe('keywordSuggestions', () => {
+  test('sends a single seed keyword to the keyword_suggestions endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      labsResponse([
+        {
+          keyword: 'antiscalant dosing rate',
+          keyword_info: {
+            search_volume: 40,
+            cpc: 1.5,
+            competition: 0.2,
+            search_volume_trend: { yearly: -3 },
+          },
+          keyword_properties: { keyword_difficulty: 8 },
+          search_intent_info: { main_intent: 'informational' },
+        },
+      ]),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const out = await client().keywordSuggestions({ keyword: 'antiscalant dosing' });
+    expect(out[0]).toEqual({
+      keyword: 'antiscalant dosing rate',
+      search_volume: 40,
+      difficulty: 8,
+      cpc: 1.5,
+      competition: 0.2,
+      trend: -3,
+      intent: 'informational',
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toContain('/dataforseo_labs/google/keyword_suggestions/live');
+    expect(JSON.parse(init.body as string)).toEqual([{ keyword: 'antiscalant dosing' }]);
+  });
+});
+
+describe('Labs result shaping', () => {
+  test('threads limit, order_by and filters into the task payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(labsResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().keywordsForSite({
+      target: 'acme.io',
+      locationName: 'United States',
+      languageName: 'English',
+      limit: 500,
+      orderBy: ['keyword_info.search_volume,desc'],
+      filters: [['keyword_info.search_volume', '>=', 10]],
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual([
+      {
+        target: 'acme.io',
+        location_name: 'United States',
+        language_name: 'English',
+        limit: 500,
+        order_by: ['keyword_info.search_volume,desc'],
+        filters: [['keyword_info.search_volume', '>=', 10]],
+      },
+    ]);
+  });
+
+  test('omits order_by and filters when they are absent or empty', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(labsResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().keywordSuggestions({ keyword: 'seed', orderBy: [], filters: [] });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual([{ keyword: 'seed' }]);
   });
 });
 

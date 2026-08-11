@@ -41,6 +41,24 @@ describe('buildSeedPrompt', () => {
     const [, user] = buildSeedPrompt(presets, []);
     expect(user!.content).not.toContain('competitors');
   });
+
+  // The rewrite (#211) only changes the instruction text; the JSON contract has
+  // to stay exactly what parseSeeds reads, or gather silently produces no seeds.
+  it('keeps the {"seeds": string[]} contract parseSeeds expects', () => {
+    const [system] = buildSeedPrompt(presets, []);
+    expect(system!.content).toContain('{"seeds": string[]}');
+    expect(parseSeeds('{"seeds":["membrane fouling","antiscalant dosing"]}')).toEqual([
+      'membrane fouling',
+      'antiscalant dosing',
+    ]);
+  });
+
+  it('asks for buyer vocabulary rather than generic category seeds', () => {
+    const [system] = buildSeedPrompt(presets, []);
+    expect(system!.content).toMatch(/technical vocabulary/i);
+    expect(system!.content).toMatch(/failure modes|problem/i);
+    expect(system!.content).not.toMatch(/generic/i);
+  });
 });
 
 describe('parseSeeds', () => {

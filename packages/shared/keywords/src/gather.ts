@@ -1,11 +1,17 @@
 import type { DataForSeoClient, LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
+import { mapWithConcurrency } from './concurrency';
 import { buildSeedPrompt, parseSeeds } from './llm-prompts';
 import { toWorking } from './normalize';
 import type { ResolvedConfig, WorkingCandidate } from './types';
 
 // Top competitor-ranked keywords fed to the seed prompt as extra context.
 const SEED_COMPETITOR_WINS = 30;
+// keyword_suggestions expands one seed per call, so the seed count multiplies
+// both the request count and the pool. Capped so the single-call relevance
+// stage keeps scoring the whole pool in one response.
+const SUGGESTION_SEEDS = 15;
+const SUGGESTION_CONCURRENCY = 4;
 
 interface GatherInput {
   websiteUrl: string;
@@ -22,9 +28,23 @@ export async function gatherCandidates(
   const geo = { locationName: config.locationName, languageName: config.languageName };
   const out: WorkingCandidate[] = [];
 
+  // Shape the slice server-side. Without these, `limit` returns an arbitrary N
+  // out of everything the endpoint knows; `ranked_keywords` nests the same
+  // fields one level deeper (#211).
+  const volumeFilter = (path: string) => [[path, '>=', config.minSearchVolume]];
+  const byVolume = (path: string) => [`${path},desc`];
+  const LABS = 'keyword_info.search_volume';
+  const RANKED = 'keyword_data.keyword_info.search_volume';
+
   const site = await dataForSeo.keywordsForSite({
     target: input.websiteUrl,
     limit: config.endpointLimits.keywordsForSite,
+    // Deliberately the endpoint's own `relevance` order, not volume: this is a
+    // loose site<->keyword association, and its high-volume head is generic
+    // noise ("oil prices today" for a desalination SaaS). Measured — ordering it
+    // by volume made the pool 96% relevance-zero (#211).
+    orderBy: ['relevance,desc'],
+    filters: volumeFilter(LABS),
     ...geo,
   });
   for (const m of site) out.push(toWorking(m, 'keywords_for_site', input.websiteUrl));
@@ -34,6 +54,8 @@ export async function gatherCandidates(
     const ranked = await dataForSeo.rankedKeywords({
       target: competitor,
       limit: config.endpointLimits.rankedKeywords,
+      orderBy: byVolume(RANKED),
+      filters: volumeFilter(RANKED),
       ...geo,
     });
     for (const m of ranked) {
@@ -51,14 +73,18 @@ export async function gatherCandidates(
     temperature: 0,
     responseFormat: 'json',
   });
-  const seeds = parseSeeds(seedRes.text);
-  if (seeds.length > 0) {
-    const ideas = await dataForSeo.keywordIdeas({
-      keywords: seeds,
-      limit: config.endpointLimits.keywordIdeas,
+  const seeds = parseSeeds(seedRes.text).slice(0, SUGGESTION_SEEDS);
+  const suggestionSets = await mapWithConcurrency(seeds, SUGGESTION_CONCURRENCY, (seed) =>
+    dataForSeo.keywordSuggestions({
+      keyword: seed,
+      limit: config.endpointLimits.keywordSuggestions,
+      orderBy: byVolume(LABS),
+      filters: volumeFilter(LABS),
       ...geo,
-    });
-    for (const m of ideas) out.push(toWorking(m, 'keyword_ideas', seeds.join(', ')));
+    }),
+  );
+  for (const [i, suggestions] of suggestionSets.entries()) {
+    for (const m of suggestions) out.push(toWorking(m, 'keyword_suggestions', seeds[i] as string));
   }
 
   return out;

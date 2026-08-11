@@ -1,4 +1,9 @@
-import { normalizeKeyword, type RejectionReason } from '@shared/schemas';
+import {
+  CANDIDATE_SOURCES,
+  type CandidateSource,
+  normalizeKeyword,
+  type RejectionReason,
+} from '@shared/schemas';
 import { classifyCandidates } from './classify';
 import { clusterCandidates } from './cluster';
 import { resolveConfig } from './config';
@@ -19,6 +24,11 @@ const EMPTY_REASON_COUNTS: Record<RejectionReason, number> = {
   serp_locality: 0,
   serp_duplicate: 0,
 };
+
+const EMPTY_SOURCE_COUNTS = Object.fromEntries(CANDIDATE_SOURCES.map((s) => [s, 0])) as Record<
+  CandidateSource,
+  number
+>;
 
 function toEnriched(c: WorkingCandidate, orgId: string): EnrichedCandidate {
   return {
@@ -66,6 +76,8 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     config,
   );
   const gathered = raw.length;
+  const gatheredBySource = { ...EMPTY_SOURCE_COUNTS };
+  for (const c of raw) gatheredBySource[c.source]++;
   const deduped = dedupe(raw);
 
   // 3 brand/nav
@@ -137,6 +149,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     candidates: all.map((c) => toEnriched(c, input.orgId)),
     stats: {
       gathered,
+      gatheredBySource,
       afterDedupe: deduped.length,
       afterBrandNav: brand.survivors.length,
       clustered: clustered.rejected.length,

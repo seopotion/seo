@@ -223,6 +223,20 @@ export interface StrategyDryRunData {
   };
   config: ResolvedConfig;
   stats: PipelineStats;
+  /**
+   * Wall clock per stage, from each `onProgress` mark to the next (so the first
+   * entry covers gather through cluster). The strategy Lambda aborts at
+   * `budget_ms`, so `total_ms` against it is the answer to "does serpTopN still
+   * fit" (#211).
+   */
+  timing: { total_ms: number; budget_ms: number; stages: { stage: string; ms: number }[] };
+  /**
+   * Per-source funnel. `after_dedupe` counts the source's survivors in the
+   * pipeline output, so `gathered - after_dedupe` is what dedupe dropped from
+   * that source — near-zero overlap between sources is the tell that they are
+   * describing different businesses (#211).
+   */
+  sources: { source: string; gathered: number; after_dedupe: number }[];
   /** The known failure: relevance the LLM never scored keeps parseRelevance's 0 seed. */
   relevance: {
     sent: number;

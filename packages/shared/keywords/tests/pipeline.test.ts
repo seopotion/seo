@@ -51,7 +51,7 @@ function fakeDataForSeo(): DataForSeoClient {
   return {
     keywordsForSite: async () => [metric('cheap dog food')],
     rankedKeywords: async () => [metric('dog food delivery')],
-    keywordIdeas: async () => [
+    keywordSuggestions: async () => [
       metric('acme login', { difficulty: 5 }),
       metric('premium dog food', { difficulty: 90 }),
     ],

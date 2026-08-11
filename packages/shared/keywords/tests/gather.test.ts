@@ -35,7 +35,7 @@ it('fans out across site/competitors/ideas and tags provenance', async () => {
   const dataForSeo = {
     keywordsForSite: vi.fn().mockResolvedValue([metric('site kw')]),
     rankedKeywords: vi.fn().mockResolvedValue([metric('comp kw')]),
-    keywordIdeas: vi.fn().mockResolvedValue([metric('idea kw')]),
+    keywordSuggestions: vi.fn().mockResolvedValue([metric('suggested kw')]),
   } as unknown as DataForSeoClient;
   const llm = {
     complete: vi.fn().mockResolvedValue({
@@ -56,14 +56,90 @@ it('fans out across site/competitors/ideas and tags provenance', async () => {
   );
 
   expect(out.map((c) => c.source).sort()).toEqual([
-    'keyword_ideas',
+    'keyword_suggestions',
     'keywords_for_site',
     'ranked_keywords',
   ]);
   expect(out.find((c) => c.source === 'ranked_keywords')!.source_context).toBe('comp.com');
-  expect(dataForSeo.keywordIdeas).toHaveBeenCalledWith(
-    expect.objectContaining({ keywords: ['dog food'] }),
+  // keyword_suggestions takes ONE seed per call, so gather fans out per seed and
+  // tags each candidate with the seed that produced it.
+  expect(dataForSeo.keywordSuggestions).toHaveBeenCalledWith(
+    expect.objectContaining({ keyword: 'dog food' }),
   );
+  expect(out.find((c) => c.source === 'keyword_suggestions')!.source_context).toBe('dog food');
+});
+
+it('pushes the volume filter and ordering down to every gather endpoint', async () => {
+  const dataForSeo = {
+    keywordsForSite: vi.fn().mockResolvedValue([]),
+    rankedKeywords: vi.fn().mockResolvedValue([]),
+    keywordSuggestions: vi.fn().mockResolvedValue([]),
+  } as unknown as DataForSeoClient;
+  const llm = {
+    complete: vi.fn().mockResolvedValue({
+      text: '{"seeds":["dog food"]}',
+      model: 'm',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+    }),
+  } as unknown as LlmClient;
+
+  await gatherCandidates(
+    {
+      websiteUrl: 'https://acme.io',
+      competitors: ['comp.com'],
+      presets,
+      clients: { dataForSeo, llm },
+    },
+    { ...config, minSearchVolume: 25 },
+  );
+
+  const labs = {
+    filters: [['keyword_info.search_volume', '>=', 25]],
+    orderBy: ['keyword_info.search_volume,desc'],
+  };
+  // keywords_for_site keeps the endpoint's own relevance order — volume order
+  // makes its head generic noise (#211).
+  expect(dataForSeo.keywordsForSite).toHaveBeenCalledWith(
+    expect.objectContaining({
+      filters: labs.filters,
+      orderBy: ['relevance,desc'],
+      limit: config.endpointLimits.keywordsForSite,
+    }),
+  );
+  expect(dataForSeo.keywordSuggestions).toHaveBeenCalledWith(
+    expect.objectContaining({ ...labs, limit: config.endpointLimits.keywordSuggestions }),
+  );
+  // ranked_keywords nests the same metrics under `keyword_data`.
+  expect(dataForSeo.rankedKeywords).toHaveBeenCalledWith(
+    expect.objectContaining({
+      filters: [['keyword_data.keyword_info.search_volume', '>=', 25]],
+      orderBy: ['keyword_data.keyword_info.search_volume,desc'],
+      limit: config.endpointLimits.rankedKeywords,
+    }),
+  );
+});
+
+it('caps how many seeds fan out to keyword_suggestions', async () => {
+  const dataForSeo = {
+    keywordsForSite: vi.fn().mockResolvedValue([]),
+    rankedKeywords: vi.fn().mockResolvedValue([]),
+    keywordSuggestions: vi.fn().mockResolvedValue([]),
+  } as unknown as DataForSeoClient;
+  const seeds = Array.from({ length: 30 }, (_, i) => `seed ${i}`);
+  const llm = {
+    complete: vi.fn().mockResolvedValue({
+      text: JSON.stringify({ seeds }),
+      model: 'm',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+    }),
+  } as unknown as LlmClient;
+
+  await gatherCandidates(
+    { websiteUrl: 'https://acme.io', competitors: [], presets, clients: { dataForSeo, llm } },
+    config,
+  );
+
+  expect((dataForSeo.keywordSuggestions as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(15);
 });
 
 it('feeds competitor wins into the seed prompt, highest volume first', async () => {
@@ -80,7 +156,7 @@ it('feeds competitor wins into the seed prompt, highest volume first', async () 
         win('top volume kw', 900),
         win('no volume kw', null),
       ]),
-    keywordIdeas: vi.fn().mockResolvedValue([]),
+    keywordSuggestions: vi.fn().mockResolvedValue([]),
   } as unknown as DataForSeoClient;
   const llm = {
     complete: vi.fn().mockResolvedValue({
@@ -116,7 +192,7 @@ it('caps competitor wins passed to the seed prompt', async () => {
   const dataForSeo = {
     keywordsForSite: vi.fn().mockResolvedValue([]),
     rankedKeywords: vi.fn().mockResolvedValue(many),
-    keywordIdeas: vi.fn().mockResolvedValue([]),
+    keywordSuggestions: vi.fn().mockResolvedValue([]),
   } as unknown as DataForSeoClient;
   const llm = {
     complete: vi.fn().mockResolvedValue({
@@ -142,11 +218,11 @@ it('caps competitor wins passed to the seed prompt', async () => {
   expect(user.content).not.toContain('competitor kw 35');
 });
 
-it('skips keywordIdeas when no seeds are produced', async () => {
+it('skips keywordSuggestions when no seeds are produced', async () => {
   const dataForSeo = {
     keywordsForSite: vi.fn().mockResolvedValue([]),
     rankedKeywords: vi.fn().mockResolvedValue([]),
-    keywordIdeas: vi.fn(),
+    keywordSuggestions: vi.fn(),
   } as unknown as DataForSeoClient;
   const llm = {
     complete: vi.fn().mockResolvedValue({
@@ -160,5 +236,5 @@ it('skips keywordIdeas when no seeds are produced', async () => {
     { websiteUrl: 'https://acme.io', competitors: [], presets, clients: { dataForSeo, llm } },
     config,
   );
-  expect(dataForSeo.keywordIdeas).not.toHaveBeenCalled();
+  expect(dataForSeo.keywordSuggestions).not.toHaveBeenCalled();
 });

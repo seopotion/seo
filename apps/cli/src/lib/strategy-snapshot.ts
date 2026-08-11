@@ -22,6 +22,7 @@ const DFS_METHODS = [
   'keywordsForSite',
   'rankedKeywords',
   'keywordIdeas',
+  'keywordSuggestions',
   'bulkKeywordDifficulty',
   'serpGoogleOrganic',
   'backlinksSummary',

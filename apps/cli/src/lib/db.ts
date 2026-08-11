@@ -36,7 +36,7 @@ import {
   type StrategyDryRunData,
 } from '../types';
 import { buildStrategyAudit } from './strategy-audit';
-import { buildDryRunReport } from './strategy-dryrun';
+import { buildDryRunReport, LAMBDA_BUDGET_MS } from './strategy-dryrun';
 import {
   configDrift,
   createRecordingClients,
@@ -325,9 +325,15 @@ export async function strategyDryRun(input: {
       });
     };
 
+    // Stage marks are taken at each stage's entry, so a mark's duration runs to
+    // the next mark (or to the end for the last one).
+    const marks: { stage: string; at: number }[] = [];
+    const startedAt = Date.now();
+
     let result: Awaited<ReturnType<typeof runKeywordPipeline>>;
     try {
       result = await runKeywordPipeline({
+        onProgress: (stage) => marks.push({ stage, at: Date.now() }),
         orgId: org.id,
         websiteUrl: org.website_url,
         presets: org.presets,
@@ -371,6 +377,14 @@ export async function strategyDryRun(input: {
         config,
         mode: input.replayPath ? 'replay' : 'live',
         startDate: new Date(),
+        timing: {
+          total_ms: Date.now() - startedAt,
+          budget_ms: LAMBDA_BUDGET_MS,
+          stages: marks.map((m, i) => ({
+            stage: m.stage,
+            ms: (marks[i + 1]?.at ?? Date.now()) - m.at,
+          })),
+        },
         snapshot: {
           wrote: input.snapshotPath ?? null,
           replayed: input.replayPath ?? null,

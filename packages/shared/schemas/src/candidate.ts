@@ -4,7 +4,9 @@ import { z } from 'zod';
 export const CANDIDATE_SOURCES = [
   'keywords_for_site',
   'ranked_keywords',
+  // Retired in #211 in favour of keyword_suggestions; kept so historical rows parse.
   'keyword_ideas',
+  'keyword_suggestions',
   'serp',
   'manual',
   'seed',

@@ -77,12 +77,15 @@ export interface PipelineConfig {
   authorityThreshold: number;
   duplicateSerpOverlap: number;
   weights: ScoreWeights;
+  /** Server-side `keyword_info.search_volume >=` filter on every gather call. */
+  minSearchVolume: number;
   locationName?: string;
   languageName?: string;
   endpointLimits: {
     keywordsForSite: number;
     rankedKeywords: number;
-    keywordIdeas: number;
+    /** Per seed — gather.ts fans out one call per seed keyword. */
+    keywordSuggestions: number;
   };
 }
 
@@ -122,6 +125,8 @@ export interface RelevanceCoverage {
 
 export interface PipelineStats {
   gathered: number;
+  /** Pre-dedupe contribution of each gather source; `gathered` is their sum. */
+  gatheredBySource: Record<CandidateSource, number>;
   afterDedupe: number;
   afterBrandNav: number;
   clustered: number;
