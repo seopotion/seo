@@ -88,6 +88,36 @@ vi.mock('@shared/db', () => {
       ],
       video: null,
     },
+    {
+      id: 'art_mid',
+      org_id: 'org_1',
+      keyword_id: 'kw_mid',
+      title: 'Mid Post',
+      meta_title: 'Mid Post',
+      slug: 'mid-post',
+      keyword: 'mid post',
+      meta_description: 'm',
+      featured_image_url: 'https://x/mid.png',
+      content: '# c',
+      difficulty: 25,
+      search_volume: 75,
+      status: 'published',
+      images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      // 10 days before the fixed "now" used by the /summary and /articles tests.
+      published_at: new Date('2026-08-01T12:00:00Z'),
+      publications: [
+        {
+          provider: 'static-site',
+          ref: 'sha3',
+          slug: 'mid-post',
+          published_at: new Date('2026-08-01T12:00:00Z'),
+          updated_at: null,
+        },
+      ],
+      video: null,
+    },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
     [
@@ -343,6 +373,195 @@ describe('GET /dashboard/analytics/summary', () => {
 
     expect(res.status).toBe(200);
     if (res.status === 200) expect((await res.json()).gated).toBe(true);
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /dashboard/analytics/articles', () => {
+  test('gated shape when GSC is not connected', async () => {
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    expect(await res.json()).toEqual({ gated: true, articles: [] });
+    expect(querySearchAnalytics).not.toHaveBeenCalled();
+  });
+
+  test('two page-dimension calls (current + prior windows) with rowLimit 25000', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1', range: '30d' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    expect(querySearchAnalytics).toHaveBeenCalledTimes(2);
+    expect(querySearchAnalytics).toHaveBeenNthCalledWith(
+      1,
+      'fake-refresh-token',
+      'https://site.com',
+      {
+        startDate: '2026-07-10',
+        endDate: '2026-08-08',
+        dimensions: ['page'],
+        rowLimit: 25000,
+      },
+    );
+    expect(querySearchAnalytics).toHaveBeenNthCalledWith(
+      2,
+      'fake-refresh-token',
+      'https://site.com',
+      {
+        startDate: '2026-06-10',
+        endDate: '2026-07-09',
+        dimensions: ['page'],
+        rowLimit: 25000,
+      },
+    );
+  });
+
+  test('every published article appears; matched rows aggregate, unmatched get zeros', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics
+      .mockResolvedValueOnce([
+        {
+          keys: ['https://site.com/blog/landing-pages'],
+          clicks: 110,
+          impressions: 1000,
+          ctr: 0.11,
+          position: 4,
+        },
+        {
+          keys: ['http://www.site.com/landing-pages/'],
+          clicks: 10,
+          impressions: 100,
+          ctr: 0.1,
+          position: 6,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          keys: ['https://site.com/blog/landing-pages'],
+          clicks: 100,
+          impressions: 900,
+          ctr: 0.111,
+          position: 5,
+        },
+      ]);
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1', range: '30d' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    const body = await res.json();
+    expect(body.gated).toBe(false);
+    expect(body.articles).toHaveLength(3);
+
+    const pub = body.articles.find((a) => a.article_id === 'art_pub');
+    expect(pub?.clicks).toBe(120);
+    expect(pub?.impressions).toBe(1100);
+    expect(pub?.ctr).toBeCloseTo(120 / 1100, 6);
+    expect(pub?.position).toBeCloseTo(4600 / 1100, 6);
+    expect(pub?.days_live).toBe(71);
+    expect(pub?.trend).toBe('up');
+    expect(pub?.data_state).toBe('ok');
+
+    const fresh = body.articles.find((a) => a.article_id === 'art_new');
+    expect(fresh).toEqual({
+      article_id: 'art_new',
+      title: 'Fresh Post',
+      published_at: '2026-08-09T12:00:00.000Z',
+      days_live: 2,
+      clicks: 0,
+      impressions: 0,
+      ctr: 0,
+      position: 0,
+      trend: null,
+      data_state: 'awaiting',
+    });
+  });
+
+  test('no row but ≥ 4 days live → ok with zero metrics; matched but < 14 days → gathering with null trend', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics
+      .mockResolvedValueOnce([
+        {
+          keys: ['https://site.com/blog/mid-post'],
+          clicks: 5,
+          impressions: 50,
+          ctr: 0.1,
+          position: 8,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1', range: '30d' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    const body = await res.json();
+
+    const mid = body.articles.find((a) => a.article_id === 'art_mid');
+    expect(mid?.days_live).toBe(10);
+    expect(mid?.clicks).toBe(5);
+    expect(mid?.trend).toBeNull();
+    expect(mid?.data_state).toBe('gathering');
+
+    const pub = body.articles.find((a) => a.article_id === 'art_pub');
+    expect(pub).toEqual({
+      article_id: 'art_pub',
+      title: 'Landing Pages',
+      published_at: '2026-06-01T00:00:00.000Z',
+      days_live: 71,
+      clicks: 0,
+      impressions: 0,
+      ctr: 0,
+      position: 0,
+      trend: null,
+      data_state: 'ok',
+    });
+  });
+
+  test('revoked access marks the connection failed and degrades to gated', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockRejectedValueOnce(new GscAuthRevokedError('revoked'));
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect(await res.json()).toEqual({ gated: true, articles: [] });
+    expect(markRefreshFailed).toHaveBeenCalledWith('org_1');
+  });
+
+  test('transient GSC errors degrade to gated without marking the connection', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockRejectedValueOnce(new Error('boom'));
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles.$get(
+      { query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect(await res.json()).toEqual({ gated: true, articles: [] });
     expect(markRefreshFailed).not.toHaveBeenCalled();
   });
 });

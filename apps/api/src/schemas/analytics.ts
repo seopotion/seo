@@ -63,3 +63,30 @@ export const AnalyticsSummaryResponse = z
     series: z.array(AnalyticsSeriesPoint),
   })
   .openapi('AnalyticsSummaryResponse');
+
+export const ArticleAnalyticsRow = z
+  .object({
+    article_id: z.string(),
+    title: z.string(),
+    published_at: z.string().nullable(),
+    days_live: z.number().int(),
+    clicks: z.number(),
+    impressions: z.number(),
+    ctr: z.number(),
+    position: z.number(),
+    // Null when < 14 days live or prior-period clicks are 0 (#208).
+    trend: z.enum(['up', 'down', 'flat']).nullable(),
+    // awaiting: no GSC row yet and published < 4 days (GSC lags 2–3 days);
+    // gathering: has data but < 14 days live; ok otherwise (zeros count as ok).
+    data_state: z.enum(['ok', 'awaiting', 'gathering']),
+  })
+  .openapi('ArticleAnalyticsRow');
+
+export const AnalyticsArticlesResponse = z
+  .object({
+    gated: z.boolean(),
+    // Every published article appears; unmatched ones carry zero metrics.
+    // Sorting/filtering/pagination are client-side in V1.
+    articles: z.array(ArticleAnalyticsRow),
+  })
+  .openapi('AnalyticsArticlesResponse');
