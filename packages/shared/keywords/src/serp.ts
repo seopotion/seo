@@ -1,26 +1,36 @@
 import type { DataForSeoClient, LlmClient, SerpResult } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
-import { mapWithConcurrency } from './concurrency';
+import { chunk, mapWithConcurrency } from './concurrency';
 import { reject } from './filters';
-import { buildSerpJudgmentPrompt, parseSerpJudgment } from './llm-prompts';
-import type { ResolvedConfig, WorkingCandidate } from './types';
+import {
+  buildSerpJudgmentPrompt,
+  FAIL_OPEN_JUDGMENT,
+  parseSerpJudgments,
+  type SerpJudgment,
+} from './llm-prompts';
+import type { JudgmentCoverage, ResolvedConfig, WorkingCandidate } from './types';
 
 interface SerpDeps {
   dataForSeo: DataForSeoClient;
   llm: LlmClient;
   presets: SetupPresets;
   config: ResolvedConfig;
+  /** Sub-stage marks, so a slow stage is attributable to fetch vs judge (#211). */
+  onProgress?: (stage: string, meta?: Record<string, unknown>) => void;
 }
 
 // The live SERP endpoint is the pipeline's slowest call (see DataForSEO client:
 // 15s timeout, up to 3 attempts). Fetching serpTopN of them one-by-one is what
 // pushed the strategy Lambda past its timeout, so fetch them with bounded
-// concurrency. Kept small to stay under the provider's rate limits.
-const SERP_FETCH_CONCURRENCY = 6;
-// The per-keyword intent judgment used to run serially behind the fetches,
-// which made the whole stage O(serpTopN) round-trips — the reason serpTopN
-// could not be raised past 40 (#211).
-const SERP_JUDGE_CONCURRENCY = 6;
+// concurrency.
+const SERP_FETCH_CONCURRENCY = 12;
+// A judge call costs ~30s whether it covers one keyword or ten — the round trip
+// dominates, not the tokens. At one call per keyword the judge alone was ~10m30s
+// of an 11m33s run, so keywords are batched and only the batches are
+// concurrent. 10 keeps the prompt near 4k tokens and bounds how much one
+// unparseable body can fail open (#211).
+export const SERP_JUDGE_BATCH_SIZE = 10;
+const SERP_JUDGE_CONCURRENCY = 8;
 
 function authorityFraction(serp: SerpResult[], topK: number, authority: Set<string>): number {
   const top = serp.slice(0, topK);
@@ -43,14 +53,20 @@ function overlap(a: Set<string>, b: Set<string>): number {
 export async function validateSerp(
   candidates: WorkingCandidate[],
   deps: SerpDeps,
-): Promise<{ accepted: WorkingCandidate[]; rejected: WorkingCandidate[] }> {
+): Promise<{
+  accepted: WorkingCandidate[];
+  rejected: WorkingCandidate[];
+  coverage: JudgmentCoverage;
+}> {
   const { config } = deps;
+  const progress = deps.onProgress ?? (() => {});
   const authority = new Set(config.authorityDomains.map((d) => d.replace(/^www\./, '')));
   const acceptedSerps: Set<string>[] = [];
   const accepted: WorkingCandidate[] = [];
   const rejected: WorkingCandidate[] = [];
 
   // Phase 1: fetch every SERP concurrently (order-preserving).
+  progress('serp_fetch', { candidates: candidates.length });
   const serps = await mapWithConcurrency(candidates, SERP_FETCH_CONCURRENCY, (c) =>
     deps.dataForSeo.serpGoogleOrganic({
       keyword: c.keyword,
@@ -65,20 +81,41 @@ export async function validateSerp(
     (serp) => authorityFraction(serp, config.serpTopK, authority) >= config.authorityThreshold,
   );
 
-  // Phase 3: judge intent/locality concurrently. Independent per keyword — the
-  // duplicate-overlap check is the only order-dependent step, and it is applied
-  // in phase 4. A candidate phase 4 later rejects as serp_duplicate has its
-  // judgment discarded; that reason has never fired, so nothing is wasted in
-  // practice and the decision order stays identical to the serial version.
-  const judgments = await mapWithConcurrency(candidates, SERP_JUDGE_CONCURRENCY, async (c, i) => {
-    if (authorityRejected[i]) return null;
+  // Phase 3: judge intent/locality in batches. Batching changes only how many
+  // keywords share a call — each is still judged on its own results, and the
+  // verdict is scattered back to the candidate's own index, so phase 4 sees the
+  // same per-candidate answers the one-call-per-keyword version produced.
+  const pending = candidates.flatMap((c, i) =>
+    authorityRejected[i] ? [] : [{ index: i, keyword: c.keyword, serp: serps[i] as SerpResult[] }],
+  );
+  const batches = chunk(pending, SERP_JUDGE_BATCH_SIZE);
+  progress('serp_judge', { candidates: pending.length, batches: batches.length });
+
+  const judgments = new Array<SerpJudgment>(candidates.length).fill(FAIL_OPEN_JUDGMENT);
+  const parsedBatches = await mapWithConcurrency(batches, SERP_JUDGE_CONCURRENCY, async (batch) => {
     const res = await deps.llm.complete({
-      messages: buildSerpJudgmentPrompt(c.keyword, serps[i] as SerpResult[], deps.presets),
+      messages: buildSerpJudgmentPrompt(batch, deps.presets),
       temperature: 0,
       responseFormat: 'json',
     });
-    return parseSerpJudgment(res.text);
+    return parseSerpJudgments(res.text, batch.length);
   });
+
+  for (const [batchIndex, batch] of batches.entries()) {
+    const result = parsedBatches[batchIndex] as ReturnType<typeof parseSerpJudgments>;
+    batch.forEach((item, i) => {
+      judgments[item.index] = result.judgments[i] as SerpJudgment;
+    });
+  }
+
+  const unparseable = parsedBatches.reduce((n, r) => n + r.unparseable, 0);
+  const coverage: JudgmentCoverage = {
+    sent: pending.length,
+    returned: pending.length - unparseable,
+    unparseable,
+    batches: batches.length,
+    failedBatches: parsedBatches.filter((r) => !r.parsed).length,
+  };
 
   // Phase 4: accept in input order — acceptedSerps grows as we go, so the
   // duplicate check sees exactly the prior acceptances the serial loop saw.
@@ -97,7 +134,7 @@ export async function validateSerp(
       continue;
     }
 
-    const judgment = judgments[i] as ReturnType<typeof parseSerpJudgment>;
+    const judgment = judgments[i] as SerpJudgment;
     if (!judgment.intentSuitable) {
       rejected.push(reject(c, 'serp_intent'));
       continue;
@@ -117,5 +154,5 @@ export async function validateSerp(
     });
   }
 
-  return { accepted, rejected };
+  return { accepted, rejected, coverage };
 }

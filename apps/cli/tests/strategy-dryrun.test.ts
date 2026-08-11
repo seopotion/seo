@@ -156,10 +156,23 @@ vi.mock('@shared/providers', async (importOriginal) => ({
       else if (sys.includes('Score each keyword'))
         text =
           '{"scores":[{"keyword":"cheap dog food","relevance":0.9},{"keyword":"dog food delivery","relevance":0.8}]}';
-      else if (sys.includes('could rank'))
-        text = '{"intentSuitable":true,"localitySuitable":true,"reason":null}';
-      else if (sys.includes('Classify each keyword'))
-        text = '{"types":[{"keyword":"cheap dog food","article_type":"listicle"}]}';
+      else if (sys.includes('could rank')) {
+        // Batched (#211): one entry per numbered keyword in the prompt.
+        const n = [...(messages.at(-1)?.content ?? '').matchAll(/^Keyword \d+: /gm)].length;
+        text = JSON.stringify({
+          judgments: Array.from({ length: n }, (_, index) => ({
+            index,
+            intentSuitable: true,
+            localitySuitable: true,
+            reason: null,
+          })),
+        });
+      } else if (sys.includes('Classify each keyword')) {
+        const n = [...(messages.at(-1)?.content ?? '').matchAll(/^\d+\. /gm)].length;
+        text = JSON.stringify({
+          types: Array.from({ length: n }, (_, index) => ({ index, article_type: 'listicle' })),
+        });
+      }
       return {
         text,
         model: 'm',
@@ -285,6 +298,33 @@ describe('strategyDryRun', () => {
     expect(report.plan.map((r) => r.keyword)).toEqual(['cheap dog food']);
     expect(report.plan.filter((r) => r.from_below_n)).toEqual([]);
     expect(report.notes.join(' ')).toContain('under-filled');
+  });
+
+  // Uniform `other` was indistinguishable from a real judgement until these
+  // counters existed — the clewas run's classify call returned an empty body and
+  // silently typed all 78 accepts `other` (#211).
+  test('reports SERP-judge and classify coverage plus the article_type spread', async () => {
+    const report = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
+
+    expect(report.stats.judgment).toMatchObject({
+      sent: 1,
+      returned: 1,
+      unparseable: 0,
+      batches: 1,
+      failedBatches: 0,
+    });
+    expect(report.stats.classification).toMatchObject({
+      sent: 1,
+      returned: 1,
+      matched: 1,
+      typed: 1,
+      assigned: 1,
+      failedBatches: 0,
+    });
+    expect(report.article_types).toEqual([{ article_type: 'listicle', count: 1 }]);
+    // Full coverage, so neither degradation note fires.
+    expect(report.notes.join(' ')).not.toContain('FAILED OPEN');
+    expect(report.notes.join(' ')).not.toContain('kept the');
   });
 
   test('replay fails loudly when the snapshot is missing a call', async () => {

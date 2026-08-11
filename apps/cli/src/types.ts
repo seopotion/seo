@@ -237,6 +237,12 @@ export interface StrategyDryRunData {
    * describing different businesses (#211).
    */
   sources: { source: string; gathered: number; after_dedupe: number }[];
+  /**
+   * article_type across the accepted pool. Uniform `other` is the classifier
+   * failing, not judging — clusterSpreadSchedule spreads the plan by this field,
+   * so one group makes it a no-op and the generation worker gets no signal (#211).
+   */
+  article_types: { article_type: string; count: number }[];
   /** The known failure: relevance the LLM never scored keeps parseRelevance's 0 seed. */
   relevance: {
     sent: number;

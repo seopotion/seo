@@ -77,8 +77,10 @@ async function runStrategy(orgId: string): Promise<void> {
     onProgress: (stage, meta) => logger.info('strategy stage', { stage, ...meta }),
   });
 
-  // Funnel counts per run, including relevance coverage — a batch the LLM only
-  // partly scored is what makes ranking collapse to volume + ease (#211).
+  // Funnel counts per run, including the three LLM coverage blocks. Each covers
+  // a stage that degrades SILENTLY when the model under-answers: relevance
+  // collapses ranking to volume + ease, an unjudged SERP is accepted fail-open,
+  // and an unclassified keyword becomes a uniform `other` (#211).
   logger.info('strategy pipeline stats', { ...result.stats });
 
   const inserted = await addCandidates(orgId, result.candidates);

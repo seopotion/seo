@@ -1,3 +1,10 @@
+/** Split into fixed-size slices, preserving order. Last slice may be short. */
+export function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 /** Map with bounded concurrency, preserving input order in the output. */
 export async function mapWithConcurrency<T, R>(
   items: T[],

@@ -123,6 +123,47 @@ export interface RelevanceCoverage {
   zero: number;
 }
 
+/**
+ * How much of the classify batch the LLM actually answered. Uniform `other` is
+ * indistinguishable from a real judgement without these: on the clewas run the
+ * single classify call returned an EMPTY body after burning its whole 65k-token
+ * output budget on reasoning, and all 78 keywords silently kept
+ * parseClassification's `other` seed. `assigned` is the bottom line; the rest
+ * say which link in the chain broke (#211).
+ */
+export interface ClassificationCoverage {
+  sent: number;
+  /** Rows the model returned across every batch. */
+  returned: number;
+  /** Rows that resolved to one of the sent keywords, by index or by keyword. */
+  matched: number;
+  /** Rows whose article_type normalized to a member of ARTICLE_TYPES. */
+  typed: number;
+  /** Keywords that ended up with a model-assigned type rather than the seed. */
+  assigned: number;
+  batches: number;
+  /** Batches whose body did not parse at all — every keyword in them kept the seed. */
+  failedBatches: number;
+}
+
+/**
+ * How much of the SERP intent/locality judgment the LLM actually answered.
+ * parseSerpJudgment fails OPEN, so an unanswered keyword is accepted as if it
+ * had been judged suitable — `unparseable` is the only way to see it, and
+ * batching makes it matter more since one bad body covers N keywords (#211).
+ */
+export interface JudgmentCoverage {
+  /** Keywords sent to the judge; authority rejects are gated out before it. */
+  sent: number;
+  /** Keywords the judge returned a parseable verdict for. */
+  returned: number;
+  /** Keywords that fell back to the fail-open default without being judged. */
+  unparseable: number;
+  batches: number;
+  /** Batches whose body did not parse at all — every keyword in them failed open. */
+  failedBatches: number;
+}
+
 export interface PipelineStats {
   gathered: number;
   /** Pre-dedupe contribution of each gather source; `gathered` is their sum. */
@@ -138,6 +179,8 @@ export interface PipelineStats {
   accepted: number;
   rejectedByReason: Record<RejectionReason, number>;
   relevance: RelevanceCoverage;
+  judgment: JudgmentCoverage;
+  classification: ClassificationCoverage;
 }
 
 export interface PipelineResult {

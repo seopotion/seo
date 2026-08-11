@@ -144,6 +144,20 @@ export function sourceFunnel(
     .sort((a, b) => b.gathered - a.gathered || a.source.localeCompare(b.source));
 }
 
+/** article_type histogram over the accepted pool, commonest first. */
+export function articleTypeDistribution(
+  accepted: DryRunCandidateRow[],
+): StrategyDryRunData['article_types'] {
+  const counts = new Map<string, number>();
+  for (const c of accepted) {
+    const key = c.article_type ?? '(null)';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([article_type, count]) => ({ article_type, count }))
+    .sort((a, b) => b.count - a.count || a.article_type.localeCompare(b.article_type));
+}
+
 export function buildDryRunReport(input: {
   org: Org;
   candidates: EnrichedCandidate[];
@@ -177,6 +191,23 @@ export function buildDryRunReport(input: {
       `Relevance: the LLM scored ${returned} of ${sent} keywords; the other ${sent - returned} kept parseRelevance's 0 seed without ever being judged.`,
     );
   }
+  const judgment = stats.judgment;
+  if (judgment.unparseable > 0) {
+    notes.push(
+      `SERP judge: ${judgment.unparseable} of ${judgment.sent} keywords got no parseable verdict${
+        judgment.failedBatches > 0
+          ? ` (${judgment.failedBatches} batch body/bodies were empty)`
+          : ''
+      } and FAILED OPEN — accepted as suitable without ever being judged.`,
+    );
+  }
+  const classification = stats.classification;
+  if (classification.assigned < classification.sent) {
+    notes.push(
+      `Classify: the LLM typed ${classification.assigned} of ${classification.sent} keywords; the other ${classification.sent - classification.assigned} kept the 'other' seed. ` +
+        `rows returned ${classification.returned}, matched to a keyword ${classification.matched}, valid article_type ${classification.typed}, dead batches ${classification.failedBatches} of ${classification.batches}.`,
+    );
+  }
   const backfill = plan.filter((r) => r.from_below_n).length;
   if (backfill > 0) {
     notes.push(
@@ -205,6 +236,7 @@ export function buildDryRunReport(input: {
     stats,
     timing: input.timing,
     sources: sourceFunnel(candidates, stats.gatheredBySource),
+    article_types: articleTypeDistribution(sections.accepted),
     relevance: {
       sent,
       returned,
@@ -335,6 +367,22 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
       .filter(([, v]) => v > 0)
       .map(([k, v]) => `${k} ${v}`)
       .join('  ')}`,
+  );
+  out.push(
+    `  serpJudge   sent ${s.judgment.sent}  judged ${s.judgment.returned}  UNPARSEABLE ${s.judgment.unparseable} (failed open)  batches ${s.judgment.batches}  dead ${s.judgment.failedBatches}`,
+  );
+  out.push(
+    `  classify    sent ${s.classification.sent}  typed ${s.classification.assigned}  rows ${s.classification.returned}  matched ${s.classification.matched}  validType ${s.classification.typed}  batches ${s.classification.batches}  dead ${s.classification.failedBatches}`,
+  );
+  out.push('');
+
+  out.push('ARTICLE TYPES  (accepted pool — clusterSpreadSchedule spreads the plan by this)');
+  out.push(
+    ...table(
+      ['article_type', 'count'],
+      d.article_types.map((r) => [r.article_type, String(r.count)]),
+      new Set([1]),
+    ).map((l) => `  ${l}`),
   );
   out.push('');
 

@@ -126,12 +126,12 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   const belowN = ranked.slice(config.serpTopN);
 
   // 10 SERP validate → 11 classify
-  progress('serp_validate', { candidates: topN.length });
   const serp = await validateSerp(topN, {
     dataForSeo: input.clients.dataForSeo,
     llm: input.clients.llm,
     presets: input.presets,
     config,
+    onProgress: progress,
   });
   rejected.push(...serp.rejected);
   progress('classify', { candidates: serp.accepted.length });
@@ -141,7 +141,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   });
 
   // 12 assemble (stable order: accepted, then below-N scored, then rejected)
-  const all: WorkingCandidate[] = [...classified, ...belowN, ...rejected];
+  const all: WorkingCandidate[] = [...classified.candidates, ...belowN, ...rejected];
   const rejectedByReason = { ...EMPTY_REASON_COUNTS };
   for (const c of rejected) if (c.rejection_reason) rejectedByReason[c.rejection_reason]++;
 
@@ -157,9 +157,11 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
       scored: scored.length,
       afterRelevanceFloor: relevant.length,
       serpValidated: topN.length,
-      accepted: classified.length,
+      accepted: classified.candidates.length,
       rejectedByReason,
       relevance: relevance.coverage,
+      judgment: serp.coverage,
+      classification: classified.coverage,
     },
   };
 }
