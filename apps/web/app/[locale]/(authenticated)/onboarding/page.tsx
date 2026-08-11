@@ -12,6 +12,7 @@ import {
   setWorkspaceStatusCache,
 } from '@/lib/session';
 import { completeOnboarding, OnboardingApiError, scanWebsiteForOnboarding } from './api';
+import { competitorErrorKey, MAX_COMPETITORS, prepareCompetitor } from './competitors';
 import { ErrorMessage } from './components/ErrorMessage';
 import { ProgressSteps } from './components/ProgressSteps';
 import { StepNavigation } from './components/StepNavigation';
@@ -23,7 +24,7 @@ import { BusinessInfoStep } from './steps/BusinessInfoStep';
 import { IntegrationsStep } from './steps/IntegrationsStep';
 import { WebsiteScanStep } from './steps/WebsiteScanStep';
 import type { Errors, OnboardingForm, ScanState } from './types';
-import { createEntryId, isValidHttpUrl } from './utils';
+import { createEntryId } from './utils';
 import { type ValidationTranslator, validateStep, validateWebsiteUrl } from './validation';
 
 const authGuardDisabled =
@@ -40,6 +41,7 @@ export default function OnboardingPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
+  const [competitorsSkipped, setCompetitorsSkipped] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [isFinishing, setIsFinishing] = useState(false);
   const [workspaceGate, setWorkspaceGate] = useState<'checking' | 'error' | 'ready'>('checking');
@@ -147,10 +149,16 @@ export default function OnboardingPage() {
     clearErrors('competitorDraft', 'competitors');
   }
 
+  function updateCompetitorsSkipped(skipped: boolean) {
+    setCompetitorsSkipped(skipped);
+    clearErrors('competitors');
+  }
+
   function getStepErrors() {
     return validateStep({
       audienceDraft,
       competitorDraft,
+      competitorsSkipped,
       form,
       scanState,
       stepIndex: currentStep,
@@ -168,15 +176,22 @@ export default function OnboardingPage() {
       const canAddAudience =
         audienceValue && currentForm.targetAudience.length < MAX_TARGET_AUDIENCES;
 
+      const competitor = competitorValue
+        ? prepareCompetitor(
+            competitorValue,
+            currentForm.competitors.map((entry) => entry.value),
+          )
+        : null;
+
       return {
         ...currentForm,
         targetAudience: canAddAudience
           ? [...currentForm.targetAudience, { id: createEntryId('audience'), value: audienceValue }]
           : currentForm.targetAudience,
-        competitors: competitorValue
+        competitors: competitor?.ok
           ? [
               ...currentForm.competitors,
-              { id: createEntryId('competitor'), value: competitorValue },
+              { id: createEntryId('competitor'), value: competitor.domain },
             ]
           : currentForm.competitors,
       };
@@ -339,19 +354,30 @@ export default function OnboardingPage() {
 
     if (!value) return;
 
-    if (!isValidHttpUrl(value)) {
+    const competitor = prepareCompetitor(
+      value,
+      form.competitors.map((entry) => entry.value),
+    );
+
+    if (!competitor.ok) {
       setErrors((currentErrors) => ({
         ...currentErrors,
-        competitorDraft: validationT('competitorUrl'),
+        competitorDraft: validationT(competitorErrorKey(competitor.reason), {
+          max: MAX_COMPETITORS,
+        }),
       }));
       return;
     }
 
     setForm((currentForm) => ({
       ...currentForm,
-      competitors: [...currentForm.competitors, { id: createEntryId('competitor'), value }],
+      competitors: [
+        ...currentForm.competitors,
+        { id: createEntryId('competitor'), value: competitor.domain },
+      ],
     }));
     setCompetitorDraft('');
+    setCompetitorsSkipped(false);
     clearErrors('competitorDraft', 'competitors');
   }
 
@@ -404,12 +430,14 @@ export default function OnboardingPage() {
         <AudienceCompetitorsStep
           audienceDraft={audienceDraft}
           competitorDraft={competitorDraft}
+          competitorsSkipped={competitorsSkipped}
           errors={errors}
           form={form}
           onAddAudience={addAudienceEntry}
           onAddCompetitor={addCompetitorEntry}
           onAudienceDraftChange={updateAudienceDraft}
           onCompetitorDraftChange={updateCompetitorDraft}
+          onCompetitorsSkippedChange={updateCompetitorsSkipped}
           onRemoveAudience={removeAudienceEntry}
           onRemoveCompetitor={removeCompetitorEntry}
         />

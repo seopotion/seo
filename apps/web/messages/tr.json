@@ -606,7 +606,7 @@
       "title": "Google Search Console"
     },
     "placeholders": {
-      "competitorUrl": "https://rakip.com"
+      "competitorUrl": "rakip.com"
     },
     "staticSite": {
       "beforeRedirect": "github.com üzerinden devam edip SeoPotion'ın yazabileceği depoları seçeceksiniz, sonra dal ve klasör seçmek için buraya döneceksiniz.",
@@ -822,7 +822,11 @@
       "youtubeVideos": "YouTube videoları"
     },
     "audience": {
-      "competitorUrls": "Rakip web sitesi URL'leri",
+      "competitorUrls": "Rakip web siteleri",
+      "competitorsHelp": "Bu sitelerin hâlihazırda sıralandığı anahtar kelimeleri buluyoruz — içerik planınız için en büyük fikir kaynağı budur. Rakip olmadan yalnızca kendi sitenize bakarak tahmin yürütebiliriz.",
+      "competitorsHint": "competitor.com gibi bir web sitesi alan adı girin. Şirket adı işe yaramaz.",
+      "competitorsSkip": "Adını verebileceğim bir rakip yok",
+      "competitorsSkipNote": "Planınızı rakip anahtar kelimeleri olmadan oluştururuz; bu genellikle daha az ve daha zayıf fikir demektir. Rakipleri daha sonra Ayarlar'dan ekleyebilirsiniz.",
       "targetAudience": "Hedef kitle",
       "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
@@ -928,8 +932,11 @@
     "validation": {
       "articleStyleRequired": "Makale stili zorunludur.",
       "businessNameRequired": "İşletme adı zorunludur.",
-      "competitorUrl": "Geçerli bir rakip URL'si girin.",
-      "competitorsValidUrls": "Her rakip geçerli bir URL olmalıdır.",
+      "competitorDomain": "Rakibin competitor.com gibi web sitesi alan adını girin.",
+      "competitorsDuplicate": "Bu rakip zaten listede.",
+      "competitorsMax": "En fazla {max} rakip ekleyebilirsiniz.",
+      "competitorsRequired": "En az bir rakip ekleyin veya rakipsiz devam etmek için kutuyu işaretleyin.",
+      "competitorsValidDomains": "Her rakip bir web sitesi alan adı olmalıdır.",
       "countryRequired": "Ülke zorunludur.",
       "labels": {
         "blogPageUrl": "Blog sayfası URL'si",

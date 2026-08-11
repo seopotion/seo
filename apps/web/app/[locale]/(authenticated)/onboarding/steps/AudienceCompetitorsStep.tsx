@@ -1,27 +1,32 @@
 import { useTranslations } from 'next-intl';
 import { TextEntryList } from '../components/TextEntryList';
+import { ToggleSwitch } from '../components/ToggleSwitch';
 import type { Errors, OnboardingForm } from '../types';
 
 export function AudienceCompetitorsStep({
   audienceDraft,
   competitorDraft,
+  competitorsSkipped,
   errors,
   form,
   onAddAudience,
   onAddCompetitor,
   onAudienceDraftChange,
   onCompetitorDraftChange,
+  onCompetitorsSkippedChange,
   onRemoveAudience,
   onRemoveCompetitor,
 }: {
   audienceDraft: string;
   competitorDraft: string;
+  competitorsSkipped: boolean;
   errors: Errors;
   form: OnboardingForm;
   onAddAudience: () => void;
   onAddCompetitor: () => void;
   onAudienceDraftChange: (value: string) => void;
   onCompetitorDraftChange: (value: string) => void;
+  onCompetitorsSkippedChange: (skipped: boolean) => void;
   onRemoveAudience: (id: string) => void;
   onRemoveCompetitor: (id: string) => void;
 }) {
@@ -48,19 +53,34 @@ export function AudienceCompetitorsStep({
           placeholder={t('targetAudiencePlaceholder')}
         />
 
-        <TextEntryList
-          ariaInvalid={Boolean(errors.competitorDraft || errors.competitors)}
-          draft={competitorDraft}
-          entries={form.competitors}
-          errors={competitorErrors}
-          inputId="competitorUrl"
-          inputType="url"
-          label={t('competitorUrls')}
-          onAdd={onAddCompetitor}
-          onDraftChange={onCompetitorDraftChange}
-          onRemove={onRemoveCompetitor}
-          placeholder="https://competitor.com"
-        />
+        <div>
+          <TextEntryList
+            ariaInvalid={Boolean(errors.competitorDraft || errors.competitors)}
+            description={t('competitorsHelp')}
+            draft={competitorDraft}
+            entries={form.competitors}
+            errors={competitorErrors}
+            inputId="competitorUrl"
+            label={t('competitorUrls')}
+            onAdd={onAddCompetitor}
+            onDraftChange={onCompetitorDraftChange}
+            onRemove={onRemoveCompetitor}
+            placeholder="competitor.com"
+          />
+
+          <p className="mt-2 text-gray-500 text-sm">{t('competitorsHint')}</p>
+
+          <div className="mt-3">
+            <ToggleSwitch
+              checked={competitorsSkipped}
+              label={t('competitorsSkip')}
+              onChange={onCompetitorsSkippedChange}
+            />
+            {competitorsSkipped && (
+              <p className="mt-2 text-gray-500 text-sm">{t('competitorsSkipNote')}</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

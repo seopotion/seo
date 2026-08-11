@@ -1,3 +1,4 @@
+import { MAX_COMPETITORS, normalizeCompetitorDomain } from './competitors';
 import { MAX_TARGET_AUDIENCES } from './constants';
 import type { Errors, OnboardingForm, ScanState } from './types';
 import { isValidHttpUrl } from './utils';
@@ -28,6 +29,7 @@ function validateOptionalUrl(value: string, label: string, t: ValidationTranslat
 export function validateStep({
   audienceDraft,
   competitorDraft,
+  competitorsSkipped = false,
   form,
   scanState,
   stepIndex,
@@ -35,6 +37,8 @@ export function validateStep({
 }: {
   audienceDraft: string;
   competitorDraft: string;
+  /** Set by the deliberate "no competitor to name" opt-out on step 2. */
+  competitorsSkipped?: boolean;
   form: OnboardingForm;
   scanState: ScanState;
   stepIndex: number;
@@ -63,12 +67,22 @@ export function validateStep({
       nextErrors.targetAudience = t('targetAudienceMax', { max: MAX_TARGET_AUDIENCES });
     }
 
-    if (competitorDraft.trim() && !isValidHttpUrl(competitorDraft)) {
-      nextErrors.competitorDraft = t('competitorUrl');
+    const competitorCount = form.competitors.length + (competitorDraft.trim() ? 1 : 0);
+
+    if (competitorDraft.trim() && !normalizeCompetitorDomain(competitorDraft).ok) {
+      nextErrors.competitorDraft = t('competitorDomain');
     }
 
-    if (form.competitors.some((competitor) => !isValidHttpUrl(competitor.value))) {
-      nextErrors.competitors = t('competitorsValidUrls');
+    if (competitorCount === 0) {
+      // Competitors drive a whole third of the keyword pipeline, so advancing
+      // without them has to be a choice the user made, not a silent default.
+      if (!competitorsSkipped) nextErrors.competitors = t('competitorsRequired');
+    } else if (competitorCount > MAX_COMPETITORS) {
+      nextErrors.competitors = t('competitorsMax', { max: MAX_COMPETITORS });
+    } else if (
+      form.competitors.some((competitor) => !normalizeCompetitorDomain(competitor.value).ok)
+    ) {
+      nextErrors.competitors = t('competitorsValidDomains');
     }
   }
 

@@ -22,15 +22,16 @@ import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import {
+  competitorErrorKey,
+  MAX_COMPETITORS,
+  normalizeCompetitorList,
+  prepareCompetitor,
+} from '../../onboarding/competitors';
 import { TextEntryList } from '../../onboarding/components/TextEntryList';
 import { countries, languages, MAX_TARGET_AUDIENCES } from '../../onboarding/constants';
 import type { TextEntry } from '../../onboarding/types';
-import {
-  createEntryId,
-  isValidHttpUrl,
-  stringsToTextEntries,
-  textEntriesToStrings,
-} from '../../onboarding/utils';
+import { createEntryId, stringsToTextEntries, textEntriesToStrings } from '../../onboarding/utils';
 import { BillingPanel } from './_components/BillingPanel';
 import { GoogleSearchConsolePanel } from './_components/GoogleSearchConsolePanel';
 import { IntegrationsPanel } from './_components/IntegrationsPanel';
@@ -88,7 +89,10 @@ function mergeGeneralSettings(
     ...currentSettings,
     businessDescription: data.business.description,
     businessName: data.business.name,
-    competitors: stringsToTextEntries(data.audience.competitors, 'competitor'),
+    competitors: stringsToTextEntries(
+      normalizeCompetitorList(data.audience.competitors),
+      'competitor',
+    ),
     country: data.business.country,
     language: data.business.language,
     targetAudience: stringsToTextEntries(data.audience.target, 'audience'),
@@ -281,14 +285,24 @@ export default function SettingsPage() {
 
     if (!value) return;
 
-    if (!isValidHttpUrl(value)) {
-      setCompetitorError(validationT('competitorUrl'));
+    const competitor = prepareCompetitor(
+      value,
+      settings.competitors.map((entry) => entry.value),
+    );
+
+    if (!competitor.ok) {
+      setCompetitorError(
+        validationT(competitorErrorKey(competitor.reason), { max: MAX_COMPETITORS }),
+      );
       return;
     }
 
     setSettings((currentSettings) => ({
       ...currentSettings,
-      competitors: [...currentSettings.competitors, { id: createEntryId('competitor'), value }],
+      competitors: [
+        ...currentSettings.competitors,
+        { id: createEntryId('competitor'), value: competitor.domain },
+      ],
     }));
     markEdited();
     setCompetitorDraft('');
@@ -488,17 +502,18 @@ export default function SettingsPage() {
           <FieldPanel>
             <TextEntryList
               ariaInvalid={Boolean(competitorError)}
+              description={audienceT('competitorsHelp')}
               draft={competitorDraft}
               entries={settings.competitors}
               errors={competitorError ? [competitorError] : undefined}
               inputId="competitor-url"
-              inputType="url"
               label={audienceT('competitorUrls')}
               onAdd={addCompetitorEntry}
               onDraftChange={setCompetitorDraft}
               onRemove={removeCompetitorEntry}
               placeholder={t('placeholders.competitorUrl')}
             />
+            <p className="mt-2 text-gray-500 text-sm">{audienceT('competitorsHint')}</p>
           </FieldPanel>
         </div>
       </div>
