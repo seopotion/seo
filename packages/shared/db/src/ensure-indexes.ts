@@ -56,6 +56,13 @@ export async function ensureIndexes(): Promise<void> {
   // One GSC connection per org (#12); the unique index makes upsertToken safe
   // under concurrent connect callbacks.
   await db.collection('gsc_connections').createIndex({ org_id: 1 }, { unique: true });
+  // GSC analytics cache (#208): one row per query key; TTL expires entries 48h
+  // after the last write (GSC's own data refreshes ~daily, so 48h staleness is
+  // acceptable and cuts quota use drastically).
+  await db.collection('gsc_analytics_cache').createIndex({ key: 1 }, { unique: true });
+  await db
+    .collection('gsc_analytics_cache')
+    .createIndex({ created_at: 1 }, { expireAfterSeconds: 172800 });
   // One connection per (org, provider) (#7) — an org is one website, so the
   // unique index is what makes connectWordPress's upsert safe.
   await db.collection('integrations').createIndex({ org_id: 1, provider: 1 }, { unique: true });
