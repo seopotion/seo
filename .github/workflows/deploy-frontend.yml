@@ -88,12 +88,23 @@ jobs:
           --require-approval never --outputs-file outputs.json
 
       - name: Seed tag cache
+        # The payload must NOT carry a `type` key. OpenNext's wrapper short-circuits
+        # on `if ("type" in event)` and treats the invoke as a warmer ping, which
+        # throws `ReferenceError: serverId is not defined` before the seed handler
+        # ever runs. The handler itself only reads `requestType`. See #206.
         run: |
           fn=$(jq -r '.["SeoWebStack-staging"].TagSeedFunctionName' infra/outputs.json)
-          aws lambda invoke --function-name "$fn" \
+          err=$(aws lambda invoke --function-name "$fn" \
             --cli-binary-format raw-in-base64-out \
-            --payload '{"type":"initializationFunction","requestType":"create","resourceId":"dynamodb-cache"}' \
-            /dev/null
+            --payload '{"requestType":"create"}' \
+            /tmp/seed.json --query FunctionError --output text)
+          # `aws lambda invoke` exits 0 with StatusCode 200 even when the handler
+          # throws — FunctionError is the only signal that it failed.
+          if [ -n "$err" ] && [ "$err" != "None" ]; then
+            echo "::error::Tag cache seed failed ($err) — ISR revalidateTag/revalidatePath will not work."
+            cat /tmp/seed.json
+            exit 1
+          fi
 
       - name: Invalidate CloudFront
         # SSG HTML carries a long s-maxage — without this, deploys don't show.
@@ -200,12 +211,19 @@ jobs:
           --require-approval never --outputs-file outputs.json
 
       - name: Seed tag cache
+        # See the staging job above for why the payload omits `type`, and why
+        # FunctionError has to be asserted explicitly (#206).
         run: |
           fn=$(jq -r '.["SeoWebStack-prod"].TagSeedFunctionName' infra/outputs.json)
-          aws lambda invoke --function-name "$fn" \
+          err=$(aws lambda invoke --function-name "$fn" \
             --cli-binary-format raw-in-base64-out \
-            --payload '{"type":"initializationFunction","requestType":"create","resourceId":"dynamodb-cache"}' \
-            /dev/null
+            --payload '{"requestType":"create"}' \
+            /tmp/seed.json --query FunctionError --output text)
+          if [ -n "$err" ] && [ "$err" != "None" ]; then
+            echo "::error::Tag cache seed failed ($err) — ISR revalidateTag/revalidatePath will not work."
+            cat /tmp/seed.json
+            exit 1
+          fi
 
       - name: Invalidate CloudFront
         run: |
