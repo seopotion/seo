@@ -34,13 +34,11 @@ const byOpportunity = (a: EnrichedCandidate, b: EnrichedCandidate): number =>
   normalizeKeyword(a.keyword).localeCompare(normalizeKeyword(b.keyword));
 
 /**
- * A survivor that never went through SERP validation. validateSerp stamps
- * serp_competitors on everything it accepts, so among candidates with no
- * rejection reason a null there means the below-serpTopN tier — schedulable,
- * unvalidated, unclassified.
+ * A survivor that never went through SERP validation — the below-serpTopN tier:
+ * scored, unvalidated, unclassified. No longer schedulable as of #211.
  */
 const isBelowN = (c: EnrichedCandidate): boolean =>
-  c.rejection_reason === null && c.serp_competitors === null;
+  c.rejection_reason === null && !c.serp_validated;
 
 /** Split the pipeline output into the three tiers the report prints. */
 export function splitSections(candidates: EnrichedCandidate[]): StrategyDryRunData['sections'] {
@@ -62,14 +60,21 @@ export function splitSections(candidates: EnrichedCandidate[]): StrategyDryRunDa
 }
 
 /**
- * The plan strategy.ts:93-110 would build — same filter, same ranking, same
+ * The plan strategy.ts would build — same filter, same ranking, same
  * clusterSpreadSchedule. Simulated as a FIRST run for the org (full 30-day
  * budget, nothing already on the planner), so two dry runs of different code are
- * comparable regardless of what the org's planner currently holds.
+ * comparable regardless of what the org's planner currently holds. Under-fills
+ * rather than padding when fewer than PLAN_DAYS candidates qualify.
  */
 export function simulatePlan(candidates: EnrichedCandidate[], startDate: Date): DryRunPlanRow[] {
   const selectable = candidates
-    .filter((c) => c.rejection_reason === null && c.search_volume !== null && c.difficulty !== null)
+    .filter(
+      (c) =>
+        c.serp_validated &&
+        c.rejection_reason === null &&
+        c.search_volume !== null &&
+        c.difficulty !== null,
+    )
     .sort(byOpportunity)
     .slice(0, PLAN_DAYS);
   return clusterSpreadSchedule(selectable, startDate, PLAN_DAYS).map((c) => ({
@@ -79,6 +84,37 @@ export function simulatePlan(candidates: EnrichedCandidate[], startDate: Date): 
   }));
 }
 
+/**
+ * Relevance histogram over the candidates the LLM actually scored, in buckets
+ * of the same shape as the floor test (`score <= floor` rejects). `cumulative`
+ * is therefore exactly how many candidates a `relevanceFloor` of that bucket's
+ * `max` would reject — the number to read when tuning the floor (#211).
+ */
+export function relevanceDistribution(
+  candidates: EnrichedCandidate[],
+): StrategyDryRunData['relevance']['distribution'] {
+  const scores = candidates
+    .filter((c) => c.relevance_score !== null)
+    .map((c) => c.relevance_score as number);
+  const buckets = [
+    { label: '= 0.00', max: 0, count: scores.filter((s) => s <= 0).length },
+    ...Array.from({ length: 10 }, (_, i) => {
+      const lo = i / 10;
+      const hi = (i + 1) / 10;
+      return {
+        label: `${lo.toFixed(2)} < r <= ${hi.toFixed(2)}`,
+        max: hi,
+        count: scores.filter((s) => s > lo && s <= hi).length,
+      };
+    }),
+  ];
+  let running = 0;
+  return buckets.map((b) => {
+    running += b.count;
+    return { ...b, cumulative: running };
+  });
+}
+
 export function buildDryRunReport(input: {
   org: Org;
   candidates: EnrichedCandidate[];
@@ -86,7 +122,7 @@ export function buildDryRunReport(input: {
   config: ResolvedConfig;
   mode: 'live' | 'replay';
   startDate: Date;
-  snapshot: { wrote: string | null; replayed: string | null; config_drift: string[] };
+  snapshot: StrategyDryRunData['snapshot'];
 }): StrategyDryRunData {
   const { org, candidates, stats, config, mode, snapshot } = input;
   const presets = org.presets;
@@ -114,7 +150,12 @@ export function buildDryRunReport(input: {
   const backfill = plan.filter((r) => r.from_below_n).length;
   if (backfill > 0) {
     notes.push(
-      `${backfill} of ${plan.length} planned entries come from the belowN tier — never SERP-validated, never classified.`,
+      `BUG: ${backfill} of ${plan.length} planned entries come from the belowN tier — never SERP-validated, never classified. Selection is supposed to require serp_validated.`,
+    );
+  }
+  if (plan.length < PLAN_DAYS) {
+    notes.push(
+      `Plan is under-filled: ${plan.length} of ${PLAN_DAYS} days. Expected when fewer candidates survive SERP validation — the worker schedules fewer rather than padding from the unvalidated tier.`,
     );
   }
 
@@ -138,6 +179,8 @@ export function buildDryRunReport(input: {
       missing: sent - returned,
       zero,
       zero_fraction: sent === 0 ? 0 : zero / sent,
+      distribution: relevanceDistribution(candidates),
+      plan_min: plan.length === 0 ? null : Math.min(...plan.map((r) => r.relevance_score ?? 0)),
     },
     sections,
     plan,
@@ -221,7 +264,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
 
   out.push('CONFIG');
   out.push(
-    `  serpTopN ${d.config.serpTopN}   difficultyCeiling ${d.config.difficultyCeiling}   volumeCap ${d.config.volumeCap}   clusterJaccard ${d.config.clusterJaccard}`,
+    `  serpTopN ${d.config.serpTopN}   difficultyCeiling ${d.config.difficultyCeiling}   relevanceFloor ${d.config.relevanceFloor}   volumeCap ${d.config.volumeCap}   clusterJaccard ${d.config.clusterJaccard}`,
   );
   out.push(
     `  weights  ${Object.entries(d.config.weights)
@@ -231,13 +274,21 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   out.push(`  geo      ${d.config.locationName ?? '—'} / ${d.config.languageName ?? '—'}`);
   if (d.snapshot.replayed) out.push(`  snapshot replayed from ${d.snapshot.replayed}`);
   if (d.snapshot.wrote) out.push(`  snapshot written to ${d.snapshot.wrote}`);
+  if (d.snapshot.live_misses) {
+    const { dataforseo, llm } = d.snapshot.live_misses;
+    out.push(
+      `  live misses  ${dataforseo} DataForSEO + ${llm} LLM call(s) fetched live${
+        dataforseo + llm > 0 ? ` and folded into ${d.snapshot.replayed}` : ''
+      }`,
+    );
+  }
   for (const drift of d.snapshot.config_drift) out.push(`  drift! ${drift}`);
   out.push('');
 
   const s = d.stats;
   out.push('PIPELINE STATS');
   out.push(
-    `  gathered ${s.gathered} → dedupe ${s.afterDedupe} → brand/nav ${s.afterBrandNav} → clustered -${s.clustered} → ceiling ${s.afterCeiling} → scored ${s.scored}`,
+    `  gathered ${s.gathered} → dedupe ${s.afterDedupe} → brand/nav ${s.afterBrandNav} → clustered -${s.clustered} → ceiling ${s.afterCeiling} → scored ${s.scored} → relevanceFloor ${s.afterRelevanceFloor}`,
   );
   out.push(`  serpValidated ${s.serpValidated}   accepted ${s.accepted}`);
   out.push(
@@ -255,6 +306,17 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   out.push(
     '      → relevance carries the largest scoring weight, so every keyword the LLM did not return keeps a 0 seed and ranking degenerates to volume + ease.',
   );
+  out.push(
+    `  lowest relevance in the plan: ${num(d.relevance.plan_min)} — a relevanceFloor at or above it starts emptying plan slots.`,
+  );
+  out.push('  distribution (cumulative = how many a floor at that bound would reject)');
+  out.push(
+    ...table(
+      ['bucket', 'count', 'cumulative'],
+      d.relevance.distribution.map((b) => [b.label, String(b.count), String(b.cumulative)]),
+      new Set([1, 2]),
+    ).map((l) => `    ${l}`),
+  );
   out.push('');
 
   out.push(
@@ -267,7 +329,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   out.push('');
   out.push(
     ...section(
-      `2. BELOW-N TIER — ${d.sections.below_n.length} (scored, never SERP-validated; today's silent backfill pool)`,
+      `2. BELOW-N TIER — ${d.sections.below_n.length} (scored, never SERP-validated; not schedulable)`,
       d.sections.below_n,
       '(none)',
     ),
@@ -286,7 +348,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   }
   out.push('');
 
-  out.push(`PLAN — ${d.plan.length} entries strategy.ts would schedule`);
+  out.push(`PLAN — ${d.plan.length} of ${PLAN_DAYS} days strategy.ts would schedule`);
   if (d.plan.length === 0) {
     out.push('  (nothing schedulable)');
   } else {

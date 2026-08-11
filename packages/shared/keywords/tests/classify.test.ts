@@ -37,6 +37,7 @@ const cand = (keyword: string): WorkingCandidate => ({
   rejection_reason: null,
   status: 'candidate',
   serp_competitors: null,
+  serp_validated: false,
 });
 
 describe('classifyCandidates', () => {

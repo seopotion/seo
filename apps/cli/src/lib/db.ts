@@ -42,8 +42,10 @@ import {
   createRecordingClients,
   createReplayClients,
   type ProviderClients,
+  type ReplaySession,
   readSnapshot,
   SNAPSHOT_VERSION,
+  type StrategySnapshot,
   writeSnapshot,
 } from './strategy-snapshot';
 
@@ -235,6 +237,7 @@ export async function strategyDryRun(input: {
   serpTopN?: number;
   snapshotPath?: string;
   replayPath?: string;
+  allowLiveMisses?: boolean;
 }): Promise<Result<StrategyDryRunData>> {
   if (input.snapshotPath && input.replayPath) {
     return fail(
@@ -242,12 +245,32 @@ export async function strategyDryRun(input: {
       'Pass either --snapshot (record live) or --replay (no network), not both.',
     );
   }
+  if (input.allowLiveMisses && !input.replayPath) {
+    return fail('BAD_ARGS', '--allow-live-misses only applies to --replay <path>.');
+  }
   try {
-    const resolved = await resolveOrgId(input.org, input.user);
-    if (!resolved.ok) return resolved;
+    // Read the snapshot first: it names the org it was recorded for, so a replay
+    // needs neither --org nor --user.
+    let snapshot: StrategySnapshot | null = null;
+    if (input.replayPath) {
+      try {
+        snapshot = await readSnapshot(input.replayPath);
+      } catch (e) {
+        return fail('SNAPSHOT_UNREADABLE', (e as Error).message);
+      }
+    }
 
-    const org = await OrgRepo.findById(resolved.data);
-    if (!org) return fail('ORG_NOT_FOUND', `No org with id "${resolved.data}".`);
+    let orgId: string;
+    if (snapshot && !input.org && !input.user) {
+      orgId = snapshot.org_id;
+    } else {
+      const resolved = await resolveOrgId(input.org, input.user);
+      if (!resolved.ok) return resolved;
+      orgId = resolved.data;
+    }
+
+    const org = await OrgRepo.findById(orgId);
+    if (!org) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
     if (!org.presets) {
       return fail(
         'ORG_NOT_FINALIZED',
@@ -260,26 +283,47 @@ export async function strategyDryRun(input: {
 
     let clients: ProviderClients;
     let recorded: ReturnType<typeof createRecordingClients>['recorded'] | null = null;
+    let replay: ReplaySession | null = null;
     let drift: string[] = [];
-    try {
-      if (input.replayPath) {
-        const snapshot = await readSnapshot(input.replayPath);
-        drift = configDrift(snapshot.config, config);
-        clients = createReplayClients(snapshot);
-      } else {
-        const live = await liveStrategyClients();
-        if (!live.ok) return live;
-        if (input.snapshotPath) {
-          const recorder = createRecordingClients(live.data);
-          clients = recorder.clients;
-          recorded = recorder.recorded;
-        } else {
-          clients = live.data;
-        }
+    if (snapshot) {
+      drift = configDrift(snapshot.config, config);
+      let live: ProviderClients | undefined;
+      if (input.allowLiveMisses) {
+        const res = await liveStrategyClients();
+        if (!res.ok) return res;
+        live = res.data;
       }
-    } catch (e) {
-      return fail('SNAPSHOT_UNREADABLE', (e as Error).message);
+      replay = createReplayClients(snapshot, live);
+      clients = replay.clients;
+    } else {
+      const live = await liveStrategyClients();
+      if (!live.ok) return live;
+      if (input.snapshotPath) {
+        const recorder = createRecordingClients(live.data);
+        clients = recorder.clients;
+        recorded = recorder.recorded;
+      } else {
+        clients = live.data;
+      }
     }
+
+    // Fold anything the miss path fetched back into the snapshot file — including
+    // after a failed run, so the credits already spent are not wasted.
+    const persistTopUp = async (): Promise<void> => {
+      if (!replay || !input.replayPath) return;
+      const misses = replay.misses();
+      if (misses.dataforseo + misses.llm === 0) return;
+      await writeSnapshot(input.replayPath, {
+        version: SNAPSHOT_VERSION,
+        recorded_at: new Date().toISOString(),
+        org_id: org.id,
+        website_url: org.website_url,
+        // The merged file now holds calls made under the current config, so it
+        // records that one; this run already reported the drift against the old.
+        config,
+        ...replay.merged(),
+      });
+    };
 
     let result: Awaited<ReturnType<typeof runKeywordPipeline>>;
     try {
@@ -296,11 +340,12 @@ export async function strategyDryRun(input: {
         config: partial,
       });
     } catch (e) {
+      await persistTopUp();
       return fail(
         'PIPELINE_FAILED',
         (e as Error).message,
         input.replayPath
-          ? 'The snapshot does not cover this run — re-record it with --snapshot <path>.'
+          ? 'The snapshot does not cover this run — re-record it with --snapshot <path>, or top it up with --allow-live-misses.'
           : undefined,
       );
     }
@@ -316,6 +361,7 @@ export async function strategyDryRun(input: {
         ...calls,
       });
     }
+    await persistTopUp();
 
     return ok(
       buildDryRunReport({
@@ -329,6 +375,7 @@ export async function strategyDryRun(input: {
           wrote: input.snapshotPath ?? null,
           replayed: input.replayPath ?? null,
           config_drift: drift,
+          live_misses: input.allowLiveMisses && replay ? replay.misses() : null,
         },
       }),
     );

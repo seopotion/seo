@@ -101,6 +101,7 @@ function candidate(kw: string, score: number) {
     rejection_reason: null,
     status: 'candidate',
     serp_competitors: [{ rank: 1, url: 'https://a.com/1', domain: 'a.com', title: 'A' }],
+    serp_validated: true,
   };
 }
 
@@ -123,6 +124,39 @@ describe('strategy worker', () => {
     expect(scheduleCandidate).toHaveBeenCalledTimes(2); // rejected one excluded
     // Stored candidates (with ids) are what get scheduled — candidate_id linkage.
     expect(scheduleCandidate.mock.calls[0]![0]).toMatchObject({ id: expect.any(String) });
+    expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
+  });
+
+  test('never schedules a candidate that was not SERP-validated', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    // The below-serpTopN tier: no rejection reason, real metrics, but never
+    // validated. It used to backfill the plan; now it must be invisible (#211).
+    runKeywordPipeline.mockResolvedValue({
+      candidates: [
+        candidate('validated', 0.5),
+        { ...candidate('below-n', 0.9), serp_validated: false, article_type: null },
+      ],
+      stats: {},
+    });
+
+    await handler(event({ org_id: 'o1' }), {} as never, () => {});
+
+    expect(scheduleCandidate).toHaveBeenCalledTimes(1);
+    expect(scheduleCandidate.mock.calls[0]![0]).toMatchObject({ keyword: 'validated' });
+  });
+
+  test('under-fills the plan rather than padding it, and still completes', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    runKeywordPipeline.mockResolvedValue({
+      candidates: Array.from({ length: 3 }, (_, i) => candidate(`k${i}`, 0.9 - i * 0.1)),
+      stats: {},
+    });
+
+    await handler(event({ org_id: 'o1' }), {} as never, () => {});
+
+    expect(scheduleCandidate).toHaveBeenCalledTimes(3); // 3, not PLAN_DAYS
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
   });
 

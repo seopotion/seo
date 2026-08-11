@@ -41,6 +41,7 @@ export const REJECTION_REASONS = [
   'brand_navigation',
   'clustered_duplicate',
   'difficulty_ceiling',
+  'relevance_floor',
   'serp_intent',
   'serp_authority',
   'serp_locality',
@@ -100,6 +101,15 @@ export const CandidateSchema = z.object({
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
   // Top-K organic results captured during SERP validation (#47/#144); null otherwise.
   serp_competitors: SerpCompetitorsField,
+  /**
+   * Whether the candidate actually passed SERP validation (#211). Explicit
+   * rather than inferred from `serp_competitors !== null`, which is a data
+   * artifact: pre-#99 records have it null for unrelated reasons, and the
+   * below-serpTopN tier is unvalidated yet indistinguishable by rejection
+   * reason. Only a validated candidate may be scheduled. Defaults to false so
+   * documents written before this field parse as unvalidated.
+   */
+  serp_validated: z.boolean().default(false),
   relevance_score: z.number().nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
   article_type: z.enum(ARTICLE_TYPES).nullable().default(null),

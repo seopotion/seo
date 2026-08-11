@@ -164,7 +164,14 @@ export const dbCommand = defineCommand({
         },
         replay: {
           type: 'string',
-          description: 'Replay a recorded snapshot; makes no network calls at all',
+          description:
+            'Replay a recorded snapshot; makes no network calls at all. Implies the org it was recorded for, so --org/--user are optional',
+        },
+        'allow-live-misses': {
+          type: 'boolean',
+          description:
+            'With --replay: fetch only the calls the snapshot lacks from the live providers and write the enlarged snapshot back',
+          default: false,
         },
         ...outputOption,
         ...verboseOption,
@@ -184,7 +191,12 @@ export const dbCommand = defineCommand({
           }
 
           const replay = args.replay as string | undefined;
-          if (replay) {
+          const allowLiveMisses = args['allow-live-misses'] as boolean;
+          if (replay && allowLiveMisses) {
+            emitter.warn(
+              `Replaying ${replay} with --allow-live-misses — cached calls are free, but anything the snapshot lacks is fetched live and costs real credits. The snapshot is rewritten with what it fetched.`,
+            );
+          } else if (replay) {
             emitter.info(`Replaying ${replay} — no network calls, no provider credits spent.`);
           } else {
             emitter.warn(
@@ -199,6 +211,7 @@ export const dbCommand = defineCommand({
             serpTopN,
             snapshotPath: args.snapshot as string | undefined,
             replayPath: replay,
+            allowLiveMisses,
           });
           emitter.step('db:strategy-dryrun', result.ok ? 'done' : 'fail');
 

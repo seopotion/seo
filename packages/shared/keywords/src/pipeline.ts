@@ -2,7 +2,7 @@ import { normalizeKeyword, type RejectionReason } from '@shared/schemas';
 import { classifyCandidates } from './classify';
 import { clusterCandidates } from './cluster';
 import { resolveConfig } from './config';
-import { applyDifficultyCeiling, brandNavFilter, fillDifficulty } from './filters';
+import { applyDifficultyCeiling, brandNavFilter, fillDifficulty, reject } from './filters';
 import { gatherCandidates } from './gather';
 import { dedupe } from './normalize';
 import { applyRelevance, scoreCandidates } from './score';
@@ -13,6 +13,7 @@ const EMPTY_REASON_COUNTS: Record<RejectionReason, number> = {
   brand_navigation: 0,
   clustered_duplicate: 0,
   difficulty_ceiling: 0,
+  relevance_floor: 0,
   serp_intent: 0,
   serp_authority: 0,
   serp_locality: 0,
@@ -37,6 +38,7 @@ function toEnriched(c: WorkingCandidate, orgId: string): EnrichedCandidate {
     rejection_reason: c.rejection_reason,
     status: c.status,
     serp_competitors: c.serp_competitors,
+    serp_validated: c.serp_validated,
   };
 }
 
@@ -97,8 +99,17 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   );
   const scored = scoreCandidates(relevance.candidates, { cannibalSet, config });
 
+  // 8b relevance floor — before the split, so a keyword the model saw no
+  // connection to never consumes one of the serpTopN validation slots.
+  const relevant: WorkingCandidate[] = [];
+  for (const c of scored) {
+    if ((c.relevance_score ?? 0) <= config.relevanceFloor)
+      rejected.push(reject(c, 'relevance_floor'));
+    else relevant.push(c);
+  }
+
   // 9 rank + split top-N
-  const ranked = [...scored].sort(rankKey);
+  const ranked = [...relevant].sort(rankKey);
   const topN = ranked.slice(0, config.serpTopN);
   const belowN = ranked.slice(config.serpTopN);
 
@@ -131,6 +142,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
       clustered: clustered.rejected.length,
       afterCeiling: ceiling.survivors.length,
       scored: scored.length,
+      afterRelevanceFloor: relevant.length,
       serpValidated: topN.length,
       accepted: classified.length,
       rejectedByReason,

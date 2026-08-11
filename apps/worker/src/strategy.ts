@@ -84,8 +84,10 @@ async function runStrategy(orgId: string): Promise<void> {
   const inserted = await addCandidates(orgId, result.candidates);
   const storedByNormalized = new Map(inserted.map((c) => [c.normalized_keyword, c]));
 
-  // Select schedulable candidates: accepted (no rejection), real metrics,
-  // not already on the planner. Rank by opportunity_score desc, stable.
+  // Select schedulable candidates: SERP-validated, real metrics, not already on
+  // the planner. Rank by opportunity_score desc, stable. `rejection_reason ===
+  // null` is NOT sufficient — it is also true of every below-serpTopN candidate,
+  // which was scored but never validated or classified (#211).
   const scheduledSet = new Set(scheduled.map((k) => normalizeKeyword(k.keyword)));
   // Strategy entries this job wrote carry a non-null opportunity_score; manual #50
   // selections go to the candidate pool (not KeywordRepo), so this proxy counts
@@ -94,9 +96,10 @@ async function runStrategy(orgId: string): Promise<void> {
   // nor collides calendar dates with already-created entries.
   const alreadyScheduled = scheduled.filter((k) => k.opportunity_score !== null).length;
   const budget = Math.max(0, PLAN_DAYS - alreadyScheduled);
-  const selectable = result.candidates
+  const qualified = result.candidates
     .filter(
       (c) =>
+        c.serp_validated &&
         c.rejection_reason === null &&
         c.search_volume !== null &&
         c.difficulty !== null &&
@@ -106,8 +109,19 @@ async function runStrategy(orgId: string): Promise<void> {
       (a, b) =>
         (b.opportunity_score ?? 0) - (a.opportunity_score ?? 0) ||
         normalizeKeyword(a.keyword).localeCompare(normalizeKeyword(b.keyword)),
-    )
-    .slice(0, budget);
+    );
+  const selectable = qualified.slice(0, budget);
+
+  // A short plan is the correct outcome when the pipeline validated fewer than
+  // `budget` keywords — padding it from the unvalidated tier is what put junk on
+  // the planner (#211). Log the shortfall so an under-filled plan is visible.
+  if (qualified.length < budget) {
+    logger.warn('strategy plan under-filled', {
+      requested: budget,
+      qualified: qualified.length,
+      shortfall: budget - qualified.length,
+    });
+  }
 
   const startDay = new Date();
   startDay.setUTCDate(startDay.getUTCDate() + alreadyScheduled);
@@ -144,7 +158,11 @@ async function runStrategy(orgId: string): Promise<void> {
   }
 
   await OrgRepo.setStrategyStatus(orgId, 'completed');
-  logger.info('strategy completed', { scheduled: scheduledCount });
+  logger.info('strategy completed', {
+    requested: budget,
+    qualified: qualified.length,
+    scheduled: scheduledCount,
+  });
 }
 
 export const handler: SQSHandler = async (event, context): Promise<void> => {

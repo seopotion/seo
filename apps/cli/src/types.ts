@@ -230,17 +230,27 @@ export interface StrategyDryRunData {
     missing: number;
     zero: number;
     zero_fraction: number;
+    /** Histogram for tuning `relevanceFloor`; `cumulative` = rejected at that `max`. */
+    distribution: { label: string; max: number; count: number; cumulative: number }[];
+    /** Lowest relevance among the planned entries — a floor at/above this empties slots. */
+    plan_min: number | null;
   };
   sections: {
     /** SERP-validated and classified. */
     accepted: DryRunCandidateRow[];
-    /** Below serpTopN: scored, never SERP-validated, still schedulable. */
+    /** Below serpTopN: scored, never SERP-validated, never schedulable (#211). */
     below_n: DryRunCandidateRow[];
     rejected: { reason: string; candidates: DryRunCandidateRow[] }[];
   };
   /** What strategy.ts would schedule for a first run of this org. */
   plan: DryRunPlanRow[];
-  snapshot: { wrote: string | null; replayed: string | null; config_drift: string[] };
+  snapshot: {
+    wrote: string | null;
+    replayed: string | null;
+    config_drift: string[];
+    /** Calls `--allow-live-misses` had to fetch live; null when not in that mode. */
+    live_misses: { dataforseo: number; llm: number } | null;
+  };
   notes: string[];
 }
 

@@ -7,7 +7,8 @@
  * network at all. A replay miss THROWS rather than returning empty — a missing
  * call is the signal that a code change altered the provider call pattern and
  * the snapshot has to be recaptured, which a silent `[]` would hide as a
- * mysteriously smaller candidate pool.
+ * mysteriously smaller candidate pool. `--allow-live-misses` opts out of the
+ * throw and fetches just the missing calls, growing the snapshot in place.
  */
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -121,28 +122,52 @@ export function createRecordingClients(base: ProviderClients): {
   };
 }
 
-/** Clients that answer only from the snapshot, and throw on anything else. */
-export function createReplayClients(snapshot: StrategySnapshot): ProviderClients {
-  const dfsByKey = new Map(snapshot.dataforseo.map((c) => [c.key, c.response]));
-  const llmByKey = new Map(snapshot.llm.map((c) => [c.key, c.response]));
+export interface ReplaySession {
+  clients: ProviderClients;
+  /** Calls the snapshot could not answer, served live instead (0 without `live`). */
+  misses: () => { dataforseo: number; llm: number };
+  /** The snapshot's calls plus everything the miss path fetched. */
+  merged: () => { dataforseo: RecordedDfsCall[]; llm: RecordedLlmCall[] };
+}
+
+/**
+ * Clients that answer from the snapshot. Without `live` a miss throws, which is
+ * the right default: it says the provider call pattern changed. With `live`
+ * (the `--allow-live-misses` top-up) a miss falls through to the real provider
+ * and is folded into `merged()`, so a change that alters *which* keywords reach
+ * SERP validation costs only the new calls instead of a full re-record (#211).
+ */
+export function createReplayClients(
+  snapshot: StrategySnapshot,
+  live?: ProviderClients,
+): ReplaySession {
+  const dfsByKey = new Map(snapshot.dataforseo.map((c) => [c.key, c]));
+  const llmByKey = new Map(snapshot.llm.map((c) => [c.key, c]));
+  const misses = { dataforseo: 0, llm: 0 };
+  const liveDfs = live?.dataForSeo as unknown as AnyDfs | undefined;
 
   const dataForSeo = {} as AnyDfs;
   for (const method of DFS_METHODS) {
     dataForSeo[method] = async (params: never) => {
       const key = dfsKey(method, params);
-      if (!dfsByKey.has(key)) {
-        const recorded = snapshot.dataforseo.filter((c) => c.method === method);
-        throw new Error(
-          [
-            `Snapshot has no recorded DataForSEO ${method} call for ${clip(stable(params), 300)}.`,
-            `  recorded ${method} calls: ${recorded.length}${
-              recorded.length ? ` (e.g. ${clip(stable(recorded[0]?.params), 200)})` : ''
-            }`,
-            '  The pipeline asked for a call the snapshot does not contain — the provider call pattern changed. Re-record with --snapshot <path>.',
-          ].join('\n'),
-        );
+      const hit = dfsByKey.get(key);
+      if (hit) return hit.response;
+      if (liveDfs) {
+        const response = await liveDfs[method](params);
+        dfsByKey.set(key, { method, key, params, response });
+        misses.dataforseo++;
+        return response;
       }
-      return dfsByKey.get(key);
+      const recorded = snapshot.dataforseo.filter((c) => c.method === method);
+      throw new Error(
+        [
+          `Snapshot has no recorded DataForSEO ${method} call for ${clip(stable(params), 300)}.`,
+          `  recorded ${method} calls: ${recorded.length}${
+            recorded.length ? ` (e.g. ${clip(stable(recorded[0]?.params), 200)})` : ''
+          }`,
+          '  The pipeline asked for a call the snapshot does not contain — the provider call pattern changed. Re-record with --snapshot <path>, or top the snapshot up with --allow-live-misses.',
+        ].join('\n'),
+      );
     };
   }
 
@@ -150,26 +175,34 @@ export function createReplayClients(snapshot: StrategySnapshot): ProviderClients
     complete: async (params) => {
       const key = llmKey(params.messages);
       const hit = llmByKey.get(key);
-      if (!hit) {
-        const roleLine = (role: string) => {
-          const msg = params.messages.find((m) => m.role === role);
-          return `  ${role}: ${msg ? clip(msg.content) : '(none)'}`;
-        };
-        throw new Error(
-          [
-            `Snapshot has no recorded LLM response for this call (key ${key}).`,
-            roleLine('system'),
-            roleLine('user'),
-            `  recorded LLM calls: ${snapshot.llm.length}`,
-            '  The pipeline asked for a call the snapshot does not contain — the prompt or the call pattern changed. Re-record with --snapshot <path>.',
-          ].join('\n'),
-        );
+      if (hit) return hit.response;
+      if (live) {
+        const response = await live.llm.complete(params);
+        llmByKey.set(key, { key, messages: params.messages, response });
+        misses.llm++;
+        return response;
       }
-      return hit;
+      const roleLine = (role: string) => {
+        const msg = params.messages.find((m) => m.role === role);
+        return `  ${role}: ${msg ? clip(msg.content) : '(none)'}`;
+      };
+      throw new Error(
+        [
+          `Snapshot has no recorded LLM response for this call (key ${key}).`,
+          roleLine('system'),
+          roleLine('user'),
+          `  recorded LLM calls: ${snapshot.llm.length}`,
+          '  The pipeline asked for a call the snapshot does not contain — the prompt or the call pattern changed. Re-record with --snapshot <path>, or top the snapshot up with --allow-live-misses.',
+        ].join('\n'),
+      );
     },
   };
 
-  return { dataForSeo: dataForSeo as unknown as DataForSeoClient, llm };
+  return {
+    clients: { dataForSeo: dataForSeo as unknown as DataForSeoClient, llm },
+    misses: () => ({ ...misses }),
+    merged: () => ({ dataforseo: [...dfsByKey.values()], llm: [...llmByKey.values()] }),
+  };
 }
 
 export async function writeSnapshot(path: string, snapshot: StrategySnapshot): Promise<void> {

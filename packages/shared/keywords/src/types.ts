@@ -27,6 +27,8 @@ export interface WorkingCandidate {
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
   serp_competitors: SerpCompetitor[] | null;
+  /** Set by validateSerp on accept; the only candidates strategy may schedule. */
+  serp_validated: boolean;
 }
 
 /** Pipeline output — assignable to `CreateCandidateInput` (repo derives normalized_keyword). */
@@ -47,6 +49,7 @@ export interface EnrichedCandidate {
   rejection_reason: RejectionReason | null;
   status: CandidateStatus;
   serp_competitors: SerpCompetitor[] | null;
+  serp_validated: boolean;
 }
 
 export interface ScoreWeights {
@@ -59,6 +62,12 @@ export interface ScoreWeights {
 
 export interface PipelineConfig {
   difficultyCeiling: number;
+  /**
+   * Candidates whose relevance is at or below this are rejected before the
+   * top-N split, so a keyword the model saw no connection to never consumes a
+   * SERP-validation slot. 0 means "reject only exact zeros" (#211).
+   */
+  relevanceFloor: number;
   serpTopN: number;
   serpDepth: number;
   serpTopK: number;
@@ -118,6 +127,8 @@ export interface PipelineStats {
   clustered: number;
   afterCeiling: number;
   scored: number;
+  /** Survivors of the relevance floor — the pool the top-N split draws from. */
+  afterRelevanceFloor: number;
   serpValidated: number;
   accepted: number;
   rejectedByReason: Record<RejectionReason, number>;

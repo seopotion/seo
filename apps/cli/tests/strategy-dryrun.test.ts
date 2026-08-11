@@ -216,7 +216,54 @@ describe('strategyDryRun', () => {
     expect(replayed.snapshot.config_drift).toEqual([]);
   });
 
-  test('reports relevance coverage, the below-N tier and the backfilled plan', async () => {
+  test('replays without --org: the snapshot names the org it was recorded for', async () => {
+    const path = join(dir, 'snap.json');
+    unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
+
+    const replayed = unwrap(await strategyDryRun({ serpTopN: 1, replayPath: path }));
+    expect(replayed.org.id).toBe('org_1');
+    expect(findById).toHaveBeenLastCalledWith('org_1');
+  });
+
+  test('--allow-live-misses fetches only what the snapshot lacks and folds it back in', async () => {
+    const path = join(dir, 'snap.json');
+    unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
+
+    // Drop one SERP call, standing in for a code change that sends a different
+    // keyword to validation: replay must miss on exactly that call.
+    const recorded = JSON.parse(await readFile(path, 'utf8'));
+    const kept = recorded.dataforseo.filter(
+      (c: { method: string }) => c.method !== 'serpGoogleOrganic',
+    );
+    const dropped = recorded.dataforseo.length - kept.length;
+    expect(dropped).toBe(1);
+    await writeFile(path, JSON.stringify({ ...recorded, dataforseo: kept }), 'utf8');
+
+    providerCalls.dataforseo = 0;
+    providerCalls.llm = 0;
+    const topped = unwrap(
+      await strategyDryRun({ serpTopN: 1, replayPath: path, allowLiveMisses: true }),
+    );
+
+    expect(topped.snapshot.live_misses).toEqual({ dataforseo: 1, llm: 0 });
+    expect(providerCalls).toEqual({ dataforseo: 1, llm: 0 });
+
+    // The enlarged snapshot is written back, so the next replay needs no network.
+    const merged = JSON.parse(await readFile(path, 'utf8'));
+    expect(merged.dataforseo).toHaveLength(recorded.dataforseo.length);
+    providerCalls.dataforseo = 0;
+    const clean = unwrap(await strategyDryRun({ serpTopN: 1, replayPath: path }));
+    expect(providerCalls).toEqual({ dataforseo: 0, llm: 0 });
+    expect(substance(clean)).toEqual(substance(topped));
+  });
+
+  test('rejects --allow-live-misses without --replay', async () => {
+    const result = await strategyDryRun({ org: 'org_1', allowLiveMisses: true });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('BAD_ARGS');
+  });
+
+  test('reports relevance coverage, the below-N tier and an under-filled plan', async () => {
     const report = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
 
     // Three candidates reach relevance; the LLM only scored two of them.
@@ -224,20 +271,18 @@ describe('strategyDryRun', () => {
     expect(report.stats.relevance.zero).toBe(1);
 
     expect(report.sections.accepted.map((c) => c.keyword)).toEqual(['cheap dog food']);
-    expect(report.sections.below_n.map((c) => c.keyword)).toEqual([
-      'dog food delivery',
-      'dog food storage',
-    ]);
+    // "dog food storage" kept the 0 seed, so the relevance floor drops it before
+    // the split; only the genuinely-scored runner-up lands below serpTopN.
+    expect(report.sections.below_n.map((c) => c.keyword)).toEqual(['dog food delivery']);
     expect(report.sections.rejected.map((g) => g.reason).sort()).toEqual([
       'brand_navigation',
       'difficulty_ceiling',
+      'relevance_floor',
     ]);
-    // Everything below serpTopN is scheduled unvalidated — the silent backfill.
-    expect(report.plan.filter((r) => r.from_below_n).map((r) => r.keyword)).toEqual([
-      'dog food delivery',
-      'dog food storage',
-    ]);
-    expect(report.notes.join(' ')).toContain('belowN tier');
+    // Nothing unvalidated is planned; the plan is short rather than padded.
+    expect(report.plan.map((r) => r.keyword)).toEqual(['cheap dog food']);
+    expect(report.plan.filter((r) => r.from_below_n)).toEqual([]);
+    expect(report.notes.join(' ')).toContain('under-filled');
   });
 
   test('replay fails loudly when the snapshot is missing a call', async () => {
@@ -310,6 +355,7 @@ const candidate = (over: Partial<EnrichedCandidate>): EnrichedCandidate => ({
   rejection_reason: null,
   status: 'candidate',
   serp_competitors: null,
+  serp_validated: false,
   ...over,
 });
 
@@ -320,7 +366,7 @@ describe('splitSections', () => {
 
   test('separates validated accepts from the below-N tier and groups rejects', () => {
     const sections = splitSections([
-      candidate({ keyword: 'a', serp_competitors: [], opportunity_score: 90 }),
+      candidate({ keyword: 'a', serp_validated: true, opportunity_score: 90 }),
       candidate({ keyword: 'b', opportunity_score: 80 }),
       candidate({ keyword: 'c', rejection_reason: 'serp_intent' }),
       candidate({ keyword: 'd', rejection_reason: 'serp_intent' }),
@@ -343,14 +389,17 @@ describe('simulatePlan', () => {
     expect(simulatePlan([], start)).toEqual([]);
   });
 
+  const validated = (over: Partial<EnrichedCandidate>): EnrichedCandidate =>
+    candidate({ serp_validated: true, ...over });
+
   test('skips rejects and candidates missing metrics, ranks by opportunity', () => {
     const plan = simulatePlan(
       [
-        candidate({ keyword: 'low', opportunity_score: 10 }),
-        candidate({ keyword: 'high', opportunity_score: 90 }),
-        candidate({ keyword: 'rejected', opportunity_score: 99, rejection_reason: 'serp_intent' }),
-        candidate({ keyword: 'no volume', opportunity_score: 95, search_volume: null }),
-        candidate({ keyword: 'no kd', opportunity_score: 95, difficulty: null }),
+        validated({ keyword: 'low', opportunity_score: 10 }),
+        validated({ keyword: 'high', opportunity_score: 90 }),
+        validated({ keyword: 'rejected', opportunity_score: 99, rejection_reason: 'serp_intent' }),
+        validated({ keyword: 'no volume', opportunity_score: 95, search_volume: null }),
+        validated({ keyword: 'no kd', opportunity_score: 95, difficulty: null }),
       ],
       start,
     );
@@ -358,17 +407,24 @@ describe('simulatePlan', () => {
     expect(plan.map((r) => r.scheduled_date)).toEqual(['2026-08-11', '2026-08-12']);
   });
 
-  test('caps at 30 days and flags which entries never saw SERP validation', () => {
+  test('plans only SERP-validated candidates, under-filling rather than backfilling', () => {
     const many = Array.from({ length: 40 }, (_, i) =>
       candidate({
         keyword: `k${String(i).padStart(2, '0')}`,
         opportunity_score: 100 - i,
-        // Only the top 5 were SERP-validated; the rest are backfill.
-        serp_competitors: i < 5 ? [] : null,
+        // Only the top 5 were SERP-validated; the rest are no longer eligible.
+        serp_validated: i < 5,
       }),
     );
     const plan = simulatePlan(many, start);
-    expect(plan).toHaveLength(30);
-    expect(plan.filter((r) => r.from_below_n)).toHaveLength(25);
+    expect(plan.map((r) => r.keyword)).toEqual(['k00', 'k01', 'k02', 'k03', 'k04']);
+    expect(plan.filter((r) => r.from_below_n)).toEqual([]);
+  });
+
+  test('caps at 30 days when more than PLAN_DAYS candidates qualify', () => {
+    const many = Array.from({ length: 40 }, (_, i) =>
+      validated({ keyword: `k${String(i).padStart(2, '0')}`, opportunity_score: 100 - i }),
+    );
+    expect(simulatePlan(many, start)).toHaveLength(30);
   });
 });

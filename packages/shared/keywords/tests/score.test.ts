@@ -40,6 +40,7 @@ const cand = (over: Partial<WorkingCandidate>): WorkingCandidate => ({
   rejection_reason: null,
   status: 'candidate',
   serp_competitors: null,
+  serp_validated: false,
   ...over,
 });
 
@@ -80,10 +81,11 @@ describe('applyRelevance', () => {
 describe('scoreCandidates', () => {
   it('computes a bounded 0..100 score from the weighted formula', () => {
     const [out] = scoreCandidates(
-      [cand({ search_volume: 10_000, difficulty: 0, trend: 1, relevance_score: 1 })],
+      // KD 1, not 0: at this volume a 0 reads as missing data and scores neutral.
+      [cand({ search_volume: 10_000, difficulty: 1, trend: 1, relevance_score: 1 })],
       { cannibalSet: new Set(), config },
     );
-    // volume=1, ease=1, trend=1, relevance=1, cannibal absent -> full score
+    // volume=1, ease=0.99, trend=1, relevance=1, cannibal absent -> full score
     expect(out!.opportunity_score).toBe(100);
   });
 
@@ -97,6 +99,40 @@ describe('scoreCandidates', () => {
     const [clean] = scoreCandidates([base], { cannibalSet: new Set(), config });
     const [hit] = scoreCandidates([base], { cannibalSet: new Set(['dog food']), config });
     expect(hit!.opportunity_score!).toBeLessThan(clean!.opportunity_score!);
+  });
+
+  // DataForSEO reports difficulty 0 both for genuinely trivial keywords and for
+  // keywords it has no KD data on; volume is the tell (#211).
+  describe('difficulty 0', () => {
+    // Volume feeds the score directly, so every comparison holds it fixed and
+    // varies only `difficulty`.
+    const scoreAt = (difficulty: number | null, search_volume: number): number => {
+      const [out] = scoreCandidates([cand({ relevance_score: 0, difficulty, search_volume })], {
+        cannibalSet: new Set(),
+        config,
+      });
+      return out!.opportunity_score as number;
+    };
+
+    it('scores KD 0 at high volume like a null KD — both mean "unknown"', () => {
+      expect(scoreAt(0, 5000)).toBe(scoreAt(null, 5000));
+    });
+
+    it('keeps KD 0 at low volume at maximum ease — plausible long-tail', () => {
+      expect(scoreAt(0, 50)).toBeGreaterThan(scoreAt(null, 50));
+    });
+
+    it('treats the volume threshold as exclusive', () => {
+      expect(scoreAt(0, 1000)).toBeGreaterThan(scoreAt(null, 1000)); // still max ease
+      expect(scoreAt(0, 1001)).toBe(scoreAt(null, 1001)); // unknown
+    });
+
+    it('leaves a real difficulty untouched at any volume', () => {
+      // KD 40 -> ease 0.6: above the 0.5 an unknown KD gets, below the 1.0 a
+      // genuine long-tail KD 0 keeps.
+      expect(scoreAt(40, 5000)).toBeGreaterThan(scoreAt(0, 5000));
+      expect(scoreAt(40, 50)).toBeLessThan(scoreAt(0, 50));
+    });
   });
 
   it('uses neutral 0.5 for null trend/difficulty and 0 for null volume', () => {

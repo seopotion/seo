@@ -24,6 +24,7 @@ export function toWorking(
     rejection_reason: null,
     status: 'candidate',
     serp_competitors: null,
+    serp_validated: false,
   };
 }
 

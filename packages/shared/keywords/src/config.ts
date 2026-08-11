@@ -4,6 +4,12 @@ import type { PipelineConfig, ResolvedConfig } from './types';
 /** Defaults for everything except location/language, which come from presets. */
 export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName'> = {
   difficultyCeiling: 45,
+  // Relevance is scale-compressed on the current model — genuinely good keywords
+  // land at 0.50-0.60 and every accepted candidate is >= 0.10 — so anything
+  // above 0 risks emptying the plan. 0 rejects only the exact zeros, which is
+  // the model explicitly seeing no connection at all. Tune against the
+  // distribution `db strategy-dryrun` prints.
+  relevanceFloor: 0,
   // Must exceed the worker's 30-day plan so every scheduled entry is
   // SERP-validated + classified, with buffer for SERP rejections.
   serpTopN: 40,

@@ -134,6 +134,89 @@ describe('runKeywordPipeline', () => {
     expect(serpCalls).toBe(1);
   });
 
+  it('stamps serp_validated only on candidates that passed SERP validation', async () => {
+    const { candidates } = await runKeywordPipeline({ ...input(), config: { serpTopN: 1 } });
+    const validated = candidates.filter((c) => c.serp_validated);
+    expect(validated.map((c) => c.keyword)).toEqual(['cheap dog food']);
+    // The below-N survivor is unrejected but unvalidated — the tier that used to
+    // backfill the plan (#211).
+    const belowN = candidates.find((c) => c.keyword === 'dog food delivery');
+    expect(belowN).toMatchObject({ rejection_reason: null, serp_validated: false });
+  });
+
+  describe('relevance floor', () => {
+    // The fake LLM scores only these two keywords; anything else keeps the 0 seed.
+    const scoring = (scores: Record<string, number>): LlmClient => {
+      const base = fakeLlm();
+      return {
+        complete: async (params) => {
+          if (!params.messages[0]!.content.includes('Score each keyword')) {
+            return base.complete(params);
+          }
+          const list = Object.entries(scores).map(([keyword, relevance]) => ({
+            keyword,
+            relevance,
+          }));
+          return {
+            text: JSON.stringify({ scores: list }),
+            model: 'm',
+            usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+          };
+        },
+      };
+    };
+
+    const run = async (scores: Record<string, number>, relevanceFloor?: number) =>
+      runKeywordPipeline({
+        ...input(),
+        clients: { dataForSeo: fakeDataForSeo(), llm: scoring(scores) },
+        config: relevanceFloor === undefined ? {} : { relevanceFloor },
+      });
+
+    it('rejects exactly 0 and keeps 0.01 at the default floor', async () => {
+      const { candidates, stats } = await run({
+        'cheap dog food': 0.01,
+        'dog food delivery': 0,
+      });
+      const byKeyword = new Map(candidates.map((c) => [c.keyword, c]));
+      expect(byKeyword.get('dog food delivery')!.rejection_reason).toBe('relevance_floor');
+      expect(byKeyword.get('cheap dog food')!.rejection_reason).toBeNull();
+      expect(stats.rejectedByReason.relevance_floor).toBe(1);
+      expect(stats.afterRelevanceFloor).toBe(1);
+    });
+
+    it('honors a configured threshold, rejecting everything at or below it', async () => {
+      const { candidates, stats } = await run(
+        { 'cheap dog food': 0.5, 'dog food delivery': 0.4 },
+        0.4,
+      );
+      const byKeyword = new Map(candidates.map((c) => [c.keyword, c]));
+      expect(byKeyword.get('dog food delivery')!.rejection_reason).toBe('relevance_floor');
+      expect(byKeyword.get('cheap dog food')!.rejection_reason).toBeNull();
+      expect(stats.afterRelevanceFloor).toBe(1);
+    });
+
+    it('rejects before the top-N split, so a zero never spends a SERP slot', async () => {
+      let serpCalls = 0;
+      const dfs = fakeDataForSeo();
+      const wrapped: DataForSeoClient = {
+        ...dfs,
+        serpGoogleOrganic: async (p) => {
+          serpCalls++;
+          return dfs.serpGoogleOrganic(p);
+        },
+      };
+      await runKeywordPipeline({
+        ...input(),
+        clients: {
+          dataForSeo: wrapped,
+          llm: scoring({ 'cheap dog food': 0.9, 'dog food delivery': 0 }),
+        },
+      });
+      expect(serpCalls).toBe(1); // not 2 — the zero was dropped first
+    });
+  });
+
   it('applies cannibalization penalty for a non-normalized existing keyword', async () => {
     const clean = await runKeywordPipeline(input());
     const penalized = await runKeywordPipeline({
