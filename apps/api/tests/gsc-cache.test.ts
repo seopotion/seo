@@ -9,13 +9,14 @@ vi.mock('@shared/db', () => ({
 }));
 
 import { cachedSearchAnalytics, cacheKey } from '../src/lib/gsc-cache';
+import type { SearchAnalyticsParams } from '../src/clients/gsc';
 
 const access = { token: 'rt-1', siteUrl: 'sc-domain:clewas.com' };
-const params = {
+const params: SearchAnalyticsParams = {
   startDate: '2026-06-17',
   endDate: '2026-07-15',
   dimensions: ['date'],
-} as const;
+};
 const rows = [{ keys: ['2026-07-01'], clicks: 5, impressions: 100, ctr: 0.05, position: 3.2 }];
 
 beforeEach(() => {
