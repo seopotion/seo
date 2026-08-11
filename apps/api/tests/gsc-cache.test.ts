@@ -8,8 +8,8 @@ vi.mock('@shared/db', () => ({
   GscAnalyticsCacheRepo: { get: cacheGet, put: cachePut },
 }));
 
-import { cachedSearchAnalytics, cacheKey } from '../src/lib/gsc-cache';
 import type { SearchAnalyticsParams } from '../src/clients/gsc';
+import { cachedSearchAnalytics, cacheKey } from '../src/lib/gsc-cache';
 
 const access = { token: 'rt-1', siteUrl: 'sc-domain:clewas.com' };
 const params: SearchAnalyticsParams = {
