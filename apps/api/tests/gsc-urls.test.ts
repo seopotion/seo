@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { matchArticleByPage, normalizeUrl } from '../src/lib/gsc-urls';
+import { finalSegment, matchArticleByPage, normalizeUrl } from '../src/lib/gsc-urls';
 
 /** Minimal article shape: the matcher only reads `publications[].slug`. */
 function article(id: string, ...slugs: string[]) {
@@ -32,6 +32,22 @@ describe('normalizeUrl', () => {
 
   test('unparseable input returns null', () => {
     expect(normalizeUrl('not a url')).toBeNull();
+  });
+});
+
+describe('finalSegment', () => {
+  test('root URL returns null', () => {
+    expect(finalSegment('https://example.com/')).toBeNull();
+    expect(finalSegment('https://example.com')).toBeNull();
+  });
+
+  test('nested path returns the decoded last segment', () => {
+    expect(finalSegment('https://example.com/blog/nested/my-post')).toBe('my-post');
+    expect(finalSegment('https://example.com/my%20post')).toBe('my post');
+  });
+
+  test('unparseable input returns null', () => {
+    expect(finalSegment('not a url')).toBeNull();
   });
 });
 

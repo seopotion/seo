@@ -1,5 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { ArticleRepo, GscConnectionRepo } from '@shared/db';
+import type { Article } from '@shared/schemas';
+import type { SearchAnalyticsRow } from '../clients/gsc';
 import { GscAuthRevokedError } from '../clients/gsc';
 import { gscAccess } from '../lib/gsc-access';
 import {
@@ -14,7 +16,7 @@ import {
   trendFor,
 } from '../lib/gsc-analytics';
 import { cachedSearchAnalytics } from '../lib/gsc-cache';
-import { matchArticleByPage } from '../lib/gsc-urls';
+import { finalSegment, matchArticleByPage } from '../lib/gsc-urls';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
@@ -30,6 +32,46 @@ const GATED_SUMMARY = {
 
 /** Published articles for matching; org article counts are small (#208). */
 const PUBLISHED_LIMIT = 1000;
+
+/**
+ * Index page-dimension rows by their final URL path segment, one `new URL()`
+ * parse per row (#208 perf): avoids re-parsing every row per article.
+ */
+function indexBySegment(rows: SearchAnalyticsRow[]): Map<string, SearchAnalyticsRow[]> {
+  const bySegment = new Map<string, SearchAnalyticsRow[]>();
+  for (const r of rows) {
+    const segment = finalSegment(r.keys[0] ?? '');
+    if (segment === null) continue;
+    const bucket = bySegment.get(segment);
+    if (bucket) bucket.push(r);
+    else bySegment.set(segment, [r]);
+  }
+  return bySegment;
+}
+
+/**
+ * All rows matching any of the article's publication slugs, deduped so a row
+ * shared by two publications of the SAME article is not double-counted. Two
+ * different articles sharing a slug still each get the row — a known,
+ * separately-tracked matching inconsistency (#208), not fixed here.
+ */
+function rowsForArticle(
+  bySegment: Map<string, SearchAnalyticsRow[]>,
+  article: Pick<Article, 'publications'>,
+): SearchAnalyticsRow[] {
+  const seen = new Set<SearchAnalyticsRow>();
+  const rows: SearchAnalyticsRow[] = [];
+  for (const p of article.publications) {
+    const bucket = bySegment.get(p.slug);
+    if (!bucket) continue;
+    for (const r of bucket) {
+      if (seen.has(r)) continue;
+      seen.add(r);
+      rows.push(r);
+    }
+  }
+  return rows;
+}
 
 /**
  * Analytics page routes (#208): GSC reads behind the 48h cache, joined to our
@@ -67,6 +109,17 @@ const analytics = new OpenAPIHono<AuthEnv>()
       if (!access) return c.json(GATED_SUMMARY, 200);
 
       const w = analyticsWindows(range);
+      // Doesn't depend on GSC data — read outside the try so a Mongo failure
+      // here isn't misattributed as a GSC read failure (#208).
+      let publishedSlugs: Set<string> | null = null;
+      if (scope === 'articles') {
+        const { articles: published } = await ArticleRepo.listByOrg(org_id, {
+          status: 'published',
+          limit: PUBLISHED_LIMIT,
+          offset: 0,
+        });
+        publishedSlugs = new Set(published.flatMap((a) => a.publications.map((p) => p.slug)));
+      }
       try {
         let rows =
           scope === 'site'
@@ -81,13 +134,12 @@ const analytics = new OpenAPIHono<AuthEnv>()
                 dimensions: ['date', 'page'],
                 rowLimit: 25000,
               });
-        if (scope === 'articles') {
-          const { articles: published } = await ArticleRepo.listByOrg(org_id, {
-            status: 'published',
-            limit: PUBLISHED_LIMIT,
-            offset: 0,
+        if (publishedSlugs) {
+          const slugs = publishedSlugs;
+          rows = rows.filter((r) => {
+            const segment = finalSegment(r.keys[1] ?? '');
+            return segment !== null && slugs.has(segment);
           });
-          rows = rows.filter((r) => matchArticleByPage(r.keys[1] ?? '', published) !== null);
         }
         const { current, prior } = splitByWindow(rows, w.currentStartDate);
         const totals = aggregateTotals(current);
@@ -141,6 +193,13 @@ const analytics = new OpenAPIHono<AuthEnv>()
 
       const w = analyticsWindows(range);
       const now = new Date();
+      // Doesn't depend on GSC data — read outside the try so a Mongo failure
+      // here isn't misattributed as a GSC read failure (#208).
+      const { articles: published } = await ArticleRepo.listByOrg(org_id, {
+        status: 'published',
+        limit: PUBLISHED_LIMIT,
+        offset: 0,
+      });
       try {
         const pageQuery = { dimensions: ['page'], rowLimit: 25000 };
         const [currentRows, priorRows] = await Promise.all([
@@ -155,18 +214,16 @@ const analytics = new OpenAPIHono<AuthEnv>()
             endDate: w.priorEndDate,
           }),
         ]);
-        const { articles: published } = await ArticleRepo.listByOrg(org_id, {
-          status: 'published',
-          limit: PUBLISHED_LIMIT,
-          offset: 0,
-        });
+        // One URL parse per row (indexed once), not per article × row (#208 perf).
+        const currentBySegment = indexBySegment(currentRows);
+        const priorBySegment = indexBySegment(priorRows);
         const rows = published.map((a) => {
           // All URL variants GSC reports for this article (http/www/…) sum up.
-          const mine = (rs: typeof currentRows) =>
-            rs.filter((r) => matchArticleByPage(r.keys[0] ?? '', [a]) !== null);
-          const current = aggregateTotals(mine(currentRows));
-          const prior = aggregateTotals(mine(priorRows));
-          const hasRow = mine(currentRows).length > 0;
+          const currentMatched = rowsForArticle(currentBySegment, a);
+          const priorMatched = rowsForArticle(priorBySegment, a);
+          const current = aggregateTotals(currentMatched);
+          const prior = aggregateTotals(priorMatched);
+          const hasRow = currentMatched.length > 0;
           const publishedAt = articlePublishedAt(a);
           const days = publishedAt ? daysLive(publishedAt, now) : 0;
           return {

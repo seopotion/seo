@@ -19,7 +19,7 @@ export function normalizeUrl(url: string): string | null {
 }
 
 /** Final path segment of a URL, decoded; null for the root or unparseable input. */
-function finalSegment(url: string): string | null {
+export function finalSegment(url: string): string | null {
   const normalized = normalizeUrl(url);
   if (normalized === null) return null;
   const segments = normalized.split('/');

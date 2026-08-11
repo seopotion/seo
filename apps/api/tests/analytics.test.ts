@@ -220,6 +220,7 @@ vi.mock('@shared/db', () => {
 
 import { testClient } from 'hono/testing';
 import { encryptSecret } from '../src/lib/crypto';
+import { logger } from '../src/logger';
 import app, { type AppType } from '../src/routes';
 
 const client = testClient<AppType>(app);
@@ -408,6 +409,7 @@ describe('GET /dashboard/analytics/summary', () => {
   test('transient GSC errors degrade to gated without marking the connection', async () => {
     connectGsc('org_1', 'https://site.com');
     querySearchAnalytics.mockRejectedValueOnce(new Error('boom'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const opts = await auth();
 
     const res = await client.api.v0.dashboard.analytics.summary.$get(
@@ -418,6 +420,7 @@ describe('GET /dashboard/analytics/summary', () => {
     expect(res.status).toBe(200);
     if (res.status === 200) expect((await res.json()).gated).toBe(true);
     expect(markRefreshFailed).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 
@@ -597,6 +600,7 @@ describe('GET /dashboard/analytics/articles', () => {
   test('transient GSC errors degrade to gated without marking the connection', async () => {
     connectGsc('org_1', 'https://site.com');
     querySearchAnalytics.mockRejectedValueOnce(new Error('boom'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const opts = await auth();
 
     const res = await client.api.v0.dashboard.analytics.articles.$get(
@@ -607,6 +611,7 @@ describe('GET /dashboard/analytics/articles', () => {
     expect(res.status).toBe(200);
     if (res.status === 200) expect(await res.json()).toEqual({ gated: true, articles: [] });
     expect(markRefreshFailed).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 
@@ -783,6 +788,7 @@ describe('GET /dashboard/analytics/articles/:id/timeseries', () => {
   test('transient GSC errors degrade to gated without marking the connection', async () => {
     connectGsc('org_1', 'https://site.com');
     querySearchAnalytics.mockRejectedValueOnce(new Error('boom'));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const opts = await auth();
 
     const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
@@ -800,5 +806,6 @@ describe('GET /dashboard/analytics/articles/:id/timeseries', () => {
       });
     }
     expect(markRefreshFailed).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

@@ -10,6 +10,7 @@ vi.mock('@shared/db', () => ({
 
 import type { SearchAnalyticsParams } from '../src/clients/gsc';
 import { cachedSearchAnalytics, cacheKey } from '../src/lib/gsc-cache';
+import { logger } from '../src/logger';
 
 const access = { token: 'rt-1', siteUrl: 'sc-domain:clewas.com' };
 const params: SearchAnalyticsParams = {
@@ -76,5 +77,30 @@ describe('cachedSearchAnalytics', () => {
     querySearchAnalytics.mockRejectedValue(new Error('quota'));
     await expect(cachedSearchAnalytics('org_1', access, { ...params })).rejects.toThrow('quota');
     expect(cachePut).not.toHaveBeenCalled();
+  });
+
+  test('cache read failure is treated as a miss: live call still happens, rows returned', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    cacheGet.mockRejectedValue(new Error('Mongo blip'));
+    querySearchAnalytics.mockResolvedValue(rows);
+
+    const result = await cachedSearchAnalytics('org_1', access, { ...params });
+
+    expect(result).toEqual(rows);
+    expect(querySearchAnalytics).toHaveBeenCalledWith(access.token, access.siteUrl, { ...params });
+    expect(warnSpy).toHaveBeenCalledWith('GSC cache read failed', { error: expect.any(Error) });
+    warnSpy.mockRestore();
+  });
+
+  test('cache write failure does not prevent the live rows from being returned', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    querySearchAnalytics.mockResolvedValue(rows);
+    cachePut.mockRejectedValue(new Error('E11000 duplicate key'));
+
+    const result = await cachedSearchAnalytics('org_1', access, { ...params });
+
+    expect(result).toEqual(rows);
+    expect(warnSpy).toHaveBeenCalledWith('GSC cache write failed', { error: expect.any(Error) });
+    warnSpy.mockRestore();
   });
 });
