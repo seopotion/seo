@@ -150,6 +150,15 @@ vi.mock('@shared/db', () => {
       updated_at: now,
       published_at: now,
       wordpress_post_id: 222,
+      publications: [
+        {
+          provider: 'wordpress',
+          ref: '222',
+          slug: 'notion-builder',
+          published_at: now,
+          updated_at: null,
+        },
+      ],
       video: null,
     },
     // Owned by org_3 (user_2) — never visible to user_1 via detail reads.

@@ -18,6 +18,7 @@ import {
   testWordPressIntegration,
 } from '../clients/wordpress';
 import { decryptSecret, encryptSecret } from '../lib/crypto';
+import { matchArticleByPage } from '../lib/gsc-urls';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { recordWordPressPublication } from '../lib/publications';
@@ -230,7 +231,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         });
         const articles = rows.map((row) => {
           const url = row.keys[0] ?? '';
-          const match = published.find((a: Article) => url.includes(`/${a.slug}`));
+          const match = matchArticleByPage(url, published);
           return { url, clicks: Math.round(row.clicks), title: match?.title ?? null };
         });
         return c.json({ articles, gated: false }, 200);
