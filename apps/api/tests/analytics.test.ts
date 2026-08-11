@@ -118,6 +118,50 @@ vi.mock('@shared/db', () => {
       ],
       video: null,
     },
+    // Owned by org_3 (user_2) — never visible to user_1 via the timeseries route.
+    {
+      id: 'art_3',
+      org_id: 'org_3',
+      keyword_id: 'kw_3',
+      title: 'Foreign Article',
+      meta_title: 'Foreign Article',
+      slug: 'foreign-article',
+      keyword: 'foreign',
+      meta_description: 'm',
+      featured_image_url: 'https://x/3.png',
+      content: '# c',
+      difficulty: 10,
+      search_volume: 50,
+      status: 'generated',
+      images_status: 'pending',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      publications: [] as Record<string, unknown>[],
+      video: null,
+    },
+    // Never published — no publications, no published_at.
+    {
+      id: 'art_draft',
+      org_id: 'org_1',
+      keyword_id: 'kw_draft',
+      title: 'Draft Post',
+      meta_title: 'Draft Post',
+      slug: 'draft-post',
+      keyword: 'draft post',
+      meta_description: 'm',
+      featured_image_url: 'https://x/draft.png',
+      content: '# d',
+      difficulty: 15,
+      search_volume: 25,
+      status: 'generated',
+      images_status: 'complete',
+      created_at: now,
+      updated_at: null,
+      published_at: null,
+      publications: [] as Record<string, unknown>[],
+      video: null,
+    },
   ];
   const orgs = new Map<string, Record<string, unknown>>([
     [
@@ -562,6 +606,199 @@ describe('GET /dashboard/analytics/articles', () => {
 
     expect(res.status).toBe(200);
     if (res.status === 200) expect(await res.json()).toEqual({ gated: true, articles: [] });
+    expect(markRefreshFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /dashboard/analytics/articles/:id/timeseries', () => {
+  test('404 for a missing article and for a foreign org article', async () => {
+    const opts = await auth();
+
+    const missing = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_nope' }, query: { org_id: 'org_1' } },
+      opts,
+    );
+    expect(missing.status).toBe(404);
+
+    // art_3 is owned by org_3, which user_1 does not own.
+    const foreignOrg = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_3' }, query: { org_id: 'org_3' } },
+      opts,
+    );
+    expect(foreignOrg.status).toBe(404);
+
+    // art_pub belongs to org_1, but the query claims org_2 — mismatched org.
+    const mismatchedOrg = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_2' } },
+      opts,
+    );
+    expect(mismatchedOrg.status).toBe(404);
+
+    expect(querySearchAnalytics).not.toHaveBeenCalled();
+  });
+
+  test('not-published shape for an article without publications', async () => {
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_draft' }, query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    expect(await res.json()).toEqual({
+      gated: false,
+      series: [],
+      days_live: null,
+      data_state: 'not_published',
+    });
+    expect(querySearchAnalytics).not.toHaveBeenCalled();
+  });
+
+  test('gated shape when GSC is not connected', async () => {
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    expect(await res.json()).toEqual({
+      gated: true,
+      series: [],
+      days_live: null,
+      data_state: 'awaiting',
+    });
+    expect(querySearchAnalytics).not.toHaveBeenCalled();
+  });
+
+  test('resolves the page URL from the cached page query, then filters the date query to it', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics
+      .mockResolvedValueOnce([
+        {
+          keys: ['https://site.com/blog/landing-pages'],
+          clicks: 10,
+          impressions: 100,
+          ctr: 0.1,
+          position: 4,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { keys: ['2026-06-05'], clicks: 3, impressions: 30, ctr: 0.1, position: 5 },
+        { keys: ['2026-08-01'], clicks: 7, impressions: 70, ctr: 0.1, position: 3 },
+      ]);
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    expect(querySearchAnalytics).toHaveBeenCalledTimes(2);
+    expect(querySearchAnalytics).toHaveBeenNthCalledWith(
+      1,
+      'fake-refresh-token',
+      'https://site.com',
+      {
+        startDate: '2026-05-11',
+        endDate: '2026-08-08',
+        dimensions: ['page'],
+        rowLimit: 25000,
+      },
+    );
+    expect(querySearchAnalytics).toHaveBeenNthCalledWith(
+      2,
+      'fake-refresh-token',
+      'https://site.com',
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-08-11',
+        dimensions: ['date'],
+        dimensionFilterGroups: [
+          {
+            filters: [
+              {
+                dimension: 'page',
+                operator: 'equals',
+                expression: 'https://site.com/blog/landing-pages',
+              },
+            ],
+          },
+        ],
+      },
+    );
+    if (res.status !== 200) return;
+    const body = await res.json();
+    expect(body.gated).toBe(false);
+    expect(body.days_live).toBe(71);
+    expect(body.data_state).toBe('ok');
+    expect(body.series).toEqual([
+      { date: '2026-06-05', clicks: 3, impressions: 30, ctr: 0.1, position: 5 },
+      { date: '2026-08-01', clicks: 7, impressions: 70, ctr: 0.1, position: 3 },
+    ]);
+  });
+
+  test('published article with no matching page row yet → awaiting with empty series', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockResolvedValueOnce([]);
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    expect(querySearchAnalytics).toHaveBeenCalledTimes(1);
+    if (res.status !== 200) return;
+    expect(await res.json()).toEqual({
+      gated: false,
+      series: [],
+      days_live: 71,
+      data_state: 'awaiting',
+    });
+  });
+
+  test('revoked → markRefreshFailed → gated-style body', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockRejectedValueOnce(new GscAuthRevokedError('revoked'));
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      expect(await res.json()).toEqual({
+        gated: true,
+        series: [],
+        days_live: null,
+        data_state: 'awaiting',
+      });
+    }
+    expect(markRefreshFailed).toHaveBeenCalledWith('org_1');
+  });
+
+  test('transient GSC errors degrade to gated without marking the connection', async () => {
+    connectGsc('org_1', 'https://site.com');
+    querySearchAnalytics.mockRejectedValueOnce(new Error('boom'));
+    const opts = await auth();
+
+    const res = await client.api.v0.dashboard.analytics.articles[':id'].timeseries.$get(
+      { param: { id: 'art_pub' }, query: { org_id: 'org_1' } },
+      opts,
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      expect(await res.json()).toEqual({
+        gated: true,
+        series: [],
+        days_live: null,
+        data_state: 'awaiting',
+      });
+    }
     expect(markRefreshFailed).not.toHaveBeenCalled();
   });
 });

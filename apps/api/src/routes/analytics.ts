@@ -9,6 +9,7 @@ import {
   buildSeries,
   computeDeltas,
   daysLive,
+  gscDate,
   splitByWindow,
   trendFor,
 } from '../lib/gsc-analytics';
@@ -191,6 +192,101 @@ const analytics = new OpenAPIHono<AuthEnv>()
           logger.warn('GSC read failed for /analytics/articles', { org_id, error: err as Error });
         }
         return c.json({ gated: true, articles: [] }, 200);
+      }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['analytics'],
+      method: 'get',
+      path: '/articles/{id}/timeseries',
+      summary: 'Full-lifetime daily series for one article (on-demand)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.ArticleParams, query: schemas.OrgQuery },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AnalyticsTimeseriesResponse } },
+          description: 'Daily series from publish date; empty while awaiting data',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
+          description: 'Article not found or not owned by the caller',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const { org_id } = c.req.valid('query');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      // Missing, foreign-org, and mismatched-org all 404 — never leak existence.
+      if (!article || article.org_id !== org_id || !(await loadOwnedOrg(org_id, userId))) {
+        return c.json({ error: 'Article not found' }, 404);
+      }
+
+      const publishedAt = articlePublishedAt(article);
+      if (!publishedAt || article.publications.length === 0) {
+        return c.json(
+          { gated: false, series: [], days_live: null, data_state: 'not_published' as const },
+          200,
+        );
+      }
+
+      const GATED = {
+        gated: true,
+        series: [],
+        days_live: null,
+        data_state: 'awaiting' as const,
+      };
+      const access = await gscAccess(org_id);
+      if (!access) return c.json(GATED, 200);
+
+      const now = new Date();
+      const days = daysLive(publishedAt, now);
+      try {
+        // The article's exact GSC URL is unknown (we match by slug) — resolve it
+        // from the cached page-dimension query first (#208). 90d window: widest
+        // match chance, and the /articles table at 90d shares the cache entry.
+        const w = analyticsWindows('90d', now);
+        const pageRows = await cachedSearchAnalytics(org_id, access, {
+          startDate: w.currentStartDate,
+          endDate: w.endDate,
+          dimensions: ['page'],
+          rowLimit: 25000,
+        });
+        const pageRow = pageRows.find(
+          (r) => matchArticleByPage(r.keys[0] ?? '', [article]) !== null,
+        );
+        if (!pageRow) {
+          return c.json(
+            { gated: false, series: [], days_live: days, data_state: 'awaiting' as const },
+            200,
+          );
+        }
+        const pageUrl = pageRow.keys[0] ?? '';
+        // Full lifetime: publish date → today. GSC's trailing-lag dip is the
+        // detail view's honest shape; the summary windows are where it biases
+        // deltas and gets the −3d cut (#208 pinned decisions).
+        const rows = await cachedSearchAnalytics(org_id, access, {
+          startDate: gscDate(publishedAt),
+          endDate: gscDate(now),
+          dimensions: ['date'],
+          dimensionFilterGroups: [
+            { filters: [{ dimension: 'page', operator: 'equals', expression: pageUrl }] },
+          ],
+        });
+        return c.json(
+          { gated: false, series: buildSeries(rows), days_live: days, data_state: 'ok' as const },
+          200,
+        );
+      } catch (err) {
+        if (err instanceof GscAuthRevokedError) {
+          await GscConnectionRepo.markRefreshFailed(org_id);
+        } else {
+          logger.warn('GSC read failed for /analytics/timeseries', { org_id, error: err as Error });
+        }
+        return c.json(GATED, 200);
       }
     },
   );

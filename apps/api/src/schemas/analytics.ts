@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { OrgQuery } from './dashboard';
 
-export { OrgNotFoundResponse } from './dashboard';
+export { ArticleNotFoundResponse, ArticleParams, OrgNotFoundResponse, OrgQuery } from './dashboard';
 
 /** Analytics page schemas (#208). All GSC-backed reads share the gated flag. */
 
@@ -90,3 +90,16 @@ export const AnalyticsArticlesResponse = z
     articles: z.array(ArticleAnalyticsRow),
   })
   .openapi('AnalyticsArticlesResponse');
+
+export const AnalyticsTimeseriesResponse = z
+  .object({
+    gated: z.boolean(),
+    // Full-lifetime daily series (publish date → today) for the resolved URL.
+    series: z.array(AnalyticsSeriesPoint),
+    // Null only when the article has never been published (or while gated).
+    days_live: z.number().int().nullable(),
+    // not_published: no publications; awaiting: no GSC page row yet (or gated).
+    // The 14-day "still gathering" gate is the frontend's, from days_live.
+    data_state: z.enum(['ok', 'awaiting', 'not_published']),
+  })
+  .openapi('AnalyticsTimeseriesResponse');
