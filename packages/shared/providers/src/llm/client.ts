@@ -76,6 +76,22 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
     };
   }
 
+  /** `once`, plus retries on transient transport failures. */
+  async function send(body: Record<string, unknown>): Promise<LlmResult> {
+    let attempt = 0;
+    // Loop: initial try + up to maxRetries retries on retryable categories.
+    for (;;) {
+      try {
+        return await once(body);
+      } catch (err) {
+        const retryable = err instanceof ProviderError && isRetryableProviderError(err.category);
+        if (!retryable || attempt >= maxRetries) throw err;
+        await sleep(retryDelayMs * 2 ** attempt);
+        attempt += 1;
+      }
+    }
+  }
+
   return {
     async complete(params: LlmCompleteParams): Promise<LlmResult> {
       const body: Record<string, unknown> = {
@@ -86,18 +102,19 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       if (params.temperature !== undefined) body.temperature = params.temperature;
       if (params.responseFormat === 'json') body.response_format = { type: 'json_object' };
 
-      let attempt = 0;
-      // Loop: initial try + up to maxRetries retries on retryable categories.
-      for (;;) {
-        try {
-          return await once(body);
-        } catch (err) {
-          const retryable = err instanceof ProviderError && isRetryableProviderError(err.category);
-          if (!retryable || attempt >= maxRetries) throw err;
-          await sleep(retryDelayMs * 2 ** attempt);
-          attempt += 1;
-        }
-      }
+      const result = await send(body);
+      // An empty body is a 200 OK that says nothing: every caller parses JSON out
+      // of `text`, so there is no reading under which "" is an answer. A
+      // reasoning model produces it by spending its entire output budget on
+      // reasoning tokens and emitting no content — measured on GLM-5.2 at 65,536
+      // completion tokens for an empty classify body, and again on 2 of 15
+      // batched SERP-judge calls (#211). One retry, because the callers'
+      // degradation paths (fail-open judge, `other` seed) are silent by design
+      // and a second sample is far cheaper than a stage that quietly does
+      // nothing. If it repeats, return the empty result and let those paths run
+      // unchanged.
+      if (result.text.trim().length > 0) return result;
+      return send(body);
     },
   };
 }

@@ -4,7 +4,9 @@ import { z } from 'zod';
 export const CANDIDATE_SOURCES = [
   'keywords_for_site',
   'ranked_keywords',
+  // Retired in #211 in favour of keyword_suggestions; kept so historical rows parse.
   'keyword_ideas',
+  'keyword_suggestions',
   'serp',
   'manual',
   'seed',
@@ -36,15 +38,20 @@ export const ARTICLE_TYPES = [
 ] as const;
 export type ArticleType = (typeof ARTICLE_TYPES)[number];
 
+export const TOPIC_ROLES = ['pillar', 'support'] as const;
+export type TopicRole = (typeof TOPIC_ROLES)[number];
+
 /** Why a candidate was rejected by the pipeline (#54). */
 export const REJECTION_REASONS = [
   'brand_navigation',
   'clustered_duplicate',
   'difficulty_ceiling',
+  'relevance_floor',
   'serp_intent',
   'serp_authority',
   'serp_locality',
   'serp_duplicate',
+  'topic_duplicate',
 ] as const;
 export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
@@ -92,6 +99,13 @@ export const CandidateSchema = z.object({
   normalized_keyword: z.string(),
   source: z.enum(CANDIDATE_SOURCES),
   source_context: z.string().nullable().default(null),
+  core_keyword: z.string().nullable().default(null),
+  category_ids: z.array(z.number().int()).default([]),
+  topic_cluster_id: z.string().nullable().default(null),
+  topic_cluster_label: z.string().nullable().default(null),
+  topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
+  topic_content_focus: z.string().nullable().default(null),
+  topic_primary_keyword: z.string().nullable().default(null),
   search_volume: z.number().int().nullable().default(null),
   difficulty: z.number().int().nullable().default(null),
   cpc: z.number().nullable().default(null),
@@ -100,6 +114,15 @@ export const CandidateSchema = z.object({
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
   // Top-K organic results captured during SERP validation (#47/#144); null otherwise.
   serp_competitors: SerpCompetitorsField,
+  /**
+   * Whether the candidate actually passed SERP validation (#211). Explicit
+   * rather than inferred from `serp_competitors !== null`, which is a data
+   * artifact: pre-#99 records have it null for unrelated reasons, and the
+   * below-serpTopN tier is unvalidated yet indistinguishable by rejection
+   * reason. Only a validated candidate may be scheduled. Defaults to false so
+   * documents written before this field parse as unvalidated.
+   */
+  serp_validated: z.boolean().default(false),
   relevance_score: z.number().nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
   article_type: z.enum(ARTICLE_TYPES).nullable().default(null),

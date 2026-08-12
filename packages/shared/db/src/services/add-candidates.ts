@@ -5,7 +5,7 @@ import { KeywordRepo } from '../repositories/keyword.repo';
 /**
  * Persist candidates into the pool, deduping against both existing candidates
  * (handled by CandidateRepo) and keywords already scheduled on the planner.
- * Shared by the #50 manual-selection handler and the #47 strategy worker.
+ * Shared by manual/API candidate-pool callers.
  */
 export async function addCandidates(
   orgId: string,

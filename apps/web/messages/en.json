@@ -606,7 +606,7 @@
       "title": "Google Search Console"
     },
     "placeholders": {
-      "competitorUrl": "https://competitor.com"
+      "competitorUrl": "competitor.com"
     },
     "staticSite": {
       "beforeRedirect": "You'll continue on github.com to choose which repositories SeoPotion can write to, then come back here to pick a branch and folder.",
@@ -822,7 +822,9 @@
       "youtubeVideos": "YouTube videos"
     },
     "audience": {
-      "competitorUrls": "Competitor website URLs",
+      "competitorUrls": "Competitor websites (optional)",
+      "competitorsHelp": "If you know genuinely comparable companies, add their domains as an optional supplementary signal. Your strategy works without competitor domains.",
+      "competitorsHint": "Optional: enter a genuinely comparable company's domain, like competitor.com. A company name will not work.",
       "targetAudience": "Target audience",
       "targetAudiencePlaceholder": "",
       "title": "Target Audience And Competitors"
@@ -928,8 +930,10 @@
     "validation": {
       "articleStyleRequired": "Article style is required.",
       "businessNameRequired": "Business name is required.",
-      "competitorUrl": "Enter a valid competitor URL.",
-      "competitorsValidUrls": "Each competitor must be a valid URL.",
+      "competitorDomain": "Enter a valid website domain, like competitor.com.",
+      "competitorsDuplicate": "That competitor is already on the list.",
+      "competitorsMax": "You can add up to {max} competitors.",
+      "competitorsValidDomains": "Each competitor must be a website domain.",
       "countryRequired": "Country is required.",
       "labels": {
         "blogPageUrl": "Blog page URL",

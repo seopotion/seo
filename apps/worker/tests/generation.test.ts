@@ -9,6 +9,7 @@ const {
   findOrgById,
   createArticle,
   listByOrg,
+  listPublishedByTopicCluster,
 } = vi.hoisted(() => ({
   claimGeneration: vi.fn(async () => true),
   findKeywordById: vi.fn(),
@@ -17,11 +18,12 @@ const {
   findOrgById: vi.fn(),
   createArticle: vi.fn(async (_doc: unknown) => ({ id: 'art1' })),
   listByOrg: vi.fn(async () => ({ articles: [] as unknown[], total: 0 })),
+  listPublishedByTopicCluster: vi.fn(async () => [] as unknown[]),
 }));
 vi.mock('@shared/db', () => ({
   KeywordRepo: { claimGeneration, findById: findKeywordById, failGeneration, linkArticle },
   OrgRepo: { findById: findOrgById },
-  ArticleRepo: { create: createArticle, listByOrg },
+  ArticleRepo: { create: createArticle, listByOrg, listPublishedByTopicCluster },
 }));
 
 const { generateArticle, verifyCandidates } = vi.hoisted(() => ({
@@ -45,6 +47,7 @@ vi.mock('../src/providers', () => ({
 const { enqueueImageTask } = vi.hoisted(() => ({ enqueueImageTask: vi.fn(async () => {}) }));
 vi.mock('../src/queue', () => ({ enqueueImageTask }));
 
+import { MAX_LINK_CANDIDATES } from '@shared/generation';
 import { handler } from '../src/generation';
 
 function event(body: unknown): SQSEvent {
@@ -91,6 +94,11 @@ const keyword = {
   keyword: 'best widgets',
   difficulty: 10,
   search_volume: 100,
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
 };
 
 const okArticle = {
@@ -135,6 +143,11 @@ describe('generation worker', () => {
     expect(createArticle.mock.calls[0]![0]).toMatchObject({
       status: 'generated',
       featured_image_url: '',
+      topic_cluster_id: null,
+      topic_cluster_label: null,
+      topic_role: null,
+      topic_content_focus: null,
+      topic_primary_keyword: null,
     });
     expect(linkArticle).toHaveBeenCalledWith('k1', 'art1');
     expect(enqueueImageTask).toHaveBeenCalledWith({ org_id: 'o1', article_id: 'art1' });
@@ -268,6 +281,37 @@ describe('generation worker', () => {
     expect(created.video).toBeNull();
   });
 
+  test.each([
+    'pillar',
+    'support',
+  ] as const)('copies exact %s Keyword topic metadata into the Article snapshot', async (role) => {
+    const semanticKeyword = {
+      ...keyword,
+      keyword: 'membrane fouling',
+      topic_cluster_id: 'topic:membrane fouling',
+      topic_cluster_label: 'Membrane fouling',
+      topic_role: role,
+      topic_content_focus: 'What membrane fouling is and why it occurs',
+      topic_primary_keyword: ' Membrane   Fouling ',
+    };
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(semanticKeyword);
+    generateArticle.mockResolvedValue(okArticle);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+    semanticKeyword.topic_cluster_label = 'Changed after generation';
+
+    expect(createArticle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topic_cluster_id: 'topic:membrane fouling',
+        topic_cluster_label: 'Membrane fouling',
+        topic_role: role,
+        topic_content_focus: 'What membrane fouling is and why it occurs',
+        topic_primary_keyword: ' Membrane   Fouling ',
+      }),
+    );
+  });
+
   const linkingOrg = {
     ...org,
     presets: {
@@ -281,10 +325,45 @@ describe('generation worker', () => {
   };
 
   const published = {
+    id: 'article-published',
+    org_id: 'o1',
     title: 'Widget Guide',
     slug: 'edited-later',
+    status: 'published',
     publications: [{ slug: 'widget-guide', published_at: new Date('2026-01-01') }],
+    topic_cluster_id: null,
+    topic_role: null,
   };
+
+  const semanticKeyword = (role: 'pillar' | 'support') => ({
+    ...keyword,
+    keyword: 'membrane fouling',
+    topic_cluster_id: 'topic:membrane fouling',
+    topic_cluster_label: 'Membrane fouling',
+    topic_role: role,
+    topic_content_focus:
+      role === 'pillar'
+        ? 'What membrane fouling is and why it occurs'
+        : 'How operators prevent membrane fouling',
+    topic_primary_keyword: ' Membrane   Fouling ',
+  });
+
+  const publishedArticle = (
+    title: string,
+    slug: string,
+    topicClusterId: string | null,
+    topicRole: 'pillar' | 'support' | null,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    ...published,
+    id: `article-${slug}`,
+    title,
+    slug,
+    publications: [{ slug, published_at: new Date('2026-01-01') }],
+    topic_cluster_id: topicClusterId,
+    topic_role: topicRole,
+    ...overrides,
+  });
 
   test('passes verified candidates from published articles into the context (#186)', async () => {
     findOrgById.mockResolvedValue(linkingOrg);
@@ -296,14 +375,24 @@ describe('generation worker', () => {
 
     expect(listByOrg).toHaveBeenCalledWith('o1', expect.objectContaining({ status: 'published' }));
     expect(verifyCandidates).toHaveBeenCalledWith([
-      { title: 'Widget Guide', url: 'https://acme.com/blog/widget-guide' },
+      {
+        title: 'Widget Guide',
+        url: 'https://acme.com/blog/widget-guide',
+        topic_cluster_id: null,
+        topic_role: null,
+      },
     ]);
     const passed = generateArticle.mock.calls[0]![0] as {
       ctx: { linkCandidates: unknown[]; maxInternalLinks: number };
     };
     expect(passed.ctx.maxInternalLinks).toBe(2);
     expect(passed.ctx.linkCandidates).toEqual([
-      { title: 'Widget Guide', url: 'https://acme.com/blog/widget-guide' },
+      {
+        title: 'Widget Guide',
+        url: 'https://acme.com/blog/widget-guide',
+        topic_cluster_id: null,
+        topic_role: null,
+      },
     ]);
   });
 
@@ -320,6 +409,177 @@ describe('generation worker', () => {
     expect(passed.ctx.linkCandidates).toEqual([]);
   });
 
+  test('a support prioritizes its published pillar, then same-cluster pages, then general pages', async () => {
+    const sameSupport = publishedArticle(
+      'Same Support',
+      'same-support',
+      'topic:membrane fouling',
+      'support',
+    );
+    const pillar = publishedArticle(
+      'Cluster Pillar',
+      'cluster-pillar',
+      'topic:membrane fouling',
+      'pillar',
+    );
+    const other = publishedArticle('Newer Unrelated', 'newer-unrelated', 'topic:other', 'pillar');
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(semanticKeyword('support'));
+    generateArticle.mockResolvedValue(okArticle);
+    listPublishedByTopicCluster
+      .mockResolvedValueOnce([pillar])
+      .mockResolvedValueOnce([sameSupport]);
+    listByOrg.mockResolvedValueOnce({ articles: [other, sameSupport, pillar], total: 3 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listPublishedByTopicCluster).toHaveBeenCalledWith('o1', 'topic:membrane fouling', {
+      limit: MAX_LINK_CANDIDATES,
+      role: { value: 'pillar', mode: 'include' },
+    });
+    expect(listPublishedByTopicCluster).toHaveBeenNthCalledWith(2, 'o1', 'topic:membrane fouling', {
+      limit: MAX_LINK_CANDIDATES,
+      role: { value: 'pillar', mode: 'exclude' },
+    });
+    const ordered = verifyCandidates.mock.calls[0]![0] as { title: string }[];
+    expect(ordered.map((candidate) => candidate.title)).toEqual([
+      'Cluster Pillar',
+      'Same Support',
+      'Newer Unrelated',
+    ]);
+  });
+
+  test('a pillar prioritizes published supports while preserving repository order within tiers', async () => {
+    const samePillar = publishedArticle(
+      'Existing Pillar',
+      'existing-pillar',
+      'topic:membrane fouling',
+      'pillar',
+    );
+    const supportOne = publishedArticle(
+      'Support One',
+      'support-one',
+      'topic:membrane fouling',
+      'support',
+    );
+    const supportTwo = publishedArticle(
+      'Support Two',
+      'support-two',
+      'topic:membrane fouling',
+      'support',
+    );
+    const other = publishedArticle('Other Cluster', 'other-cluster', 'topic:other', 'support');
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(semanticKeyword('pillar'));
+    generateArticle.mockResolvedValue(okArticle);
+    listPublishedByTopicCluster
+      .mockResolvedValueOnce([supportOne, supportTwo])
+      .mockResolvedValueOnce([samePillar]);
+    listByOrg.mockResolvedValueOnce({ articles: [other], total: 1 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const ordered = verifyCandidates.mock.calls[0]![0] as { title: string }[];
+    expect(ordered.map((candidate) => candidate.title)).toEqual([
+      'Support One',
+      'Support Two',
+      'Existing Pillar',
+      'Other Cluster',
+    ]);
+  });
+
+  test('legacy Keywords retain the deterministic general published-page path', async () => {
+    const older = publishedArticle('Older', 'older', null, null);
+    const newer = publishedArticle('Newer', 'newer', null, null);
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({ articles: [newer, older], total: 2 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listPublishedByTopicCluster).not.toHaveBeenCalled();
+    const ordered = verifyCandidates.mock.calls[0]![0] as { title: string }[];
+    expect(ordered.map((candidate) => candidate.title)).toEqual(['Newer', 'Older']);
+  });
+
+  test('canonical duplicate URLs are removed before bounded verification', async () => {
+    const pillar = publishedArticle(
+      'Cluster Pillar',
+      'same-url',
+      'topic:membrane fouling',
+      'pillar',
+    );
+    const duplicate = publishedArticle('Duplicate', 'same-url', 'topic:other', 'support', {
+      publications: [{ slug: '/same-url/', published_at: new Date('2026-02-01') }],
+    });
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(semanticKeyword('support'));
+    generateArticle.mockResolvedValue(okArticle);
+    listPublishedByTopicCluster.mockResolvedValueOnce([pillar]).mockResolvedValueOnce([]);
+    listByOrg.mockResolvedValueOnce({ articles: [duplicate], total: 1 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const checked = verifyCandidates.mock.calls[0]![0] as { title: string }[];
+    expect(checked.map((candidate) => candidate.title)).toEqual(['Cluster Pillar']);
+  });
+
+  test('caps verification and GenerationContext candidates at MAX_LINK_CANDIDATES', async () => {
+    const same = publishedArticle(
+      'Cluster Pillar',
+      'cluster-pillar',
+      'topic:membrane fouling',
+      'pillar',
+    );
+    const general = Array.from({ length: MAX_LINK_CANDIDATES + 10 }, (_, index) =>
+      publishedArticle(`General ${index}`, `general-${index}`, 'topic:other', 'support'),
+    );
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(semanticKeyword('support'));
+    generateArticle.mockResolvedValue(okArticle);
+    listPublishedByTopicCluster.mockResolvedValueOnce([same]);
+    listByOrg.mockResolvedValueOnce({ articles: general, total: general.length });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(listByOrg).toHaveBeenCalledWith('o1', {
+      status: 'published',
+      limit: MAX_LINK_CANDIDATES,
+      offset: 0,
+    });
+    expect(verifyCandidates.mock.calls[0]![0]).toHaveLength(MAX_LINK_CANDIDATES);
+    const passed = generateArticle.mock.calls[0]![0] as {
+      ctx: { linkCandidates: unknown[] };
+    };
+    expect(passed.ctx.linkCandidates).toHaveLength(MAX_LINK_CANDIDATES);
+  });
+
+  test('unpublished, cross-org, invalid, and failed-verification rows never reach generation', async () => {
+    const unpublished = publishedArticle('Draft', 'draft', null, null, { status: 'generated' });
+    const crossOrg = publishedArticle('Cross Org', 'cross-org', null, null, { org_id: 'o2' });
+    const invalid = publishedArticle('Invalid URL', '', null, null, { publications: [] });
+    const failsVerification = publishedArticle('Fails Live Check', 'fails-live', null, null);
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({
+      articles: [unpublished, crossOrg, invalid, failsVerification],
+      total: 4,
+    });
+    verifyCandidates.mockResolvedValueOnce([]);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(verifyCandidates).toHaveBeenCalledWith([
+      expect.objectContaining({ title: 'Fails Live Check' }),
+    ]);
+    const passed = generateArticle.mock.calls[0]![0] as {
+      ctx: { linkCandidates: unknown[] };
+    };
+    expect(passed.ctx.linkCandidates).toEqual([]);
+  });
+
   test('an org with internal_links_count 0 queries nothing (#186)', async () => {
     findOrgById.mockResolvedValue(org); // fixture has internal_links_count: 0
     findKeywordById.mockResolvedValue(keyword);
@@ -328,6 +588,8 @@ describe('generation worker', () => {
     await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
 
     expect(listByOrg).not.toHaveBeenCalled();
+    expect(listPublishedByTopicCluster).not.toHaveBeenCalled();
+    expect(verifyCandidates).not.toHaveBeenCalled();
     const passed = generateArticle.mock.calls[0]![0] as { ctx: { linkCandidates: unknown[] } };
     expect(passed.ctx.linkCandidates).toEqual([]);
   });
@@ -346,5 +608,7 @@ describe('generation worker', () => {
     await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
 
     expect(listByOrg).not.toHaveBeenCalled();
+    expect(listPublishedByTopicCluster).not.toHaveBeenCalled();
+    expect(verifyCandidates).not.toHaveBeenCalled();
   });
 });

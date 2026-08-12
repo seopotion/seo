@@ -6,6 +6,7 @@ import { ErrorMessage } from './ErrorMessage';
 
 export function TextEntryList({
   ariaInvalid,
+  description,
   draft,
   errors,
   entries,
@@ -18,6 +19,8 @@ export function TextEntryList({
   placeholder,
 }: {
   ariaInvalid?: boolean;
+  /** Why this field matters — rendered under the label, before the input. */
+  description?: string;
   draft: string;
   errors?: string[];
   entries: TextEntry[];
@@ -34,6 +37,7 @@ export function TextEntryList({
   return (
     <div>
       <Label htmlFor={inputId}>{label}</Label>
+      {description && <p className="mt-1 text-gray-600 text-sm">{description}</p>}
       <div className="mt-2 flex gap-2">
         <Input
           id={inputId}

@@ -606,7 +606,7 @@
       "title": "Google Search Console"
     },
     "placeholders": {
-      "competitorUrl": "https://rakip.com"
+      "competitorUrl": "rakip.com"
     },
     "staticSite": {
       "beforeRedirect": "github.com üzerinden devam edip SeoPotion'ın yazabileceği depoları seçeceksiniz, sonra dal ve klasör seçmek için buraya döneceksiniz.",
@@ -822,7 +822,9 @@
       "youtubeVideos": "YouTube videoları"
     },
     "audience": {
-      "competitorUrls": "Rakip web sitesi URL'leri",
+      "competitorUrls": "Rakip web siteleri (isteğe bağlı)",
+      "competitorsHelp": "İşletmenizle gerçekten karşılaştırılabilir şirketler biliyorsanız alan adlarını isteğe bağlı ek bir sinyal olarak ekleyin. Stratejiniz rakip alan adları olmadan da çalışır.",
+      "competitorsHint": "İsteğe bağlı: işletmenizle gerçekten karşılaştırılabilir bir şirketin competitor.com gibi alan adını girin. Şirket adı işe yaramaz.",
       "targetAudience": "Hedef kitle",
       "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
@@ -928,8 +930,10 @@
     "validation": {
       "articleStyleRequired": "Makale stili zorunludur.",
       "businessNameRequired": "İşletme adı zorunludur.",
-      "competitorUrl": "Geçerli bir rakip URL'si girin.",
-      "competitorsValidUrls": "Her rakip geçerli bir URL olmalıdır.",
+      "competitorDomain": "competitor.com gibi geçerli bir web sitesi alan adı girin.",
+      "competitorsDuplicate": "Bu rakip zaten listede.",
+      "competitorsMax": "En fazla {max} rakip ekleyebilirsiniz.",
+      "competitorsValidDomains": "Her rakip bir web sitesi alan adı olmalıdır.",
       "countryRequired": "Ülke zorunludur.",
       "labels": {
         "blogPageUrl": "Blog sayfası URL'si",

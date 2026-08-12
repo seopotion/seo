@@ -12,6 +12,7 @@ export { OrgRepo } from './repositories/org.repo';
 export { SubscriptionRepo } from './repositories/subscription.repo';
 export { UserRepo } from './repositories/user.repo';
 export { addCandidates } from './services/add-candidates';
+export { persistStrategyCandidates } from './services/persist-strategy-candidates';
 export {
   isDuplicateKeyError,
   type ScheduleConflict,

@@ -9,6 +9,13 @@ const cand = (keyword: string): WorkingCandidate => ({
   normalized: keyword.toLowerCase(),
   source: 'keyword_ideas',
   source_context: null,
+  core_keyword: null,
+  category_ids: [],
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   search_volume: null,
   difficulty: null,
   cpc: null,
@@ -21,6 +28,7 @@ const cand = (keyword: string): WorkingCandidate => ({
   rejection_reason: null,
   status: 'candidate',
   serp_competitors: null,
+  serp_validated: false,
 });
 
 describe('brandNavFilter', () => {
