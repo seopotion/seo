@@ -1,9 +1,32 @@
 import type { LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
+import { chunk, mapWithConcurrency } from './concurrency';
 import { buildRelevancePrompt, parseRelevance } from './llm-prompts';
 import type { RelevanceCoverage, ResolvedConfig, WorkingCandidate } from './types';
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
+
+/**
+ * Sized from the recorded clewas calls: ~7 prompt tokens and ~30-34 completion
+ * tokens per keyword (reasoning included). At 50 a batch spends ~1.7k of the
+ * model's 65,536-token output ceiling — a ~38x margin, so a reasoning blowup has
+ * to be extraordinary before it truncates. It also puts a ~500-keyword pool at
+ * ~10 batches, which keeps one dead batch at ~10% coverage loss, comfortably
+ * inside the minLlmCoverage guard (#211).
+ */
+export const RELEVANCE_BATCH_SIZE = 50;
+// Matches the SERP judge. Relevance prompts are small, so a call is ~7s rather
+// than the judge's ~30s: 9 batches at 8 wide is two waves, measured at 14.0s for
+// the whole stage against 197.5s for the single call it replaced (#211).
+const RELEVANCE_CONCURRENCY = 8;
+
+const EMPTY_COVERAGE: RelevanceCoverage = {
+  sent: 0,
+  returned: 0,
+  zero: 0,
+  batches: 0,
+  failedBatches: 0,
+};
 
 /** Above this volume, a difficulty of 0 reads as missing data rather than a real KD. */
 const UNKNOWN_DIFFICULTY_VOLUME = 1000;
@@ -22,32 +45,45 @@ function ease(difficulty: number | null, searchVolume: number | null): number {
 }
 
 /**
- * Score relevance for the whole batch in one LLM call. Returns the coverage
- * alongside the candidates: relevance carries the largest scoring weight, so a
- * response that covers only part of the batch silently degrades ranking to
- * volume + ease, and the counts are the only way to see it (#211).
+ * Score relevance in batches. This was the pipeline's last single-call stage,
+ * which made it the last one where a single empty body could decide the whole
+ * run — structurally the failure that broke classify (#211). A batch that comes
+ * back unparseable now costs only its own keywords: they stay NULL, which is
+ * "never judged", not "scored 0". The caller enforces a coverage floor on top.
  */
 export async function applyRelevance(
   candidates: WorkingCandidate[],
-  deps: { llm: LlmClient; presets: SetupPresets },
+  deps: { llm: LlmClient; presets: SetupPresets; model?: string },
 ): Promise<{ candidates: WorkingCandidate[]; coverage: RelevanceCoverage }> {
-  if (candidates.length === 0) {
-    return { candidates, coverage: { sent: 0, returned: 0, zero: 0 } };
-  }
-  const keywords = candidates.map((c) => c.keyword);
-  const res = await deps.llm.complete({
-    messages: buildRelevancePrompt(keywords, deps.presets),
-    temperature: 0,
-    responseFormat: 'json',
+  if (candidates.length === 0) return { candidates, coverage: EMPTY_COVERAGE };
+
+  const batches = chunk(
+    candidates.map((c) => c.keyword),
+    RELEVANCE_BATCH_SIZE,
+  );
+  const results = await mapWithConcurrency(batches, RELEVANCE_CONCURRENCY, async (keywords) => {
+    const res = await deps.llm.complete({
+      messages: buildRelevancePrompt(keywords, deps.presets),
+      model: deps.model,
+      temperature: 0,
+      responseFormat: 'json',
+    });
+    return parseRelevance(res.text, keywords);
   });
-  const { scores, returned } = parseRelevance(res.text, keywords);
-  const scored = candidates.map((c) => ({ ...c, relevance_score: scores.get(c.keyword) ?? 0 }));
+
+  const scores = new Map(results.flatMap((r) => [...r.scores]));
+  const scored = candidates.map((c) => ({
+    ...c,
+    relevance_score: scores.get(c.keyword) ?? null,
+  }));
   return {
     candidates: scored,
     coverage: {
-      sent: keywords.length,
-      returned,
+      sent: candidates.length,
+      returned: scores.size,
       zero: scored.filter((c) => c.relevance_score === 0).length,
+      batches: batches.length,
+      failedBatches: results.filter((r) => !r.parsed).length,
     },
   };
 }

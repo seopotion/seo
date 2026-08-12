@@ -77,10 +77,12 @@ async function runStrategy(orgId: string): Promise<void> {
     onProgress: (stage, meta) => logger.info('strategy stage', { stage, ...meta }),
   });
 
-  // Funnel counts per run, including the three LLM coverage blocks. Each covers
-  // a stage that degrades SILENTLY when the model under-answers: relevance
-  // collapses ranking to volume + ease, an unjudged SERP is accepted fail-open,
-  // and an unclassified keyword becomes a uniform `other` (#211).
+  // Funnel counts per run, including the three LLM coverage blocks and the seeds
+  // the pool was built from. Relevance and the SERP judge now ABORT below
+  // config.minLlmCoverage — they degrade in ways that still produce a full,
+  // plausible plan, so the run never reaches this line when either has failed.
+  // Classify is only reported: an unanswered keyword becomes `other`, which
+  // flattens the plan's spread but never schedules the wrong keyword (#211).
   logger.info('strategy pipeline stats', { ...result.stats });
 
   const inserted = await addCandidates(orgId, result.candidates);

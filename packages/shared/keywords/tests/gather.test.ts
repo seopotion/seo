@@ -1,6 +1,6 @@
 import type { DataForSeoClient, KeywordMetric, LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
-import { expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '../src/config';
 import { gatherCandidates } from '../src/gather';
 
@@ -55,18 +55,23 @@ it('fans out across site/competitors/ideas and tags provenance', async () => {
     config,
   );
 
-  expect(out.map((c) => c.source).sort()).toEqual([
+  expect(out.candidates.map((c) => c.source).sort()).toEqual([
     'keyword_suggestions',
     'keywords_for_site',
     'ranked_keywords',
   ]);
-  expect(out.find((c) => c.source === 'ranked_keywords')!.source_context).toBe('comp.com');
+  expect(out.seeds).toEqual(['dog food']);
+  expect(out.candidates.find((c) => c.source === 'ranked_keywords')!.source_context).toBe(
+    'comp.com',
+  );
   // keyword_suggestions takes ONE seed per call, so gather fans out per seed and
   // tags each candidate with the seed that produced it.
   expect(dataForSeo.keywordSuggestions).toHaveBeenCalledWith(
     expect.objectContaining({ keyword: 'dog food' }),
   );
-  expect(out.find((c) => c.source === 'keyword_suggestions')!.source_context).toBe('dog food');
+  expect(out.candidates.find((c) => c.source === 'keyword_suggestions')!.source_context).toBe(
+    'dog food',
+  );
 });
 
 it('pushes the volume filter and ordering down to every gather endpoint', async () => {
@@ -216,6 +221,84 @@ it('caps competitor wins passed to the seed prompt', async () => {
   const user = seedCall.messages.find((m: { role: string }) => m.role === 'user');
   expect(user.content).toContain('competitor kw 0');
   expect(user.content).not.toContain('competitor kw 35');
+});
+
+describe('pinned seeds', () => {
+  const clients = () => ({
+    dataForSeo: {
+      keywordsForSite: vi.fn().mockResolvedValue([]),
+      rankedKeywords: vi.fn().mockResolvedValue([]),
+      keywordSuggestions: vi.fn().mockResolvedValue([metric('suggested kw')]),
+    } as unknown as DataForSeoClient,
+    llm: {
+      complete: vi.fn().mockResolvedValue({
+        text: '{"seeds":["llm seed"]}',
+        model: 'm',
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+      }),
+    } as unknown as LlmClient,
+  });
+
+  // Overriding the LLM's answer is not enough — the call itself is the
+  // non-determinism, so a pinned run must not make it at all (#211).
+  it('bypasses the seed LLM entirely and fans out over the pinned list', async () => {
+    const { dataForSeo, llm } = clients();
+    const out = await gatherCandidates(
+      { websiteUrl: 'https://acme.io', competitors: [], presets, clients: { dataForSeo, llm } },
+      { ...config, seeds: ['pinned a', 'pinned b'] },
+    );
+
+    expect(llm.complete).not.toHaveBeenCalled();
+    expect(out.seeds).toEqual(['pinned a', 'pinned b']);
+    expect(
+      (dataForSeo.keywordSuggestions as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([p]) => p.keyword,
+      ),
+    ).toEqual(['pinned a', 'pinned b']);
+    expect(out.candidates.every((c) => c.source === 'keyword_suggestions')).toBe(true);
+  });
+
+  it('is stable across runs, unlike the LLM path', async () => {
+    const a = await gatherCandidates(
+      {
+        websiteUrl: 'https://acme.io',
+        competitors: [],
+        presets,
+        clients: clients(),
+      },
+      { ...config, seeds: ['pinned a'] },
+    );
+    const b = await gatherCandidates(
+      {
+        websiteUrl: 'https://acme.io',
+        competitors: [],
+        presets,
+        clients: clients(),
+      },
+      { ...config, seeds: ['pinned a'] },
+    );
+    expect(a).toEqual(b);
+  });
+
+  it('caps a pinned list at the same seed ceiling as the LLM path', async () => {
+    const { dataForSeo, llm } = clients();
+    await gatherCandidates(
+      { websiteUrl: 'https://acme.io', competitors: [], presets, clients: { dataForSeo, llm } },
+      { ...config, seeds: Array.from({ length: 30 }, (_, i) => `seed ${i}`) },
+    );
+    expect((dataForSeo.keywordSuggestions as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(15);
+  });
+
+  it('passes the per-stage seed model override to the seed call', async () => {
+    const { dataForSeo, llm } = clients();
+    await gatherCandidates(
+      { websiteUrl: 'https://acme.io', competitors: [], presets, clients: { dataForSeo, llm } },
+      { ...config, models: { seeds: 'anthropic/claude-haiku-4.5' } },
+    );
+    expect((llm.complete as ReturnType<typeof vi.fn>).mock.calls[0]![0].model).toBe(
+      'anthropic/claude-haiku-4.5',
+    );
+  });
 });
 
 it('skips keywordSuggestions when no seeds are produced', async () => {

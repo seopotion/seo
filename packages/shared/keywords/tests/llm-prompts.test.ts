@@ -73,16 +73,83 @@ describe('parseSeeds', () => {
   });
 });
 
+describe('buildRelevancePrompt', () => {
+  it('includes business context and the keyword list', () => {
+    const msgs = buildRelevancePrompt(['dog food'], presets);
+    expect(msgs[0]!.role).toBe('system');
+    expect(JSON.stringify(msgs)).toContain('dog food');
+    expect(JSON.stringify(msgs)).toContain('pet food');
+  });
+
+  it('numbers the keywords and asks for answers by index, not by echo', () => {
+    const [system, user] = buildRelevancePrompt(['dog food', 'puppy diet'], presets);
+    expect(system!.content).toContain('answer by that index');
+    expect(system!.content).toContain('{"scores":[{"index":number,"relevance":number}]}');
+    expect(user!.content).toContain('0. dog food');
+    expect(user!.content).toContain('1. puppy diet');
+  });
+
+  // The scoring criterion is the thing that must not drift; only the addressing
+  // changed when the call was batched (#211).
+  it('keeps the scoring criterion verbatim', () => {
+    const [system] = buildRelevancePrompt(['dog food'], presets);
+    expect(system!.content).toContain(
+      'Score each keyword 0..1 for how relevant it is to the business and audience.',
+    );
+  });
+});
+
 describe('parseRelevance', () => {
-  it('maps and clamps scores, defaulting missing to 0', () => {
-    const { scores, returned } = parseRelevance(
-      '{"scores":[{"keyword":"dog food","relevance":1.4}]}',
+  it('reads rows by index and clamps to 0..1', () => {
+    const { scores, parsed } = parseRelevance(
+      '{"scores":[{"index":0,"relevance":1.4},{"index":1,"relevance":-2}]}',
       ['dog food', 'x'],
     );
     expect(scores.get('dog food')).toBe(1);
     expect(scores.get('x')).toBe(0);
-    // "x" was never judged — it only has the seed, which `returned` excludes.
-    expect(returned).toBe(1);
+    expect(parsed).toBe(true);
+  });
+
+  // The whole point of the null-vs-zero split: an absent keyword must be ABSENT,
+  // not seeded to 0, because the relevance floor rejects at 0 (#211).
+  it('omits keywords the model never answered instead of seeding them to 0', () => {
+    const { scores } = parseRelevance('{"scores":[{"index":0,"relevance":0.5}]}', [
+      'dog food',
+      'never judged',
+    ]);
+    expect(scores.has('never judged')).toBe(false);
+    expect(scores.size).toBe(1);
+  });
+
+  it('still honours an echoed keyword, case-insensitively, when the model ignores the index', () => {
+    const { scores } = parseRelevance('{"scores":[{"keyword":"Dog  Food","relevance":0.5}]}', [
+      'dog food',
+    ]);
+    expect(scores.get('dog food')).toBe(0.5);
+  });
+
+  it('drops a malformed row without losing its neighbours', () => {
+    const { scores } = parseRelevance(
+      '{"scores":[{"index":0,"relevance":"high"},{"index":1,"relevance":0.7},{"index":9,"relevance":0.1}]}',
+      ['a', 'b'],
+    );
+    expect([...scores]).toEqual([['b', 0.7]]);
+  });
+
+  // Every parser shares tryParse, so a fenced body broke all of them at once —
+  // it is why the Haiku A/B arm scored 0 of 340 keywords (#211).
+  it('reads a body wrapped in a markdown code fence', () => {
+    const fenced = '```json\n{"scores":[{"index":0,"relevance":0.5}]}\n```';
+    expect(parseRelevance(fenced, ['a']).scores.get('a')).toBe(0.5);
+    expect(
+      parseRelevance('```\n{"scores":[{"index":0,"relevance":1}]}\n```', ['a']).scores.get('a'),
+    ).toBe(1);
+  });
+
+  it('reports an empty or unparseable body as unparsed', () => {
+    expect(parseRelevance('', ['a']).parsed).toBe(false);
+    expect(parseRelevance('not json', ['a']).scores.size).toBe(0);
+    expect(parseRelevance('{"scores":[]}', ['a']).parsed).toBe(false);
   });
 });
 
@@ -246,14 +313,5 @@ describe('parseClassification', () => {
     expect(coverage.matched).toBe(1);
     expect(coverage.typed).toBe(1);
     expect(coverage.assigned).toBe(0);
-  });
-});
-
-describe('buildRelevancePrompt', () => {
-  it('includes business context and the keyword list', () => {
-    const msgs = buildRelevancePrompt(['dog food'], presets);
-    expect(msgs[0]!.role).toBe('system');
-    expect(JSON.stringify(msgs)).toContain('dog food');
-    expect(JSON.stringify(msgs)).toContain('pet food');
   });
 });

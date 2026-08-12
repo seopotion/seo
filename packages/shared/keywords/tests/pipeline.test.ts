@@ -23,6 +23,19 @@ const metric = (keyword: string, over: Partial<KeywordMetric> = {}): KeywordMetr
 const serp = (domains: string[]): SerpResult[] =>
   domains.map((d, i) => ({ rank: i + 1, url: `https://${d}/p${i}`, domain: d, title: `t${i}` }));
 
+/** One suitable verdict per `Keyword <i>:` block the judge prompt carries. */
+function judgeAll(userContent: string): string {
+  const count = (userContent.match(/^Keyword \d+:/gm) ?? []).length;
+  return JSON.stringify({
+    judgments: Array.from({ length: count }, (_, index) => ({
+      index,
+      intentSuitable: true,
+      localitySuitable: true,
+      reason: null,
+    })),
+  });
+}
+
 // Deterministic fake LLM: routes by the system prompt's leading instruction.
 function fakeLlm(): LlmClient {
   return {
@@ -33,8 +46,7 @@ function fakeLlm(): LlmClient {
       else if (sys.includes('Score each keyword'))
         text =
           '{"scores":[{"keyword":"cheap dog food","relevance":0.9},{"keyword":"dog food delivery","relevance":0.8}]}';
-      else if (sys.includes('could rank'))
-        text = '{"intentSuitable":true,"localitySuitable":true,"reason":null}';
+      else if (sys.includes('could rank')) text = judgeAll(messages[1]!.content);
       else if (sys.includes('Classify each keyword'))
         text =
           '{"types":[{"keyword":"cheap dog food","article_type":"listicle"},{"keyword":"dog food delivery","article_type":"product_guide"}]}';
@@ -110,6 +122,14 @@ describe('runKeywordPipeline', () => {
     expect(stats.accepted).toBe(2);
   });
 
+  it('reports the seeds it fanned out over, so a run documents its own input', async () => {
+    const { stats } = await runKeywordPipeline(input());
+    expect(stats.seeds).toEqual(['dog food']);
+
+    const pinned = await runKeywordPipeline({ ...input(), config: { seeds: ['pinned seed'] } });
+    expect(pinned.stats.seeds).toEqual(['pinned seed']);
+  });
+
   it('is deterministic for fixed provider responses', async () => {
     const a = await runKeywordPipeline(input());
     const b = await runKeywordPipeline(input());
@@ -145,7 +165,7 @@ describe('runKeywordPipeline', () => {
   });
 
   describe('relevance floor', () => {
-    // The fake LLM scores only these two keywords; anything else keeps the 0 seed.
+    // The fake LLM scores only the keywords named here; anything else stays null.
     const scoring = (scores: Record<string, number>): LlmClient => {
       const base = fakeLlm();
       return {
@@ -214,6 +234,111 @@ describe('runKeywordPipeline', () => {
         },
       });
       expect(serpCalls).toBe(1); // not 2 — the zero was dropped first
+    });
+  });
+
+  /**
+   * The failure this whole guard exists for: the relevance call comes back empty
+   * — the exact 200-OK-with-no-content a reasoning model produces — and the run
+   * must ABORT. Before the guard, parseRelevance seeded every keyword to 0, the
+   * floor rejected all of them, and the worker marked the org `completed` with a
+   * 30-day plan holding nothing (#211).
+   */
+  describe('failure guards', () => {
+    /** fakeLlm with one stage's body replaced, routed by its system prompt. */
+    const llmWith = (marker: string, text: string): LlmClient => {
+      const base = fakeLlm();
+      return {
+        complete: async (params) =>
+          params.messages[0]!.content.includes(marker)
+            ? {
+                text,
+                model: 'm',
+                usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+              }
+            : base.complete(params),
+      };
+    };
+
+    const runWith = (llm: LlmClient, config: PipelineInput['config'] = {}) =>
+      runKeywordPipeline({
+        ...input(),
+        clients: { dataForSeo: fakeDataForSeo(), llm },
+        config,
+      });
+
+    it('FAILS the run when the relevance body is empty, instead of shipping an empty plan', async () => {
+      await expect(runWith(llmWith('Score each keyword', ''))).rejects.toThrow(
+        /relevance LLM answered only 0 of 2 keywords \(0%, minLlmCoverage 50%\)/,
+      );
+    });
+
+    it('fails the same way on an unparseable relevance body', async () => {
+      await expect(
+        runWith(llmWith('Score each keyword', 'I cannot help with that')),
+      ).rejects.toThrow(/strategy aborted/);
+    });
+
+    it('completes when coverage is exactly at the floor', async () => {
+      const { stats } = await runWith(
+        llmWith('Score each keyword', '{"scores":[{"keyword":"cheap dog food","relevance":0.9}]}'),
+      );
+      expect(stats.relevance).toMatchObject({ sent: 2, returned: 1 });
+    });
+
+    // A null score is "never judged". Rejecting it at the floor is what turned a
+    // partial degradation into a total one.
+    it('does not let the relevance floor reject a candidate the model never scored', async () => {
+      const { candidates } = await runWith(
+        llmWith('Score each keyword', '{"scores":[{"keyword":"cheap dog food","relevance":0.9}]}'),
+      );
+      const unscored = candidates.find((c) => c.keyword === 'dog food delivery');
+      expect(unscored).toMatchObject({ relevance_score: null, rejection_reason: null });
+    });
+
+    it('FAILS the run when the SERP judge answers nothing, rather than accepting every keyword fail-open', async () => {
+      await expect(runWith(llmWith('could rank', ''))).rejects.toThrow(
+        /SERP judge LLM answered only 0 of 2 keywords/,
+      );
+    });
+
+    // Coverage is fine, every stage answered — but nothing survived. A plan with
+    // no entries is still a failed run, not a successful empty one.
+    it('FAILS the run when every candidate is rejected and the plan would be empty', async () => {
+      const rejectAll = llmWith(
+        'could rank',
+        JSON.stringify({
+          judgments: [0, 1].map((index) => ({
+            index,
+            intentSuitable: false,
+            localitySuitable: true,
+            reason: 'product pages',
+          })),
+        }),
+      );
+      await expect(runWith(rejectAll)).rejects.toThrow(
+        /gathered \d+ keywords but accepted 0, so the plan would be empty/,
+      );
+    });
+
+    it('does not fire the empty-plan guard when nothing was gathered at all', async () => {
+      const empty = {
+        keywordsForSite: async () => [],
+        rankedKeywords: async () => [],
+        keywordSuggestions: async () => [],
+        bulkKeywordDifficulty: async () => [],
+        serpGoogleOrganic: async () => [],
+      } as unknown as DataForSeoClient;
+      const { stats } = await runKeywordPipeline({
+        ...input(),
+        clients: { dataForSeo: empty, llm: fakeLlm() },
+      });
+      expect(stats).toMatchObject({ gathered: 0, accepted: 0 });
+    });
+
+    it('minLlmCoverage 0 disables the guard', async () => {
+      const { stats } = await runWith(llmWith('Score each keyword', ''), { minLlmCoverage: 0 });
+      expect(stats.relevance.returned).toBe(0);
     });
   });
 

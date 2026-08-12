@@ -16,7 +16,12 @@ import {
   SubscriptionRepo,
   UserRepo,
 } from '@shared/db';
-import { resolveConfig, runKeywordPipeline } from '@shared/keywords';
+import {
+  type PipelineConfig,
+  resolveConfig,
+  runKeywordPipeline,
+  type StageModels,
+} from '@shared/keywords';
 import {
   createDataForSeoClient,
   createLemonSqueezyProvider,
@@ -235,6 +240,10 @@ export async function strategyDryRun(input: {
   org?: string;
   user?: string;
   serpTopN?: number;
+  /** Pin the seed list so two runs are comparable; empty means ask the LLM. */
+  seeds?: string[];
+  /** Per-stage model overrides; unset stages keep the client default. */
+  models?: StageModels;
   snapshotPath?: string;
   replayPath?: string;
   allowLiveMisses?: boolean;
@@ -278,7 +287,11 @@ export async function strategyDryRun(input: {
       );
     }
 
-    const partial = input.serpTopN === undefined ? {} : { serpTopN: input.serpTopN };
+    const partial: Partial<PipelineConfig> = {
+      ...(input.serpTopN === undefined ? {} : { serpTopN: input.serpTopN }),
+      ...(input.seeds?.length ? { seeds: input.seeds } : {}),
+      ...(input.models && Object.keys(input.models).length ? { models: input.models } : {}),
+    };
     const config = resolveConfig(org.presets, partial);
 
     let clients: ProviderClients;
@@ -307,6 +320,10 @@ export async function strategyDryRun(input: {
       }
     }
 
+    // The seeds the run actually used; only known once gather has run, so a
+    // failed run falls back to whatever the replayed file already recorded.
+    let usedSeeds: string[] | undefined;
+
     // Fold anything the miss path fetched back into the snapshot file — including
     // after a failed run, so the credits already spent are not wasted.
     const persistTopUp = async (): Promise<void> => {
@@ -321,6 +338,7 @@ export async function strategyDryRun(input: {
         // The merged file now holds calls made under the current config, so it
         // records that one; this run already reported the drift against the old.
         config,
+        seeds: usedSeeds ?? snapshot?.seeds,
         ...replay.merged(),
       });
     };
@@ -356,6 +374,8 @@ export async function strategyDryRun(input: {
       );
     }
 
+    usedSeeds = result.stats.seeds;
+
     if (input.snapshotPath && recorded) {
       const calls = recorded();
       await writeSnapshot(input.snapshotPath, {
@@ -364,6 +384,7 @@ export async function strategyDryRun(input: {
         org_id: org.id,
         website_url: org.website_url,
         config,
+        seeds: usedSeeds,
         ...calls,
       });
     }

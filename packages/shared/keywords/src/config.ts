@@ -33,6 +33,22 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   authorityThreshold: 0.5,
   duplicateSerpOverlap: 0.6,
   weights: { relevance: 0.35, volume: 0.3, ease: 0.2, trend: 0.1, cannibalization: 0.05 },
+  // Half. A healthy run answers 100% — both measured clewas runs returned every
+  // keyword — so any real shortfall is a truncated or empty body, and those are
+  // all-or-nothing per call: the question is how many BATCHES died, not how many
+  // keywords. At ~10 relevance batches this tolerates one or two dead ones
+  // (ranking degrades, the survivors still rank sensibly) and catches the failure
+  // that actually happened — a whole stage returning nothing. Set it near 1.0 to
+  // demand a perfect stage; 0 disables the guard (#211).
+  minLlmCoverage: 0.5,
+  // Unset = the LlmClient's default model for every stage. Overriding a single
+  // stage is how the reasoning-vs-extraction question gets measured per call
+  // rather than per pipeline.
+  models: {},
+  // Empty = ask the LLM for seeds, the production path. Pin them for benchmark
+  // runs, where a non-deterministic seed list swings the pool +/-40% and swamps
+  // whatever change is being measured (#211).
+  seeds: [],
   // Drops the zero-demand tail server-side. Deliberately low: the winnable B2B
   // intent lives in low-volume technical queries, so this is a "has any measured
   // demand" cut, not a quality bar (#211).
@@ -65,7 +81,9 @@ export function resolveConfig(
     ...partial,
     weights: { ...DEFAULT_CONFIG.weights, ...partial.weights },
     endpointLimits: { ...DEFAULT_CONFIG.endpointLimits, ...partial.endpointLimits },
+    models: { ...DEFAULT_CONFIG.models, ...partial.models },
     authorityDomains: partial.authorityDomains ?? DEFAULT_CONFIG.authorityDomains,
+    seeds: partial.seeds ?? DEFAULT_CONFIG.seeds,
     locationName: partial.locationName ?? toLocationName(presets.business.country),
     languageName: partial.languageName ?? presets.business.language,
   };

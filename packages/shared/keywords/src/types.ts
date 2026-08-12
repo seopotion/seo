@@ -60,6 +60,20 @@ export interface ScoreWeights {
   cannibalization: number;
 }
 
+/**
+ * Per-stage model override. Every one of these calls is structured extraction,
+ * not reasoning, and it was a reasoning model burning its whole output budget on
+ * reasoning tokens that returned the empty classify body (#211) — so the stage a
+ * model is used for is worth choosing per stage. Unset means the LlmClient's own
+ * default, which keeps behaviour identical to before this existed.
+ */
+export interface StageModels {
+  seeds?: string;
+  relevance?: string;
+  serpJudge?: string;
+  classify?: string;
+}
+
 export interface PipelineConfig {
   difficultyCeiling: number;
   /**
@@ -77,6 +91,23 @@ export interface PipelineConfig {
   authorityThreshold: number;
   duplicateSerpOverlap: number;
   weights: ScoreWeights;
+  /**
+   * Fraction of a stage's keywords the LLM must actually answer for the run to
+   * be trusted. Below it the pipeline THROWS rather than finishing: an
+   * under-answered relevance stage ranks the pool on volume + ease alone, and an
+   * under-answered SERP judge fails every keyword open — both produce a plausible
+   * plan built on nothing, which is worse than no plan at all (#211).
+   */
+  minLlmCoverage: number;
+  /** Per-stage model override; unset stages use the LlmClient default. */
+  models: StageModels;
+  /**
+   * Pinned seed keywords. Non-empty skips the seed LLM call entirely, which is
+   * the only way to make two runs comparable — the seed model is
+   * non-deterministic at temperature 0 and seeds drive the whole
+   * keyword_suggestions fan-out (#211).
+   */
+  seeds: string[];
   /** Server-side `keyword_info.search_volume >=` filter on every gather call. */
   minSearchVolume: number;
   locationName?: string;
@@ -114,13 +145,18 @@ export interface PipelineInput {
 
 /**
  * How much of the relevance batch the LLM actually scored. `sent - returned`
- * keywords kept parseRelevance's 0 seed without the model ever judging them.
+ * candidates were never judged and keep a NULL relevance_score — which the floor
+ * must not confuse with a real 0, since seeding them to 0 meant one empty
+ * response rejected the entire pool and shipped an empty 30-day plan (#211).
  */
 export interface RelevanceCoverage {
   sent: number;
   returned: number;
-  /** Candidates whose final relevance_score is exactly 0 — real zeros plus seeds. */
+  /** Candidates the model explicitly scored 0 — genuine "no connection" verdicts. */
   zero: number;
+  batches: number;
+  /** Batches whose body did not parse at all — every keyword in them is unscored. */
+  failedBatches: number;
 }
 
 /**
@@ -166,6 +202,12 @@ export interface JudgmentCoverage {
 
 export interface PipelineStats {
   gathered: number;
+  /**
+   * The seeds keyword_suggestions was fanned out over — LLM-generated, or the
+   * pinned `config.seeds`. Recorded so a run documents the input that decides
+   * most of its pool.
+   */
+  seeds: string[];
   /** Pre-dedupe contribution of each gather source; `gathered` is their sum. */
   gatheredBySource: Record<CandidateSource, number>;
   afterDedupe: number;

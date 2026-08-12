@@ -95,6 +95,7 @@ export async function validateSerp(
   const parsedBatches = await mapWithConcurrency(batches, SERP_JUDGE_CONCURRENCY, async (batch) => {
     const res = await deps.llm.complete({
       messages: buildSerpJudgmentPrompt(batch, deps.presets),
+      model: config.models.serpJudge,
       temperature: 0,
       responseFormat: 'json',
     });

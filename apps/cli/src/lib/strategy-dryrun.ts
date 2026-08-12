@@ -188,7 +188,11 @@ export function buildDryRunReport(input: {
   }
   if (sent > returned) {
     notes.push(
-      `Relevance: the LLM scored ${returned} of ${sent} keywords; the other ${sent - returned} kept parseRelevance's 0 seed without ever being judged.`,
+      `Relevance: the LLM scored ${returned} of ${sent} keywords${
+        stats.relevance.failedBatches > 0
+          ? ` (${stats.relevance.failedBatches} of ${stats.relevance.batches} batch bodies were unparseable)`
+          : ''
+      }; the other ${sent - returned} carry a NULL relevance_score — never judged, so the floor leaves them alone and they simply rank lower.`,
     );
   }
   const judgment = stats.judgment;
@@ -343,6 +347,29 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
       .join('  ')}`,
   );
   out.push(`  geo      ${d.config.locationName ?? '—'} / ${d.config.languageName ?? '—'}`);
+  out.push(
+    `  guards   minLlmCoverage ${d.config.minLlmCoverage} (relevance + SERP judge below this ABORT the run)`,
+  );
+  const modelOverrides = Object.entries(d.config.models).filter(([, m]) => !!m);
+  out.push(
+    `  models   ${
+      modelOverrides.length === 0
+        ? '(client default for every stage)'
+        : modelOverrides.map(([stage, model]) => `${stage} ${model}`).join('  ')
+    }`,
+  );
+  out.push(
+    `  seeds    ${
+      d.config.seeds.length > 0
+        ? `PINNED (${d.config.seeds.length}) — the seed LLM call was skipped`
+        : 'LLM-generated (non-deterministic; pin with --seeds for a comparable run)'
+    }`,
+  );
+  out.push(
+    ...(d.stats.seeds.length === 0
+      ? ['    (none)']
+      : d.stats.seeds.map((seed, i) => `    ${i}. ${seed}`)),
+  );
   if (d.snapshot.replayed) out.push(`  snapshot replayed from ${d.snapshot.replayed}`);
   if (d.snapshot.wrote) out.push(`  snapshot written to ${d.snapshot.wrote}`);
   if (d.snapshot.live_misses) {
@@ -367,6 +394,9 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
       .filter(([, v]) => v > 0)
       .map(([k, v]) => `${k} ${v}`)
       .join('  ')}`,
+  );
+  out.push(
+    `  relevance   sent ${s.relevance.sent}  scored ${s.relevance.returned}  UNSCORED ${s.relevance.sent - s.relevance.returned} (null, not 0)  batches ${s.relevance.batches}  dead ${s.relevance.failedBatches}`,
   );
   out.push(
     `  serpJudge   sent ${s.judgment.sent}  judged ${s.judgment.returned}  UNPARSEABLE ${s.judgment.unparseable} (failed open)  batches ${s.judgment.batches}  dead ${s.judgment.failedBatches}`,
@@ -414,10 +444,10 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
 
   out.push('RELEVANCE');
   out.push(
-    `  sent ${d.relevance.sent}   scored by LLM ${d.relevance.returned}   never judged ${d.relevance.missing}   exactly 0 ${d.relevance.zero} (${pct(d.relevance.zero_fraction)})`,
+    `  sent ${d.relevance.sent}   scored by LLM ${d.relevance.returned}   never judged ${d.relevance.missing}   scored exactly 0 ${d.relevance.zero} (${pct(d.relevance.zero_fraction)})`,
   );
   out.push(
-    '      → relevance carries the largest scoring weight, so every keyword the LLM did not return keeps a 0 seed and ranking degenerates to volume + ease.',
+    '      → relevance carries the largest scoring weight, so every keyword the LLM did not return ranks on volume + ease alone. It is NOT rejected by the floor — null is "never judged", not "irrelevant".',
   );
   out.push(
     `  lowest relevance in the plan: ${num(d.relevance.plan_min)} — a relevanceFloor at or above it starts emptying plan slots.`,

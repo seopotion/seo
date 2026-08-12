@@ -39,6 +39,8 @@ export interface RecordedDfsCall {
 export interface RecordedLlmCall {
   key: string;
   messages: LlmMessage[];
+  /** The per-stage model override in force, if any — part of the cache key. */
+  model?: string;
   response: LlmResult;
 }
 
@@ -49,6 +51,12 @@ export interface StrategySnapshot {
   website_url: string;
   /** The config the recorded run resolved — replay warns when it has drifted. */
   config: ResolvedConfig;
+  /**
+   * The seeds the recorded run actually fanned out over, so the file documents
+   * the input that decided most of its pool. Optional: snapshots recorded before
+   * seeds were tracked have none (#211).
+   */
+  seeds?: string[];
   dataforseo: RecordedDfsCall[];
   llm: RecordedLlmCall[];
 }
@@ -70,8 +78,18 @@ function stable(value: unknown): string {
 
 const dfsKey = (method: DfsMethod, params: unknown): string => `${method}:${stable(params)}`;
 
-const llmKey = (messages: LlmMessage[]): string =>
-  createHash('sha1').update(stable(messages)).digest('hex').slice(0, 12);
+/**
+ * Keyed on the messages, plus the model WHEN ONE IS PINNED. Two models given the
+ * same prompt are different calls — without this an A/B run would replay the
+ * other model's recorded answer and report it as its own. Folding the model in
+ * only when it is set keeps every key stable for the default-model path, so
+ * existing snapshots stay valid (#211).
+ */
+const llmKey = (messages: LlmMessage[], model?: string): string =>
+  createHash('sha1')
+    .update(model === undefined ? stable(messages) : stable({ messages, model }))
+    .digest('hex')
+    .slice(0, 12);
 
 const clip = (s: string, n = 160): string =>
   s.length <= n ? s : `${s.slice(0, n).replace(/\s+$/, '')}…`;
@@ -108,11 +126,8 @@ export function createRecordingClients(base: ProviderClients): {
   const llm: LlmClient = {
     complete: async (params) => {
       const response = await base.llm.complete(params);
-      llmCalls.set(llmKey(params.messages), {
-        key: llmKey(params.messages),
-        messages: params.messages,
-        response,
-      });
+      const key = llmKey(params.messages, params.model);
+      llmCalls.set(key, { key, messages: params.messages, model: params.model, response });
       return response;
     },
   };
@@ -174,12 +189,12 @@ export function createReplayClients(
 
   const llm: LlmClient = {
     complete: async (params) => {
-      const key = llmKey(params.messages);
+      const key = llmKey(params.messages, params.model);
       const hit = llmByKey.get(key);
       if (hit) return hit.response;
       if (live) {
         const response = await live.llm.complete(params);
-        llmByKey.set(key, { key, messages: params.messages, response });
+        llmByKey.set(key, { key, messages: params.messages, model: params.model, response });
         misses.llm++;
         return response;
       }
@@ -189,7 +204,9 @@ export function createReplayClients(
       };
       throw new Error(
         [
-          `Snapshot has no recorded LLM response for this call (key ${key}).`,
+          `Snapshot has no recorded LLM response for this call (key ${key}${
+            params.model ? `, model ${params.model}` : ''
+          }).`,
           roleLine('system'),
           roleLine('user'),
           `  recorded LLM calls: ${snapshot.llm.length}`,

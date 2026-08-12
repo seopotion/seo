@@ -283,16 +283,24 @@ describe('strategyDryRun', () => {
 
     // Three candidates reach relevance; the LLM only scored two of them.
     expect(report.relevance).toMatchObject({ sent: 3, returned: 2, missing: 1 });
-    expect(report.stats.relevance.zero).toBe(1);
+    // Nothing was scored 0 — the unscored one is null, which `zero` excludes.
+    expect(report.stats.relevance.zero).toBe(0);
+    expect(report.stats.relevance).toMatchObject({ batches: 1, failedBatches: 0 });
 
     expect(report.sections.accepted.map((c) => c.keyword)).toEqual(['cheap dog food']);
-    // "dog food storage" kept the 0 seed, so the relevance floor drops it before
-    // the split; only the genuinely-scored runner-up lands below serpTopN.
-    expect(report.sections.below_n.map((c) => c.keyword)).toEqual(['dog food delivery']);
+    // "dog food storage" was never scored, so it carries a NULL relevance and the
+    // floor leaves it alone — it just ranks low and lands below serpTopN. Seeding
+    // it to 0 instead is what let an empty response delete the whole pool (#211).
+    expect(report.sections.below_n.map((c) => c.keyword)).toEqual([
+      'dog food delivery',
+      'dog food storage',
+    ]);
+    expect(
+      report.sections.below_n.find((c) => c.keyword === 'dog food storage')?.relevance_score,
+    ).toBeNull();
     expect(report.sections.rejected.map((g) => g.reason).sort()).toEqual([
       'brand_navigation',
       'difficulty_ceiling',
-      'relevance_floor',
     ]);
     // Nothing unvalidated is planned; the plan is short rather than padded.
     expect(report.plan.map((r) => r.keyword)).toEqual(['cheap dog food']);
@@ -369,6 +377,78 @@ describe('strategyDryRun', () => {
     }
     expect(findById).toHaveBeenCalledWith('org_1');
     expect(db.closeDb).toHaveBeenCalled();
+  });
+
+  // Item 4 of #211: without a pinned seed list the seed LLM swings `gathered`
+  // +/-40% between identical runs, and no A/B on this pipeline is falsifiable.
+  test('--seeds bypasses the seed LLM and records the seeds it actually used', async () => {
+    const path = join(dir, 'snap.json');
+    providerCalls.llm = 0;
+    const report = unwrap(
+      await strategyDryRun({
+        org: 'org_1',
+        serpTopN: 1,
+        seeds: ['pinned seed'],
+        snapshotPath: path,
+      }),
+    );
+
+    expect(report.stats.seeds).toEqual(['pinned seed']);
+    expect(report.config.seeds).toEqual(['pinned seed']);
+    // The seed call is one of the four LLM stages; pinning removes it entirely.
+    const unpinned = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
+    expect(unpinned.stats.seeds).toEqual(['dog food']);
+
+    // The file documents its own inputs, so a recorded run stays interpretable.
+    expect(JSON.parse(await readFile(path, 'utf8')).seeds).toEqual(['pinned seed']);
+  });
+
+  test('records the LLM-generated seeds in the snapshot too', async () => {
+    const path = join(dir, 'snap.json');
+    unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
+    expect(JSON.parse(await readFile(path, 'utf8')).seeds).toEqual(['dog food']);
+  });
+
+  // The A/B would be meaningless otherwise: same prompt, different model, and
+  // replay would hand back the first model's recorded answer as the second's.
+  test('a per-stage model override is part of the snapshot cache key', async () => {
+    const path = join(dir, 'snap.json');
+    unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
+    const baseline = JSON.parse(await readFile(path, 'utf8'));
+    expect(baseline.llm.every((c: { model?: string }) => c.model === undefined)).toBe(true);
+
+    // Same org, same prompts, different classify model — the classify call must
+    // MISS rather than replay the default model's body.
+    const result = await strategyDryRun({
+      org: 'org_1',
+      serpTopN: 1,
+      replayPath: path,
+      models: { classify: 'anthropic/claude-haiku-4.5' },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.message).toContain('model anthropic/claude-haiku-4.5');
+
+    // Recorded under the override, the two models' answers coexist in one file.
+    const abPath = join(dir, 'ab.json');
+    unwrap(
+      await strategyDryRun({
+        org: 'org_1',
+        serpTopN: 1,
+        snapshotPath: abPath,
+        models: { classify: 'anthropic/claude-haiku-4.5' },
+      }),
+    );
+    const ab = JSON.parse(await readFile(abPath, 'utf8'));
+    const classify = ab.llm.filter(
+      (c: { model?: string }) => c.model === 'anthropic/claude-haiku-4.5',
+    );
+    expect(classify).toHaveLength(1);
+    expect(classify[0].key).not.toBe(
+      baseline.llm.find((c: { messages: { content: string }[] }) =>
+        c.messages[0]!.content.includes('Classify each keyword'),
+      ).key,
+    );
   });
 
   test('rejects --snapshot together with --replay', async () => {

@@ -31,6 +31,7 @@ const config = {
   authorityDomains: [],
   authorityThreshold: 0.9,
   duplicateSerpOverlap: 0.9,
+  models: {},
 } as unknown as ResolvedConfig;
 
 test('accepted candidates carry the top-K SERP entries', async () => {

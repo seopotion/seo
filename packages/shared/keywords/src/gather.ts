@@ -20,10 +20,15 @@ interface GatherInput {
   clients: { dataForSeo: DataForSeoClient; llm: LlmClient };
 }
 
+/**
+ * Returns the seeds alongside the candidates: they decide most of the pool, and
+ * a run that cannot say what its own inputs were is not comparable to any other
+ * run (#211).
+ */
 export async function gatherCandidates(
   input: GatherInput,
   config: ResolvedConfig,
-): Promise<WorkingCandidate[]> {
+): Promise<{ candidates: WorkingCandidate[]; seeds: string[] }> {
   const { dataForSeo, llm } = input.clients;
   const geo = { locationName: config.locationName, languageName: config.languageName };
   const out: WorkingCandidate[] = [];
@@ -68,12 +73,22 @@ export async function gatherCandidates(
     .slice(0, SEED_COMPETITOR_WINS)
     .map((w) => w.keyword);
 
-  const seedRes = await llm.complete({
-    messages: buildSeedPrompt(input.presets, topWins),
-    temperature: 0,
-    responseFormat: 'json',
-  });
-  const seeds = parseSeeds(seedRes.text).slice(0, SUGGESTION_SEEDS);
+  // Pinned seeds skip the LLM entirely rather than merely overriding its answer:
+  // the point is a run with no non-deterministic input, and the call is also the
+  // one whose output swung the pool +/-40% between identical runs (#211).
+  const seeds =
+    config.seeds.length > 0
+      ? config.seeds.slice(0, SUGGESTION_SEEDS)
+      : parseSeeds(
+          (
+            await llm.complete({
+              messages: buildSeedPrompt(input.presets, topWins),
+              model: config.models.seeds,
+              temperature: 0,
+              responseFormat: 'json',
+            })
+          ).text,
+        ).slice(0, SUGGESTION_SEEDS);
   const suggestionSets = await mapWithConcurrency(seeds, SUGGESTION_CONCURRENCY, (seed) =>
     dataForSeo.keywordSuggestions({
       keyword: seed,
@@ -87,5 +102,5 @@ export async function gatherCandidates(
     for (const m of suggestions) out.push(toWorking(m, 'keyword_suggestions', seeds[i] as string));
   }
 
-  return out;
+  return { candidates: out, seeds };
 }

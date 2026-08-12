@@ -59,9 +59,30 @@ function rankKey(a: WorkingCandidate, b: WorkingCandidate): number {
   );
 }
 
+/**
+ * Abort the run when a stage's model answered too little of its batch. Both
+ * guarded stages degrade INVISIBLY and in opposite directions — an unscored
+ * relevance pool ranks on volume + ease alone, an unjudged SERP batch fails
+ * every keyword open — so each one produces a full, plausible-looking 30-day
+ * plan built on nothing. Throwing hands the run to the worker's catch, which
+ * marks the org failed and rethrows so SQS redelivers; a degraded plan silently
+ * marked `completed` is the outcome this exists to prevent (#211).
+ */
+function assertCoverage(stage: string, sent: number, returned: number, min: number): void {
+  if (sent === 0 || min <= 0) return;
+  const fraction = returned / sent;
+  if (fraction >= min) return;
+  throw new Error(
+    `strategy aborted: the ${stage} LLM answered only ${returned} of ${sent} keywords ` +
+      `(${Math.round(fraction * 100)}%, minLlmCoverage ${Math.round(min * 100)}%). ` +
+      'Completing would ship a plan the model never actually judged.',
+  );
+}
+
 export async function runKeywordPipeline(input: PipelineInput): Promise<PipelineResult> {
   const config = resolveConfig(input.presets, input.config);
   const progress = input.onProgress ?? (() => {});
+  const minCoverage = config.minLlmCoverage;
   const rejected: WorkingCandidate[] = [];
 
   // 1 gather → 2 dedupe
@@ -75,10 +96,10 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     },
     config,
   );
-  const gathered = raw.length;
+  const gathered = raw.candidates.length;
   const gatheredBySource = { ...EMPTY_SOURCE_COUNTS };
-  for (const c of raw) gatheredBySource[c.source]++;
-  const deduped = dedupe(raw);
+  for (const c of raw.candidates) gatheredBySource[c.source]++;
+  const deduped = dedupe(raw.candidates);
 
   // 3 brand/nav
   const brand = brandNavFilter(deduped, {
@@ -105,17 +126,24 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   const relevance = await applyRelevance(ceiling.survivors, {
     llm: input.clients.llm,
     presets: input.presets,
+    model: config.models.relevance,
   });
+  assertCoverage('relevance', relevance.coverage.sent, relevance.coverage.returned, minCoverage);
   const cannibalSet = new Set(
     [...input.existingKeywords, ...input.existingArticleKeywords].map(normalizeKeyword),
   );
   const scored = scoreCandidates(relevance.candidates, { cannibalSet, config });
 
   // 8b relevance floor — before the split, so a keyword the model saw no
-  // connection to never consumes one of the serpTopN validation slots.
+  // connection to never consumes one of the serpTopN validation slots. A NULL
+  // score is not a zero: it means the model never judged the keyword, and
+  // treating the two alike is what let an empty response reject the entire pool
+  // and still report success (#211). Unscored candidates survive the floor and
+  // simply rank lower, since scoreCandidates weights a null relevance as 0.
   const relevant: WorkingCandidate[] = [];
   for (const c of scored) {
-    if ((c.relevance_score ?? 0) <= config.relevanceFloor)
+    const score = c.relevance_score;
+    if (score !== null && score <= config.relevanceFloor)
       rejected.push(reject(c, 'relevance_floor'));
     else relevant.push(c);
   }
@@ -134,11 +162,27 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     onProgress: progress,
   });
   rejected.push(...serp.rejected);
+  assertCoverage('SERP judge', serp.coverage.sent, serp.coverage.returned, minCoverage);
   progress('classify', { candidates: serp.accepted.length });
+  // Classify is deliberately NOT guarded: an unclassified keyword becomes
+  // `other`, which flattens clusterSpreadSchedule's spread but never puts a
+  // keyword on the plan that does not belong there. Its coverage counters are
+  // the report; they are not grounds to fail a run.
   const classified = await classifyCandidates(serp.accepted, {
     llm: input.clients.llm,
     presets: input.presets,
+    model: config.models.classify,
   });
+
+  // A pool that gathered keywords but accepted none is not a valid empty plan —
+  // it is a stage that failed in a way the coverage guards did not name. The
+  // worker would otherwise mark the org `completed` with nothing scheduled.
+  if (gathered > 0 && classified.candidates.length === 0) {
+    throw new Error(
+      `strategy aborted: gathered ${gathered} keywords but accepted 0, so the plan would be ` +
+        'empty. Check rejectedByReason for which stage consumed them.',
+    );
+  }
 
   // 12 assemble (stable order: accepted, then below-N scored, then rejected)
   const all: WorkingCandidate[] = [...classified.candidates, ...belowN, ...rejected];
@@ -149,6 +193,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     candidates: all.map((c) => toEnriched(c, input.orgId)),
     stats: {
       gathered,
+      seeds: raw.seeds,
       gatheredBySource,
       afterDedupe: deduped.length,
       afterBrandNav: brand.survivors.length,

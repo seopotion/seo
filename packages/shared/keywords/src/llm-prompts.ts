@@ -19,9 +19,22 @@ function businessContext(presets: SetupPresets): string {
   ].join('\n');
 }
 
+/**
+ * Parse a JSON body, tolerating a markdown code fence around it. Models wrap
+ * their answer in ```json even when asked for raw JSON and told the response
+ * format is JSON — measured on claude-haiku-4.5, which returned a complete,
+ * correctly-indexed relevance body inside a fence and scored 0 of 340 keywords
+ * because JSON.parse choked on the backticks. Stripping it is what makes the
+ * per-stage model override usable at all; on an unfenced body it is a no-op
+ * (#211).
+ */
 function tryParse(text: string): unknown {
+  const body = text
+    .trim()
+    .replace(/^```(?:json)?[ \t]*\r?\n?/i, '')
+    .replace(/\r?\n?[ \t]*```$/, '');
   try {
-    return JSON.parse(text);
+    return JSON.parse(body);
   } catch {
     return null;
   }
@@ -79,48 +92,59 @@ export function parseSeeds(text: string): string[] {
 }
 
 // ---- relevance ----
+/**
+ * Score a batch of keywords. The SCORING CRITERION is carried over verbatim from
+ * the single-call prompt; what changed is the addressing. Echoing 400+ keywords
+ * back was the single largest output of any stage — 60-68 chars per keyword,
+ * measured — and output tokens are what the classify call exhausted before
+ * returning an empty body. Rows are answered by INDEX instead (#211).
+ */
 export function buildRelevancePrompt(keywords: string[], presets: SetupPresets): LlmMessage[] {
+  const list = keywords.map((k, i) => `${i}. ${k}`).join('\n');
   return [
     {
       role: 'system',
       content:
         'Score each keyword 0..1 for how relevant it is to the business and audience. ' +
-        'Respond ONLY with JSON: {"scores":[{"keyword":string,"relevance":number}]}.',
+        'Each keyword is numbered; answer by that index and do not repeat the keyword text. ' +
+        'Return one entry for every index. Respond ONLY with JSON: ' +
+        '{"scores":[{"index":number,"relevance":number}]}.',
     },
-    {
-      role: 'user',
-      content: `${businessContext(presets)}\n\nKeywords:\n${JSON.stringify(keywords)}`,
-    },
+    { role: 'user', content: `${businessContext(presets)}\n\nKeywords:\n${list}` },
   ];
 }
 
 /**
- * Score every keyword, seeding 0 for the ones the model did not echo back
- * verbatim. `returned` counts the ones it did: a large gap between it and
- * `keywords.length` means a truncated or re-cased response rather than
- * genuinely irrelevant keywords, which is otherwise indistinguishable from a
- * real 0 (#211).
+ * Scores for the keywords the model actually answered — and ONLY those. An
+ * absent keyword is deliberately absent rather than seeded to 0: the seed made
+ * "never judged" indistinguishable from "judged irrelevant", and since the
+ * relevance floor rejects at 0, one empty response rejected the entire pool and
+ * shipped a 30-day plan with nothing in it (#211). `parsed === false` marks a
+ * body that yielded nothing at all, so a dead batch is countable.
  */
 export function parseRelevance(
   text: string,
   keywords: string[],
-): { scores: Map<string, number>; returned: number } {
-  const out = new Map<string, number>(keywords.map((k) => [k, 0]));
-  const matched = new Set<string>();
+): { scores: Map<string, number>; parsed: boolean } {
+  const out = new Map<string, number>();
+  const byNormalized = new Map(keywords.map((k) => [normalizeKeyword(k), k]));
   const parsed = tryParse(text) as {
-    scores?: Array<{ keyword?: unknown; relevance?: unknown }>;
+    scores?: Array<{ index?: unknown; keyword?: unknown; relevance?: unknown }>;
   } | null;
   for (const row of parsed?.scores ?? []) {
-    if (
-      typeof row.keyword === 'string' &&
-      typeof row.relevance === 'number' &&
-      out.has(row.keyword)
-    ) {
-      out.set(row.keyword, clamp01(row.relevance));
-      matched.add(row.keyword);
-    }
+    if (typeof row.relevance !== 'number' || !Number.isFinite(row.relevance)) continue;
+    // Index is the contract; an echoed keyword is still honoured so a model that
+    // ignores it degrades to the old behaviour rather than to silence.
+    const keyword =
+      typeof row.index === 'number' && Number.isInteger(row.index)
+        ? keywords[row.index]
+        : typeof row.keyword === 'string'
+          ? byNormalized.get(normalizeKeyword(row.keyword))
+          : undefined;
+    if (keyword === undefined) continue;
+    out.set(keyword, clamp01(row.relevance));
   }
-  return { scores: out, returned: matched.size };
+  return { scores: out, parsed: out.size > 0 };
 }
 
 // ---- SERP judgment ----

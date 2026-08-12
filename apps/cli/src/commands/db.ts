@@ -158,6 +158,28 @@ export const dbCommand = defineCommand({
           type: 'string',
           description: 'Override config.serpTopN — live SERP calls dominate the cost',
         },
+        seeds: {
+          type: 'string',
+          description:
+            'Pin the seed keywords (comma-separated, or repeat the flag) instead of asking the LLM. The seed call is non-deterministic and swings the pool +/-40%, so pin it for any A/B',
+        },
+        'model-seeds': {
+          type: 'string',
+          description: 'Model for the seed call only (default: the client default)',
+        },
+        'model-relevance': {
+          type: 'string',
+          description: 'Model for the relevance stage only (default: the client default)',
+        },
+        'model-serp-judge': {
+          type: 'string',
+          description:
+            'Model for the SERP intent/locality judge only (default: the client default)',
+        },
+        'model-classify': {
+          type: 'string',
+          description: 'Model for the article_type classifier only (default: the client default)',
+        },
         snapshot: {
           type: 'string',
           description: 'Run live and record every provider response to this JSON file',
@@ -190,6 +212,26 @@ export const dbCommand = defineCommand({
             process.exit(EXIT.USER_ERROR);
           }
 
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const rawSeeds = args.seeds as string | string[] | undefined;
+          const seeds = (Array.isArray(rawSeeds) ? rawSeeds : rawSeeds ? [rawSeeds] : [])
+            .flatMap((s) => s.split(','))
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          const models = Object.fromEntries(
+            (
+              [
+                ['seeds', 'model-seeds'],
+                ['relevance', 'model-relevance'],
+                ['serpJudge', 'model-serp-judge'],
+                ['classify', 'model-classify'],
+              ] as const
+            )
+              .map(([stage, flag]) => [stage, args[flag] as string | undefined])
+              .filter(([, model]) => !!model),
+          );
+
           const replay = args.replay as string | undefined;
           const allowLiveMisses = args['allow-live-misses'] as boolean;
           if (replay && allowLiveMisses) {
@@ -200,7 +242,10 @@ export const dbCommand = defineCommand({
             emitter.info(`Replaying ${replay} — no network calls, no provider credits spent.`);
           } else {
             emitter.warn(
-              `LIVE RUN — real DataForSEO + OpenRouter credits will be spent: up to ${serpTopN ?? DEFAULT_CONFIG.serpTopN} SERP calls (serpTopN) plus the gather/difficulty calls, and up to ${(serpTopN ?? DEFAULT_CONFIG.serpTopN) + 3} LLM calls. Pass --snapshot <path> to record it, then --replay <path> to iterate for free.`,
+              // The LLM count is no longer ~1 per keyword: relevance, the SERP
+              // judge and classify are all batched (#211), so it is a few dozen
+              // calls regardless of pool size.
+              `LIVE RUN — real DataForSEO + OpenRouter credits will be spent: up to ${serpTopN ?? DEFAULT_CONFIG.serpTopN} SERP calls (serpTopN) plus the gather/difficulty calls, and a few dozen batched LLM calls. Pass --snapshot <path> to record it, then --replay <path> to iterate for free.`,
             );
           }
           emitter.step('db:strategy-dryrun', 'start');
@@ -209,6 +254,8 @@ export const dbCommand = defineCommand({
             org: args.org as string | undefined,
             user: args.user as string | undefined,
             serpTopN,
+            seeds,
+            models,
             snapshotPath: args.snapshot as string | undefined,
             replayPath: replay,
             allowLiveMisses,

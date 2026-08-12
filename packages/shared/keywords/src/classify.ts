@@ -26,7 +26,7 @@ const EMPTY_COVERAGE: ClassificationCoverage = {
 
 export async function classifyCandidates(
   candidates: WorkingCandidate[],
-  deps: { llm: LlmClient; presets: SetupPresets },
+  deps: { llm: LlmClient; presets: SetupPresets; model?: string },
 ): Promise<{ candidates: WorkingCandidate[]; coverage: ClassificationCoverage }> {
   if (candidates.length === 0) return { candidates, coverage: EMPTY_COVERAGE };
 
@@ -38,6 +38,7 @@ export async function classifyCandidates(
   const results = await mapWithConcurrency(batches, CLASSIFY_CONCURRENCY, async (keywords) => {
     const res = await deps.llm.complete({
       messages: buildClassifyPrompt(keywords, deps.presets),
+      model: deps.model,
       temperature: 0,
       responseFormat: 'json',
     });
