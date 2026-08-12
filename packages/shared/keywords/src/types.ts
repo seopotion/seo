@@ -7,6 +7,7 @@ import type {
   SearchIntent,
   SerpCompetitor,
   SetupPresets,
+  TopicRole,
 } from '@shared/schemas';
 
 /** A candidate as it flows through the pipeline. `normalized` is the dedup key. */
@@ -15,6 +16,13 @@ export interface WorkingCandidate {
   normalized: string;
   source: CandidateSource;
   source_context: string | null;
+  core_keyword: string | null;
+  category_ids: number[];
+  topic_cluster_id: string | null;
+  topic_cluster_label: string | null;
+  topic_role: TopicRole | null;
+  topic_content_focus: string | null;
+  topic_primary_keyword: string | null;
   search_volume: number | null;
   difficulty: number | null;
   cpc: number | null;
@@ -37,6 +45,13 @@ export interface EnrichedCandidate {
   keyword: string;
   source: CandidateSource;
   source_context: string | null;
+  core_keyword: string | null;
+  category_ids: number[];
+  topic_cluster_id: string | null;
+  topic_cluster_label: string | null;
+  topic_role: TopicRole | null;
+  topic_content_focus: string | null;
+  topic_primary_keyword: string | null;
   search_volume: number | null;
   difficulty: number | null;
   cpc: number | null;
@@ -72,6 +87,7 @@ export interface StageModels {
   relevance?: string;
   serpJudge?: string;
   classify?: string;
+  topicClusters?: string;
 }
 
 export interface PipelineConfig {
@@ -86,10 +102,8 @@ export interface PipelineConfig {
   serpDepth: number;
   serpTopK: number;
   volumeCap: number;
-  clusterJaccard: number;
   authorityDomains: string[];
   authorityThreshold: number;
-  duplicateSerpOverlap: number;
   weights: ScoreWeights;
   /**
    * Fraction of a stage's keywords the LLM must actually answer for the run to
@@ -212,12 +226,22 @@ export interface PipelineStats {
   gatheredBySource: Record<CandidateSource, number>;
   afterDedupe: number;
   afterBrandNav: number;
-  clustered: number;
   afterCeiling: number;
   scored: number;
   /** Survivors of the relevance floor — the pool the top-N split draws from. */
   afterRelevanceFloor: number;
+  /** Candidates sent through SERP validation. */
+  serpChecked: number;
+  /** Candidates that passed authority, intent, and locality checks. */
   serpValidated: number;
+  topicClustering: {
+    candidates: number;
+    clusters: number;
+    targets: number;
+    duplicates: number;
+    pillars: number;
+    supports: number;
+  };
   accepted: number;
   rejectedByReason: Record<RejectionReason, number>;
   relevance: RelevanceCoverage;

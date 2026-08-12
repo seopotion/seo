@@ -71,6 +71,11 @@ export const KeywordRepo = {
       intent: candidate.intent,
       opportunity_score: candidate.opportunity_score,
       serp_competitors: candidate.serp_competitors,
+      topic_cluster_id: candidate.topic_cluster_id,
+      topic_cluster_label: candidate.topic_cluster_label,
+      topic_role: candidate.topic_role,
+      topic_content_focus: candidate.topic_content_focus,
+      topic_primary_keyword: candidate.topic_primary_keyword,
     });
   },
 

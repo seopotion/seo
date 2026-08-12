@@ -29,7 +29,6 @@ function validateOptionalUrl(value: string, label: string, t: ValidationTranslat
 export function validateStep({
   audienceDraft,
   competitorDraft,
-  competitorsSkipped = false,
   form,
   scanState,
   stepIndex,
@@ -37,8 +36,6 @@ export function validateStep({
 }: {
   audienceDraft: string;
   competitorDraft: string;
-  /** Set by the deliberate "no competitor to name" opt-out on step 2. */
-  competitorsSkipped?: boolean;
   form: OnboardingForm;
   scanState: ScanState;
   stepIndex: number;
@@ -73,11 +70,7 @@ export function validateStep({
       nextErrors.competitorDraft = t('competitorDomain');
     }
 
-    if (competitorCount === 0) {
-      // Competitors drive a whole third of the keyword pipeline, so advancing
-      // without them has to be a choice the user made, not a silent default.
-      if (!competitorsSkipped) nextErrors.competitors = t('competitorsRequired');
-    } else if (competitorCount > MAX_COMPETITORS) {
+    if (competitorCount > MAX_COMPETITORS) {
       nextErrors.competitors = t('competitorsMax', { max: MAX_COMPETITORS });
     } else if (
       form.competitors.some((competitor) => !normalizeCompetitorDomain(competitor.value).ok)

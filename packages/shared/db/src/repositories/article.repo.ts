@@ -5,6 +5,7 @@ import {
   ArticleSchema,
   type CreateArticleInput,
   CreateArticleInput as CreateArticleInputSchema,
+  type TopicRole,
 } from '@shared/schemas';
 import { type Document, ObjectId, type UpdateFilter, type WithId } from 'mongodb';
 import { getDb } from '../client';
@@ -43,6 +44,30 @@ export const ArticleRepo = {
 
   async countByStatus(orgId: string, status: Article['status']): Promise<number> {
     return (await collection()).countDocuments({ org_id: orgId, status });
+  },
+
+  async listPublishedByTopicCluster(
+    orgId: string,
+    topicClusterId: string,
+    opts: {
+      limit: number;
+      role?: { value: TopicRole; mode: 'include' | 'exclude' };
+    },
+  ): Promise<Article[]> {
+    const filter: Document = {
+      org_id: orgId,
+      status: 'published',
+      topic_cluster_id: topicClusterId,
+    };
+    if (opts.role) {
+      filter.topic_role = opts.role.mode === 'include' ? opts.role.value : { $ne: opts.role.value };
+    }
+    const docs = await (await collection())
+      .find(filter)
+      .sort({ created_at: -1 })
+      .limit(opts.limit)
+      .toArray();
+    return docs.map(toEntity);
   },
 
   /**

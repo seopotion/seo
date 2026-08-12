@@ -38,6 +38,9 @@ export const ARTICLE_TYPES = [
 ] as const;
 export type ArticleType = (typeof ARTICLE_TYPES)[number];
 
+export const TOPIC_ROLES = ['pillar', 'support'] as const;
+export type TopicRole = (typeof TOPIC_ROLES)[number];
+
 /** Why a candidate was rejected by the pipeline (#54). */
 export const REJECTION_REASONS = [
   'brand_navigation',
@@ -48,6 +51,7 @@ export const REJECTION_REASONS = [
   'serp_authority',
   'serp_locality',
   'serp_duplicate',
+  'topic_duplicate',
 ] as const;
 export type RejectionReason = (typeof REJECTION_REASONS)[number];
 
@@ -95,6 +99,13 @@ export const CandidateSchema = z.object({
   normalized_keyword: z.string(),
   source: z.enum(CANDIDATE_SOURCES),
   source_context: z.string().nullable().default(null),
+  core_keyword: z.string().nullable().default(null),
+  category_ids: z.array(z.number().int()).default([]),
+  topic_cluster_id: z.string().nullable().default(null),
+  topic_cluster_label: z.string().nullable().default(null),
+  topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
+  topic_content_focus: z.string().nullable().default(null),
+  topic_primary_keyword: z.string().nullable().default(null),
   search_volume: z.number().int().nullable().default(null),
   difficulty: z.number().int().nullable().default(null),
   cpc: z.number().nullable().default(null),

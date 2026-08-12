@@ -5,6 +5,7 @@ import {
   normalizeKeyword,
   type SetupPresets,
 } from '@shared/schemas';
+import { parseJsonResponse } from './json-response';
 import type { ClassificationCoverage } from './types';
 
 const ARTICLE_TYPE_SET = new Set<string>(ARTICLE_TYPES);
@@ -17,27 +18,6 @@ function businessContext(presets: SetupPresets): string {
     `Country: ${presets.business.country}`,
     `Language: ${presets.business.language}`,
   ].join('\n');
-}
-
-/**
- * Parse a JSON body, tolerating a markdown code fence around it. Models wrap
- * their answer in ```json even when asked for raw JSON and told the response
- * format is JSON — measured on claude-haiku-4.5, which returned a complete,
- * correctly-indexed relevance body inside a fence and scored 0 of 340 keywords
- * because JSON.parse choked on the backticks. Stripping it is what makes the
- * per-stage model override usable at all; on an unfenced body it is a no-op
- * (#211).
- */
-function tryParse(text: string): unknown {
-  const body = text
-    .trim()
-    .replace(/^```(?:json)?[ \t]*\r?\n?/i, '')
-    .replace(/\r?\n?[ \t]*```$/, '');
-  try {
-    return JSON.parse(body);
-  } catch {
-    return null;
-  }
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
@@ -85,7 +65,7 @@ export function buildSeedPrompt(presets: SetupPresets, competitorWins: string[])
 }
 
 export function parseSeeds(text: string): string[] {
-  const parsed = tryParse(text) as { seeds?: unknown } | null;
+  const parsed = parseJsonResponse(text) as { seeds?: unknown } | null;
   const seeds = parsed?.seeds;
   if (!Array.isArray(seeds)) return [];
   return seeds.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
@@ -128,7 +108,7 @@ export function parseRelevance(
 ): { scores: Map<string, number>; parsed: boolean } {
   const out = new Map<string, number>();
   const byNormalized = new Map(keywords.map((k) => [normalizeKeyword(k), k]));
-  const parsed = tryParse(text) as {
+  const parsed = parseJsonResponse(text) as {
     scores?: Array<{ index?: unknown; keyword?: unknown; relevance?: unknown }>;
   } | null;
   for (const row of parsed?.scores ?? []) {
@@ -213,7 +193,7 @@ export function parseSerpJudgments(
 ): { judgments: SerpJudgment[]; unparseable: number; parsed: boolean } {
   const out = new Array<SerpJudgment>(count).fill(FAIL_OPEN_JUDGMENT);
   const seen = new Set<number>();
-  const parsed = tryParse(text) as {
+  const parsed = parseJsonResponse(text) as {
     judgments?: Array<{
       index?: unknown;
       intentSuitable?: unknown;
@@ -299,7 +279,7 @@ export function parseClassification(
   let matched = 0;
   let typed = 0;
 
-  const parsed = tryParse(text) as {
+  const parsed = parseJsonResponse(text) as {
     types?: Array<{ index?: unknown; keyword?: unknown; article_type?: unknown }>;
   } | null;
 

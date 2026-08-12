@@ -20,7 +20,6 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   serpDepth: 20,
   serpTopK: 10,
   volumeCap: 10_000,
-  clusterJaccard: 0.6,
   authorityDomains: [
     'wikipedia.org',
     'amazon.com',
@@ -31,7 +30,6 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
     'pinterest.com',
   ],
   authorityThreshold: 0.5,
-  duplicateSerpOverlap: 0.6,
   weights: { relevance: 0.35, volume: 0.3, ease: 0.2, trend: 0.1, cannibalization: 0.05 },
   // Half. A healthy run answers 100% — both measured clewas runs returned every
   // keyword — so any real shortfall is a truncated or empty body, and those are
@@ -42,7 +40,10 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   // demand a perfect stage; 0 disables the guard (#211).
   minLlmCoverage: 0.5,
   // Unset = the LlmClient's default model for that stage.
-  models: { classify: 'anthropic/claude-haiku-4.5' },
+  models: {
+    classify: 'anthropic/claude-haiku-4.5',
+    topicClusters: 'anthropic/claude-haiku-4.5',
+  },
   // Empty = ask the LLM for seeds, the production path. Pin them for benchmark
   // runs, where a non-deterministic seed list swings the pool +/-40% and swamps
   // whatever change is being measured (#211).

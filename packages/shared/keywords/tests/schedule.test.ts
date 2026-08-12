@@ -1,29 +1,38 @@
 import { describe, expect, test } from 'vitest';
-import { clusterSpreadSchedule } from '../src/schedule';
+import { stampScheduledDates } from '../src/schedule';
 
 const item = (id: number, type: string) => ({ id, article_type: type });
 
-describe('clusterSpreadSchedule', () => {
-  test('assigns consecutive dates from the start date', () => {
-    const out = clusterSpreadSchedule(
+describe('stampScheduledDates', () => {
+  test('preserves input order and assigns consecutive UTC dates', () => {
+    const input = [item(1, 'same'), item(2, 'same'), item(3, 'different')];
+    const out = stampScheduledDates(input, new Date('2026-07-08T23:00:00-07:00'), 30);
+
+    expect(out.map((entry) => entry.item.id)).toEqual([1, 2, 3]);
+    expect(out.map((entry) => entry.scheduled_date)).toEqual([
+      '2026-07-09',
+      '2026-07-10',
+      '2026-07-11',
+    ]);
+    expect(out[0]!.item).toBe(input[0]);
+    expect(input).toEqual([item(1, 'same'), item(2, 'same'), item(3, 'different')]);
+  });
+
+  test('caps without padding', () => {
+    const out = stampScheduledDates(
       [item(1, 'a'), item(2, 'b')],
       new Date('2026-07-08T00:00:00Z'),
-      30,
+      1,
     );
-    expect(out.map((o) => o.scheduled_date)).toEqual(['2026-07-08', '2026-07-09']);
+    expect(out).toEqual([{ item: { id: 1, article_type: 'a' }, scheduled_date: '2026-07-08' }]);
+    expect(stampScheduledDates([item(1, 'a')], new Date('2026-07-08T00:00:00Z'), 3)).toHaveLength(
+      1,
+    );
   });
 
-  test('interleaves clusters so no two adjacent days share a type when possible', () => {
-    const items = [item(1, 'a'), item(2, 'a'), item(3, 'b'), item(4, 'b')];
-    const out = clusterSpreadSchedule(items, new Date('2026-07-08T00:00:00Z'), 30);
-    const types = out.map((o) => o.article_type);
-    for (let i = 1; i < types.length; i++) expect(types[i]).not.toBe(types[i - 1]);
-  });
-
-  test('is deterministic', () => {
-    const items = [item(1, 'a'), item(2, 'b'), item(3, 'a')];
-    const a = clusterSpreadSchedule(items, new Date('2026-07-08T00:00:00Z'));
-    const b = clusterSpreadSchedule(items, new Date('2026-07-08T00:00:00Z'));
-    expect(a).toEqual(b);
+  test.each([-1, 1.5, Number.NaN])('rejects invalid days %s', (days) => {
+    expect(() => stampScheduledDates([], new Date('2026-07-08T00:00:00Z'), days)).toThrow(
+      /days must be a non-negative integer/i,
+    );
   });
 });

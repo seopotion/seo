@@ -9,7 +9,6 @@ const config = {
   ...DEFAULT_CONFIG,
   serpTopK: 4,
   authorityThreshold: 0.5,
-  duplicateSerpOverlap: 0.6,
   locationName: 'United States',
   languageName: 'English',
 };
@@ -34,6 +33,13 @@ const cand = (keyword: string): WorkingCandidate => ({
   normalized: keyword,
   source: 'keyword_ideas',
   source_context: null,
+  core_keyword: null,
+  category_ids: [],
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   search_volume: null,
   difficulty: null,
   cpc: null,
@@ -102,7 +108,7 @@ it('rejects authority-dominated SERPs deterministically (no LLM call)', async ()
   expect(llm.complete).not.toHaveBeenCalled();
 });
 
-it('rejects a duplicate SERP against an already-accepted candidate', async () => {
+it('accepts candidates with identical SERPs and retains evidence for both', async () => {
   const shared = serp(['a.com', 'b.com', 'c.com', 'd.com']);
   const dataForSeo = {
     serpGoogleOrganic: vi.fn().mockResolvedValueOnce(shared).mockResolvedValueOnce(shared),
@@ -113,8 +119,9 @@ it('rejects a duplicate SERP against an already-accepted candidate', async () =>
     presets,
     config,
   });
-  expect(accepted.map((c) => c.keyword)).toEqual(['first']);
-  expect(rejected[0]!.rejection_reason).toBe('serp_duplicate');
+  expect(accepted.map((c) => c.keyword)).toEqual(['first', 'second']);
+  expect(rejected).toEqual([]);
+  expect(accepted.every((candidate) => candidate.serp_competitors?.length === 4)).toBe(true);
 });
 
 it('uses the LLM to reject unsuitable intent', async () => {
@@ -128,13 +135,12 @@ it('uses the LLM to reject unsuitable intent', async () => {
   expect(rejected[0]!.rejection_reason).toBe('serp_intent');
 });
 
-it('fetches SERPs concurrently, but preserves order and dedup semantics', async () => {
+it('fetches SERPs concurrently and preserves input order', async () => {
   let inFlight = 0;
   let maxInFlight = 0;
   const shared = serp(['a.com', 'b.com', 'c.com', 'd.com']);
   const dataForSeo = {
-    // Distinct SERP per keyword except 'dup', which mirrors 'first' so it trips
-    // the sequential duplicate check — proving Phase 2 stays ordered.
+    // 'dup' mirrors 'first'; both must remain available to semantic clustering.
     serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
@@ -153,30 +159,27 @@ it('fetches SERPs concurrently, but preserves order and dedup semantics', async 
   });
 
   expect(maxInFlight).toBeGreaterThan(1); // ran in parallel
-  expect(accepted.map((c) => c.keyword)).toEqual(['first', 'k2', 'k3']);
-  expect(rejected.map((c) => c.rejection_reason)).toEqual(['serp_duplicate']);
+  expect(accepted.map((c) => c.keyword)).toEqual(['first', 'k2', 'k3', 'dup']);
+  expect(rejected).toEqual([]);
 });
 
 // ---- determinism ----
 // The judge went from one call per keyword to one call per batch (#211). The
-// duplicate-overlap check reads the SERPs accepted BEFORE it, so the decision
-// walk has to stay in input order no matter how the batches are cut or what
-// order they resolve in. This fixture is built to break a naive implementation:
-// duplicates sit in a DIFFERENT batch from their anchor, and the batches
-// deliberately resolve out of order.
+// verdicts must still scatter back to input order even when batches resolve out
+// of order.
 const authoritySerp = serp(['wikipedia.org', 'amazon.com', 'blogx.com', 'blogy.com']);
 const sharedSerp = serp(['a.com', 'b.com', 'c.com', 'd.com']);
 
 /** 25 keywords — 3 batches at SERP_JUDGE_BATCH_SIZE=10, with the interesting ones spread across them. */
 const fixtureKeywords = [
-  'anchor', // batch 0 — accepted, becomes the duplicate anchor
+  'anchor',
   'badIntent',
   ...Array.from({ length: 6 }, (_, i) => `f${i}`),
   'authority', // gated before the LLM, so it shifts the batch boundaries
   'dupA', // batch 0 tail
   ...Array.from({ length: 7 }, (_, i) => `g${i}`), // batch 1
   'badLocality',
-  'dupB', // batch 1 — same SERP as 'anchor' back in batch 0
+  'dupB',
   ...Array.from({ length: 6 }, (_, i) => `h${i}`), // batch 2
   'dupC',
 ];
@@ -198,7 +201,6 @@ const verdictFor = (keyword: string) => ({
  * exactly, because the replay fixture is only a valid comparison if it does.
  */
 function serialReference(keywords: string[]): { keyword: string; reason: string | null }[] {
-  const acceptedUrls: Set<string>[] = [];
   const out: { keyword: string; reason: string | null }[] = [];
   for (const keyword of keywords) {
     const top = serpFor(keyword).slice(0, config.serpTopK);
@@ -209,22 +211,10 @@ function serialReference(keywords: string[]): { keyword: string; reason: string 
       out.push({ keyword, reason: 'serp_authority' });
       continue;
     }
-    const urls = new Set(top.map((r) => r.url));
-    const dup = acceptedUrls.some((prev) => {
-      const inter = [...urls].filter((u) => prev.has(u)).length;
-      return inter / (urls.size + prev.size - inter) >= config.duplicateSerpOverlap;
-    });
-    if (dup) {
-      out.push({ keyword, reason: 'serp_duplicate' });
-      continue;
-    }
     const v = verdictFor(keyword);
     if (!v.intentSuitable) out.push({ keyword, reason: 'serp_intent' });
     else if (!v.localitySuitable) out.push({ keyword, reason: 'serp_locality' });
-    else {
-      acceptedUrls.push(urls);
-      out.push({ keyword, reason: null });
-    }
+    else out.push({ keyword, reason: null });
   }
   return out;
 }
@@ -272,8 +262,14 @@ it('batched judgment returns exactly what one-call-per-keyword would', async () 
   expect(rejected.map((c) => ({ keyword: c.keyword, reason: c.rejection_reason }))).toEqual(
     expected.filter((e) => e.reason !== null),
   );
-  // The duplicates really did land in different batches from their anchor.
-  expect(rejected.filter((c) => c.rejection_reason === 'serp_duplicate')).toHaveLength(3);
+  expect(accepted).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ keyword: 'anchor' }),
+      expect.objectContaining({ keyword: 'dupA' }),
+      expect.objectContaining({ keyword: 'dupB' }),
+      expect.objectContaining({ keyword: 'dupC' }),
+    ]),
+  );
   // One call per batch of the 24 non-authority keywords, not one per keyword.
   const pending = fixtureKeywords.length - 1;
   expect((llm.complete as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(

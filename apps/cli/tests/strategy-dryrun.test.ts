@@ -9,11 +9,18 @@ import { join } from 'node:path';
 import type { EnrichedCandidate } from '@shared/keywords';
 import type { DataForSeoClient, KeywordMetric, LlmClient, SerpResult } from '@shared/providers';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { simulatePlan, sourceFunnel, splitSections } from '../src/lib/strategy-dryrun';
+import {
+  renderStrategyDryRun,
+  simulatePlan,
+  sourceFunnel,
+  splitSections,
+} from '../src/lib/strategy-dryrun';
 import type { StrategyDryRunData } from '../src/types';
 
 const metric = (keyword: string, over: Partial<KeywordMetric> = {}): KeywordMetric => ({
   keyword,
+  core_keyword: null,
+  category_ids: [],
   search_volume: 100,
   difficulty: 20,
   cpc: null,
@@ -172,6 +179,27 @@ vi.mock('@shared/providers', async (importOriginal) => ({
         text = JSON.stringify({
           types: Array.from({ length: n }, (_, index) => ({ index, article_type: 'listicle' })),
         });
+      } else if (sys.includes('Assign the candidates to broad topic clusters')) {
+        const indices = (messages.at(-1)?.content ?? '')
+          .split('\n')
+          .filter((line) => line.startsWith('{"index":'))
+          .map((line) => (JSON.parse(line) as { index: number }).index);
+        text = JSON.stringify({
+          clusters:
+            indices.length === 0
+              ? []
+              : [
+                  {
+                    label: 'Dog food',
+                    pillar_index: indices[0],
+                    targets: indices.map((index) => ({
+                      primary_index: index,
+                      member_indices: [index],
+                      content_focus: `Dog food target ${index}`,
+                    })),
+                  },
+                ],
+        });
       }
       return {
         text,
@@ -308,10 +336,27 @@ describe('strategyDryRun', () => {
     expect(report.notes.join(' ')).toContain('under-filled');
   });
 
+  test('shows semantic cluster and role in structured and rendered plan output', async () => {
+    const report = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
+
+    expect(report.plan[0]).toMatchObject({
+      keyword: 'cheap dog food',
+      topic_cluster_id: 'topic:cheap dog food',
+      topic_cluster_label: 'Dog food',
+      topic_role: 'pillar',
+    });
+    const rendered = renderStrategyDryRun(report);
+    expect(rendered).toContain('cluster');
+    expect(rendered).toContain('Dog food');
+    expect(rendered).toContain('pillar');
+    expect(rendered).toContain('accepted-pool classification diagnostic only');
+    expect(rendered).not.toContain('clusterSpreadSchedule');
+  });
+
   // Uniform `other` was indistinguishable from a real judgement until these
   // counters existed — the clewas run's classify call returned an empty body and
   // silently typed all 78 accepts `other` (#211).
-  test('reports SERP-judge and classify coverage plus the article_type spread', async () => {
+  test('reports SERP-judge and classify coverage plus article_type diagnostics', async () => {
     const report = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
 
     expect(report.stats.judgment).toMatchObject({
@@ -328,6 +373,19 @@ describe('strategyDryRun', () => {
       typed: 1,
       assigned: 1,
       failedBatches: 0,
+    });
+    expect(report.stats).toMatchObject({
+      serpChecked: 1,
+      serpValidated: 1,
+      accepted: 1,
+      topicClustering: {
+        candidates: 1,
+        clusters: 1,
+        targets: 1,
+        duplicates: 0,
+        pillars: 1,
+        supports: 0,
+      },
     });
     expect(report.article_types).toEqual([{ article_type: 'listicle', count: 1 }]);
     // Full coverage, so neither degradation note fires.
@@ -395,7 +453,7 @@ describe('strategyDryRun', () => {
 
     expect(report.stats.seeds).toEqual(['pinned seed']);
     expect(report.config.seeds).toEqual(['pinned seed']);
-    // The seed call is one of the four LLM stages; pinning removes it entirely.
+    // Pinning removes the seed stage while leaving relevance, SERP, classify, and topic assignment.
     const unpinned = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
     expect(unpinned.stats.seeds).toEqual(['dog food']);
 
@@ -418,10 +476,16 @@ describe('strategyDryRun', () => {
     const baselineClassify = baseline.llm.find((c: { messages: { content: string }[] }) =>
       c.messages[0]!.content.includes('Classify each keyword'),
     );
+    const baselineTopic = baseline.llm.find((c: { messages: { content: string }[] }) =>
+      c.messages[0]!.content.includes('Assign the candidates to broad topic clusters'),
+    );
     expect(baselineClassify.model).toBe('anthropic/claude-haiku-4.5');
+    expect(baselineTopic.model).toBe('anthropic/claude-haiku-4.5');
     expect(
       baseline.llm
-        .filter((c: { messages: { content: string }[] }) => c !== baselineClassify)
+        .filter(
+          (c: { messages: { content: string }[] }) => c !== baselineClassify && c !== baselineTopic,
+        )
         .every((c: { model?: string }) => c.model === undefined),
     ).toBe(true);
 
@@ -467,6 +531,13 @@ const candidate = (over: Partial<EnrichedCandidate>): EnrichedCandidate => ({
   keyword: 'dog food',
   source: 'keyword_ideas',
   source_context: null,
+  core_keyword: null,
+  category_ids: [],
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   search_volume: 100,
   difficulty: 20,
   cpc: null,
@@ -545,7 +616,15 @@ describe('simulatePlan', () => {
   });
 
   const validated = (over: Partial<EnrichedCandidate>): EnrichedCandidate =>
-    candidate({ serp_validated: true, ...over });
+    candidate({
+      serp_validated: true,
+      topic_cluster_id: `topic:${(over.keyword ?? 'dog food').trim().toLowerCase()}`,
+      topic_cluster_label: `${over.keyword ?? 'dog food'} cluster`,
+      topic_role: 'pillar',
+      topic_content_focus: `${over.keyword ?? 'dog food'} focus`,
+      topic_primary_keyword: over.keyword ?? 'dog food',
+      ...over,
+    });
 
   test('skips rejects and candidates missing metrics, ranks by opportunity', () => {
     const plan = simulatePlan(
@@ -564,12 +643,15 @@ describe('simulatePlan', () => {
 
   test('plans only SERP-validated candidates, under-filling rather than backfilling', () => {
     const many = Array.from({ length: 40 }, (_, i) =>
-      candidate({
-        keyword: `k${String(i).padStart(2, '0')}`,
-        opportunity_score: 100 - i,
-        // Only the top 5 were SERP-validated; the rest are no longer eligible.
-        serp_validated: i < 5,
-      }),
+      i < 5
+        ? validated({
+            keyword: `k${String(i).padStart(2, '0')}`,
+            opportunity_score: 100 - i,
+          })
+        : candidate({
+            keyword: `k${String(i).padStart(2, '0')}`,
+            opportunity_score: 100 - i,
+          }),
     );
     const plan = simulatePlan(many, start);
     expect(plan.map((r) => r.keyword)).toEqual(['k00', 'k01', 'k02', 'k03', 'k04']);
@@ -581,5 +663,67 @@ describe('simulatePlan', () => {
       validated({ keyword: `k${String(i).padStart(2, '0')}`, opportunity_score: 100 - i }),
     );
     expect(simulatePlan(many, start)).toHaveLength(30);
+  });
+
+  test('uses pillar-first, cluster-priority, round-robin order without article-type spreading', () => {
+    const topic = (
+      keyword: string,
+      score: number,
+      clusterId: string,
+      role: 'pillar' | 'support',
+      articleType: EnrichedCandidate['article_type'],
+    ) =>
+      validated({
+        keyword,
+        opportunity_score: score,
+        topic_cluster_id: clusterId,
+        topic_cluster_label: clusterId.toUpperCase(),
+        topic_role: role,
+        topic_content_focus: `${keyword} focus`,
+        topic_primary_keyword: keyword,
+        article_type: articleType,
+      });
+    const plan = simulatePlan(
+      [
+        topic('A support', 100, 'topic:a', 'support', 'how_to_guide'),
+        topic('B support', 80, 'topic:b', 'support', 'listicle'),
+        topic('A pillar', 10, 'topic:a', 'pillar', 'comparison'),
+        topic('B pillar', 90, 'topic:b', 'pillar', 'comparison'),
+      ],
+      start,
+    );
+
+    expect(plan.map((row) => row.keyword)).toEqual([
+      'A pillar',
+      'B pillar',
+      'A support',
+      'B support',
+    ]);
+    expect(plan.map((row) => row.scheduled_date)).toEqual([
+      '2026-08-11',
+      '2026-08-12',
+      '2026-08-13',
+      '2026-08-14',
+    ]);
+    expect(plan.map((row) => row.topic_role)).toEqual(['pillar', 'pillar', 'support', 'support']);
+  });
+
+  test('excludes topic duplicates and below-N rows while preserving under-fill', () => {
+    const primary = validated({ keyword: 'Primary' });
+    const duplicate = candidate({
+      keyword: 'Primary variant',
+      serp_validated: true,
+      rejection_reason: 'topic_duplicate',
+      status: 'rejected',
+      topic_cluster_id: primary.topic_cluster_id,
+      topic_cluster_label: primary.topic_cluster_label,
+      topic_role: primary.topic_role,
+      topic_content_focus: primary.topic_content_focus,
+      topic_primary_keyword: primary.keyword,
+    });
+
+    expect(simulatePlan([primary, duplicate, candidate({ keyword: 'Below N' })], start)).toEqual([
+      expect.objectContaining({ keyword: 'Primary', topic_role: 'pillar' }),
+    ]);
   });
 });

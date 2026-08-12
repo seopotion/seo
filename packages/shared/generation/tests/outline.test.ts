@@ -14,6 +14,11 @@ const ctx: GenerationContext = {
   linkCandidates: [],
   llmInstructions: 'be concise',
   keyword: 'best widgets',
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   articleType: 'listicle',
   intent: 'commercial',
   serpCompetitors: [
@@ -25,8 +30,18 @@ const withCandidates = (max: number): GenerationContext => ({
   ...ctx,
   maxInternalLinks: max,
   linkCandidates: [
-    { title: 'Widget Guide', url: 'https://a.com/blog/widget-guide' },
-    { title: 'Widget Care', url: 'https://a.com/blog/widget-care' },
+    {
+      title: 'Widget Guide',
+      url: 'https://a.com/blog/widget-guide',
+      topic_cluster_id: null,
+      topic_role: null,
+    },
+    {
+      title: 'Widget Care',
+      url: 'https://a.com/blog/widget-care',
+      topic_cluster_id: null,
+      topic_role: null,
+    },
   ],
 });
 
@@ -85,6 +100,63 @@ describe('outline', () => {
     expect(joined).toContain('no internal link candidates');
   });
 
+  test('a complete pillar brief sets its exact focus and broad hub scope', () => {
+    const focus = 'How widgets work across the full production lifecycle';
+    const pillar: GenerationContext = {
+      ...ctx,
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widget fundamentals',
+      topic_role: 'pillar',
+      topic_content_focus: focus,
+      topic_primary_keyword: ' BEST   WIDGETS ',
+      maxInternalLinks: 1,
+      linkCandidates: [
+        {
+          title: 'Widget Sizing',
+          url: 'https://a.com/blog/widget-sizing',
+          topic_cluster_id: 'topic:best widgets',
+          topic_role: 'support',
+        },
+      ],
+    };
+
+    const joined = buildOutlinePrompt(pillar)
+      .map((message) => message.content)
+      .join('\n');
+    expect(joined).toContain('Topic cluster: Widget fundamentals');
+    expect(joined).toContain('Topic role: pillar');
+    expect(joined).toContain(focus);
+    expect(joined).toContain('broad, authoritative cluster overview and hub');
+    expect(joined).toContain('Do not exhaustively replace');
+    expect(joined).toContain('[same-cluster support]');
+    expect(joined).toContain('pick none if none fit');
+  });
+
+  test('legacy and incomplete briefs emit no partial topic instructions', () => {
+    const legacy = buildOutlinePrompt(ctx)
+      .map((message) => message.content)
+      .join('\n');
+    const incomplete = buildOutlinePrompt({
+      ...ctx,
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widget fundamentals',
+      topic_role: 'pillar',
+      topic_content_focus: null,
+      topic_primary_keyword: 'best widgets',
+    })
+      .map((message) => message.content)
+      .join('\n');
+
+    for (const prompt of [legacy, incomplete]) {
+      expect(prompt).not.toContain('Topic cluster:');
+      expect(prompt).not.toContain('Topic role:');
+      expect(prompt).not.toContain('Assigned content focus');
+      expect(prompt).not.toContain('Topic scope:');
+      expect(prompt).not.toContain('null');
+      expect(prompt).not.toContain('undefined');
+    }
+  });
+
   test('parseOutline parses fenced JSON and applies defaults', () => {
     const out = parseOutline(
       '```json\n{"h1":"Best Widgets Ranked","meta_title":"t","meta_description":"d","slug":"best-widgets","sections":[{"heading":"H","intent":"i"}]}\n```',
@@ -132,5 +204,27 @@ describe('outline', () => {
   test('parseOutline yields no links when there are no candidates (#186)', () => {
     const out = parseOutline(outlineJson(['https://a.com/blog/widget-guide']), ctx);
     expect(out.internal_links).toEqual([]);
+  });
+
+  test('same-cluster status never forces the model to select a link', () => {
+    const semantic: GenerationContext = {
+      ...ctx,
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widgets',
+      topic_role: 'support',
+      topic_content_focus: 'How to choose a widget',
+      topic_primary_keyword: 'best widgets',
+      maxInternalLinks: 1,
+      linkCandidates: [
+        {
+          title: 'Widget Pillar',
+          url: 'https://a.com/blog/widget-pillar',
+          topic_cluster_id: 'topic:best widgets',
+          topic_role: 'pillar',
+        },
+      ],
+    };
+
+    expect(parseOutline(outlineJson([]), semantic).internal_links).toEqual([]);
   });
 });

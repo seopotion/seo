@@ -39,17 +39,6 @@ function authorityFraction(serp: SerpResult[], topK: number, authority: Set<stri
   return hits / top.length;
 }
 
-function urlSet(serp: SerpResult[], topK: number): Set<string> {
-  return new Set(serp.slice(0, topK).map((r) => r.url));
-}
-
-function overlap(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 || b.size === 0) return 0;
-  let inter = 0;
-  for (const u of a) if (b.has(u)) inter++;
-  return inter / (a.size + b.size - inter);
-}
-
 export async function validateSerp(
   candidates: WorkingCandidate[],
   deps: SerpDeps,
@@ -61,7 +50,6 @@ export async function validateSerp(
   const { config } = deps;
   const progress = deps.onProgress ?? (() => {});
   const authority = new Set(config.authorityDomains.map((d) => d.replace(/^www\./, '')));
-  const acceptedSerps: Set<string>[] = [];
   const accepted: WorkingCandidate[] = [];
   const rejected: WorkingCandidate[] = [];
 
@@ -118,20 +106,14 @@ export async function validateSerp(
     failedBatches: parsedBatches.filter((r) => !r.parsed).length,
   };
 
-  // Phase 4: accept in input order — acceptedSerps grows as we go, so the
-  // duplicate check sees exactly the prior acceptances the serial loop saw.
+  // Phase 4: accept every candidate that passed authority, intent, and locality.
+  // SERP overlap is retained as topic evidence and is not a pre-clustering gate.
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i] as WorkingCandidate;
     const serp = serps[i] as SerpResult[];
 
     if (authorityRejected[i]) {
       rejected.push(reject(c, 'serp_authority'));
-      continue;
-    }
-
-    const urls = urlSet(serp, config.serpTopK);
-    if (acceptedSerps.some((prev) => overlap(urls, prev) >= config.duplicateSerpOverlap)) {
-      rejected.push(reject(c, 'serp_duplicate'));
       continue;
     }
 
@@ -145,7 +127,6 @@ export async function validateSerp(
       continue;
     }
 
-    acceptedSerps.push(urls);
     accepted.push({
       ...c,
       serp_validated: true,

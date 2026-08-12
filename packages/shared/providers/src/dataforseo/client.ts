@@ -30,6 +30,19 @@ function num(raw: unknown): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 }
 
+function nonEmptyString(raw: unknown): string | null {
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
+}
+
+function integerArray(raw: unknown): number[] {
+  return Array.isArray(raw)
+    ? raw.filter(
+        (value): value is number =>
+          typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value),
+      )
+    : [];
+}
+
 /**
  * Labs site endpoints require `target` as a bare domain ("without https:// and
  * www."), but org/competitor URLs arrive as full URLs — strip scheme, www, and path.
@@ -47,6 +60,8 @@ function toKeywordMetric(item: Record<string, unknown>): KeywordMetric {
   const trend = (info.search_volume_trend ?? {}) as Record<string, unknown>;
   return {
     keyword: String(item.keyword ?? ''),
+    core_keyword: nonEmptyString(props.core_keyword),
+    category_ids: integerArray(info.categories),
     search_volume: num(info.search_volume),
     // Difficulty lives in keyword_properties for most Labs endpoints; the bulk
     // endpoint returns it directly on the item.

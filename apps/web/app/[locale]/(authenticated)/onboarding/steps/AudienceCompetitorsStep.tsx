@@ -1,32 +1,27 @@
 import { useTranslations } from 'next-intl';
 import { TextEntryList } from '../components/TextEntryList';
-import { ToggleSwitch } from '../components/ToggleSwitch';
 import type { Errors, OnboardingForm } from '../types';
 
 export function AudienceCompetitorsStep({
   audienceDraft,
   competitorDraft,
-  competitorsSkipped,
   errors,
   form,
   onAddAudience,
   onAddCompetitor,
   onAudienceDraftChange,
   onCompetitorDraftChange,
-  onCompetitorsSkippedChange,
   onRemoveAudience,
   onRemoveCompetitor,
 }: {
   audienceDraft: string;
   competitorDraft: string;
-  competitorsSkipped: boolean;
   errors: Errors;
   form: OnboardingForm;
   onAddAudience: () => void;
   onAddCompetitor: () => void;
   onAudienceDraftChange: (value: string) => void;
   onCompetitorDraftChange: (value: string) => void;
-  onCompetitorsSkippedChange: (skipped: boolean) => void;
   onRemoveAudience: (id: string) => void;
   onRemoveCompetitor: (id: string) => void;
 }) {
@@ -69,17 +64,6 @@ export function AudienceCompetitorsStep({
           />
 
           <p className="mt-2 text-gray-500 text-sm">{t('competitorsHint')}</p>
-
-          <div className="mt-3">
-            <ToggleSwitch
-              checked={competitorsSkipped}
-              label={t('competitorsSkip')}
-              onChange={onCompetitorsSkippedChange}
-            />
-            {competitorsSkipped && (
-              <p className="mt-2 text-gray-500 text-sm">{t('competitorsSkipNote')}</p>
-            )}
-          </div>
         </div>
       </div>
     </div>

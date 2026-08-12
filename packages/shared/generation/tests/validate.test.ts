@@ -9,6 +9,13 @@ const ctx = {
   linkCandidates: [],
 } as unknown as GenerationContext;
 
+const linkCandidate = (title: string, url: string) => ({
+  title,
+  url,
+  topic_cluster_id: null,
+  topic_role: null,
+});
+
 // Fixture must clear WORD_COUNT_FLOOR (800): 140 intro + 2 x 360 section words = ~868.
 const goodBody = `# Best Widgets For Makers\n\n${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(60)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(60)}\n`;
 
@@ -73,7 +80,7 @@ describe('validateArticle', () => {
     const linked = {
       ...ctx,
       maxInternalLinks: 1,
-      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+      linkCandidates: [linkCandidate('One', 'https://a.com/blog/one')],
     } as GenerationContext;
     const content = `${goodBody}\n\nsee [features](/features/invented)\n`;
     const codes = validateArticle({ ...goodArticle, content }, linked).map((f) => f.code);
@@ -84,7 +91,7 @@ describe('validateArticle', () => {
     const linked = {
       ...ctx,
       maxInternalLinks: 1,
-      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+      linkCandidates: [linkCandidate('One', 'https://a.com/blog/one')],
     } as GenerationContext;
     const content = `${goodBody}\n\nsee [our guide](https://a.com/blog/one)\n`;
     expect(validateArticle({ ...goodArticle, content }, linked)).toEqual([]);
@@ -95,8 +102,8 @@ describe('validateArticle', () => {
       ...ctx,
       maxInternalLinks: 1,
       linkCandidates: [
-        { title: 'One', url: 'https://a.com/blog/one' },
-        { title: 'Two', url: 'https://a.com/blog/two' },
+        linkCandidate('One', 'https://a.com/blog/one'),
+        linkCandidate('Two', 'https://a.com/blog/two'),
       ],
     } as GenerationContext;
     const content = `${goodBody}\n\n[a](https://a.com/blog/one) [b](https://a.com/blog/two)\n`;
@@ -113,7 +120,7 @@ describe('validateArticle', () => {
     const linked = {
       ...ctx,
       maxInternalLinks: 1,
-      linkCandidates: [{ title: 'One', url: 'https://a.com/blog/one' }],
+      linkCandidates: [linkCandidate('One', 'https://a.com/blog/one')],
     } as GenerationContext;
     const content = `${goodBody}\n\nsee [our sizing guide](/guides/sizing 'Sizing Guide')\n`;
     const codes = validateArticle({ ...goodArticle, content }, linked).map((f) => f.code);
@@ -125,8 +132,8 @@ describe('validateArticle', () => {
       ...ctx,
       maxInternalLinks: 2,
       linkCandidates: [
-        { title: 'One', url: 'https://a.com/blog/one' },
-        { title: 'Two', url: 'https://a.com/blog/two' },
+        linkCandidate('One', 'https://a.com/blog/one'),
+        linkCandidate('Two', 'https://a.com/blog/two'),
       ],
     } as GenerationContext;
     const content = `${goodBody}\n\nsee [two](https://a.com/blog/two)\n`;

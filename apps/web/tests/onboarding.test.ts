@@ -16,6 +16,8 @@ import {
   textEntriesToStrings,
 } from '../app/[locale]/(authenticated)/onboarding/utils';
 import { validateStep } from '../app/[locale]/(authenticated)/onboarding/validation';
+import enMessages from '../messages/en.json';
+import trMessages from '../messages/tr.json';
 
 function entries(values: string[]): TextEntry[] {
   return values.map((value, index) => ({ id: `audience-${index}`, value }));
@@ -38,16 +40,12 @@ function competitorEntries(values: string[]): TextEntry[] {
   return values.map((value, index) => ({ id: `competitor-${index}`, value }));
 }
 
-function validateCompetitors(
-  competitors: TextEntry[],
-  { competitorDraft = '', competitorsSkipped = false } = {},
-) {
+function validateCompetitors(competitors: TextEntry[], { competitorDraft = '' } = {}) {
   const form: OnboardingForm = { ...initialForm, competitors };
 
   return validateStep({
     audienceDraft: 'Plant operators',
     competitorDraft,
-    competitorsSkipped,
     form,
     scanState: 'complete',
     stepIndex: 2,
@@ -126,21 +124,14 @@ describe('competitor entry rules', () => {
 });
 
 describe('onboarding competitor validation', () => {
-  test('blocks the step when no competitor was given', () => {
-    expect(validateCompetitors([]).competitors).toBe('competitorsRequired');
+  test('accepts an empty competitor list without an opt-out', () => {
+    expect(validateCompetitors([]).competitors).toBeUndefined();
   });
 
   test('accepts a competitor still sitting in the draft input', () => {
     expect(
       validateCompetitors([], { competitorDraft: 'competitor.com' }).competitors,
     ).toBeUndefined();
-  });
-
-  test('lets the deliberate skip through, but only when it was chosen', () => {
-    expect(validateCompetitors([], { competitorsSkipped: true }).competitors).toBeUndefined();
-    expect(validateCompetitors([], { competitorsSkipped: false }).competitors).toBe(
-      'competitorsRequired',
-    );
   });
 
   test('rejects a draft that is not a domain', () => {
@@ -167,6 +158,30 @@ describe('onboarding competitor validation', () => {
     expect(validateCompetitors(full, { competitorDraft: 'newrival.com' }).competitors).toBe(
       `competitorsMax:${MAX_COMPETITORS}`,
     );
+  });
+});
+
+describe('competitor onboarding copy', () => {
+  test('describes competitors as optional supplementary evidence in English and Turkish', () => {
+    expect(enMessages.Onboarding.audience).toMatchObject({
+      competitorUrls: 'Competitor websites (optional)',
+      competitorsHelp:
+        'If you know genuinely comparable companies, add their domains as an optional supplementary signal. Your strategy works without competitor domains.',
+    });
+    expect(trMessages.Onboarding.audience).toMatchObject({
+      competitorUrls: 'Rakip web siteleri (isteğe bağlı)',
+      competitorsHelp:
+        'İşletmenizle gerçekten karşılaştırılabilir şirketler biliyorsanız alan adlarını isteğe bağlı ek bir sinyal olarak ekleyin. Stratejiniz rakip alan adları olmadan da çalışır.',
+    });
+  });
+
+  test('contains no competitor opt-out or required-validation copy', () => {
+    expect(enMessages.Onboarding.audience).not.toHaveProperty('competitorsSkip');
+    expect(enMessages.Onboarding.audience).not.toHaveProperty('competitorsSkipNote');
+    expect(enMessages.Onboarding.validation).not.toHaveProperty('competitorsRequired');
+    expect(trMessages.Onboarding.audience).not.toHaveProperty('competitorsSkip');
+    expect(trMessages.Onboarding.audience).not.toHaveProperty('competitorsSkipNote');
+    expect(trMessages.Onboarding.validation).not.toHaveProperty('competitorsRequired');
   });
 });
 

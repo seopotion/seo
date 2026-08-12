@@ -1,5 +1,17 @@
-import { addCandidates, CandidateRepo, KeywordRepo, OrgRepo, scheduleCandidate } from '@shared/db';
-import { clusterSpreadSchedule, runKeywordPipeline } from '@shared/keywords';
+import {
+  CandidateRepo,
+  KeywordRepo,
+  OrgRepo,
+  persistStrategyCandidates,
+  scheduleCandidate,
+} from '@shared/db';
+import {
+  type EnrichedCandidate,
+  runKeywordPipeline,
+  selectTopicCandidateTargets,
+  stampScheduledDates,
+  type TopicCandidateTarget,
+} from '@shared/keywords';
 import { type Candidate, normalizeKeyword, StrategyTask } from '@shared/schemas';
 import type { Context, SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
@@ -43,10 +55,57 @@ function nextFreeDate(from: string, occupied: Set<string>): string {
   return iso;
 }
 
+type SemanticPipelineTarget = EnrichedCandidate & TopicCandidateTarget;
+
+function semanticTargetPool(candidates: readonly EnrichedCandidate[]): SemanticPipelineTarget[] {
+  return candidates.filter(
+    (candidate) =>
+      candidate.serp_validated &&
+      candidate.rejection_reason === null &&
+      candidate.search_volume !== null &&
+      candidate.difficulty !== null,
+  ) as SemanticPipelineTarget[];
+}
+
+function isPersistedTargetEligible(
+  candidate: Candidate,
+  assignment: SemanticPipelineTarget,
+): boolean {
+  if (
+    (candidate.status !== 'candidate' && candidate.status !== 'selected') ||
+    candidate.rejection_reason !== null ||
+    !candidate.serp_validated ||
+    candidate.search_volume === null ||
+    candidate.difficulty === null ||
+    candidate.topic_cluster_id === null ||
+    candidate.topic_cluster_id.trim().length === 0 ||
+    candidate.topic_cluster_label === null ||
+    candidate.topic_cluster_label.trim().length === 0 ||
+    candidate.topic_role === null ||
+    candidate.topic_content_focus === null ||
+    candidate.topic_content_focus.trim().length === 0 ||
+    candidate.topic_primary_keyword === null ||
+    normalizeKeyword(candidate.keyword).length === 0 ||
+    normalizeKeyword(candidate.topic_primary_keyword) !== normalizeKeyword(candidate.keyword)
+  ) {
+    return false;
+  }
+
+  return (
+    normalizeKeyword(candidate.keyword) === normalizeKeyword(assignment.keyword) &&
+    candidate.topic_cluster_id === assignment.topic_cluster_id &&
+    candidate.topic_cluster_label === assignment.topic_cluster_label &&
+    candidate.topic_role === assignment.topic_role &&
+    candidate.topic_content_focus === assignment.topic_content_focus &&
+    normalizeKeyword(candidate.topic_primary_keyword) ===
+      normalizeKeyword(assignment.topic_primary_keyword)
+  );
+}
+
 /**
  * Strategy worker — triggered by SQS (enqueued from POST /setup/finalize for
  * paid orgs). Runs the keyword pipeline, persists candidates, and schedules up
- * to 30 non-overlapping planner entries spread across 30 days. Idempotent:
+ * to 30 non-overlapping planner entries in semantic topic order. Idempotent:
  * skips if already completed; on failure marks the org and rethrows so SQS
  * redelivers (-> DLQ). See design/product-flow.md and epic #56.
  */
@@ -64,7 +123,8 @@ async function runStrategy(orgId: string): Promise<void> {
   const clients = await getStrategyClients();
   const scheduled = await KeywordRepo.listByOrg(orgId);
   const scheduledKeywords = scheduled.map((k) => k.keyword);
-  const articleKeywords: string[] = []; // ArticleRepo has none until #55 generates
+  // Generated Articles retain source Keywords already included in scheduledKeywords.
+  const articleKeywords: string[] = [];
 
   const result = await runKeywordPipeline({
     orgId,
@@ -82,16 +142,15 @@ async function runStrategy(orgId: string): Promise<void> {
   // config.minLlmCoverage — they degrade in ways that still produce a full,
   // plausible plan, so the run never reaches this line when either has failed.
   // Classify is only reported: an unanswered keyword becomes `other`, which
-  // flattens the plan's spread but never schedules the wrong keyword (#211).
+  // weakens its content brief but never schedules the wrong keyword (#211).
   logger.info('strategy pipeline stats', { ...result.stats });
 
-  const inserted = await addCandidates(orgId, result.candidates);
-  const storedByNormalized = new Map(inserted.map((c) => [c.normalized_keyword, c]));
+  const targetPool = semanticTargetPool(result.candidates);
+  const orderedTargets = selectTopicCandidateTargets(targetPool, targetPool.length);
 
-  // Select schedulable candidates: SERP-validated, real metrics, not already on
-  // the planner. Rank by opportunity_score desc, stable. `rejection_reason ===
-  // null` is NOT sufficient — it is also true of every below-serpTopN candidate,
-  // which was scored but never validated or classified (#211).
+  const persisted = await persistStrategyCandidates(orgId, result.candidates);
+  const storedByNormalized = new Map(persisted.map((c) => [c.normalized_keyword, c]));
+
   const scheduledSet = new Set(scheduled.map((k) => normalizeKeyword(k.keyword)));
   // Strategy entries this job wrote carry a non-null opportunity_score; manual #50
   // selections go to the candidate pool (not KeywordRepo), so this proxy counts
@@ -100,71 +159,79 @@ async function runStrategy(orgId: string): Promise<void> {
   // nor collides calendar dates with already-created entries.
   const alreadyScheduled = scheduled.filter((k) => k.opportunity_score !== null).length;
   const budget = Math.max(0, PLAN_DAYS - alreadyScheduled);
-  const qualified = result.candidates
-    .filter(
-      (c) =>
-        c.serp_validated &&
-        c.rejection_reason === null &&
-        c.search_volume !== null &&
-        c.difficulty !== null &&
-        !scheduledSet.has(normalizeKeyword(c.keyword)),
-    )
-    .sort(
-      (a, b) =>
-        (b.opportunity_score ?? 0) - (a.opportunity_score ?? 0) ||
-        normalizeKeyword(a.keyword).localeCompare(normalizeKeyword(b.keyword)),
-    );
-  const selectable = qualified.slice(0, budget);
-
-  // A short plan is the correct outcome when the pipeline validated fewer than
-  // `budget` keywords — padding it from the unvalidated tier is what put junk on
-  // the planner (#211). Log the shortfall so an under-filled plan is visible.
-  if (qualified.length < budget) {
-    logger.warn('strategy plan under-filled', {
-      requested: budget,
-      qualified: qualified.length,
-      shortfall: budget - qualified.length,
-    });
+  const confirmedTopicClusters = new Set<string>();
+  for (const keyword of scheduled) {
+    if (
+      keyword.topic_role === 'pillar' &&
+      keyword.topic_cluster_id !== null &&
+      keyword.topic_cluster_id.trim().length > 0
+    ) {
+      confirmedTopicClusters.add(keyword.topic_cluster_id);
+    }
   }
 
   const startDay = new Date();
   startDay.setUTCDate(startDay.getUTCDate() + alreadyScheduled);
-  const plan = clusterSpreadSchedule(selectable, startDay, budget);
-
-  // Schedule via the shared service (#99) so strategy honors the same
-  // invariants as manual scheduling: candidate_id linkage, unique
-  // org/date + org/keyword indexes, claim-then-insert idempotency. Dates
-  // already taken (e.g. by manual entries) are skipped to the next free
-  // day; per-entry conflicts never fail the whole job.
   const occupied = new Set(scheduled.map((k) => k.scheduled_date));
+  let qualifiedCount = 0;
   let scheduledCount = 0;
-  for (const c of plan) {
-    const normalized = normalizeKeyword(c.keyword);
-    const stored: Candidate | null =
+
+  for (const target of orderedTargets) {
+    const normalized = normalizeKeyword(target.keyword);
+    if (scheduledSet.has(normalized)) {
+      if (target.topic_role === 'pillar') confirmedTopicClusters.add(target.topic_cluster_id);
+      continue;
+    }
+    if (scheduledCount >= budget) break;
+
+    const stored =
       storedByNormalized.get(normalized) ??
       (await CandidateRepo.findByNormalized(orgId, normalized));
-    if (!stored) continue;
+    if (!stored || !isPersistedTargetEligible(stored, target)) continue;
+    if (target.topic_role === 'support' && !confirmedTopicClusters.has(target.topic_cluster_id)) {
+      continue;
+    }
 
-    let date = nextFreeDate(c.scheduled_date, occupied);
-    let res = await scheduleCandidate(stored, date);
+    qualifiedCount++;
+    const slotStart = new Date(startDay);
+    slotStart.setUTCDate(slotStart.getUTCDate() + scheduledCount);
+    const entry = stampScheduledDates([stored], slotStart, 1)[0] as {
+      item: Candidate;
+      scheduled_date: string;
+    };
+    let date = nextFreeDate(entry.scheduled_date, occupied);
+    let res = await scheduleCandidate(entry.item, date);
     if (!res.ok && res.reason === 'date_occupied') {
       // Lost a race for the date: mark it taken and try the next free one.
       occupied.add(date);
       date = nextFreeDate(date, occupied);
-      res = await scheduleCandidate(stored, date);
+      res = await scheduleCandidate(entry.item, date);
     }
     if (res.ok) {
       occupied.add(res.keyword.scheduled_date);
       scheduledCount++;
+      if (target.topic_role === 'pillar') confirmedTopicClusters.add(target.topic_cluster_id);
     } else {
-      logger.info('strategy schedule skipped', { keyword: c.keyword, reason: res.reason });
+      if (res.reason === 'date_occupied') occupied.add(date);
+      logger.info('strategy schedule skipped', { keyword: entry.item.keyword, reason: res.reason });
     }
+  }
+
+  // A short plan is the correct outcome when the pipeline validated fewer than
+  // `budget` usable semantic targets — padding it from the unvalidated tier is
+  // what put junk on the planner (#211). Log the shortfall so it is visible.
+  if (scheduledCount < budget) {
+    logger.warn('strategy plan under-filled', {
+      requested: budget,
+      qualified: qualifiedCount,
+      shortfall: budget - scheduledCount,
+    });
   }
 
   await OrgRepo.setStrategyStatus(orgId, 'completed');
   logger.info('strategy completed', {
     requested: budget,
-    qualified: qualified.length,
+    qualified: qualifiedCount,
     scheduled: scheduledCount,
   });
 }

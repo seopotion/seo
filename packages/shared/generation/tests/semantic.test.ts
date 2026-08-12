@@ -7,6 +7,11 @@ const ctx = {
   competitors: ['rival.com'],
   keyword: 'best widgets',
   language: 'English',
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
 } as GenerationContext;
 
 describe('semantic check', () => {
@@ -28,5 +33,57 @@ describe('semantic check', () => {
       pass: false,
       reasons: ['promotes rival'],
     });
+  });
+
+  test.each([
+    ['pillar', 'broad, authoritative overview/hub'],
+    ['support', 'deep coverage of the assigned focus'],
+  ] as const)('a complete %s brief makes scope compliance mandatory', (role, scope) => {
+    const focus = 'How membrane fouling affects reverse-osmosis output';
+    const joined = buildSemanticCheckPrompt(
+      {
+        ...ctx,
+        topic_cluster_id: 'topic:membrane fouling',
+        topic_cluster_label: 'Membrane fouling',
+        topic_role: role,
+        topic_content_focus: focus,
+        topic_primary_keyword: ' BEST   WIDGETS ',
+      },
+      '# Article\n\nbody',
+    )
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(joined).toContain('Topic cluster: Membrane fouling');
+    expect(joined).toContain(`Topic role: ${role}`);
+    expect(joined).toContain(focus);
+    expect(joined).toContain('materially ignores its assigned content focus');
+    expect(joined).toContain(scope);
+  });
+
+  test('legacy and incomplete metadata keep the semantic check topic-agnostic', () => {
+    const legacy = buildSemanticCheckPrompt(ctx, '# Article\n\nbody')
+      .map((message) => message.content)
+      .join('\n');
+    const incomplete = buildSemanticCheckPrompt(
+      {
+        ...ctx,
+        topic_cluster_id: 'topic:best widgets',
+        topic_cluster_label: 'Widgets',
+        topic_role: 'support',
+        topic_content_focus: null,
+        topic_primary_keyword: 'best widgets',
+      },
+      '# Article\n\nbody',
+    )
+      .map((message) => message.content)
+      .join('\n');
+
+    for (const prompt of [legacy, incomplete]) {
+      expect(prompt).not.toContain('Topic cluster:');
+      expect(prompt).not.toContain('Topic role:');
+      expect(prompt).not.toContain('Assigned content focus');
+      expect(prompt).not.toContain('pillar/support scope');
+    }
   });
 });

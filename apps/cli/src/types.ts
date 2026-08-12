@@ -208,6 +208,9 @@ export interface DryRunCandidateRow {
 
 export interface DryRunPlanRow extends DryRunCandidateRow {
   scheduled_date: string;
+  topic_cluster_id: string;
+  topic_cluster_label: string;
+  topic_role: 'pillar' | 'support';
   /** Scored but never SERP-validated or classified — today's silent backfill. */
   from_below_n: boolean;
 }
@@ -225,7 +228,7 @@ export interface StrategyDryRunData {
   stats: PipelineStats;
   /**
    * Wall clock per stage, from each `onProgress` mark to the next (so the first
-   * entry covers gather through cluster). The strategy Lambda aborts at
+   * entry covers gather through the next stage). The strategy Lambda aborts at
    * `budget_ms`, so `total_ms` against it is the answer to "does serpTopN still
    * fit" (#211).
    */
@@ -239,8 +242,7 @@ export interface StrategyDryRunData {
   sources: { source: string; gathered: number; after_dedupe: number }[];
   /**
    * article_type across the accepted pool. Uniform `other` is the classifier
-   * failing, not judging — clusterSpreadSchedule spreads the plan by this field,
-   * so one group makes it a no-op and the generation worker gets no signal (#211).
+   * failing, not judging; this remains diagnostic and does not order the plan.
    */
   article_types: { article_type: string; count: number }[];
   /** The known failure: relevance the LLM never scored keeps parseRelevance's 0 seed. */

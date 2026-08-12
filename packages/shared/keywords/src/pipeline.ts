@@ -5,13 +5,19 @@ import {
   type RejectionReason,
 } from '@shared/schemas';
 import { classifyCandidates } from './classify';
-import { clusterCandidates } from './cluster';
 import { resolveConfig } from './config';
 import { applyDifficultyCeiling, brandNavFilter, fillDifficulty, reject } from './filters';
 import { gatherCandidates } from './gather';
 import { dedupe } from './normalize';
 import { applyRelevance, scoreCandidates } from './score';
 import { validateSerp } from './serp';
+import {
+  assignTopicClusters,
+  type MaterializedTopicTarget,
+  materializeTopicClusters,
+  TOPIC_CLUSTER_MAX_CANDIDATES,
+  type TopicClusterResult,
+} from './topic-clusters';
 import type { EnrichedCandidate, PipelineInput, PipelineResult, WorkingCandidate } from './types';
 
 const EMPTY_REASON_COUNTS: Record<RejectionReason, number> = {
@@ -23,6 +29,7 @@ const EMPTY_REASON_COUNTS: Record<RejectionReason, number> = {
   serp_authority: 0,
   serp_locality: 0,
   serp_duplicate: 0,
+  topic_duplicate: 0,
 };
 
 const EMPTY_SOURCE_COUNTS = Object.fromEntries(CANDIDATE_SOURCES.map((s) => [s, 0])) as Record<
@@ -36,6 +43,13 @@ function toEnriched(c: WorkingCandidate, orgId: string): EnrichedCandidate {
     keyword: c.keyword,
     source: c.source,
     source_context: c.source_context,
+    core_keyword: c.core_keyword,
+    category_ids: c.category_ids,
+    topic_cluster_id: c.topic_cluster_id,
+    topic_cluster_label: c.topic_cluster_label,
+    topic_role: c.topic_role,
+    topic_content_focus: c.topic_content_focus,
+    topic_primary_keyword: c.topic_primary_keyword,
     search_volume: c.search_volume,
     difficulty: c.difficulty,
     cpc: c.cpc,
@@ -49,6 +63,31 @@ function toEnriched(c: WorkingCandidate, orgId: string): EnrichedCandidate {
     status: c.status,
     serp_competitors: c.serp_competitors,
     serp_validated: c.serp_validated,
+  };
+}
+
+function assertSerpTopN(serpTopN: number): void {
+  if (!Number.isInteger(serpTopN) || serpTopN < 0) {
+    throw new Error(`serpTopN must be a non-negative integer; received ${String(serpTopN)}`);
+  }
+  if (serpTopN > TOPIC_CLUSTER_MAX_CANDIDATES) {
+    throw new Error(
+      `serpTopN ${serpTopN} exceeds the topic-clustering maximum of ${TOPIC_CLUSTER_MAX_CANDIDATES}`,
+    );
+  }
+}
+
+function attachTopicMetadata(
+  candidate: WorkingCandidate,
+  target: MaterializedTopicTarget,
+): WorkingCandidate {
+  return {
+    ...candidate,
+    topic_cluster_id: target.topic_cluster_id,
+    topic_cluster_label: target.topic_cluster_label,
+    topic_role: target.topic_role,
+    topic_content_focus: target.content_focus,
+    topic_primary_keyword: target.primary_keyword,
   };
 }
 
@@ -81,6 +120,7 @@ function assertCoverage(stage: string, sent: number, returned: number, min: numb
 
 export async function runKeywordPipeline(input: PipelineInput): Promise<PipelineResult> {
   const config = resolveConfig(input.presets, input.config);
+  assertSerpTopN(config.serpTopN);
   const progress = input.onProgress ?? (() => {});
   const minCoverage = config.minLlmCoverage;
   const rejected: WorkingCandidate[] = [];
@@ -108,20 +148,16 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   });
   rejected.push(...brand.rejected);
 
-  // 4 cluster
-  const clustered = clusterCandidates(brand.survivors, config.clusterJaccard);
-  rejected.push(...clustered.rejected);
-
-  // 5 fill difficulty → 6 ceiling
-  progress('fill_difficulty', { candidates: clustered.survivors.length });
-  const filled = await fillDifficulty(clustered.survivors, {
+  // 4 fill difficulty → 5 ceiling
+  progress('fill_difficulty', { candidates: brand.survivors.length });
+  const filled = await fillDifficulty(brand.survivors, {
     dataForSeo: input.clients.dataForSeo,
     config,
   });
   const ceiling = applyDifficultyCeiling(filled, config.difficultyCeiling);
   rejected.push(...ceiling.rejected);
 
-  // 7 relevance → 8 score
+  // 6 relevance → 7 score
   progress('relevance', { candidates: ceiling.survivors.length });
   const relevance = await applyRelevance(ceiling.survivors, {
     llm: input.clients.llm,
@@ -134,7 +170,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   );
   const scored = scoreCandidates(relevance.candidates, { cannibalSet, config });
 
-  // 8b relevance floor — before the split, so a keyword the model saw no
+  // 7b relevance floor — before the split, so a keyword the model saw no
   // connection to never consumes one of the serpTopN validation slots. A NULL
   // score is not a zero: it means the model never judged the keyword, and
   // treating the two alike is what let an empty response reject the entire pool
@@ -148,12 +184,12 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     else relevant.push(c);
   }
 
-  // 9 rank + split top-N
+  // 8 rank + split top-N
   const ranked = [...relevant].sort(rankKey);
   const topN = ranked.slice(0, config.serpTopN);
   const belowN = ranked.slice(config.serpTopN);
 
-  // 10 SERP validate → 11 classify
+  // 9 SERP validate → 10 classify
   const serp = await validateSerp(topN, {
     dataForSeo: input.clients.dataForSeo,
     llm: input.clients.llm,
@@ -165,9 +201,9 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
   assertCoverage('SERP judge', serp.coverage.sent, serp.coverage.returned, minCoverage);
   progress('classify', { candidates: serp.accepted.length });
   // Classify is deliberately NOT guarded: an unclassified keyword becomes
-  // `other`, which flattens clusterSpreadSchedule's spread but never puts a
-  // keyword on the plan that does not belong there. Its coverage counters are
-  // the report; they are not grounds to fail a run.
+  // `other`, which weakens its content brief but never puts a keyword on the
+  // plan that does not belong there. Its coverage counters are the report;
+  // they are not grounds to fail a run.
   const classified = await classifyCandidates(serp.accepted, {
     llm: input.clients.llm,
     presets: input.presets,
@@ -184,8 +220,43 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     );
   }
 
-  // 12 assemble (stable order: accepted, then below-N scored, then rejected)
-  const all: WorkingCandidate[] = [...classified.candidates, ...belowN, ...rejected];
+  let topicResult: TopicClusterResult = { clusters: [] };
+  if (classified.candidates.length > 0) {
+    progress('topic_clustering', { candidates: classified.candidates.length });
+    topicResult = await assignTopicClusters(
+      classified.candidates,
+      {
+        businessName: input.presets.business.name,
+        businessDescription: input.presets.business.description,
+        targetAudience: input.presets.audience.target,
+        language: input.presets.business.language,
+        country: input.presets.business.country,
+      },
+      input.clients.llm,
+      config.models.topicClusters,
+    );
+  }
+  const materialized = materializeTopicClusters(classified.candidates, topicResult);
+  const accepted: WorkingCandidate[] = [];
+  const topicDuplicates: WorkingCandidate[] = [];
+  for (const target of materialized.targets) {
+    accepted.push(
+      attachTopicMetadata(classified.candidates[target.primary_index] as WorkingCandidate, target),
+    );
+    for (const memberIndex of target.member_indices) {
+      if (memberIndex === target.primary_index) continue;
+      topicDuplicates.push(
+        reject(
+          attachTopicMetadata(classified.candidates[memberIndex] as WorkingCandidate, target),
+          'topic_duplicate',
+        ),
+      );
+    }
+  }
+  rejected.push(...topicDuplicates);
+
+  // 11 assemble (stable order: materialized targets, below-N scored, then rejected)
+  const all: WorkingCandidate[] = [...accepted, ...belowN, ...rejected];
   const rejectedByReason = { ...EMPTY_REASON_COUNTS };
   for (const c of rejected) if (c.rejection_reason) rejectedByReason[c.rejection_reason]++;
 
@@ -197,12 +268,20 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
       gatheredBySource,
       afterDedupe: deduped.length,
       afterBrandNav: brand.survivors.length,
-      clustered: clustered.rejected.length,
       afterCeiling: ceiling.survivors.length,
       scored: scored.length,
       afterRelevanceFloor: relevant.length,
-      serpValidated: topN.length,
-      accepted: classified.candidates.length,
+      serpChecked: topN.length,
+      serpValidated: serp.accepted.length,
+      accepted: accepted.length,
+      topicClustering: {
+        candidates: classified.candidates.length,
+        clusters: topicResult.clusters.length,
+        targets: materialized.targets.length,
+        duplicates: materialized.duplicates.length,
+        pillars: materialized.targets.filter((target) => target.topic_role === 'pillar').length,
+        supports: materialized.targets.filter((target) => target.topic_role === 'support').length,
+      },
       rejectedByReason,
       relevance: relevance.coverage,
       judgment: serp.coverage,

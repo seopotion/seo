@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TOPIC_ROLES } from './candidate';
 import { INTEGRATION_PROVIDERS } from './integration';
 
 /** Article lifecycle statuses. */
@@ -83,6 +84,11 @@ export const ArticleSchema = z.object({
   meta_title: z.string(),
   slug: z.string(),
   keyword: z.string(),
+  topic_cluster_id: z.string().nullable().default(null),
+  topic_cluster_label: z.string().nullable().default(null),
+  topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
+  topic_content_focus: z.string().nullable().default(null),
+  topic_primary_keyword: z.string().nullable().default(null),
   meta_description: z.string(),
   featured_image_url: z.string(),
   content: z.string(),

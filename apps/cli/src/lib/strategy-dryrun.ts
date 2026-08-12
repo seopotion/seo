@@ -5,10 +5,12 @@
  * from plain arrays; `strategyDryRun` in ./db.ts does the reads and the run.
  */
 import {
-  clusterSpreadSchedule,
   type EnrichedCandidate,
   type PipelineStats,
   type ResolvedConfig,
+  selectTopicCandidateTargets,
+  stampScheduledDates,
+  type TopicCandidateTarget,
 } from '@shared/keywords';
 import { normalizeKeyword, type Org } from '@shared/schemas';
 import type { DryRunCandidateRow, DryRunPlanRow, StrategyDryRunData } from '../types';
@@ -67,27 +69,28 @@ export function splitSections(candidates: EnrichedCandidate[]): StrategyDryRunDa
 }
 
 /**
- * The plan strategy.ts would build — same filter, same ranking, same
- * clusterSpreadSchedule. Simulated as a FIRST run for the org (full 30-day
+ * The plan strategy.ts would build — same semantic filter and selector order.
+ * Simulated as a FIRST run for the org (full 30-day
  * budget, nothing already on the planner), so two dry runs of different code are
  * comparable regardless of what the org's planner currently holds. Under-fills
  * rather than padding when fewer than PLAN_DAYS candidates qualify.
  */
 export function simulatePlan(candidates: EnrichedCandidate[], startDate: Date): DryRunPlanRow[] {
-  const selectable = candidates
-    .filter(
-      (c) =>
-        c.serp_validated &&
-        c.rejection_reason === null &&
-        c.search_volume !== null &&
-        c.difficulty !== null,
-    )
-    .sort(byOpportunity)
-    .slice(0, PLAN_DAYS);
-  return clusterSpreadSchedule(selectable, startDate, PLAN_DAYS).map((c) => ({
-    ...toRow(c),
-    scheduled_date: c.scheduled_date,
-    from_below_n: isBelowN(c),
+  const selectable = candidates.filter(
+    (c) =>
+      c.serp_validated &&
+      c.rejection_reason === null &&
+      c.search_volume !== null &&
+      c.difficulty !== null,
+  ) as Array<EnrichedCandidate & TopicCandidateTarget>;
+  const selected = selectTopicCandidateTargets(selectable, PLAN_DAYS);
+  return stampScheduledDates(selected, startDate, PLAN_DAYS).map(({ item, scheduled_date }) => ({
+    ...toRow(item),
+    scheduled_date,
+    from_below_n: isBelowN(item),
+    topic_cluster_id: item.topic_cluster_id,
+    topic_cluster_label: item.topic_cluster_label,
+    topic_role: item.topic_role,
   }));
 }
 
@@ -332,7 +335,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
 
   out.push('CONFIG');
   out.push(
-    `  serpTopN ${d.config.serpTopN}   difficultyCeiling ${d.config.difficultyCeiling}   relevanceFloor ${d.config.relevanceFloor}   volumeCap ${d.config.volumeCap}   clusterJaccard ${d.config.clusterJaccard}`,
+    `  serpTopN ${d.config.serpTopN}   difficultyCeiling ${d.config.difficultyCeiling}   relevanceFloor ${d.config.relevanceFloor}   volumeCap ${d.config.volumeCap}`,
   );
   out.push(
     `  weights  ${Object.entries(d.config.weights)
@@ -386,9 +389,14 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   const s = d.stats;
   out.push('PIPELINE STATS');
   out.push(
-    `  gathered ${s.gathered} → dedupe ${s.afterDedupe} → brand/nav ${s.afterBrandNav} → clustered -${s.clustered} → ceiling ${s.afterCeiling} → scored ${s.scored} → relevanceFloor ${s.afterRelevanceFloor}`,
+    `  gathered ${s.gathered} → dedupe ${s.afterDedupe} → brand/nav ${s.afterBrandNav} → ceiling ${s.afterCeiling} → scored ${s.scored} → relevanceFloor ${s.afterRelevanceFloor}`,
   );
-  out.push(`  serpValidated ${s.serpValidated}   accepted ${s.accepted}`);
+  out.push(
+    `  SERP checked ${s.serpChecked}   validated ${s.serpValidated}   accepted targets ${s.accepted}`,
+  );
+  out.push(
+    `  topic clusters ${s.topicClustering.clusters}   candidates ${s.topicClustering.candidates}   targets ${s.topicClustering.targets}   duplicates ${s.topicClustering.duplicates}   pillars ${s.topicClustering.pillars}   supports ${s.topicClustering.supports}`,
+  );
   out.push(
     `  rejectedByReason  ${Object.entries(s.rejectedByReason)
       .filter(([, v]) => v > 0)
@@ -406,7 +414,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   );
   out.push('');
 
-  out.push('ARTICLE TYPES  (accepted pool — clusterSpreadSchedule spreads the plan by this)');
+  out.push('ARTICLE TYPES  (accepted-pool classification diagnostic only)');
   out.push(
     ...table(
       ['article_type', 'count'],
@@ -497,10 +505,24 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   } else {
     out.push(
       ...table(
-        ['date', 'keyword', 'source', 'vol', 'kd', 'rel', 'opp', 'article_type', 'tier'],
+        [
+          'date',
+          'keyword',
+          'cluster',
+          'role',
+          'source',
+          'vol',
+          'kd',
+          'rel',
+          'opp',
+          'article_type',
+          'tier',
+        ],
         d.plan.map((r) => [
           r.scheduled_date,
           r.keyword,
+          r.topic_cluster_label || r.topic_cluster_id,
+          r.topic_role,
           r.source,
           int(r.search_volume),
           int(r.difficulty),
@@ -509,7 +531,7 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
           r.article_type ?? '—',
           r.from_below_n ? 'BELOW-N' : 'accepted',
         ]),
-        new Set([3, 4, 5, 6]),
+        new Set([5, 6, 7, 8]),
       ).map((l) => `  ${l}`),
     );
   }

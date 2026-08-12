@@ -9,6 +9,13 @@ function candidate(keyword: string): WorkingCandidate {
     normalized: keyword,
     source: 'seed',
     source_context: null,
+    core_keyword: null,
+    category_ids: [],
+    topic_cluster_id: null,
+    topic_cluster_label: null,
+    topic_role: null,
+    topic_content_focus: null,
+    topic_primary_keyword: null,
     search_volume: 100,
     difficulty: 10,
     cpc: null,
@@ -30,7 +37,6 @@ const config = {
   serpDepth: 10,
   authorityDomains: [],
   authorityThreshold: 0.9,
-  duplicateSerpOverlap: 0.9,
   models: {},
 } as unknown as ResolvedConfig;
 

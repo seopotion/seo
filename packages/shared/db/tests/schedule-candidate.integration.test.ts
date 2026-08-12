@@ -53,6 +53,11 @@ describe('scheduleCandidate (integration)', () => {
     expect(res.keyword.scheduled_date).toBe('2026-11-01');
     expect(res.keyword.search_volume).toBe(100);
     expect(res.keyword.article_type).toBe('comparison');
+    expect(res.keyword.topic_cluster_id).toBeNull();
+    expect(res.keyword.topic_cluster_label).toBeNull();
+    expect(res.keyword.topic_role).toBeNull();
+    expect(res.keyword.topic_content_focus).toBeNull();
+    expect(res.keyword.topic_primary_keyword).toBeNull();
     expect(res.keyword.generation_status).toBe('pending');
     expect((await CandidateRepo.findById(cand.id))!.status).toBe('selected');
   });

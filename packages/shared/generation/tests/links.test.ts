@@ -2,9 +2,11 @@ import type { Keyword, Org } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
 import { buildContext } from '../src/context';
 import {
+  deduplicateLinkCandidates,
   deriveCandidates,
   extractLinks,
   normalizeUrl,
+  prioritizeLinkCandidates,
   publishedArticleUrl,
   sanitizeLinks,
 } from '../src/links';
@@ -52,27 +54,120 @@ describe('deriveCandidates', () => {
           pub('published-slug-old', new Date('2026-01-01')),
           pub('published-slug-new', new Date('2026-02-01')),
         ],
+        topic_cluster_id: 'topic:widgets',
+        topic_role: 'pillar',
       },
     ]);
-    expect(got).toEqual([{ title: 'Post One', url: 'https://a.com/blog/published-slug-new' }]);
+    expect(got).toEqual([
+      {
+        title: 'Post One',
+        url: 'https://a.com/blog/published-slug-new',
+        topic_cluster_id: 'topic:widgets',
+        topic_role: 'pillar',
+      },
+    ]);
   });
 
   test('falls back to article.slug when there is no publication entry', () => {
     const got = deriveCandidates('https://a.com/blog', [
-      { title: 'Post', slug: 'fallback', publications: [] },
+      {
+        title: 'Post',
+        slug: 'fallback',
+        publications: [],
+        topic_cluster_id: null,
+        topic_role: null,
+      },
     ]);
     expect(got[0]!.url).toBe('https://a.com/blog/fallback');
   });
 
   test('drops undecidable URLs and de-duplicates', () => {
-    const got = deriveCandidates('', [{ title: 'P', slug: 's', publications: [] }]);
+    const got = deriveCandidates('', [
+      {
+        title: 'P',
+        slug: 's',
+        publications: [],
+        topic_cluster_id: null,
+        topic_role: null,
+      },
+    ]);
     expect(got).toEqual([]);
 
     const dupes = deriveCandidates('https://a.com/blog', [
-      { title: 'A', slug: 'same', publications: [] },
-      { title: 'B', slug: 'same', publications: [] },
+      {
+        title: 'A',
+        slug: 'same',
+        publications: [],
+        topic_cluster_id: null,
+        topic_role: null,
+      },
+      {
+        title: 'B',
+        slug: 'same',
+        publications: [],
+        topic_cluster_id: null,
+        topic_role: null,
+      },
     ]);
     expect(dupes).toHaveLength(1);
+  });
+});
+
+describe('topic-aware link priority', () => {
+  const topic = {
+    topic_cluster_id: 'topic:widgets',
+    topic_cluster_label: 'Widgets',
+    topic_role: 'support' as const,
+    topic_content_focus: 'Widget sizing',
+    topic_primary_keyword: 'widget sizing',
+  };
+  const candidate = (
+    title: string,
+    topic_cluster_id: string | null,
+    topic_role: 'pillar' | 'support' | null,
+    url = `https://a.com/blog/${title.toLowerCase().replaceAll(' ', '-')}`,
+  ) => ({ title, url, topic_cluster_id, topic_role });
+
+  test('support prefers its pillar, then other same-cluster pages, preserving tier order', () => {
+    const input = [
+      candidate('Same Support One', 'topic:widgets', 'support'),
+      candidate('Other', 'topic:other', 'pillar'),
+      candidate('Cluster Pillar', 'topic:widgets', 'pillar'),
+      candidate('Same Support Two', 'topic:widgets', 'support'),
+    ];
+
+    expect(prioritizeLinkCandidates(topic, input).map((item) => item.title)).toEqual([
+      'Cluster Pillar',
+      'Same Support One',
+      'Same Support Two',
+      'Other',
+    ]);
+    expect(input.map((item) => item.title)).toEqual([
+      'Same Support One',
+      'Other',
+      'Cluster Pillar',
+      'Same Support Two',
+    ]);
+  });
+
+  test('pillar prefers supports and canonical URL de-duplication keeps the ranked first row', () => {
+    const pillarTopic = { ...topic, topic_role: 'pillar' as const };
+    const input = [
+      candidate('Cluster Pillar', 'topic:widgets', 'pillar', 'https://a.com/blog/shared/'),
+      candidate('Other', 'topic:other', 'support'),
+      candidate('Cluster Support', 'topic:widgets', 'support', 'https://a.com/blog/shared'),
+    ];
+
+    const ranked = prioritizeLinkCandidates(pillarTopic, input);
+    expect(ranked.map((item) => item.title)).toEqual([
+      'Cluster Support',
+      'Cluster Pillar',
+      'Other',
+    ]);
+    expect(deduplicateLinkCandidates(ranked).map((item) => item.title)).toEqual([
+      'Cluster Support',
+      'Other',
+    ]);
   });
 });
 
@@ -326,16 +421,56 @@ const org = {
   },
 } as unknown as Org;
 
-const keyword = { keyword: 'best widgets' } as Keyword;
+const keyword = {
+  keyword: 'best widgets',
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
+} as Keyword;
 
 describe('buildContext link fields', () => {
   test('carries the raw preset count and the supplied candidates', () => {
-    const ctx = buildContext(org, keyword, [{ title: 'One', url: 'https://a.com/blog/one' }]);
+    const ctx = buildContext(org, keyword, [
+      {
+        title: 'One',
+        url: 'https://a.com/blog/one',
+        topic_cluster_id: null,
+        topic_role: null,
+      },
+    ]);
     expect(ctx.maxInternalLinks).toBe(2);
-    expect(ctx.linkCandidates).toEqual([{ title: 'One', url: 'https://a.com/blog/one' }]);
+    expect(ctx.linkCandidates).toEqual([
+      {
+        title: 'One',
+        url: 'https://a.com/blog/one',
+        topic_cluster_id: null,
+        topic_role: null,
+      },
+    ]);
   });
 
   test('defaults to no candidates when none are supplied', () => {
     expect(buildContext(org, keyword).linkCandidates).toEqual([]);
+  });
+
+  test('copies all Keyword topic fields exactly', () => {
+    const semantic = {
+      ...keyword,
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widget selection',
+      topic_role: 'support' as const,
+      topic_content_focus: 'How makers choose the right widget',
+      topic_primary_keyword: ' Best   Widgets ',
+    } as Keyword;
+
+    expect(buildContext(org, semantic)).toMatchObject({
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widget selection',
+      topic_role: 'support',
+      topic_content_focus: 'How makers choose the right widget',
+      topic_primary_keyword: ' Best   Widgets ',
+    });
   });
 });

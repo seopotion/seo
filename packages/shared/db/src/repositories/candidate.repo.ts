@@ -5,7 +5,13 @@ import {
   CreateCandidateInput as CreateCandidateInputSchema,
   normalizeKeyword,
 } from '@shared/schemas';
-import { type Document, ObjectId, type WithId } from 'mongodb';
+import {
+  type Document,
+  MongoBulkWriteError,
+  MongoServerError,
+  ObjectId,
+  type WithId,
+} from 'mongodb';
 import { getDb } from '../client';
 
 const collection = async () => (await getDb()).collection('candidates');
@@ -61,6 +67,121 @@ export const CandidateRepo = {
     const docs = toInsert.map((d) => ({ ...d, created_at: now, updated_at: now }));
     const res = await col.insertMany(docs, { ordered: false });
     return docs.map((d, i) => toEntity({ _id: res.insertedIds[i]!, ...d }));
+  },
+
+  async persistStrategyMany(orgId: string, items: CreateCandidateInput[]): Promise<Candidate[]> {
+    if (items.length === 0) return [];
+
+    const now = new Date();
+    const prepared = items.map((item) => {
+      const data = CreateCandidateInputSchema.parse({ ...item, org_id: orgId });
+      return {
+        data,
+        normalized_keyword: normalizeKeyword(data.keyword),
+        strategyFields: {
+          core_keyword: data.core_keyword,
+          category_ids: data.category_ids,
+          search_volume: data.search_volume,
+          difficulty: data.difficulty,
+          cpc: data.cpc,
+          competition: data.competition,
+          trend: data.trend,
+          intent: data.intent,
+          relevance_score: data.relevance_score,
+          opportunity_score: data.opportunity_score,
+          article_type: data.article_type,
+          serp_competitors: data.serp_competitors,
+          serp_validated: data.serp_validated,
+          topic_cluster_id: data.topic_cluster_id,
+          topic_cluster_label: data.topic_cluster_label,
+          topic_role: data.topic_role,
+          topic_content_focus: data.topic_content_focus,
+          topic_primary_keyword: data.topic_primary_keyword,
+          updated_at: now,
+        },
+      };
+    });
+
+    const col = await collection();
+    try {
+      await col.bulkWrite(
+        prepared.map(({ data, normalized_keyword, strategyFields }) => ({
+          updateOne: {
+            filter: { org_id: orgId, normalized_keyword },
+            update: {
+              $set: strategyFields,
+              $setOnInsert: {
+                org_id: orgId,
+                normalized_keyword,
+                keyword: data.keyword,
+                source: data.source,
+                source_context: data.source_context,
+                status: data.status,
+                rejection_reason: data.rejection_reason,
+                created_at: now,
+              },
+            },
+            upsert: true,
+          },
+        })),
+        { ordered: false },
+      );
+    } catch (error) {
+      const bulkWriteErrors =
+        error instanceof MongoBulkWriteError
+          ? Array.isArray(error.writeErrors)
+            ? error.writeErrors
+            : [error.writeErrors]
+          : [];
+      const duplicateRace =
+        error instanceof MongoBulkWriteError
+          ? bulkWriteErrors.length > 0 &&
+            bulkWriteErrors.every((writeError) => writeError.code === 11000)
+          : error instanceof MongoServerError && error.code === 11000;
+      if (!duplicateRace) throw error;
+      await col.bulkWrite(
+        prepared.map(({ normalized_keyword, strategyFields }) => ({
+          updateOne: {
+            filter: { org_id: orgId, normalized_keyword },
+            update: { $set: strategyFields },
+          },
+        })),
+        { ordered: false },
+      );
+    }
+
+    await col.bulkWrite(
+      prepared.map(({ data, normalized_keyword }) => ({
+        updateOne: {
+          filter: { org_id: orgId, normalized_keyword, status: 'candidate' },
+          update: {
+            $set: {
+              status: data.status,
+              rejection_reason: data.rejection_reason,
+              updated_at: now,
+            },
+          },
+        },
+      })),
+      { ordered: false },
+    );
+
+    const docs = await col
+      .find({
+        org_id: orgId,
+        normalized_keyword: { $in: prepared.map((item) => item.normalized_keyword) },
+      })
+      .toArray();
+    const byNormalized = new Map(
+      docs.map((doc) => [doc.normalized_keyword as string, toEntity(doc)]),
+    );
+    return prepared.map(({ normalized_keyword }) => {
+      const persisted = byNormalized.get(normalized_keyword);
+      if (!persisted) {
+        throw new Error(`strategy candidate persistence lost ${normalized_keyword}`);
+      }
+      return persisted;
+    });
   },
 
   /**

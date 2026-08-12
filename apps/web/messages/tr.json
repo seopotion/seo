@@ -822,11 +822,9 @@
       "youtubeVideos": "YouTube videoları"
     },
     "audience": {
-      "competitorUrls": "Rakip web siteleri",
-      "competitorsHelp": "Bu sitelerin hâlihazırda sıralandığı anahtar kelimeleri buluyoruz — içerik planınız için en büyük fikir kaynağı budur. Rakip olmadan yalnızca kendi sitenize bakarak tahmin yürütebiliriz.",
-      "competitorsHint": "competitor.com gibi bir web sitesi alan adı girin. Şirket adı işe yaramaz.",
-      "competitorsSkip": "Adını verebileceğim bir rakip yok",
-      "competitorsSkipNote": "Planınızı rakip anahtar kelimeleri olmadan oluştururuz; bu genellikle daha az ve daha zayıf fikir demektir. Rakipleri daha sonra Ayarlar'dan ekleyebilirsiniz.",
+      "competitorUrls": "Rakip web siteleri (isteğe bağlı)",
+      "competitorsHelp": "İşletmenizle gerçekten karşılaştırılabilir şirketler biliyorsanız alan adlarını isteğe bağlı ek bir sinyal olarak ekleyin. Stratejiniz rakip alan adları olmadan da çalışır.",
+      "competitorsHint": "İsteğe bağlı: işletmenizle gerçekten karşılaştırılabilir bir şirketin competitor.com gibi alan adını girin. Şirket adı işe yaramaz.",
       "targetAudience": "Hedef kitle",
       "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
@@ -932,10 +930,9 @@
     "validation": {
       "articleStyleRequired": "Makale stili zorunludur.",
       "businessNameRequired": "İşletme adı zorunludur.",
-      "competitorDomain": "Rakibin competitor.com gibi web sitesi alan adını girin.",
+      "competitorDomain": "competitor.com gibi geçerli bir web sitesi alan adı girin.",
       "competitorsDuplicate": "Bu rakip zaten listede.",
       "competitorsMax": "En fazla {max} rakip ekleyebilirsiniz.",
-      "competitorsRequired": "En az bir rakip ekleyin veya rakipsiz devam etmek için kutuyu işaretleyin.",
       "competitorsValidDomains": "Her rakip bir web sitesi alan adı olmalıdır.",
       "countryRequired": "Ülke zorunludur.",
       "labels": {

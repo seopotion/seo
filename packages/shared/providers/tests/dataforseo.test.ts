@@ -40,6 +40,8 @@ describe('keywordsForSite', () => {
     expect(out).toEqual([
       {
         keyword: 'Best SEO Tools',
+        core_keyword: null,
+        category_ids: [],
         search_volume: 1000,
         difficulty: 40,
         cpc: 2.5,
@@ -61,6 +63,8 @@ describe('keywordsForSite', () => {
     const [out] = await client().keywordsForSite({ target: 'example.com' });
     expect(out).toEqual({
       keyword: 'seo audit',
+      core_keyword: null,
+      category_ids: [],
       search_volume: null,
       difficulty: null,
       cpc: null,
@@ -241,8 +245,11 @@ describe('rankedKeywords', () => {
         {
           keyword_data: {
             keyword: 'membrane fouling',
-            keyword_info: { search_volume: 70, cpc: 3 },
-            keyword_properties: { keyword_difficulty: 12 },
+            keyword_info: { search_volume: 70, cpc: 3, categories: [100, 200] },
+            keyword_properties: {
+              keyword_difficulty: 12,
+              core_keyword: 'reverse osmosis membrane fouling',
+            },
           },
           ranked_serp_element: { serp_item: { rank_group: 4 } },
         },
@@ -252,6 +259,8 @@ describe('rankedKeywords', () => {
     const out = await client().rankedKeywords({ target: 'x.com' });
     expect(out[0]).toMatchObject({
       keyword: 'membrane fouling',
+      core_keyword: 'reverse osmosis membrane fouling',
+      category_ids: [100, 200],
       search_volume: 70,
       difficulty: 12,
       cpc: 3,
@@ -279,8 +288,12 @@ describe('keywordSuggestions', () => {
             cpc: 1.5,
             competition: 0.2,
             search_volume_trend: { yearly: -3 },
+            categories: [110, 220],
           },
-          keyword_properties: { keyword_difficulty: 8 },
+          keyword_properties: {
+            keyword_difficulty: 8,
+            core_keyword: 'antiscalant dosing',
+          },
           search_intent_info: { main_intent: 'informational' },
         },
       ]),
@@ -289,6 +302,8 @@ describe('keywordSuggestions', () => {
     const out = await client().keywordSuggestions({ keyword: 'antiscalant dosing' });
     expect(out[0]).toEqual({
       keyword: 'antiscalant dosing rate',
+      core_keyword: 'antiscalant dosing',
+      category_ids: [110, 220],
       search_volume: 40,
       difficulty: 8,
       cpc: 1.5,
@@ -299,6 +314,31 @@ describe('keywordSuggestions', () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toContain('/dataforseo_labs/google/keyword_suggestions/live');
     expect(JSON.parse(init.body as string)).toEqual([{ keyword: 'antiscalant dosing' }]);
+  });
+
+  test('safely defaults malformed core keyword and category values', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        labsResponse([
+          {
+            keyword: 'antiscalant dosage',
+            keyword_info: { categories: [10, 10.5, '11', null, 12] },
+            keyword_properties: { core_keyword: '   ' },
+          },
+          {
+            keyword: 'reverse osmosis chemicals',
+            keyword_info: { categories: 'not-an-array' },
+            keyword_properties: { core_keyword: 42 },
+          },
+        ]),
+      ),
+    );
+
+    const out = await client().keywordSuggestions({ keyword: 'antiscalant' });
+
+    expect(out[0]).toMatchObject({ core_keyword: null, category_ids: [10, 12] });
+    expect(out[1]).toMatchObject({ core_keyword: null, category_ids: [] });
   });
 });
 

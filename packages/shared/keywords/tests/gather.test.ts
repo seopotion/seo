@@ -23,6 +23,8 @@ const presets = {
 
 const metric = (keyword: string): KeywordMetric => ({
   keyword,
+  core_keyword: null,
+  category_ids: [],
   search_volume: null,
   difficulty: null,
   cpc: null,

@@ -7,10 +7,15 @@
  * unwrapped to plain text rather than guessed at.
  */
 
+import type { TopicRole } from '@shared/schemas';
+import type { CompleteTopicBrief } from './topic';
+
 /** A link target we are willing to hand to the model. */
 export interface LinkCandidate {
   title: string;
   url: string;
+  topic_cluster_id: string | null;
+  topic_role: TopicRole | null;
 }
 
 export interface MarkdownLink {
@@ -19,11 +24,13 @@ export interface MarkdownLink {
 }
 
 /** The article fields `deriveCandidates` needs — a structural subset of `Article`
- * so this module does not depend on `@shared/schemas` or `@shared/db`. */
+ * that keeps this pure module independent of repositories. */
 export interface PublishedArticleInput {
   title: string;
   slug: string;
   publications: { slug: string; published_at: Date }[];
+  topic_cluster_id: string | null;
+  topic_role: TopicRole | null;
 }
 
 const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
@@ -115,7 +122,7 @@ export function publishedArticleUrl(mainBlogUrl: string, slug: string): string |
  */
 export function deriveCandidates(
   mainBlogUrl: string,
-  articles: PublishedArticleInput[],
+  articles: readonly PublishedArticleInput[],
 ): LinkCandidate[] {
   const seen = new Set<string>();
   const candidates: LinkCandidate[] = [];
@@ -128,9 +135,44 @@ export function deriveCandidates(
     const key = normalizeUrl(url);
     if (seen.has(key)) continue;
     seen.add(key);
-    candidates.push({ title: article.title, url });
+    candidates.push({
+      title: article.title,
+      url,
+      topic_cluster_id: article.topic_cluster_id,
+      topic_role: article.topic_role,
+    });
   }
   return candidates;
+}
+
+/** Stable topic priority for an article with a complete semantic brief. */
+export function prioritizeLinkCandidates(
+  topic: CompleteTopicBrief,
+  candidates: readonly LinkCandidate[],
+): LinkCandidate[] {
+  const complementaryRole = topic.topic_role === 'pillar' ? 'support' : 'pillar';
+  const sameCluster = (candidate: LinkCandidate) =>
+    candidate.topic_cluster_id === topic.topic_cluster_id;
+  return [
+    ...candidates.filter(
+      (candidate) => sameCluster(candidate) && candidate.topic_role === complementaryRole,
+    ),
+    ...candidates.filter(
+      (candidate) => sameCluster(candidate) && candidate.topic_role !== complementaryRole,
+    ),
+    ...candidates.filter((candidate) => !sameCluster(candidate)),
+  ];
+}
+
+/** Stable canonical-URL de-duplication for candidates gathered from multiple queries. */
+export function deduplicateLinkCandidates(candidates: readonly LinkCandidate[]): LinkCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = normalizeUrl(candidate.url);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**

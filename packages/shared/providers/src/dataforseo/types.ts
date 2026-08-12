@@ -3,6 +3,8 @@ import type { SearchIntent } from '@shared/schemas';
 /** Normalized keyword metrics returned by the Labs endpoints. */
 export interface KeywordMetric {
   keyword: string;
+  core_keyword: string | null;
+  category_ids: number[];
   search_volume: number | null;
   difficulty: number | null;
   cpc: number | null;

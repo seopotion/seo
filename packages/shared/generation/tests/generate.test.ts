@@ -15,6 +15,11 @@ const ctx: GenerationContext = {
   linkCandidates: [],
   llmInstructions: '',
   keyword: 'best widgets',
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   articleType: 'listicle',
   intent: 'commercial',
   serpCompetitors: [],
@@ -93,7 +98,14 @@ describe('generateArticle', () => {
     const linked: GenerationContext = {
       ...ctx,
       maxInternalLinks: 1,
-      linkCandidates: [{ title: 'Guide', url: 'https://a.com/blog/guide' }],
+      linkCandidates: [
+        {
+          title: 'Guide',
+          url: 'https://a.com/blog/guide',
+          topic_cluster_id: null,
+          topic_role: null,
+        },
+      ],
     };
     const outlineWithLink = JSON.stringify({
       ...JSON.parse(outlineJson),
@@ -122,6 +134,36 @@ describe('generateArticle', () => {
     if (result.ok) {
       expect(result.article.content).not.toContain('](');
       expect(result.article.content).toContain('features');
+    }
+  });
+
+  test('same-cluster status neither forces a link nor widens the sanitizer allow-list', async () => {
+    const semantic: GenerationContext = {
+      ...ctx,
+      topic_cluster_id: 'topic:best widgets',
+      topic_cluster_label: 'Widgets',
+      topic_role: 'support',
+      topic_content_focus: 'How makers choose widgets',
+      topic_primary_keyword: 'best widgets',
+      maxInternalLinks: 1,
+      linkCandidates: [
+        {
+          title: 'Widget Pillar',
+          url: 'https://a.com/blog/widget-pillar',
+          topic_cluster_id: 'topic:best widgets',
+          topic_role: 'pillar',
+        },
+      ],
+    };
+    const md = `${articleMd}\nRead the [pillar](https://a.com/blog/widget-pillar).\n`;
+    const llm = mockLlm([outlineJson, md, md, '{"pass":true,"reasons":[]}']);
+
+    const result = await generateArticle({ ctx: semantic, llm });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.article.content).not.toContain('https://a.com/blog/widget-pillar');
+      expect(result.article.content).toContain('pillar');
     }
   });
 });

@@ -822,11 +822,9 @@
       "youtubeVideos": "YouTube videos"
     },
     "audience": {
-      "competitorUrls": "Competitor websites",
-      "competitorsHelp": "We look up the keywords these sites already rank for — it is the single biggest source of ideas for your content plan. Without them we can only guess from your own site.",
-      "competitorsHint": "Enter a website domain, like competitor.com. A company name will not work.",
-      "competitorsSkip": "I cannot name a competitor",
-      "competitorsSkipNote": "We will build your plan without competitor keywords, which usually means fewer and weaker ideas. You can add competitors later in Settings.",
+      "competitorUrls": "Competitor websites (optional)",
+      "competitorsHelp": "If you know genuinely comparable companies, add their domains as an optional supplementary signal. Your strategy works without competitor domains.",
+      "competitorsHint": "Optional: enter a genuinely comparable company's domain, like competitor.com. A company name will not work.",
       "targetAudience": "Target audience",
       "targetAudiencePlaceholder": "",
       "title": "Target Audience And Competitors"
@@ -932,10 +930,9 @@
     "validation": {
       "articleStyleRequired": "Article style is required.",
       "businessNameRequired": "Business name is required.",
-      "competitorDomain": "Enter a competitor's website domain, like competitor.com.",
+      "competitorDomain": "Enter a valid website domain, like competitor.com.",
       "competitorsDuplicate": "That competitor is already on the list.",
       "competitorsMax": "You can add up to {max} competitors.",
-      "competitorsRequired": "Add at least one competitor, or tick the box to continue without one.",
       "competitorsValidDomains": "Each competitor must be a website domain.",
       "countryRequired": "Country is required.",
       "labels": {

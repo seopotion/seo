@@ -41,7 +41,6 @@ export default function OnboardingPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
-  const [competitorsSkipped, setCompetitorsSkipped] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [isFinishing, setIsFinishing] = useState(false);
   const [workspaceGate, setWorkspaceGate] = useState<'checking' | 'error' | 'ready'>('checking');
@@ -149,16 +148,10 @@ export default function OnboardingPage() {
     clearErrors('competitorDraft', 'competitors');
   }
 
-  function updateCompetitorsSkipped(skipped: boolean) {
-    setCompetitorsSkipped(skipped);
-    clearErrors('competitors');
-  }
-
   function getStepErrors() {
     return validateStep({
       audienceDraft,
       competitorDraft,
-      competitorsSkipped,
       form,
       scanState,
       stepIndex: currentStep,
@@ -377,7 +370,6 @@ export default function OnboardingPage() {
       ],
     }));
     setCompetitorDraft('');
-    setCompetitorsSkipped(false);
     clearErrors('competitorDraft', 'competitors');
   }
 
@@ -430,14 +422,12 @@ export default function OnboardingPage() {
         <AudienceCompetitorsStep
           audienceDraft={audienceDraft}
           competitorDraft={competitorDraft}
-          competitorsSkipped={competitorsSkipped}
           errors={errors}
           form={form}
           onAddAudience={addAudienceEntry}
           onAddCompetitor={addCompetitorEntry}
           onAudienceDraftChange={updateAudienceDraft}
           onCompetitorDraftChange={updateCompetitorDraft}
-          onCompetitorsSkippedChange={updateCompetitorsSkipped}
           onRemoveAudience={removeAudienceEntry}
           onRemoveCompetitor={removeCompetitorEntry}
         />
