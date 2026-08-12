@@ -5,6 +5,104 @@
     "retry": "Tekrar dene",
     "workspaceError": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin."
   },
+  "AnalyticsPage": {
+    "chart": {
+      "description": "Seçilen dönem için günlük arama performansı.",
+      "empty": "Bu dönem için henüz arama performansı verisi yok.",
+      "label": "Arama performansı trend grafiği",
+      "modes": {
+        "searchMetrics": "TO ve konum",
+        "traffic": "Tıklamalar ve gösterimler"
+      },
+      "title": "Performans trendi"
+    },
+    "controls": {
+      "rangeLabel": "Tarih aralığı",
+      "ranges": {
+        "7d": "7 gün",
+        "30d": "1 ay",
+        "90d": "3 ay"
+      },
+      "scopeLabel": "Sayfa kapsamı",
+      "scopes": {
+        "articles": "SEO Potion makaleleri",
+        "site": "Tüm site sayfaları"
+      }
+    },
+    "description": "Makalelerinizin ve sitenizin Google Arama performansını görün.",
+    "detail": {
+      "awaitingData": "Search Console bu makale için henüz veri bildirmedi.",
+      "awaitingTitle": "Veri bekleniyor",
+      "back": "Analitiğe dön",
+      "chartDescription": "Yayın tarihinden bugüne günlük tıklamalar ve gösterimler.",
+      "chartTitle": "Yayından bu yana performans",
+      "daysLive": "{count, plural, other {# gündür yayında}}",
+      "description": "Bu makalenin yayınlandığı günden bugüne arama performansını takip edin.",
+      "gatheringTitle": "Veri toplanmaya devam ediyor",
+      "notFound": "Bu makale bulunamadı veya bu organizasyona ait değil.",
+      "notFoundTitle": "Makale bulunamadı",
+      "notPublished": "Arama performansını takip etmek için önce bu makaleyi yayınlayın.",
+      "notPublishedTitle": "Makale yayınlanmadı",
+      "stillGathering": "Veri toplanmaya devam ediyor — 14. günden sonra tekrar kontrol edin.",
+      "title": "Makale analitiği"
+    },
+    "gated": {
+      "cta": "Search Console ayarlarını aç",
+      "description": "Sitenizin ve makalelerinizin analitiğini görmek için Google Search Console'u bağlayın veya yeniden bağlayın.",
+      "title": "Google Search Console'u bağlayın"
+    },
+    "states": {
+      "errorTitle": "Analitik kullanılamıyor",
+      "loadError": "Analitik verileri yüklenemedi. Tekrar deneyin.",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı."
+    },
+    "summary": {
+      "clicks": "Tıklamalar",
+      "ctr": "TO",
+      "deltaComparison": "Önceki eşit uzunluktaki dönemle karşılaştırma",
+      "impressions": "Gösterimler",
+      "label": "Arama performansı özeti",
+      "position": "Ort. konum"
+    },
+    "table": {
+      "articleCount": "{count, plural, other {# makale}}",
+      "attentionBadge": "İlgilenilmeli",
+      "awaitingData": "Veri bekleniyor",
+      "columns": {
+        "clicks": "Tıklamalar",
+        "ctr": "TO",
+        "daysLive": "Yayındaki gün",
+        "impressions": "Gösterimler",
+        "position": "Ort. konum",
+        "publishedDate": "Yayın tarihi",
+        "title": "Başlık",
+        "trend": "Eğilim"
+      },
+      "description": "Yayınlanan makaleleri karşılaştırın ve iyileştirme fırsatlarını bulun.",
+      "empty": "Henüz yayınlanmış makale yok.",
+      "filterLabel": "Makaleleri başlığa göre filtrele",
+      "filterPlaceholder": "Makaleleri filtrele…",
+      "needsAttention": "İlgilenilmesi gerekenler",
+      "noMatches": "Geçerli filtrelerle eşleşen makale yok.",
+      "openArticle": "{title} için analitiği aç",
+      "pagination": {
+        "emptyRange": "Gösterilecek makale yok",
+        "label": "Makale analitiği sayfalandırması",
+        "next": "Sonraki",
+        "page": "Sayfa {page} / {total}",
+        "previous": "Önceki",
+        "range": "{total} makalenin {start}–{end} arası gösteriliyor"
+      },
+      "stillGathering": "Veri toplanmaya devam ediyor",
+      "title": "Makale performansı",
+      "trends": {
+        "down": "Düşüş trendinde",
+        "flat": "Değişiklik yok",
+        "up": "Yükseliş trendinde"
+      }
+    },
+    "title": "Analitik"
+  },
   "BillingPage": {
     "activating": {
       "continue": "Panele devam et",

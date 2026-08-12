@@ -5,6 +5,104 @@
     "retry": "Retry",
     "workspaceError": "Could not check your workspace. Try again."
   },
+  "AnalyticsPage": {
+    "chart": {
+      "description": "Daily search performance for the selected period.",
+      "empty": "No search performance data is available for this period yet.",
+      "label": "Search performance trend chart",
+      "modes": {
+        "searchMetrics": "CTR & position",
+        "traffic": "Clicks & impressions"
+      },
+      "title": "Performance trend"
+    },
+    "controls": {
+      "rangeLabel": "Date range",
+      "ranges": {
+        "7d": "7 days",
+        "30d": "1 month",
+        "90d": "3 months"
+      },
+      "scopeLabel": "Page scope",
+      "scopes": {
+        "articles": "SEO Potion articles",
+        "site": "All site pages"
+      }
+    },
+    "description": "See how your articles and site perform in Google Search.",
+    "detail": {
+      "awaitingData": "Search Console has not reported data for this article yet.",
+      "awaitingTitle": "Awaiting data",
+      "back": "Back to analytics",
+      "chartDescription": "Daily clicks and impressions from the publication date to today.",
+      "chartTitle": "Performance since publication",
+      "daysLive": "{count, plural, one {# day live} other {# days live}}",
+      "description": "Follow this article's search performance from publication to today.",
+      "gatheringTitle": "Still gathering data",
+      "notFound": "This article could not be found or does not belong to this organization.",
+      "notFoundTitle": "Article not found",
+      "notPublished": "Publish this article before tracking its search performance.",
+      "notPublishedTitle": "Article not published",
+      "stillGathering": "Still gathering data — check back after day 14.",
+      "title": "Article analytics"
+    },
+    "gated": {
+      "cta": "Open Search Console settings",
+      "description": "Connect or reconnect Google Search Console to unlock analytics for your site and articles.",
+      "title": "Connect Google Search Console"
+    },
+    "states": {
+      "errorTitle": "Analytics unavailable",
+      "loadError": "Analytics data could not be loaded. Try again.",
+      "noOrganization": "No completed organization was found for this workspace."
+    },
+    "summary": {
+      "clicks": "Clicks",
+      "ctr": "CTR",
+      "deltaComparison": "Compared with the previous equal-length period",
+      "impressions": "Impressions",
+      "label": "Search performance summary",
+      "position": "Avg. position"
+    },
+    "table": {
+      "articleCount": "{count, plural, one {# article} other {# articles}}",
+      "attentionBadge": "Attention",
+      "awaitingData": "Awaiting data",
+      "columns": {
+        "clicks": "Clicks",
+        "ctr": "CTR",
+        "daysLive": "Days live",
+        "impressions": "Impressions",
+        "position": "Avg. position",
+        "publishedDate": "Published",
+        "title": "Title",
+        "trend": "Trend"
+      },
+      "description": "Compare published articles and find opportunities to improve.",
+      "empty": "No published articles are available yet.",
+      "filterLabel": "Filter articles by title",
+      "filterPlaceholder": "Filter articles…",
+      "needsAttention": "Needs attention",
+      "noMatches": "No articles match the current filters.",
+      "openArticle": "Open analytics for {title}",
+      "pagination": {
+        "emptyRange": "No articles to show",
+        "label": "Article analytics pagination",
+        "next": "Next",
+        "page": "Page {page} of {total}",
+        "previous": "Previous",
+        "range": "Showing {start}–{end} of {total}"
+      },
+      "stillGathering": "Still gathering data",
+      "title": "Article performance",
+      "trends": {
+        "down": "Trending down",
+        "flat": "No change",
+        "up": "Trending up"
+      }
+    },
+    "title": "Analytics"
+  },
   "BillingPage": {
     "activating": {
       "continue": "Continue to dashboard",

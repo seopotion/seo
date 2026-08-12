@@ -7,6 +7,14 @@ export const dashboardQueryKeys = {
     [...dashboardQueryKeys.all, 'organization', organizationId] as const,
   home: (organizationId: string) =>
     [...dashboardQueryKeys.organization(organizationId), 'home'] as const,
+  analytics: (organizationId: string) =>
+    [...dashboardQueryKeys.organization(organizationId), 'analytics'] as const,
+  analyticsSummary: (organizationId: string, range: string, scope: string) =>
+    [...dashboardQueryKeys.analytics(organizationId), 'summary', range, scope] as const,
+  analyticsArticles: (organizationId: string, range: string) =>
+    [...dashboardQueryKeys.analytics(organizationId), 'articles', range] as const,
+  analyticsArticle: (organizationId: string, articleId: string) =>
+    [...dashboardQueryKeys.analytics(organizationId), 'article', articleId] as const,
   planner: (organizationId: string) =>
     [...dashboardQueryKeys.organization(organizationId), 'planner'] as const,
   candidatePool: (organizationId: string) =>
