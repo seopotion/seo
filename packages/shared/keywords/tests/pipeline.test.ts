@@ -7,7 +7,7 @@ import type {
   SerpParams,
   SerpResult,
 } from '@shared/providers';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 const metric = (keyword: string, over: Partial<KeywordMetric> = {}): KeywordMetric => ({
   keyword,
@@ -128,6 +128,25 @@ describe('runKeywordPipeline', () => {
 
     const pinned = await runKeywordPipeline({ ...input(), config: { seeds: ['pinned seed'] } });
     expect(pinned.stats.seeds).toEqual(['pinned seed']);
+  });
+
+  it('uses Haiku by default only for classification', async () => {
+    const base = fakeLlm();
+    const complete = vi.fn(base.complete);
+
+    await runKeywordPipeline({
+      ...input(),
+      clients: { dataForSeo: fakeDataForSeo(), llm: { complete } },
+    });
+
+    const modelFor = (marker: string) =>
+      complete.mock.calls.find(([params]) => params.messages[0]!.content.includes(marker))?.[0]
+        .model;
+
+    expect(modelFor('seed keywords')).toBeUndefined();
+    expect(modelFor('Score each keyword')).toBeUndefined();
+    expect(modelFor('could rank')).toBeUndefined();
+    expect(modelFor('Classify each keyword')).toBe('anthropic/claude-haiku-4.5');
   });
 
   it('is deterministic for fixed provider responses', async () => {

@@ -41,10 +41,8 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   // that actually happened — a whole stage returning nothing. Set it near 1.0 to
   // demand a perfect stage; 0 disables the guard (#211).
   minLlmCoverage: 0.5,
-  // Unset = the LlmClient's default model for every stage. Overriding a single
-  // stage is how the reasoning-vs-extraction question gets measured per call
-  // rather than per pipeline.
-  models: {},
+  // Unset = the LlmClient's default model for that stage.
+  models: { classify: 'anthropic/claude-haiku-4.5' },
   // Empty = ask the LLM for seeds, the production path. Pin them for benchmark
   // runs, where a non-deterministic seed list swings the pool +/-40% and swamps
   // whatever change is being measured (#211).

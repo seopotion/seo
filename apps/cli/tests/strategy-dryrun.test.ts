@@ -415,19 +415,27 @@ describe('strategyDryRun', () => {
     const path = join(dir, 'snap.json');
     unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
     const baseline = JSON.parse(await readFile(path, 'utf8'));
-    expect(baseline.llm.every((c: { model?: string }) => c.model === undefined)).toBe(true);
+    const baselineClassify = baseline.llm.find((c: { messages: { content: string }[] }) =>
+      c.messages[0]!.content.includes('Classify each keyword'),
+    );
+    expect(baselineClassify.model).toBe('anthropic/claude-haiku-4.5');
+    expect(
+      baseline.llm
+        .filter((c: { messages: { content: string }[] }) => c !== baselineClassify)
+        .every((c: { model?: string }) => c.model === undefined),
+    ).toBe(true);
 
     // Same org, same prompts, different classify model — the classify call must
-    // MISS rather than replay the default model's body.
+    // MISS rather than replay Haiku's body.
     const result = await strategyDryRun({
       org: 'org_1',
       serpTopN: 1,
       replayPath: path,
-      models: { classify: 'anthropic/claude-haiku-4.5' },
+      models: { classify: 'z-ai/glm-5.2' },
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.error.message).toContain('model anthropic/claude-haiku-4.5');
+    expect(result.error.message).toContain('model z-ai/glm-5.2');
 
     // Recorded under the override, the two models' answers coexist in one file.
     const abPath = join(dir, 'ab.json');
@@ -436,19 +444,13 @@ describe('strategyDryRun', () => {
         org: 'org_1',
         serpTopN: 1,
         snapshotPath: abPath,
-        models: { classify: 'anthropic/claude-haiku-4.5' },
+        models: { classify: 'z-ai/glm-5.2' },
       }),
     );
     const ab = JSON.parse(await readFile(abPath, 'utf8'));
-    const classify = ab.llm.filter(
-      (c: { model?: string }) => c.model === 'anthropic/claude-haiku-4.5',
-    );
+    const classify = ab.llm.filter((c: { model?: string }) => c.model === 'z-ai/glm-5.2');
     expect(classify).toHaveLength(1);
-    expect(classify[0].key).not.toBe(
-      baseline.llm.find((c: { messages: { content: string }[] }) =>
-        c.messages[0]!.content.includes('Classify each keyword'),
-      ).key,
-    );
+    expect(classify[0].key).not.toBe(baselineClassify.key);
   });
 
   test('rejects --snapshot together with --replay', async () => {
