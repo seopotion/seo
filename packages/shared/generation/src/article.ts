@@ -1,8 +1,10 @@
 import type { LlmMessage } from '@shared/providers';
 import { normalizeUrl } from './links';
+import { completeTopicBrief } from './topic';
 import type { GenerationContext, Outline } from './types';
 
 export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): LlmMessage[] {
+  const topic = completeTopicBrief(ctx);
   // Resolved at the outline step and already filtered to approved targets (#186);
   // the model receives concrete URLs or none, never a topic to invent an href for.
   const linkLines = outline.internal_links
@@ -19,6 +21,12 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     'Include an engaging introduction before the first H2 and a concluding section.',
     'Use the target keyword naturally; never keyword-stuff.',
     'Do not invent unverifiable facts about the business. Never promote competitors.',
+    topic?.topic_role === 'pillar'
+      ? 'Topic scope: write a broad, authoritative cluster overview and hub that orients readers across the subject. Do not exhaustively replace the narrower support articles.'
+      : '',
+    topic?.topic_role === 'support'
+      ? 'Topic scope: go deep on the assigned content focus. Do not broaden it into a second cluster overview, and keep it distinct from the pillar and other article targets.'
+      : '',
     `Write the entire article in ${ctx.language}.`,
     linkLines.length
       ? 'Link to the internal pages listed below, at most once each, using descriptive anchor text. Use those exact URLs verbatim — never invent, shorten, or alter one — and include no other links of any kind.'
@@ -29,6 +37,11 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
 
   const user = [
     `Target keyword: ${ctx.keyword}`,
+    topic ? `Topic cluster: ${topic.topic_cluster_label}` : '',
+    topic ? `Topic role: ${topic.topic_role}` : '',
+    topic
+      ? `Assigned content focus (the intended scope of this article): ${topic.topic_content_focus}`
+      : '',
     `H1: ${outline.h1}`,
     `Sections: ${outline.sections.map((s) => s.heading).join(' | ')}`,
     outline.faqs.length ? `FAQs to answer: ${outline.faqs.map((f) => f.question).join(' | ')}` : '',

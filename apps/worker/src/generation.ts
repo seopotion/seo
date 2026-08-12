@@ -3,6 +3,8 @@ import {
   buildContext,
   buildVideoEmbed,
   buildVideoPickPrompt,
+  completeTopicBrief,
+  deduplicateLinkCandidates,
   deriveCandidates,
   extractH2s,
   generateArticle,
@@ -11,9 +13,10 @@ import {
   languageCodeFromName,
   MAX_LINK_CANDIDATES,
   parseVideoPick,
+  prioritizeLinkCandidates,
   verifyCandidates,
 } from '@shared/generation';
-import type { ArticleVideo, Org } from '@shared/schemas';
+import type { Article, ArticleVideo, Keyword, Org } from '@shared/schemas';
 import { GenerateTask, isPaid } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
 import { logger } from './logger';
@@ -34,18 +37,62 @@ import { enqueueImageTask } from './queue';
  * with nothing published, or no blog URL to build one from, gets no links at
  * all, whatever `internal_links_count` says.
  */
-async function resolveLinkCandidates(org: Org): Promise<LinkCandidate[]> {
+async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCandidate[]> {
   const max = org.presets?.article_preferences.content_seo.internal_links_count ?? 0;
   const mainBlogUrl = org.presets?.blog.main_blog_url ?? '';
   if (max <= 0 || !mainBlogUrl.trim()) return [];
-  const { articles } = await ArticleRepo.listByOrg(org.id, {
-    status: 'published',
-    limit: MAX_LINK_CANDIDATES,
-    offset: 0,
-  });
-  const candidates = await verifyCandidates(deriveCandidates(mainBlogUrl, articles));
+
+  const topic = completeTopicBrief(keyword);
+  const eligible = (articles: Article[]) =>
+    articles.filter((article) => article.org_id === org.id && article.status === 'published');
+  let derived: LinkCandidate[];
+
+  if (topic) {
+    const complementaryRole = topic.topic_role === 'pillar' ? 'support' : 'pillar';
+    const complementary = eligible(
+      await ArticleRepo.listPublishedByTopicCluster(org.id, topic.topic_cluster_id, {
+        limit: MAX_LINK_CANDIDATES,
+        role: { value: complementaryRole, mode: 'include' },
+      }),
+    );
+    let sameClusterCandidates = deriveCandidates(mainBlogUrl, complementary);
+    if (sameClusterCandidates.length < MAX_LINK_CANDIDATES) {
+      const remainingSameCluster = eligible(
+        await ArticleRepo.listPublishedByTopicCluster(org.id, topic.topic_cluster_id, {
+          limit: MAX_LINK_CANDIDATES,
+          role: { value: complementaryRole, mode: 'exclude' },
+        }),
+      );
+      sameClusterCandidates = deduplicateLinkCandidates([
+        ...sameClusterCandidates,
+        ...deriveCandidates(mainBlogUrl, remainingSameCluster),
+      ]);
+    }
+    let gathered = sameClusterCandidates;
+    if (sameClusterCandidates.length < MAX_LINK_CANDIDATES) {
+      const { articles } = await ArticleRepo.listByOrg(org.id, {
+        status: 'published',
+        limit: MAX_LINK_CANDIDATES,
+        offset: 0,
+      });
+      gathered = [...sameClusterCandidates, ...deriveCandidates(mainBlogUrl, eligible(articles))];
+    }
+    derived = deduplicateLinkCandidates(prioritizeLinkCandidates(topic, gathered)).slice(
+      0,
+      MAX_LINK_CANDIDATES,
+    );
+  } else {
+    const { articles } = await ArticleRepo.listByOrg(org.id, {
+      status: 'published',
+      limit: MAX_LINK_CANDIDATES,
+      offset: 0,
+    });
+    derived = deriveCandidates(mainBlogUrl, eligible(articles)).slice(0, MAX_LINK_CANDIDATES);
+  }
+
+  const candidates = (await verifyCandidates(derived)).slice(0, MAX_LINK_CANDIDATES);
   logger.info('internal link candidates resolved', {
-    derived: articles.length,
+    derived: derived.length,
     verified: candidates.length,
   });
   return candidates;
@@ -85,7 +132,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         continue;
       }
 
-      const ctx = buildContext(org, keyword, await resolveLinkCandidates(org));
+      const ctx = buildContext(org, keyword, await resolveLinkCandidates(org, keyword));
       const { llm, youtube } = await getGenerationClients();
       const result = await generateArticle({ ctx, llm });
 
@@ -146,6 +193,11 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         meta_title: result.article.meta_title,
         slug: result.article.slug,
         keyword: keyword.keyword,
+        topic_cluster_id: keyword.topic_cluster_id,
+        topic_cluster_label: keyword.topic_cluster_label,
+        topic_role: keyword.topic_role,
+        topic_content_focus: keyword.topic_content_focus,
+        topic_primary_keyword: keyword.topic_primary_keyword,
         meta_description: result.article.meta_description,
         featured_image_url: '', // populated by the images worker (#51)
         content,

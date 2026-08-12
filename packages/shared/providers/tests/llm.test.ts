@@ -46,6 +46,41 @@ describe('complete', () => {
     });
   });
 
+  // A reasoning model can spend its whole output budget on reasoning tokens and
+  // return a 200 with no content. Callers parse JSON out of `text`, so "" is
+  // never an answer — it silently degraded a whole pipeline stage (#211).
+  test('retries once when the model returns an empty completion', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(chatResponse(''))
+      .mockResolvedValueOnce(chatResponse('{"types":[]}'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await client().complete({ messages: [{ role: 'user', content: 'x' }] });
+
+    expect(out.text).toBe('{"types":[]}');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('gives up after one empty retry and returns the empty result', async () => {
+    // A fresh Response per call — a Response body can only be read once.
+    const fetchMock = vi.fn(async () => chatResponse('   '));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await client().complete({ messages: [{ role: 'user', content: 'x' }] });
+
+    // Returned, not thrown: the callers' own degradation paths still apply.
+    expect(out.text).toBe('   ');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not retry a response that has content', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().complete({ messages: [{ role: 'user', content: 'x' }] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test('json responseFormat maps to response_format json_object', async () => {
     const fetchMock = vi.fn().mockResolvedValue(chatResponse('{}'));
     vi.stubGlobal('fetch', fetchMock);

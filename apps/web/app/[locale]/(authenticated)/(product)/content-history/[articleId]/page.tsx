@@ -1,38 +1,31 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Pencil } from 'lucide-react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { ArticleContentPreview } from '@/components/article/ArticleContentPreview';
+import {
+  ARTICLE_EDITOR_TITLE_ID,
+  ArticleEditorDetailItem,
+  ArticleEditorPanel,
+} from '@/components/article/ArticleEditorPanel';
 import { Badge, Button, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
+import {
+  type ArticleDetailResponse,
+  type ArticleStatus,
+  useArticleEditor,
+} from '@/lib/article-editor';
 import { clearToken } from '@/lib/auth';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
-
-type ArticleStatus = 'generated' | 'published' | 'deleted';
-
-type ArticleDetail = {
-  content: string;
-  created_at: string;
-  featured_image_url: string;
-  id: string;
-  keyword_id: string;
-  meta_description: string;
-  published_at: string | null;
-  slug: string;
-  static_site_published_at: string | null;
-  status: ArticleStatus;
-  title: string;
-  wordpress_post_id?: number;
-};
 
 type ArticleLoadState = 'error' | 'loading' | 'not_found' | 'ready';
 type WordPressActionState = 'error' | 'idle' | 'loading' | 'published' | 'updated';
@@ -59,6 +52,7 @@ const SITE_ERROR_KEYS: Record<string, SiteErrorKey> = {
 
 export default function ArticleDetailPage() {
   const t = useTranslations('ArticleDetailPage');
+  const editorT = useTranslations('ArticleEditor');
   const locale = useLocale();
   const router = useRouter();
   const params = useParams<{ articleId?: string | string[] }>();
@@ -70,6 +64,7 @@ export default function ArticleDetailPage() {
   } = useActiveOrganization();
   const [redirecting, setRedirecting] = useState(false);
   const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
   const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
   const [wordpressError, setWordpressError] = useState<string | null>(null);
   const [wordpressWarnings, setWordpressWarnings] = useState<string[]>([]);
@@ -81,6 +76,10 @@ export default function ArticleDetailPage() {
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
     [locale],
   );
+  const dateTimeFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }),
+    [locale],
+  );
 
   const handleUnauthorized = useCallback(() => {
     setRedirecting(true);
@@ -90,33 +89,32 @@ export default function ArticleDetailPage() {
     router.replace('/');
   }, [queryClient, router]);
 
-  const articleQuery = useQuery({
-    queryKey: dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
-    queryFn: async (): Promise<ArticleDetail | null> => {
-      if (!organization || !articleId) return null;
+  const leaveEditMode = useCallback(() => setEditing(false), []);
 
-      const response = await api.api.v0.dashboard.articles[':id'].$get({
-        param: { id: articleId },
-      });
-
-      if ((response.status as number) === 401) {
-        handleUnauthorized();
-        return null;
-      }
-
-      if ((response.status as number) === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error('article_load_failed');
-      }
-
-      return response.json();
-    },
-    enabled: !redirecting && !organizationLoading && Boolean(organization && articleId),
-    staleTime: 60 * 60 * 1000,
+  const editor = useArticleEditor({
+    articleId: articleId ?? null,
+    enabled: !redirecting && !organizationLoading && Boolean(organization),
+    onClose: leaveEditMode,
+    onUnauthorized: handleUnauthorized,
+    organizationId: organization?.id ?? '',
   });
+  const { dirty, draftArticle, requestClose } = editor;
+  const article = editor.article;
+  // Publishing pushes the *saved* record, so shipping mid-edit would silently
+  // publish the old text. Blocked until the draft is saved or discarded.
+  const publishBlocked = editing || dirty;
+
+  // A reload or tab close is the one exit the in-app guards below cannot catch.
+  useEffect(() => {
+    if (!dirty) return;
+
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+    }
+
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [dirty]);
 
   const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
     enabled: !redirecting && !organizationLoading,
@@ -138,16 +136,15 @@ export default function ArticleDetailPage() {
   const showSiteButton = staticSiteConnected === true;
   const showWordPressButton = wordpressConnected !== false || !showSiteButton;
 
-  const article = articleQuery.data ?? null;
   const loadState: ArticleLoadState = !articleId
     ? 'not_found'
     : redirecting || organizationLoading
       ? 'loading'
       : organizationError || !organization
         ? 'error'
-        : articleQuery.isPending
+        : editor.isPending
           ? 'loading'
-          : articleQuery.isError
+          : editor.isError
             ? 'error'
             : article
               ? 'ready'
@@ -185,7 +182,7 @@ export default function ArticleDetailPage() {
         throw new Error('wordpress_response_invalid');
       }
 
-      queryClient.setQueryData<ArticleDetail | null>(
+      queryClient.setQueryData<ArticleDetailResponse | null>(
         dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
         (currentArticle) =>
           currentArticle ? { ...currentArticle, wordpress_post_id: data.post_id } : currentArticle,
@@ -229,7 +226,7 @@ export default function ArticleDetailPage() {
 
       // The article carries its first-publish date from here on, which is what
       // flips the button to "Update".
-      queryClient.setQueryData<ArticleDetail | null>(
+      queryClient.setQueryData<ArticleDetailResponse | null>(
         dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
         (currentArticle) =>
           currentArticle
@@ -262,7 +259,16 @@ export default function ArticleDetailPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Button asChild variant="link" className="mb-2 text-slate-600">
-            <Link href="/content-history">
+            <Link
+              href="/content-history"
+              // Leaving the route would drop the draft; the editor's own
+              // confirmation banner asks first.
+              onClick={(event) => {
+                if (!dirty) return;
+                event.preventDefault();
+                requestClose();
+              }}
+            >
               <ArrowLeft className="size-4" aria-hidden="true" />
               {t('actions.back')}
             </Link>
@@ -290,8 +296,17 @@ export default function ArticleDetailPage() {
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {!editing && draftArticle ? (
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <Pencil className="size-4" aria-hidden="true" />
+                  {t('actions.edit')}
+                </Button>
+              ) : null}
               {showSiteButton ? (
-                <Button onClick={publishToSite} disabled={siteActionState === 'loading'}>
+                <Button
+                  onClick={publishToSite}
+                  disabled={publishBlocked || siteActionState === 'loading'}
+                >
                   {siteActionState === 'loading'
                     ? t(
                         article.static_site_published_at
@@ -309,7 +324,11 @@ export default function ArticleDetailPage() {
                 <Button
                   onClick={syncWordPressArticle}
                   variant={showSiteButton ? 'outline' : 'default'}
-                  disabled={wordpressActionState === 'loading' || wordpressConnected === false}
+                  disabled={
+                    publishBlocked ||
+                    wordpressActionState === 'loading' ||
+                    wordpressConnected === false
+                  }
                 >
                   {wordpressActionState === 'loading'
                     ? t(
@@ -325,7 +344,10 @@ export default function ArticleDetailPage() {
                 </Button>
               ) : null}
             </div>
-            {showWordPressButton && wordpressConnected === false ? (
+            {publishBlocked && (showSiteButton || showWordPressButton) ? (
+              <p className="text-slate-500 text-xs">{t('status.editingBlocksPublish')}</p>
+            ) : null}
+            {!publishBlocked && showWordPressButton && wordpressConnected === false ? (
               <p className="text-slate-500 text-xs">
                 {t.rich('wordpress.connectFirst', {
                   link: (chunks) => (
@@ -392,7 +414,52 @@ export default function ArticleDetailPage() {
         </StatusPanel>
       ) : null}
 
-      {article ? (
+      {editing && article && draftArticle ? (
+        <section
+          aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
+          className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+        >
+          <ArticleEditorPanel
+            canSave={editor.canSave}
+            context={
+              <dl className="grid gap-3 text-sm">
+                <ArticleEditorDetailItem label={t('labels.keyword')} value={article.keyword} />
+                <ArticleEditorDetailItem
+                  label={t('labels.createdAt')}
+                  value={formatDate(article.created_at, dateFormatter)}
+                />
+                <ArticleEditorDetailItem
+                  label={t('labels.publishedAt')}
+                  value={
+                    article.published_at
+                      ? formatDate(article.published_at, dateFormatter)
+                      : t('labels.notPublished')
+                  }
+                />
+              </dl>
+            }
+            dirty={dirty}
+            draftArticle={draftArticle}
+            headerActions={
+              <Button type="button" size="sm" variant="outline" onClick={requestClose}>
+                {t('actions.cancelEdit')}
+              </Button>
+            }
+            onContinueEditing={editor.continueEditing}
+            onDiscardAndClose={editor.discardAndClose}
+            onSave={editor.saveArticle}
+            onUpdateDraftField={editor.updateDraftField}
+            saveError={editor.saveError}
+            saveState={editor.saveState}
+            serverInvalidFields={editor.serverInvalidFields}
+            showCloseConfirmation={editor.showCloseConfirmation}
+            updatedAtLabel={editorT('status.updatedAt', {
+              date: formatDate(draftArticle.updatedAt ?? draftArticle.createdAt, dateTimeFormatter),
+            })}
+            validation={editor.validation}
+          />
+        </section>
+      ) : article ? (
         <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label={t('labels.slug')} value={article.slug} />

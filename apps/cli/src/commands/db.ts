@@ -2,7 +2,7 @@
  * db command — database management.
  */
 import { defineCommand } from 'citty';
-import { EXIT, type OutputMode } from '../types';
+import { EXIT, fail, type OutputMode } from '../types';
 import { createEmitter } from '../utils/emitter';
 import { emitInternal, outputOption, verboseOption } from './shared';
 
@@ -85,6 +85,190 @@ export const dbCommand = defineCommand({
           });
           emitter.step('db:set-plan', result.ok ? 'done' : 'fail');
           emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'strategy-audit': defineCommand({
+      meta: {
+        name: 'strategy-audit',
+        description:
+          'Read-only report on why the 30-day plan scheduled what it did (#211): candidate-pool histograms, the scheduled plan, and named diagnostics. NOTE: the pool is the union of every strategy run for the org, so if the job has been re-run the histograms are approximate.',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to audit' },
+        user: { type: 'string', description: "Owner's email; resolves to their single org" },
+        keyword: {
+          type: 'string',
+          description:
+            'Dump full candidate records whose normalized_keyword contains this substring (case-insensitive). Repeatable or comma-separated.',
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { strategyAudit } = await import('../lib/db');
+          const { renderStrategyAudit } = await import('../lib/strategy-audit');
+
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const raw = args.keyword as string | string[] | undefined;
+          const keywords = (Array.isArray(raw) ? raw : raw ? [raw] : [])
+            .flatMap((k) => k.split(','))
+            .map((k) => k.trim())
+            .filter(Boolean);
+
+          emitter.step('db:strategy-audit', 'start');
+
+          const result = await strategyAudit({
+            org: args.org as string | undefined,
+            user: args.user as string | undefined,
+            keywords,
+          });
+          emitter.step('db:strategy-audit', result.ok ? 'done' : 'fail');
+
+          // The report is a page of tables, so text mode renders it instead of
+          // dumping the raw JSON the default emitter would print.
+          if (result.ok && args.output !== 'json') {
+            process.stdout.write(renderStrategyAudit(result.data));
+          } else {
+            emitter.result(result);
+          }
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'strategy-dryrun': defineCommand({
+      meta: {
+        name: 'strategy-dryrun',
+        description:
+          'Run the real keyword pipeline for one org and report the result (#211). Persists NOTHING — no candidates, no planner entries, no strategy_status. Record provider responses with --snapshot, then iterate for free with --replay.',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to run for' },
+        user: { type: 'string', description: "Owner's email; resolves to their single org" },
+        'serp-top-n': {
+          type: 'string',
+          description: 'Override config.serpTopN — live SERP calls dominate the cost',
+        },
+        seeds: {
+          type: 'string',
+          description:
+            'Pin the seed keywords (comma-separated, or repeat the flag) instead of asking the LLM. The seed call is non-deterministic and swings the pool +/-40%, so pin it for any A/B',
+        },
+        'model-seeds': {
+          type: 'string',
+          description: 'Model for the seed call only (default: the client default)',
+        },
+        'model-relevance': {
+          type: 'string',
+          description: 'Model for the relevance stage only (default: the client default)',
+        },
+        'model-serp-judge': {
+          type: 'string',
+          description:
+            'Model for the SERP intent/locality judge only (default: the client default)',
+        },
+        'model-classify': {
+          type: 'string',
+          description: 'Model for the article_type classifier only (default: the client default)',
+        },
+        snapshot: {
+          type: 'string',
+          description: 'Run live and record every provider response to this JSON file',
+        },
+        replay: {
+          type: 'string',
+          description:
+            'Replay a recorded snapshot; makes no network calls at all. Implies the org it was recorded for, so --org/--user are optional',
+        },
+        'allow-live-misses': {
+          type: 'boolean',
+          description:
+            'With --replay: fetch only the calls the snapshot lacks from the live providers and write the enlarged snapshot back',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { strategyDryRun } = await import('../lib/db');
+          const { renderStrategyDryRun } = await import('../lib/strategy-dryrun');
+          const { DEFAULT_CONFIG } = await import('@shared/keywords');
+
+          const rawTopN = args['serp-top-n'] as string | undefined;
+          const serpTopN = rawTopN === undefined ? undefined : Number(rawTopN);
+          if (serpTopN !== undefined && !Number.isInteger(serpTopN)) {
+            emitter.result(fail('BAD_ARGS', `--serp-top-n must be an integer, got "${rawTopN}".`));
+            process.exit(EXIT.USER_ERROR);
+          }
+
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const rawSeeds = args.seeds as string | string[] | undefined;
+          const seeds = (Array.isArray(rawSeeds) ? rawSeeds : rawSeeds ? [rawSeeds] : [])
+            .flatMap((s) => s.split(','))
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          const models = Object.fromEntries(
+            (
+              [
+                ['seeds', 'model-seeds'],
+                ['relevance', 'model-relevance'],
+                ['serpJudge', 'model-serp-judge'],
+                ['classify', 'model-classify'],
+              ] as const
+            )
+              .map(([stage, flag]) => [stage, args[flag] as string | undefined])
+              .filter(([, model]) => !!model),
+          );
+
+          const replay = args.replay as string | undefined;
+          const allowLiveMisses = args['allow-live-misses'] as boolean;
+          if (replay && allowLiveMisses) {
+            emitter.warn(
+              `Replaying ${replay} with --allow-live-misses — cached calls are free, but anything the snapshot lacks is fetched live and costs real credits. The snapshot is rewritten with what it fetched.`,
+            );
+          } else if (replay) {
+            emitter.info(`Replaying ${replay} — no network calls, no provider credits spent.`);
+          } else {
+            emitter.warn(
+              // The LLM count is no longer ~1 per keyword: relevance, the SERP
+              // judge and classify are all batched (#211), so it is a few dozen
+              // calls regardless of pool size.
+              `LIVE RUN — real DataForSEO + OpenRouter credits will be spent: up to ${serpTopN ?? DEFAULT_CONFIG.serpTopN} SERP calls (serpTopN) plus the gather/difficulty calls, and a few dozen batched LLM calls. Pass --snapshot <path> to record it, then --replay <path> to iterate for free.`,
+            );
+          }
+          emitter.step('db:strategy-dryrun', 'start');
+
+          const result = await strategyDryRun({
+            org: args.org as string | undefined,
+            user: args.user as string | undefined,
+            serpTopN,
+            seeds,
+            models,
+            snapshotPath: args.snapshot as string | undefined,
+            replayPath: replay,
+            allowLiveMisses,
+          });
+          emitter.step('db:strategy-dryrun', result.ok ? 'done' : 'fail');
+
+          // The report is a page of tables, so text mode renders it instead of
+          // dumping the raw JSON the default emitter would print.
+          if (result.ok && args.output !== 'json') {
+            process.stdout.write(renderStrategyDryRun(result.data));
+          } else {
+            emitter.result(result);
+          }
 
           process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
         } catch (e) {

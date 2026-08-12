@@ -3,6 +3,8 @@ import type { SearchIntent } from '@shared/schemas';
 /** Normalized keyword metrics returned by the Labs endpoints. */
 export interface KeywordMetric {
   keyword: string;
+  core_keyword: string | null;
+  category_ids: number[];
   search_volume: number | null;
   difficulty: number | null;
   cpc: number | null;
@@ -32,18 +34,41 @@ export interface DataForSeoConfig {
   retryDelayMs?: number;
 }
 
-export interface SiteKeywordsParams {
+/**
+ * Labs server-side result shaping. Without these the provider returns an
+ * arbitrary `limit`-sized slice, so the client-side ceiling was cutting a random
+ * third of the catalogue rather than the best of it (#211).
+ *
+ * `filters` is a nested array of `[field_path, operator, value]` triples joined
+ * by `'and'` / `'or'` (max 8 conditions); `orderBy` holds up to 3
+ * `"<field_path>,asc|desc"` rules. Field paths are endpoint-specific — the
+ * `keywords_for_site` / `keyword_suggestions` items expose
+ * `keyword_info.*` / `keyword_properties.*`, while `ranked_keywords` nests the
+ * same fields under `keyword_data.*`.
+ */
+export interface LabsQueryShape {
+  limit?: number;
+  orderBy?: string[];
+  filters?: unknown[];
+}
+
+export interface SiteKeywordsParams extends LabsQueryShape {
   target: string;
   locationName?: string;
   languageName?: string;
-  limit?: number;
 }
 
-export interface SeedKeywordsParams {
+export interface SeedKeywordsParams extends LabsQueryShape {
   keywords: string[];
   locationName?: string;
   languageName?: string;
-  limit?: number;
+}
+
+/** `keyword_suggestions` expands ONE seed at a time, unlike `keyword_ideas`. */
+export interface SuggestionKeywordsParams extends LabsQueryShape {
+  keyword: string;
+  locationName?: string;
+  languageName?: string;
 }
 
 export interface SerpParams {

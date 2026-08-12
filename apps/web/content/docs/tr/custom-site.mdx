@@ -1,0 +1,763 @@
+---
+title: Özel sitede yayınlama
+description: Bir GitHub deposu bağlayın, Seopotion'ın depoya işlediği Markdown ve manifest dosyalarını tanıyın, bunları Next.js, Astro, Nuxt veya Vue ile ekrana getirin.
+updated: 2026-08-08
+---
+
+Siteniz bir JavaScript çatısıyla kuruluysa — Next.js, Astro, Nuxt, Vue, Hugo, Eleventy — içine yazı
+gönderebileceğiniz bir sunucu yoktur. Site bir dosyalar klasörüdür ve içerik ancak site derlenirken
+oradaysa vardır.
+
+Bu yüzden bu entegrasyon, yayınlamayı **içeriği Git deponuza işleyerek (commit)** yapar. Seopotion
+her makale için bir Markdown dosyası ve bir `manifest.json` dizini yazar, mevcut dağıtım hattınız
+bu push'u görüp siteyi yeniden derler ve makale yayına girer. Her yayınlama, okuyabileceğiniz,
+inceleyebileceğiniz ve geri alabileceğiniz sıradan bir commit'tir.
+
+Kurulumun iki yarısı var. İlki Bağlan'a tıklamak; bir dakika sürer. İkincisi sitenize bu dosyaları
+nasıl işleyeceğini öğretmek — bir kez yazılan yaklaşık 60–100 satır kod.
+
+## Başlamadan önce
+
+- Sitenizin kaynak kodu bir **GitHub deposunda** olmalı. GitLab ve Bitbucket henüz desteklenmiyor.
+- O depoya **GitHub App kurabilmelisiniz** — depo sizin olmalı ya da organizasyon yöneticisi
+  olmalısınız. Değilseniz GitHub bir yöneticiden onay ister; onay gelince devam edebilirsiniz.
+- Siteniz **sayfaları önceden üreten bir çatıyla** derlenmeli (statik üretim veya sunucu tarafı
+  render). Tamamen tarayıcıda render edilen bir uygulama uygun değildir — bkz.
+  [Çatısız React](#çatısız-react).
+- Dağıtımınız **push ile** çalışmalı. Vercel, Netlify, Cloudflare Pages veya bir GitHub Actions iş
+  akışı kullanıyorsanız bu zaten böyledir.
+
+## Adım 1 — Deponuzu bağlayın
+
+1. Seopotion'da **Ayarlar → Entegrasyonlar** bölümünü açın.
+2. **Özel site (GitHub)** kartında **Bağlan** seçeneğine tıklayın.
+3. GitHub hangi hesaba ve hangi depolara izin vereceğinizi sorar. **Only select repositories**
+   (Yalnızca seçili depolar) seçeneğini işaretleyip sitenizin derlendiği depoyu seçin. Seopotion
+   yalnızca **Contents: read and write** (İçerik: okuma ve yazma) izni ister — dosya işlemeye yeter
+   ve issue'lara, actions'a, secret'lara ya da başka hiçbir şeye erişmez.
+4. GitHub sizi Seopotion'a geri gönderir; burada şunları seçersiniz:
+   - **Depo** — az önce izin verdiğiniz depo.
+   - **Dal (branch)** — canlı sitenizin derlendiği dal, genellikle `main`.
+   - **İçerik klasörü** — dosyaların gideceği yer. Varsayılan `seopotion/`.
+
+Siz onaylayana kadar deponuza hiçbir şey yazılmaz; ilk makalenizi yayınlayana kadar da hiçbir şey
+yazılmaz.
+
+Erişimi istediğiniz an GitHub ayarlarınızdan, **Applications → Installed GitHub Apps** altından
+kendiniz kaldırabilirsiniz. Erişimi kaldırmak sonraki yayınlamaları durdurur; daha önce işlenmiş
+dosyaları silmez.
+
+## Adım 2 — Deponuza ne geliyor
+
+Bir makaleyi yayınlamak, o makalenin Markdown dosyasını ve güncellenmiş manifest'i birlikte taşıyan
+**tek bir commit** üretir:
+
+```
+seopotion/
+├── manifest.json
+└── articles/
+    └── ai-outfit-generator.md
+```
+
+Bıraktığımız iz bundan ibarettir. `public/`, `static/`, derleme yapılandırmanız veya başka bir yere
+hiçbir şey yazılmaz — dolayısıyla buradaki hiçbir şey kendi içeriğinizle çakışamaz ya da derlemenizi
+bozamaz.
+
+**Görseller depoya işlenmez.** Seopotion'ın CDN'inde kalır ve mutlak URL ile gösterilir. Deponuz
+yalnızca metin içerir ve yeniden yayınlama, bir paragrafı değiştirmek için megabaytlar push
+etmez. Bunun karşılığı şudur: yayınlanmış görselleriniz bizim tarafımızdan sunulur. Bir gün
+ayrılırsanız makale metni Git'te sizindir, ancak görseller açılmaz.
+
+### `manifest.json`
+
+Dizin dosyası. Makale dosyalarındaki her alanı o da taşır; bu da şu anlama gelir: **kodunuz tek
+satır YAML ayrıştırmadan eksiksiz bir blog oluşturabilir.**
+
+```json
+{
+  "version": 1,
+  "generated_at": "2026-08-08T10:15:00.000Z",
+  "articles": [
+    {
+      "slug": "ai-outfit-generator",
+      "title": "How AI Outfit Generators Work",
+      "meta_title": "How AI Outfit Generators Work | Guide",
+      "meta_description": "A plain-language look at how AI turns a photo into an outfit.",
+      "keyword": "ai outfit generator",
+      "cover": "https://cdn.seopotion.com/orgs/abc/articles/123/cover.webp",
+      "cover_alt": "A phone showing a generated outfit",
+      "cover_width": 1216,
+      "cover_height": 640,
+      "images": [
+        {
+          "src": "https://cdn.seopotion.com/orgs/abc/articles/123/inline-1.webp",
+          "alt": "Three generated looks side by side",
+          "width": 1216,
+          "height": 672
+        }
+      ],
+      "published_at": "2026-08-08T10:15:00.000Z",
+      "updated_at": null,
+      "path": "seopotion/articles/ai-outfit-generator.md"
+    }
+  ]
+}
+```
+
+| Alan | Notlar |
+| --- | --- |
+| `version` | Sözleşme sürümü. `1` dışındaki bir değerde **açıkça hata verin**; anlamadığınız bir biçimi render etmeyin. |
+| `articles` | Zaten **en yeniden eskiye** sıralıdır; diziyi olduğu gibi render etmek doğru bir blog dizini verir, sıralama kodu gerekmez. |
+| `path` | Depo köküne göre verilir; içerik klasörünü kendiniz birleştirmeniz gerekmez. |
+| `title` ve `meta_title` | `title` sayfadaki H1'dir. `meta_title` arama sonuçlarında görünen `<title>` etiketidir. Kasıtlı olarak farklıdırlar. |
+| `cover` | Makalenin kapak görseli; `og:image` için doğru değer budur. Gövdenin **içinde değildir** — onu render etmek sayfanızın işidir. |
+| `cover_width` / `cover_height` | Gerçek piksel ölçüleri; yer ayırıp sayfanın zıplamasını önlemek için. Eski makalelerde **`null` olabilir** — tahmin etmek yerine bu durumda özniteliği hiç yazmayın. |
+| `images` | Gövdedeki tüm içerik görselleri, ölçüleriyle birlikte burada tekrarlanır. Markdown görsel söz dizimi genişlik ve yükseklik taşıyamadığı için ölçüleri ancak buradan ekleyebilirsiniz. |
+| `updated_at` | Makale düzenlenip yeniden yayınlanana kadar `null`'dır. `published_at` her zaman "ilk yayına girdiği an" demektir. |
+
+### Makale dosyası
+
+Önce YAML frontmatter, sonra gövde:
+
+```markdown
+---
+slug: "ai-outfit-generator"
+title: "How AI Outfit Generators Work"
+meta_title: "How AI Outfit Generators Work | Guide"
+meta_description: "A plain-language look at how AI turns a photo into an outfit."
+keyword: "ai outfit generator"
+published_at: "2026-08-08T10:15:00.000Z"
+updated_at: null
+cover: "https://cdn.seopotion.com/orgs/abc/articles/123/cover.webp"
+cover_alt: "A phone showing a generated outfit"
+cover_width: 1216
+cover_height: 640
+images:
+  - src: "https://cdn.seopotion.com/orgs/abc/articles/123/inline-1.webp"
+    alt: "Three generated looks side by side"
+    width: 1216
+    height: 672
+video:
+  id: "dQw4w9WgXcQ"
+  title: "How AI styling works"
+---
+
+## What an outfit generator actually does
+
+Gövde metni buradan başlar…
+```
+
+Manifest bunların hepsini zaten taşıdığı için en basit ve doğru yaklaşım şudur: **üst verileri
+`manifest.json`'dan okuyun, `.md` dosyasını yalnızca gövdesi için kullanın** — ikinci `---` dahil
+olmak üzere öncesindeki her şeyi kesin. Aşağıdaki örnekler bunu yapar; hiçbirinin YAML bağımlılığına
+ihtiyaç duymamasının sebebi de budur.
+
+Bilmeye değer tek istisna: `video`, frontmatter'da olup manifest'te **olmayan** tek alandır. Buna
+nadiren ihtiyaç duyarsınız, çünkü video zaten gövdeye `<iframe>` olarak gömülüdür. Videoyla başka
+bir şey yapmak isterseniz diye oradadır.
+
+## Her render'ın uyması gereken kurallar
+
+Sözleşmenin tamamı bu dört kuraldır. Doğru yaparsanız her çatı çalışır; yanlış yaparsanız ortaya
+çıkan belirtiler kafa karıştırıcıdır. Aşağıdaki tüm örnekler için geçerlidir.
+
+1. **Markdown render'ınızda ham HTML'i açın.** YouTube videoları gövdeye `<iframe>` olarak
+   gömülüdür. HTML'i kaçışlayan bir render — güvenlik gerekçesiyle birçoğu varsayılan olarak bunu
+   yapar — iframe'in kaynak kodunu okuyucularınıza düz metin olarak gösterir.
+2. **Gövde `##` ile başlar.** Markdown içinde H1 yoktur; çünkü H1, manifest'teki `title` alanıdır ve
+   sayfa şablonunuza aittir. Onu kendiniz render edin, yoksa makaleleriniz başlıksız yayınlanır.
+3. **Görsel URL'leri mutlaktır ve zaten doğrudur.** Seopotion'ın CDN'ini gösterirler ve oradaki
+   dosyalar hâlihazırda sıkıştırılmış ve doğru boyuttadır. Bunları paketleyicinizin varlık
+   hattından geçirmeyin, göreli yola çevirmeyin ve import etmeye çalışmayın — hiçbiri çözümlenmez.
+   Doğru cevap düz bir `<img>` etiketidir.
+
+   Bunun yerine çatınızın görsel bileşenini kullanmak isterseniz, yapılandırmasında CDN alan adına
+   izin vermeniz gerekir. Alan adını örneklerimizden kopyalamak yerine kendi `manifest.json`
+   dosyanızdaki `cover` alanından alın. Bedelini bilin: izin vermek, derlemenizin zaten yapılmış
+   bir işi yeniden yapmak için her kapak görselini indirmesine yol açar ve CDN'de yaşanacak kısa
+   bir aksaklığı derleme hatasına dönüştürür. Astro'da ayrıca şaşırtıcı bir yan etkisi var —
+   aşağıdaki ilgili bölüme bakın.
+4. **İçerik görsellerine `width` ve `height` değerlerini kendiniz ekleyin.** Markdown'ın
+   `![alt](url)` söz dizimi ölçü taşıyamaz; bu yüzden düz bir render'da görseller yüklendikçe sayfa
+   oynar. Her görseli `src` değerine göre `images` dizisiyle eşleştirip öznitelikleri yazın. Ölçüsü
+   `null` olanları atlayın.
+
+## Blog sayfalarınızı oluşturun
+
+Her örnek, ihtiyacınız olan iki sayfa için eksiksiz ve çalışan bir başlangıç noktasıdır: makaleleri
+listeleyen bir dizin sayfası ve makale başına bir sayfa. Yönlendirmeyi ve stili kendi sitenize göre
+uyarlayın.
+
+Hepsi varsayılan içerik klasörünü (`seopotion/`) varsayar. Farklı bir klasör seçtiyseniz yolları
+ona göre değiştirin.
+
+### Next.js (App Router)
+
+Dosyaları derleme anında diskten okuyun. İstek anında hiçbir şey çalışmaz ve hiçbir API çağrısı
+yapılmaz.
+
+Ham HTML destekleyen bir Markdown render'ı kurun:
+
+```bash
+npm install react-markdown rehype-raw
+```
+
+`lib/seopotion.ts`:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+export type ArticleImage = {
+  src: string;
+  alt: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type Article = {
+  slug: string;
+  title: string;
+  meta_title: string;
+  meta_description: string;
+  keyword: string;
+  cover: string;
+  cover_alt: string;
+  cover_width: number | null;
+  cover_height: number | null;
+  images: ArticleImage[];
+  published_at: string;
+  updated_at: string | null;
+  path: string;
+};
+
+type Manifest = { version: number; generated_at: string; articles: Article[] };
+
+export async function getArticles(): Promise<Article[]> {
+  const raw = await readFile(path.join(process.cwd(), 'seopotion/manifest.json'), 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+
+  // Kural: yazılmadığınız bir sözleşme sürümünü kabul etmeyin.
+  if (manifest.version !== 1) {
+    throw new Error(`Desteklenmeyen Seopotion manifest sürümü ${manifest.version}`);
+  }
+
+  return manifest.articles;
+}
+
+export async function getArticle(slug: string): Promise<Article | undefined> {
+  return (await getArticles()).find((article) => article.slug === slug);
+}
+
+/** Yalnızca gövde. Her frontmatter alanı zaten manifest'te var. */
+export async function getBody(article: Article): Promise<string> {
+  const raw = await readFile(path.join(process.cwd(), article.path), 'utf8');
+  return raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+}
+```
+
+`app/blog/page.tsx` — dizin sayfası:
+
+```tsx
+import Link from 'next/link';
+import { getArticles } from '@/lib/seopotion';
+
+export default async function BlogIndex() {
+  const articles = await getArticles(); // zaten en yeniden eskiye sıralı
+
+  return (
+    <main>
+      <h1>Blog</h1>
+      {articles.map((article) => (
+        <article key={article.slug}>
+          <Link href={`/blog/${article.slug}`}>
+            <img
+              src={article.cover}
+              alt={article.cover_alt}
+              width={article.cover_width ?? undefined}
+              height={article.cover_height ?? undefined}
+            />
+            <h2>{article.title}</h2>
+          </Link>
+          <p>{article.meta_description}</p>
+          <time dateTime={article.published_at}>
+            {new Date(article.published_at).toLocaleDateString()}
+          </time>
+        </article>
+      ))}
+    </main>
+  );
+}
+```
+
+`app/blog/[slug]/page.tsx` — makale sayfası:
+
+```tsx
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import { getArticle, getArticles, getBody } from '@/lib/seopotion';
+
+export async function generateStaticParams() {
+  const articles = await getArticles();
+  return articles.map((article) => ({ slug: article.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const article = await getArticle(slug);
+  if (!article) return {};
+
+  return {
+    title: article.meta_title,
+    description: article.meta_description,
+    openGraph: {
+      title: article.meta_title,
+      description: article.meta_description,
+      images: [article.cover],
+      type: 'article',
+      publishedTime: article.published_at,
+    },
+  };
+}
+
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getArticle(slug);
+  if (!article) notFound();
+
+  const body = await getBody(article);
+  const sizes = new Map(article.images.map((image) => [image.src, image]));
+
+  return (
+    <article>
+      {/* Kural 2: H1 bizim, gövdenin değil. */}
+      <h1>{article.title}</h1>
+      <time dateTime={article.published_at}>
+        {new Date(article.published_at).toLocaleDateString()}
+      </time>
+      {/* Kural 3: kapak görseli gövdenin içinde değil. */}
+      <img
+        src={article.cover}
+        alt={article.cover_alt}
+        width={article.cover_width ?? undefined}
+        height={article.cover_height ?? undefined}
+      />
+
+      <Markdown
+        // Kural 1: bu olmadan YouTube gömüleri düz metin olarak basılır.
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          // Kural 4: Markdown ölçü taşıyamaz, manifest taşır.
+          img: ({ src, alt }) => {
+            const size = typeof src === 'string' ? sizes.get(src) : undefined;
+            return (
+              <img
+                src={typeof src === 'string' ? src : undefined}
+                alt={alt ?? ''}
+                width={size?.width ?? undefined}
+                height={size?.height ?? undefined}
+                loading="lazy"
+              />
+            );
+          },
+        }}
+      >
+        {body}
+      </Markdown>
+    </article>
+  );
+}
+```
+
+Next.js'e özgü iki not:
+
+- Next.js 15 ve sonrasında **`params` bir Promise'tir**; örneklerde `await` edilmesinin sebebi
+  budur. Next.js 14'te doğrudan `params.slug` kullanın.
+- Düz `<img>` yerine **`next/image` kullanmak isterseniz** önce CDN'imizi `next.config.js`
+  dosyanıza ekleyin; yoksa her görsel derleme sırasında hata verir:
+
+  ```js
+  module.exports = {
+    images: {
+      remotePatterns: [{ protocol: 'https', hostname: 'cdn.seopotion.com' }],
+    },
+  };
+  ```
+
+  Burada düz `<img>` gerçekten yeterlidir: görseller zaten doğru boyutta WebP olarak gelir, yani
+  `next/image`'in yapacağı bir optimizasyon kalmamıştır.
+
+### Astro
+
+Astro frontmatter'ı ayrıştırır ve Markdown içindeki ham HTML'e varsayılan olarak izin verir; bu
+yüzden en az iş isteyen seçenektir. Bir içerik koleksiyonunu klasöre yönlendirin.
+
+`src/content.config.ts`:
+
+```ts
+import { glob } from 'astro/loaders';
+import { defineCollection, z } from 'astro:content';
+
+const image = z.object({
+  src: z.string(),
+  alt: z.string(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+});
+
+const blog = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './seopotion/articles' }),
+  schema: z.object({
+    slug: z.string(),
+    title: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    keyword: z.string(),
+    published_at: z.string(),
+    updated_at: z.string().nullable(),
+    cover: z.string(),
+    cover_alt: z.string(),
+    cover_width: z.number().nullable(),
+    cover_height: z.number().nullable(),
+    images: z.array(image),
+    video: z.object({ id: z.string(), title: z.string() }).nullable(),
+  }),
+});
+
+export const collections = { blog };
+```
+
+`src/pages/blog/[slug].astro`:
+
+```astro
+---
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({ params: { slug: post.data.slug }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const { data } = post;
+---
+
+<html lang="tr">
+  <head>
+    <title>{data.meta_title}</title>
+    <meta name="description" content={data.meta_description} />
+    <meta property="og:image" content={data.cover} />
+  </head>
+  <body>
+    <article>
+      <h1>{data.title}</h1>
+      <img
+        src={data.cover}
+        alt={data.cover_alt}
+        width={data.cover_width ?? undefined}
+        height={data.cover_height ?? undefined}
+      />
+      <Content />
+    </article>
+  </body>
+</html>
+```
+
+Dizin sayfası için `seopotion/manifest.json` dosyasını doğrudan okuyun (`import manifest from
+'../../seopotion/manifest.json'`) — zaten en yeniden eskiye sıralıdır.
+
+Astro'nun `<Image />` bileşeni ve `astro:assets` yerel dosyalar için tasarlanmıştır; bu yüzden CDN
+URL'lerini düz `<img>` etiketlerinde bırakın.
+
+4. kural — içerik görsellerine ölçü eklemek — bir rehype eklentisidir; çünkü bu görseller
+şablonunuzda değil, render edilmiş gövdenin içindedir. Eklentiyi `astro.config.ts` dosyasındaki
+`markdown.rehypePlugins` dizisine ekleyin:
+
+```ts
+import { visit } from 'unist-util-visit';
+import type { RehypePlugin } from '@astrojs/markdown-remark';
+
+export const imageSizesRehypePlugin: RehypePlugin = () => {
+  return function (tree, file) {
+    const images = file?.data?.astro?.frontmatter?.images;
+    if (!Array.isArray(images) || images.length === 0) return;
+
+    const sizes = new Map(images.map((image) => [image.src, image]));
+
+    visit(tree, 'element', function (node) {
+      if (node.tagName !== 'img') return;
+      const size = sizes.get(node.properties?.src);
+      if (!size) return;
+      // Sözleşmede null olabilir — width="null" basmak yerine hiç yazma.
+      if (size.width) node.properties.width = size.width;
+      if (size.height) node.properties.height = size.height;
+    });
+  };
+};
+```
+
+Astro'ya özgü iki tuzağı, denk gelmeden önce bilmekte fayda var:
+
+**CDN'i `image.remotePatterns` veya `image.domains` içine eklemeyin.** Kapak görseli
+yüklenmediğinde çözüm buymuş gibi görünür; oysa bu, gövdedeki *tüm* Markdown görsellerini de
+Astro'nun varlık hattına sokar. Astro bu görselleri çözümleyemez ve derleme `Failed to parse image
+reference` hatasıyla kırılır. Uzaktaki kapak görselleri, hiçbir izin listesi olmadan düz bir
+`<img>` etiketiyle sorunsuz render edilir.
+
+**Makaleler yeniden adlandırılıyor veya siliniyorsa `astro build --force` ile derleyin.** Astro'nun
+içerik katmanı, ayrıştırdığı kayıtları `node_modules/.astro` içinde önbelleğe alır ve bu önbellek,
+dosyası silinmiş bir makaleyi sunmaya devam eder. Bir makalenin slug'ını değiştirmek eski dosyayı
+sildiği ve CI platformları derlemeler arasında `node_modules` dizinini geri yüklediği için,
+`--force` olmadan eski URL yayında kalıp yenisiyle rekabet edebilir.
+
+### Nuxt
+
+`@nuxt/content` kullanın ve kaynağını klasöre yönlendirin:
+
+```ts
+// content.config.ts
+import { defineCollection, defineContentConfig, z } from '@nuxt/content';
+
+export default defineContentConfig({
+  collections: {
+    blog: defineCollection({
+      type: 'page',
+      source: { include: '**/*.md', cwd: './seopotion/articles' },
+      schema: z.object({
+        slug: z.string(),
+        title: z.string(),
+        meta_title: z.string(),
+        meta_description: z.string(),
+        cover: z.string(),
+        cover_alt: z.string(),
+        cover_width: z.number().nullable(),
+        cover_height: z.number().nullable(),
+        published_at: z.string(),
+      }),
+    }),
+  },
+});
+```
+
+`pages/blog/[slug].vue`:
+
+```vue
+<script setup lang="ts">
+const route = useRoute();
+const { data: article } = await useAsyncData(`blog-${route.params.slug}`, () =>
+  queryCollection('blog').where('slug', '=', route.params.slug).first(),
+);
+
+useSeoMeta({
+  title: () => article.value?.meta_title,
+  description: () => article.value?.meta_description,
+  ogImage: () => article.value?.cover,
+});
+</script>
+
+<template>
+  <article v-if="article">
+    <h1>{{ article.title }}</h1>
+    <img
+      :src="article.cover"
+      :alt="article.cover_alt"
+      :width="article.cover_width ?? undefined"
+      :height="article.cover_height ?? undefined"
+    />
+    <ContentRenderer :value="article" />
+  </article>
+</template>
+```
+
+Ham HTML'in temizlenmediğinden emin olun — `nuxt.config.ts` içinde `content.build.markdown`
+ayarında rehype HTML geçişi açık kalmalıdır; varsayılan zaten böyledir.
+
+### vite-ssg ile Vue
+
+`vite-ssg` ile önceden render edilen bir Vue sitesinde dosyaları `import.meta.glob` ile yükleyip
+`marked` ile işleyin.
+
+```bash
+npm install marked
+```
+
+`src/blog/articles.ts`:
+
+```ts
+import { marked } from 'marked';
+import manifest from '../../seopotion/manifest.json';
+
+if (manifest.version !== 1) {
+  throw new Error(`Desteklenmeyen Seopotion manifest sürümü ${manifest.version}`);
+}
+
+const files = import.meta.glob('../../seopotion/articles/*.md', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
+/** Yalnızca gövde — her frontmatter alanı zaten manifest'te var. */
+function bodyOf(slug: string): string {
+  const entry = Object.entries(files).find(([path]) => path.endsWith(`/${slug}.md`));
+  if (!entry) return '';
+  return entry[1].replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+}
+
+export const articles = manifest.articles; // zaten en yeniden eskiye sıralı
+
+export function renderArticle(slug: string): string {
+  const article = articles.find((candidate) => candidate.slug === slug);
+  if (!article) return '';
+
+  // marked ham HTML'i varsayılan olarak korur, YouTube iframe'i böylece hayatta kalır.
+  let html = marked.parse(bodyOf(slug), { async: false }) as string;
+
+  // Kural 4: Markdown söz diziminin taşıyamadığı ölçüleri ekleyin.
+  for (const image of article.images) {
+    if (image.width === null || image.height === null) continue;
+    html = html.replaceAll(
+      `<img src="${image.src}"`,
+      `<img width="${image.width}" height="${image.height}" loading="lazy" src="${image.src}"`,
+    );
+  }
+
+  return html;
+}
+```
+
+Sonucu `v-html` ile render edin ve `vite-ssg`'ye hangi rotaları önceden üreteceğini söyleyin:
+
+```ts
+// vite.config.ts
+import manifest from './seopotion/manifest.json';
+
+export default defineConfig({
+  ssgOptions: {
+    includedRoutes: (paths) => [
+      ...paths,
+      ...manifest.articles.map((article) => `/blog/${article.slug}`),
+    ],
+  },
+});
+```
+
+### Çatısız React
+
+**Bu entegrasyonu tamamen tarayıcıda render edilen düz bir React uygulamasıyla kullanmanızı
+önermiyoruz** (Create React App veya önceden render etmeyen Vite React şablonu).
+
+Sorun çalıştırılamaması değil — `import.meta.glob` Markdown'ı yükler, React de onu render eder.
+Sorun, bunun amacı boşa çıkarmasıdır. Tarayıcıda render edilen bir uygulamada makaleleriniz ancak
+JavaScript indirilip ayrıştırıldıktan ve çalıştıktan sonra var olur. Sunucudan giden şey boş bir
+`<div>`'dir. Arama motorları bunu sonunda render edip dizine ekleyebilir de eklemeyebilir de; her
+iki durumda da SEO içeriği yayınlamanın asıl sebebi olan hızlı ve eksiksiz HTML yanıtından
+vazgeçmiş olursunuz.
+
+Siteniz React ise bunun yerine şunlardan birini seçin — dördü de bu entegrasyonu düzgün destekler:
+
+| Durumunuz | Geçilecek seçenek |
+| --- | --- |
+| Vite + React, en küçük değişiklik isteniyor | [`vite-react-ssg`](https://github.com/Daydreamer-riri/vite-react-ssg) — mevcut rotalarınızı önceden üretir |
+| Yeni bir tanıtım sitesi veya blog kuruluyor | **Astro** — React bileşenleri `@astrojs/react` ile çalışmaya devam eder |
+| Tam bir uygulama çatısı isteniyor | **Next.js** — yukarıdaki App Router örneğini kullanın |
+| Zaten React Router 7 kullanılıyor | Çatı modunu (framework mode) ön render ile açın |
+
+Önceden render etmeye başladıktan sonra yukarıdaki Next.js örneğini izleyin — dosya okuma ve dört
+kural birebir aynıdır.
+
+## Adım 3 — Biz yayınlayınca siteyi yeniden derlemek
+
+Yapılandırılacak bir şey yok. Yayınlama, seçtiğiniz dala bir commit push eder ve mevcut dağıtım
+hattınız bunu diğer push'lardan ayırt etmez.
+
+| Barındırma | Ne olur |
+| --- | --- |
+| Vercel, Netlify, Cloudflare Pages | Push ile otomatik yeniden derler. Yapılacak bir şey yok. |
+| GitHub Actions ile GitHub Pages | İş akışınızda o dal için `on: push` varsa yeniden derler. |
+| Kendi sunucunuz | Zaten ne kullanıyorsanız o — webhook, cron ile `git pull` veya bir CI işi. |
+
+Dikkat edilmesi gereken ilk yayınlamadır. Tek bir makale yayınlayın, commit'in deponuzda
+göründüğünü doğrulayın, ardından dağıtımın çalıştığını ve sayfanın açıldığını doğrulayın.
+
+## Yeniden yayınlama, ad değiştirme ve silme
+
+- Bir makaleyi **düzenleyip yeniden yayınlamak** aynı dosyanın üzerine yazar ve manifest'teki
+  `updated_at` alanını günceller. `published_at` hiç değişmez.
+- **Slug değiştirmek**, eski dosyayı siler ve yenisini *aynı commit içinde* yazar; böylece siteniz
+  bir an bile ikisini birden sunmaz.
+- **Silme henüz bağlanmadı.** Seopotion'da bir makaleyi kaldırmak şu an için Markdown dosyasını
+  deponuzdan kaldırmaz — elle silebilirsiniz.
+
+## Sorun giderme
+
+### Makalede iframe'in HTML kodu düz metin olarak görünüyor
+
+Markdown render'ınız ham HTML'i kaçışlıyor. Bu 1. kuraldır. `react-markdown` kullanıyorsanız
+`rehypePlugins` içine `rehype-raw` ekleyin. Diğer render'larda `html`, `raw` veya
+`dangerouslyAllowHtml` adlı bir seçenek arayıp açın.
+
+### Makalelerin başlığı yok ya da iki başlık var
+
+Gövde kasıtlı olarak H1 içermez — 2. kural. Manifest'teki `title` alanını şablonunuzda render edin.
+*İki* başlık görüyorsanız hem `title` alanını render ediyor hem de gövdesinde başlık bulunan bir
+makale okuyorsunuz demektir; bu makale Seopotion'dan gelmemiştir.
+
+### Görseller yüklenmiyor ya da derleme bir görselde hata veriyor
+
+URL'ler Seopotion'ın CDN'ini gösterir ve zaten nihai hâldedir — 3. kural. Bu genellikle bir şeyin
+onları yerelde çözmeye çalıştığı anlamına gelir: izin listesi isteyen bir görsel bileşeni
+(`next/image`, `astro:assets`) veya görsel yollarını değiştiren bir paketleyici eklentisi. Düz bir
+`<img>` etiketi her durumda sorunu çözer.
+
+Görsel bileşenini kullanmaya devam etmek isterseniz alan adına izin verin — alan adını kendi
+`manifest.json` dosyanızdaki `cover` alanından kopyalayın. Astro'da ise tersini yapın: soruna
+*sebep olan* şey izin listesidir; CDN'i `image.remotePatterns` içinden çıkarın ve URL'leri düz
+`<img>` etiketlerinde bırakın.
+
+### Sayfa yüklenirken zıplıyor
+
+İçerik görsellerinin ölçüleri yok — 4. kural. Her `<img>` etiketini `src` değerine göre manifest'in
+`images` dizisiyle eşleştirip `width` ve `height` ekleyin.
+
+### "Desteklenmeyen manifest sürümü"
+
+Sözleşmeyi değiştirdik ve kodunuz doğru davranıp tahmin yürütmeyi reddetti. Neyin değiştiğini bu
+sayfadan kontrol edin; sürüm ilk günden beri `1`.
+
+### `manifest.json` bulunamıyor
+
+İlk makalenizi yayınlayana kadar bu dosya yoktur. Yayınladıysanız **Ayarlar → Entegrasyonlar**
+altındaki **Özel site (GitHub)** kartında görünen içerik klasörünü kontrol edin — kodunuzdaki yolla
+aynı olmalıdır.
+
+### Commit depoma geldi ama sitede bir şey değişmedi
+
+Dağıtımınız çalışmadı ya da başka bir dalda çalıştı. Entegrasyon kartındaki dalın, canlı sitenizin
+derlendiği dal olduğunu doğrulayın.
+
+### Yayınlama izin veya depo hatasıyla başarısız oluyor
+
+Kart, sebebini gösterir. Sık görülenler:
+
+| Mesaj | Ne yapmalı |
+| --- | --- |
+| Kurulum bulunamadı | GitHub App kaldırılmış. Karttan yeniden bağlanın. |
+| Kurulum askıya alınmış | Bir organizasyon yöneticisi GitHub ayarlarından askıya almış. |
+| Yazma izni yok | App'in erişimi daraltılmış. Yeniden bağlanıp depoya tekrar izin verin. |
+| Depo bulunamadı | Depo yeniden adlandırılmış, silinmiş ya da App'in seçili depolarından çıkarılmış. |
+| Commit reddedildi | Genellikle korumalı bir dal veya zorunlu bir durum kontrolü. Ya korumasız bir dala yayınlayın ya da App'in kuralı aşmasına izin verin. |
+
+## Sitenizin sorumluluğunda kalanlar
+
+Size içeriği ve ona dair verileri veriyoruz. Sitenizin kendi yönlendirmesine bağlı olan her şey
+sizde kalır: canonical adresler, `og:` ve Twitter etiketleri, `BlogPosting` ve `BreadcrumbList`
+JSON-LD, site haritanız ve RSS akışınız. Manifest hepsini kolaylaştıracak şekilde tasarlandı —
+ihtiyacınız olan her alan içinde ve en yeniden eskiye sıralı geliyor.

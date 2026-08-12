@@ -160,6 +160,11 @@ describe('KeywordRepo (integration)', () => {
         intent: 'commercial',
         article_type: 'comparison',
         opportunity_score: 0.9,
+        topic_cluster_id: 'topic:best crm software',
+        topic_cluster_label: 'CRM software',
+        topic_role: 'pillar',
+        topic_content_focus: 'A broad comparison of CRM software',
+        topic_primary_keyword: 'Best CRM Software',
         serp_competitors: [
           { rank: 1, url: 'https://a.com/crm', domain: 'a.com', title: 'Best CRMs' },
         ],
@@ -177,6 +182,11 @@ describe('KeywordRepo (integration)', () => {
     expect(kw.article_type).toBe('comparison');
     expect(kw.intent).toBe('commercial');
     expect(kw.opportunity_score).toBe(0.9);
+    expect(kw.topic_cluster_id).toBe('topic:best crm software');
+    expect(kw.topic_cluster_label).toBe('CRM software');
+    expect(kw.topic_role).toBe('pillar');
+    expect(kw.topic_content_focus).toBe('A broad comparison of CRM software');
+    expect(kw.topic_primary_keyword).toBe('Best CRM Software');
     expect(kw.serp_competitors).toEqual([
       { rank: 1, url: 'https://a.com/crm', domain: 'a.com', title: 'Best CRMs' },
     ]);

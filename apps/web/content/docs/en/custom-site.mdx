@@ -1,0 +1,759 @@
+---
+title: Publish to a custom site
+description: Connect a GitHub repository, understand the Markdown and manifest files Seopotion commits into it, and render them in Next.js, Astro, Nuxt or Vue.
+updated: 2026-08-08
+---
+
+If your site is built with a JavaScript framework — Next.js, Astro, Nuxt, Vue, Hugo, Eleventy —
+there is no server to push a post into. The site is a folder of files, and content only exists if
+it was there when the site was built.
+
+So this integration publishes by **committing content into your Git repository**. Seopotion writes
+one Markdown file per article plus a `manifest.json` index, your existing deploy pipeline sees the
+push and rebuilds, and the article is live. Every publish is an ordinary commit you can read,
+review and revert.
+
+There are two halves to setting this up. The first is clicking Connect, and takes a minute. The
+second is teaching your site to render the files — roughly 60–100 lines of code, written once.
+
+## Before you start
+
+- Your site's source is in a **GitHub repository**. GitLab and Bitbucket are not supported yet.
+- You can **install a GitHub App** on that repository — you own it, or you are an organization
+  admin. If you are not, GitHub will ask an owner to approve the install and you can continue
+  once they do.
+- Your site is built by a **framework that renders pages ahead of time** (static generation or
+  server rendering). A purely client-rendered app will not do — see
+  [React without a framework](#react-without-a-framework).
+- Your deploy runs **on push**. If you deploy from Vercel, Netlify, Cloudflare Pages or a GitHub
+  Actions workflow, this is already true.
+
+## Step 1 — Connect your repository
+
+1. In Seopotion, open **Settings → Integrations**.
+2. On the **Custom site (GitHub)** card, select **Connect**.
+3. GitHub asks which account and which repositories to grant. Choose **Only select repositories**
+   and pick the repository your site is built from. Seopotion requests **Contents: read and
+   write** and nothing else — enough to commit files, and no access to issues, actions, secrets
+   or any other repository.
+4. GitHub sends you back to Seopotion, where you choose:
+   - **Repository** — the one you just granted.
+   - **Branch** — the branch your production site builds from, usually `main`.
+   - **Content folder** — where the files go. `seopotion/` by default.
+
+Nothing is written to your repository until you confirm, and nothing is written at all until you
+publish your first article.
+
+You can revoke the access yourself at any time from your GitHub settings, under
+**Applications → Installed GitHub Apps**. Revoking stops future publishes; it does not remove
+anything already committed.
+
+## Step 2 — What lands in your repository
+
+Publishing an article produces **one commit** containing that article's Markdown and the updated
+manifest together:
+
+```
+seopotion/
+├── manifest.json
+└── articles/
+    └── ai-outfit-generator.md
+```
+
+That is the entire footprint. Nothing is written to `public/`, `static/`, your build config, or
+anywhere else — so nothing here can collide with your own content or break your build.
+
+**Images are not committed.** They stay on Seopotion's CDN and are referenced by absolute URL.
+Your repository stays text-only, and a republish never pushes megabytes to move a paragraph. The
+trade is that your published images are served by us: if you ever leave, the article text is
+yours in Git, but the images stop resolving.
+
+### `manifest.json`
+
+The index. It carries every field the article files carry, which means **your code can render a
+complete blog without parsing a single line of YAML**.
+
+```json
+{
+  "version": 1,
+  "generated_at": "2026-08-08T10:15:00.000Z",
+  "articles": [
+    {
+      "slug": "ai-outfit-generator",
+      "title": "How AI Outfit Generators Work",
+      "meta_title": "How AI Outfit Generators Work | Guide",
+      "meta_description": "A plain-language look at how AI turns a photo into an outfit.",
+      "keyword": "ai outfit generator",
+      "cover": "https://cdn.seopotion.com/orgs/abc/articles/123/cover.webp",
+      "cover_alt": "A phone showing a generated outfit",
+      "cover_width": 1216,
+      "cover_height": 640,
+      "images": [
+        {
+          "src": "https://cdn.seopotion.com/orgs/abc/articles/123/inline-1.webp",
+          "alt": "Three generated looks side by side",
+          "width": 1216,
+          "height": 672
+        }
+      ],
+      "published_at": "2026-08-08T10:15:00.000Z",
+      "updated_at": null,
+      "path": "seopotion/articles/ai-outfit-generator.md"
+    }
+  ]
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `version` | The contract version. **Fail loudly on anything other than `1`** rather than rendering a format you do not understand. |
+| `articles` | Already sorted **newest first**, so rendering the array in order gives you a correct blog index with no sorting code. |
+| `path` | Repo-root-relative, so you never have to reconstruct the content folder yourself. |
+| `title` vs `meta_title` | `title` is the H1 on the page. `meta_title` is the `<title>` tag shown in search results. They are deliberately different. |
+| `cover` | The article's header image, and the right value for `og:image`. It is **not** in the body — rendering it is your page's job. |
+| `cover_width` / `cover_height` | Real pixel dimensions, for reserving space so the layout does not jump. **May be `null`** on older articles — omit the attributes rather than guessing. |
+| `images` | Every inline image in the body, repeated here with its dimensions. Markdown image syntax cannot carry width and height, so this list is how you add them. |
+| `updated_at` | `null` until the article is edited and republished. `published_at` always means "first went live". |
+
+### The article file
+
+YAML frontmatter, then the body:
+
+```markdown
+---
+slug: "ai-outfit-generator"
+title: "How AI Outfit Generators Work"
+meta_title: "How AI Outfit Generators Work | Guide"
+meta_description: "A plain-language look at how AI turns a photo into an outfit."
+keyword: "ai outfit generator"
+published_at: "2026-08-08T10:15:00.000Z"
+updated_at: null
+cover: "https://cdn.seopotion.com/orgs/abc/articles/123/cover.webp"
+cover_alt: "A phone showing a generated outfit"
+cover_width: 1216
+cover_height: 640
+images:
+  - src: "https://cdn.seopotion.com/orgs/abc/articles/123/inline-1.webp"
+    alt: "Three generated looks side by side"
+    width: 1216
+    height: 672
+video:
+  id: "dQw4w9WgXcQ"
+  title: "How AI styling works"
+---
+
+## What an outfit generator actually does
+
+Body text starts here…
+```
+
+Because the manifest already carries all of this, the simplest correct approach is to **read
+metadata from `manifest.json` and use the `.md` file only for its body** — cut everything up to
+and including the second `---`. That is what the examples below do, and it is why none of them
+need a YAML dependency.
+
+One exception worth knowing: `video` is the only field that exists in the frontmatter and *not*
+in the manifest. You rarely need it, because the video is already embedded in the body as an
+`<iframe>`. It is there if you want to do something else with it.
+
+## Rules every renderer must follow
+
+These four rules are the whole contract. Get them right and any framework works; get them wrong
+and the symptoms are confusing. They apply equally to every example below.
+
+1. **Enable raw HTML in your Markdown renderer.** YouTube videos are embedded in the body as an
+   `<iframe>`. A renderer that escapes HTML — which many do by default, for safety — will print
+   the iframe's source code at your readers as text.
+2. **The body starts at `##`.** There is no H1 in the Markdown, because the H1 is `title` in the
+   manifest and belongs to your page template. Render it yourself, or your articles ship with no
+   heading at all.
+3. **Image URLs are absolute and already correct.** They point at Seopotion's CDN, and the files
+   there are already compressed and correctly sized. Do not run them through your bundler's asset
+   pipeline, do not rewrite them to relative paths, and do not try to import them — none of that
+   will resolve. A plain `<img>` is the right answer.
+
+   If you want to use a framework image component instead, it will need the CDN host allowlisted
+   in its config. Copy the host out of the `cover` field of your own `manifest.json` rather than
+   typing the one in our examples. Be aware of the trade: allowlisting makes your build download
+   every cover image to re-optimize work that is already done, and it makes a CDN hiccup a build
+   failure. In Astro it also has a surprising side effect — see the note in that section below.
+4. **Add `width` and `height` to inline images yourself.** Markdown's `![alt](url)` syntax cannot
+   carry dimensions, so a plain render shifts the page around as images load. Match each image on
+   its `src` against the `images` array and set the attributes. Skip any whose size is `null`.
+
+## Build your blog pages
+
+Each example is a complete, working starting point for the two pages you need: an index listing
+your articles and a page per article. Adapt the routing and styling to your site.
+
+All of them assume the default content folder `seopotion/`. If you chose a different one, adjust
+the paths.
+
+### Next.js (App Router)
+
+Read the files from disk at build time. Nothing runs at request time, and no API call is
+involved.
+
+Install a Markdown renderer that supports raw HTML:
+
+```bash
+npm install react-markdown rehype-raw
+```
+
+`lib/seopotion.ts`:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
+export type ArticleImage = {
+  src: string;
+  alt: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type Article = {
+  slug: string;
+  title: string;
+  meta_title: string;
+  meta_description: string;
+  keyword: string;
+  cover: string;
+  cover_alt: string;
+  cover_width: number | null;
+  cover_height: number | null;
+  images: ArticleImage[];
+  published_at: string;
+  updated_at: string | null;
+  path: string;
+};
+
+type Manifest = { version: number; generated_at: string; articles: Article[] };
+
+export async function getArticles(): Promise<Article[]> {
+  const raw = await readFile(path.join(process.cwd(), 'seopotion/manifest.json'), 'utf8');
+  const manifest = JSON.parse(raw) as Manifest;
+
+  // Rule: refuse a contract version you were not written against.
+  if (manifest.version !== 1) {
+    throw new Error(`Unsupported Seopotion manifest version ${manifest.version}`);
+  }
+
+  return manifest.articles;
+}
+
+export async function getArticle(slug: string): Promise<Article | undefined> {
+  return (await getArticles()).find((article) => article.slug === slug);
+}
+
+/** The body only. Every frontmatter field is already in the manifest. */
+export async function getBody(article: Article): Promise<string> {
+  const raw = await readFile(path.join(process.cwd(), article.path), 'utf8');
+  return raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+}
+```
+
+`app/blog/page.tsx` — the index:
+
+```tsx
+import Link from 'next/link';
+import { getArticles } from '@/lib/seopotion';
+
+export default async function BlogIndex() {
+  const articles = await getArticles(); // already newest-first
+
+  return (
+    <main>
+      <h1>Blog</h1>
+      {articles.map((article) => (
+        <article key={article.slug}>
+          <Link href={`/blog/${article.slug}`}>
+            <img
+              src={article.cover}
+              alt={article.cover_alt}
+              width={article.cover_width ?? undefined}
+              height={article.cover_height ?? undefined}
+            />
+            <h2>{article.title}</h2>
+          </Link>
+          <p>{article.meta_description}</p>
+          <time dateTime={article.published_at}>
+            {new Date(article.published_at).toLocaleDateString()}
+          </time>
+        </article>
+      ))}
+    </main>
+  );
+}
+```
+
+`app/blog/[slug]/page.tsx` — the article:
+
+```tsx
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import { getArticle, getArticles, getBody } from '@/lib/seopotion';
+
+export async function generateStaticParams() {
+  const articles = await getArticles();
+  return articles.map((article) => ({ slug: article.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const article = await getArticle(slug);
+  if (!article) return {};
+
+  return {
+    title: article.meta_title,
+    description: article.meta_description,
+    openGraph: {
+      title: article.meta_title,
+      description: article.meta_description,
+      images: [article.cover],
+      type: 'article',
+      publishedTime: article.published_at,
+    },
+  };
+}
+
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getArticle(slug);
+  if (!article) notFound();
+
+  const body = await getBody(article);
+  const sizes = new Map(article.images.map((image) => [image.src, image]));
+
+  return (
+    <article>
+      {/* Rule 2: the H1 is ours, not the body's. */}
+      <h1>{article.title}</h1>
+      <time dateTime={article.published_at}>
+        {new Date(article.published_at).toLocaleDateString()}
+      </time>
+      {/* Rule 3: the cover is not in the body. */}
+      <img
+        src={article.cover}
+        alt={article.cover_alt}
+        width={article.cover_width ?? undefined}
+        height={article.cover_height ?? undefined}
+      />
+
+      <Markdown
+        // Rule 1: without this, YouTube embeds print as text.
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          // Rule 4: Markdown cannot carry dimensions; the manifest can.
+          img: ({ src, alt }) => {
+            const size = typeof src === 'string' ? sizes.get(src) : undefined;
+            return (
+              <img
+                src={typeof src === 'string' ? src : undefined}
+                alt={alt ?? ''}
+                width={size?.width ?? undefined}
+                height={size?.height ?? undefined}
+                loading="lazy"
+              />
+            );
+          },
+        }}
+      >
+        {body}
+      </Markdown>
+    </article>
+  );
+}
+```
+
+Two Next.js-specific notes:
+
+- **`params` is a Promise** in Next.js 15 and newer, which is why the examples `await` it. On
+  Next.js 14, use `params.slug` directly.
+- **If you prefer `next/image`** over a plain `<img>`, add our CDN to `next.config.js` first —
+  otherwise every image throws at build time:
+
+  ```js
+  module.exports = {
+    images: {
+      remotePatterns: [{ protocol: 'https', hostname: 'cdn.seopotion.com' }],
+    },
+  };
+  ```
+
+  Plain `<img>` is genuinely fine here: the images are already WebP at the right size, so there
+  is no optimization left for `next/image` to do.
+
+### Astro
+
+Astro parses frontmatter and allows raw HTML in Markdown out of the box, so it needs the least
+work. Point a content collection at the folder.
+
+`src/content.config.ts`:
+
+```ts
+import { glob } from 'astro/loaders';
+import { defineCollection, z } from 'astro:content';
+
+const image = z.object({
+  src: z.string(),
+  alt: z.string(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+});
+
+const blog = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './seopotion/articles' }),
+  schema: z.object({
+    slug: z.string(),
+    title: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    keyword: z.string(),
+    published_at: z.string(),
+    updated_at: z.string().nullable(),
+    cover: z.string(),
+    cover_alt: z.string(),
+    cover_width: z.number().nullable(),
+    cover_height: z.number().nullable(),
+    images: z.array(image),
+    video: z.object({ id: z.string(), title: z.string() }).nullable(),
+  }),
+});
+
+export const collections = { blog };
+```
+
+`src/pages/blog/[slug].astro`:
+
+```astro
+---
+import { getCollection, render } from 'astro:content';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({ params: { slug: post.data.slug }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const { data } = post;
+---
+
+<html lang="en">
+  <head>
+    <title>{data.meta_title}</title>
+    <meta name="description" content={data.meta_description} />
+    <meta property="og:image" content={data.cover} />
+  </head>
+  <body>
+    <article>
+      <h1>{data.title}</h1>
+      <img
+        src={data.cover}
+        alt={data.cover_alt}
+        width={data.cover_width ?? undefined}
+        height={data.cover_height ?? undefined}
+      />
+      <Content />
+    </article>
+  </body>
+</html>
+```
+
+For the index page, read `seopotion/manifest.json` directly (`import manifest from
+'../../seopotion/manifest.json'`) — it is already sorted newest-first.
+
+Astro's `<Image />` component and `astro:assets` are built for local files, so leave the CDN URLs
+on plain `<img>` tags.
+
+Rule 4 — dimensions on inline images — is a rehype plugin, because the images are inside the
+rendered body rather than in your template. Add it to `markdown.rehypePlugins` in
+`astro.config.ts`:
+
+```ts
+import { visit } from 'unist-util-visit';
+import type { RehypePlugin } from '@astrojs/markdown-remark';
+
+export const imageSizesRehypePlugin: RehypePlugin = () => {
+  return function (tree, file) {
+    const images = file?.data?.astro?.frontmatter?.images;
+    if (!Array.isArray(images) || images.length === 0) return;
+
+    const sizes = new Map(images.map((image) => [image.src, image]));
+
+    visit(tree, 'element', function (node) {
+      if (node.tagName !== 'img') return;
+      const size = sizes.get(node.properties?.src);
+      if (!size) return;
+      // Nullable in the contract — omit rather than emit width="null".
+      if (size.width) node.properties.width = size.width;
+      if (size.height) node.properties.height = size.height;
+    });
+  };
+};
+```
+
+Two Astro-specific traps are worth knowing before you hit them:
+
+**Do not add the CDN to `image.remotePatterns` or `image.domains`.** It looks like the fix when a
+cover image will not load, but it also opts every *inline* Markdown image into Astro's asset
+pipeline, which then fails to resolve them and breaks the build with `Failed to parse image
+reference`. Remote covers render fine on a plain `<img>` without any allowlist.
+
+**Build with `astro build --force` if articles are ever renamed or deleted.** Astro's content
+layer caches parsed entries in `node_modules/.astro`, and that cache keeps serving an article
+whose file has been removed. Since renaming an article's slug deletes the old file and CI
+platforms restore `node_modules` between builds, without `--force` the old URL can stay live and
+compete with the new one.
+
+### Nuxt
+
+Use `@nuxt/content` and point its source at the folder:
+
+```ts
+// content.config.ts
+import { defineCollection, defineContentConfig, z } from '@nuxt/content';
+
+export default defineContentConfig({
+  collections: {
+    blog: defineCollection({
+      type: 'page',
+      source: { include: '**/*.md', cwd: './seopotion/articles' },
+      schema: z.object({
+        slug: z.string(),
+        title: z.string(),
+        meta_title: z.string(),
+        meta_description: z.string(),
+        cover: z.string(),
+        cover_alt: z.string(),
+        cover_width: z.number().nullable(),
+        cover_height: z.number().nullable(),
+        published_at: z.string(),
+      }),
+    }),
+  },
+});
+```
+
+`pages/blog/[slug].vue`:
+
+```vue
+<script setup lang="ts">
+const route = useRoute();
+const { data: article } = await useAsyncData(`blog-${route.params.slug}`, () =>
+  queryCollection('blog').where('slug', '=', route.params.slug).first(),
+);
+
+useSeoMeta({
+  title: () => article.value?.meta_title,
+  description: () => article.value?.meta_description,
+  ogImage: () => article.value?.cover,
+});
+</script>
+
+<template>
+  <article v-if="article">
+    <h1>{{ article.title }}</h1>
+    <img
+      :src="article.cover"
+      :alt="article.cover_alt"
+      :width="article.cover_width ?? undefined"
+      :height="article.cover_height ?? undefined"
+    />
+    <ContentRenderer :value="article" />
+  </article>
+</template>
+```
+
+Make sure raw HTML is not stripped — in `nuxt.config.ts`, `content.build.markdown` must leave
+`rehype` HTML passthrough enabled, which is the default.
+
+### Vue with vite-ssg
+
+For a Vue site prerendered by `vite-ssg`, load the files with `import.meta.glob` and render them
+with `marked`.
+
+```bash
+npm install marked
+```
+
+`src/blog/articles.ts`:
+
+```ts
+import { marked } from 'marked';
+import manifest from '../../seopotion/manifest.json';
+
+if (manifest.version !== 1) {
+  throw new Error(`Unsupported Seopotion manifest version ${manifest.version}`);
+}
+
+const files = import.meta.glob('../../seopotion/articles/*.md', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
+/** Body only — every frontmatter field is already in the manifest. */
+function bodyOf(slug: string): string {
+  const entry = Object.entries(files).find(([path]) => path.endsWith(`/${slug}.md`));
+  if (!entry) return '';
+  return entry[1].replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '');
+}
+
+export const articles = manifest.articles; // already newest-first
+
+export function renderArticle(slug: string): string {
+  const article = articles.find((candidate) => candidate.slug === slug);
+  if (!article) return '';
+
+  // marked keeps raw HTML by default, so the YouTube iframe survives.
+  let html = marked.parse(bodyOf(slug), { async: false }) as string;
+
+  // Rule 4: add dimensions the Markdown syntax could not carry.
+  for (const image of article.images) {
+    if (image.width === null || image.height === null) continue;
+    html = html.replaceAll(
+      `<img src="${image.src}"`,
+      `<img width="${image.width}" height="${image.height}" loading="lazy" src="${image.src}"`,
+    );
+  }
+
+  return html;
+}
+```
+
+Then render it with `v-html`, and tell `vite-ssg` which routes to prerender:
+
+```ts
+// vite.config.ts
+import manifest from './seopotion/manifest.json';
+
+export default defineConfig({
+  ssgOptions: {
+    includedRoutes: (paths) => [
+      ...paths,
+      ...manifest.articles.map((article) => `/blog/${article.slug}`),
+    ],
+  },
+});
+```
+
+### React without a framework
+
+**We do not recommend using this integration with a plain client-rendered React app** (Create
+React App, or Vite's React template without a prerenderer).
+
+The problem is not that it cannot be made to work — `import.meta.glob` will load the Markdown and
+React will render it. The problem is that it defeats the purpose. In a client-rendered app your
+articles exist only after JavaScript downloads, parses and runs. What is actually served is an
+empty `<div>`. Search engines may eventually render and index that, or may not, and either way
+you have given up the fast, complete HTML response that is the whole reason to publish SEO
+content in the first place.
+
+If your site is React, pick one of these instead — all four support this integration properly:
+
+| Your situation | Move to |
+| --- | --- |
+| Vite + React, want the smallest change | [`vite-react-ssg`](https://github.com/Daydreamer-riri/vite-react-ssg) — prerenders your existing routes |
+| Building a new marketing site or blog | **Astro** — React components still work, via `@astrojs/react` |
+| Want a full application framework | **Next.js** — use the App Router example above |
+| Already on React Router 7 | Enable its framework mode with prerendering |
+
+Once you are prerendering, follow the Next.js example above — the file loading and the four rules
+are identical.
+
+## Step 3 — Rebuilding when we publish
+
+There is nothing to configure. Publishing pushes a commit to the branch you chose, and your
+existing deploy pipeline treats it like any other push.
+
+| Your host | What happens |
+| --- | --- |
+| Vercel, Netlify, Cloudflare Pages | Rebuilds automatically on push. Nothing to do. |
+| GitHub Pages via Actions | Rebuilds if your workflow has `on: push` for that branch. |
+| Your own server | Whatever you already use — a webhook, a cron `git pull`, a CI job. |
+
+The first publish is the one to watch. Publish a single article, confirm the commit appears in
+your repository, then confirm your deploy ran and the page renders.
+
+## Republishing, renaming and deleting
+
+- **Editing and republishing** an article overwrites the same file, and updates its `updated_at`
+  in the manifest. `published_at` never changes.
+- **Renaming a slug** deletes the old file and writes the new one *in the same commit*, so your
+  site is never briefly serving both.
+- **Deleting** is not wired up yet. Removing an article in Seopotion does not currently remove
+  its Markdown file from your repository — you can delete it by hand.
+
+## Troubleshooting
+
+### The iframe's HTML is printed as text in the article
+
+Your Markdown renderer is escaping raw HTML. This is rule 1. In `react-markdown`, add
+`rehype-raw` to `rehypePlugins`. In other renderers, look for an option named `html`, `raw` or
+`dangerouslyAllowHtml` and enable it.
+
+### Articles have no heading, or two headings
+
+The body deliberately contains no H1 — rule 2. Render `title` from the manifest in your template.
+If you see *two* headings, you are rendering `title` and the body contains one anyway, which
+means you are reading an article that did not come from Seopotion.
+
+### Images do not load, or the build fails on an image
+
+The URLs point at Seopotion's CDN and are already final — rule 3. This usually means something is
+trying to resolve them locally: a framework image component that requires an allowlist
+(`next/image`, `astro:assets`), or a bundler plugin rewriting image paths. A plain `<img>` fixes
+it in every case.
+
+If you would rather keep the image component, allowlist the host — copy it from the `cover` field
+of your own `manifest.json`. In Astro, do the opposite: allowlisting is what *causes* this, so
+remove the CDN from `image.remotePatterns` and leave the URLs on plain `<img>` tags.
+
+### The page jumps around as it loads
+
+Inline images have no dimensions — rule 4. Match each `<img>` on its `src` against the `images`
+array in the manifest and add `width` and `height`.
+
+### "Unsupported manifest version"
+
+We changed the contract and your code correctly refused to guess. Check this page for what
+changed; the version has been `1` since launch.
+
+### Cannot find `manifest.json`
+
+It does not exist until you publish your first article. If you have published one, check the
+content folder shown on the **Custom site (GitHub)** card in **Settings → Integrations** — it
+must match the path in your code.
+
+### The commit is in my repository but the site did not change
+
+Your deploy did not run, or ran on a different branch. Check that the branch on the integration
+card is the branch your production site builds from.
+
+### Publishing fails with a permission or repository error
+
+The card shows the reason. The common ones:
+
+| Message | What to do |
+| --- | --- |
+| The installation is gone | The GitHub App was uninstalled. Reconnect from the card. |
+| The installation is suspended | An organization admin suspended it in GitHub's settings. |
+| Missing write permission | The App's access was narrowed. Reconnect and re-grant the repository. |
+| Repository not found | It was renamed, deleted, or removed from the App's selected repositories. |
+| The commit was rejected | Usually a protected branch or a required status check. Either publish to an unprotected branch or allow the App to bypass the rule. |
+
+## What your site still owns
+
+We give you the content and the data about it. Everything that depends on your site's own routing
+stays yours to render: canonical URLs, `og:` and Twitter tags, `BlogPosting` and `BreadcrumbList`
+JSON-LD, your sitemap and your RSS feed. The manifest is designed to make all of them
+straightforward — every field you need is in it, and it is sorted newest-first.

@@ -51,6 +51,43 @@ describe('ArticleRepo (integration)', () => {
     expect(await ArticleRepo.countByStatus('org_art', 'generated')).toBe(1);
   });
 
+  test('topic metadata round-trips and published cluster lookup stays org-scoped', async () => {
+    const topic = {
+      topic_cluster_id: 'topic:membrane fouling',
+      topic_cluster_label: 'Membrane fouling',
+      topic_role: 'support' as const,
+      topic_content_focus: 'How to prevent membrane fouling',
+      topic_primary_keyword: 'prevent membrane fouling',
+    };
+    const wanted = await ArticleRepo.create(
+      base({
+        ...topic,
+        org_id: 'org_topic',
+        slug: 'wanted-topic',
+        status: 'published',
+        published_at: new Date(),
+      }),
+    );
+    await ArticleRepo.create(
+      base({
+        ...topic,
+        org_id: 'other_org',
+        slug: 'cross-org-topic',
+        status: 'published',
+        published_at: new Date(),
+      }),
+    );
+    await ArticleRepo.create(base({ ...topic, org_id: 'org_topic', slug: 'not-published' }));
+
+    expect(wanted).toMatchObject(topic);
+    const rows = await ArticleRepo.listPublishedByTopicCluster(
+      'org_topic',
+      topic.topic_cluster_id,
+      { limit: 25 },
+    );
+    expect(rows.map((article) => article.slug)).toEqual(['wanted-topic']);
+  });
+
   test('findById round-trips, returns null for unknown/invalid id', async () => {
     const { articles } = await ArticleRepo.listByOrg('org_art', { limit: 1, offset: 0 });
     const found = await ArticleRepo.findById(articles[0]!.id);

@@ -3,6 +3,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
+import analytics from './analytics';
 import billing from './billing';
 import core from './core';
 import dashboard from './dashboard';
@@ -29,7 +30,8 @@ const routes = app
   .route(`/api/${API_VERSION}/keywords`, keywords)
   .route(`/api/${API_VERSION}/dashboard`, dashboard)
   .route(`/api/${API_VERSION}/dashboard/gsc`, gsc)
-  .route(`/api/${API_VERSION}/dashboard/integrations`, integrations);
+  .route(`/api/${API_VERSION}/dashboard/integrations`, integrations)
+  .route(`/api/${API_VERSION}/dashboard/analytics`, analytics);
 
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
   type: 'http',

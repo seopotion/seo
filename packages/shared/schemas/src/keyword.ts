@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARTICLE_TYPES, SEARCH_INTENTS, SerpCompetitorsField } from './candidate';
+import { ARTICLE_TYPES, SEARCH_INTENTS, SerpCompetitorsField, TOPIC_ROLES } from './candidate';
 
 /** Keyword statuses. Only `scheduled` today; the enum leaves room to grow. */
 export const KEYWORD_STATUSES = ['scheduled'] as const;
@@ -32,6 +32,11 @@ export const KeywordSchema = z.object({
   intent: z.enum(SEARCH_INTENTS).nullable().default(null),
   opportunity_score: z.number().nullable().default(null),
   serp_competitors: SerpCompetitorsField,
+  topic_cluster_id: z.string().nullable().default(null),
+  topic_cluster_label: z.string().nullable().default(null),
+  topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
+  topic_content_focus: z.string().nullable().default(null),
+  topic_primary_keyword: z.string().nullable().default(null),
   created_at: z.date(),
   // Generation lifecycle (#55). Defaulted so pre-#55 planner docs still parse.
   generation_status: z.enum(GENERATION_STATUSES).default('pending'),

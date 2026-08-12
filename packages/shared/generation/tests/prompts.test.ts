@@ -15,6 +15,11 @@ const ctx: GenerationContext = {
   linkCandidates: [],
   llmInstructions: '',
   keyword: 'mejores widgets',
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
   articleType: 'listicle',
   intent: 'commercial',
   serpCompetitors: [],
@@ -53,7 +58,14 @@ describe('article + humanize prompts', () => {
     const linked = {
       ...ctx,
       maxInternalLinks: 2,
-      linkCandidates: [{ title: 'Widget Guide', url: 'https://a.com/blog/widget-guide' }],
+      linkCandidates: [
+        {
+          title: 'Widget Guide',
+          url: 'https://a.com/blog/widget-guide',
+          topic_cluster_id: null,
+          topic_role: null,
+        },
+      ],
     };
     const joined = buildArticlePrompt(linked, {
       ...outline,
@@ -71,5 +83,46 @@ describe('article + humanize prompts', () => {
       .map((m) => m.content)
       .join('\n');
     expect(joined).toContain('Do not include any hyperlinks');
+  });
+
+  test('a complete support brief repeats its exact narrow scope in the writing prompt', () => {
+    const focus = 'How makers size widgets for high-temperature machinery';
+    const support: GenerationContext = {
+      ...ctx,
+      topic_cluster_id: 'topic:mejores widgets',
+      topic_cluster_label: 'Selección de widgets',
+      topic_role: 'support',
+      topic_content_focus: focus,
+      topic_primary_keyword: ' MEJORES   WIDGETS ',
+    };
+
+    const joined = buildArticlePrompt(support, outline)
+      .map((message) => message.content)
+      .join('\n');
+    expect(joined).toContain('Topic cluster: Selección de widgets');
+    expect(joined).toContain('Topic role: support');
+    expect(joined).toContain(focus);
+    expect(joined).toContain('go deep on the assigned content focus');
+    expect(joined).toContain('Do not broaden it into a second cluster overview');
+  });
+
+  test('incomplete metadata preserves topic-agnostic article prompt behavior', () => {
+    const joined = buildArticlePrompt(
+      {
+        ...ctx,
+        topic_cluster_id: 'topic:mejores widgets',
+        topic_cluster_label: 'Selección de widgets',
+        topic_role: 'support',
+        topic_content_focus: 'Widget sizing',
+        topic_primary_keyword: 'different keyword',
+      },
+      outline,
+    )
+      .map((message) => message.content)
+      .join('\n');
+    expect(joined).not.toContain('Topic cluster:');
+    expect(joined).not.toContain('Topic role:');
+    expect(joined).not.toContain('Assigned content focus');
+    expect(joined).not.toContain('Topic scope:');
   });
 });

@@ -1,7 +1,8 @@
 import type { SerpCompetitor } from '@shared/schemas';
 import type { LinkCandidate } from './links';
+import type { TopicBriefFields } from './topic';
 
-export interface GenerationContext {
+export interface GenerationContext extends TopicBriefFields {
   businessName: string;
   businessDescription: string;
   language: string;

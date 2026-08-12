@@ -1,8 +1,9 @@
 import type { SetupPresets } from '@shared/schemas';
 import type { SetupStatus } from '@shared/types';
 import { api } from '@/lib/api';
+import { normalizeCompetitorList } from './competitors';
 import type { OnboardingForm } from './types';
-import { isValidHttpUrl, stringsToTextEntries, textEntriesToStrings } from './utils';
+import { stringsToTextEntries, textEntriesToStrings } from './utils';
 
 const SCAN_POLL_INTERVAL_MS = 2000;
 const SCAN_POLL_TIMEOUT_MS = 120_000;
@@ -94,16 +95,6 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeCompetitor(value: string) {
-  const trimmedValue = value.trim();
-
-  if (!trimmedValue) return '';
-  if (isValidHttpUrl(trimmedValue)) return trimmedValue;
-  if (/^[^\s/]+\.[^\s/]+$/.test(trimmedValue)) return `https://${trimmedValue}`;
-
-  return trimmedValue;
-}
-
 function toBlogPosts(values: string[]): [string, string, string] {
   const blogPosts = values.map((value) => value.trim()).filter(Boolean);
 
@@ -118,7 +109,7 @@ function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
     businessDescription: presets.business.description,
     businessName: presets.business.name,
     competitors: stringsToTextEntries(
-      presets.audience.competitors.map((competitor) => normalizeCompetitor(competitor)),
+      normalizeCompetitorList(presets.audience.competitors),
       'competitor',
     ),
     country: presets.business.country,

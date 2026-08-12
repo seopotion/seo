@@ -48,19 +48,23 @@ export function AudienceCompetitorsStep({
           placeholder={t('targetAudiencePlaceholder')}
         />
 
-        <TextEntryList
-          ariaInvalid={Boolean(errors.competitorDraft || errors.competitors)}
-          draft={competitorDraft}
-          entries={form.competitors}
-          errors={competitorErrors}
-          inputId="competitorUrl"
-          inputType="url"
-          label={t('competitorUrls')}
-          onAdd={onAddCompetitor}
-          onDraftChange={onCompetitorDraftChange}
-          onRemove={onRemoveCompetitor}
-          placeholder="https://competitor.com"
-        />
+        <div>
+          <TextEntryList
+            ariaInvalid={Boolean(errors.competitorDraft || errors.competitors)}
+            description={t('competitorsHelp')}
+            draft={competitorDraft}
+            entries={form.competitors}
+            errors={competitorErrors}
+            inputId="competitorUrl"
+            label={t('competitorUrls')}
+            onAdd={onAddCompetitor}
+            onDraftChange={onCompetitorDraftChange}
+            onRemove={onRemoveCompetitor}
+            placeholder="competitor.com"
+          />
+
+          <p className="mt-2 text-gray-500 text-sm">{t('competitorsHint')}</p>
+        </div>
       </div>
     </div>
   );

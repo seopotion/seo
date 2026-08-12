@@ -2,6 +2,7 @@ import type { LlmMessage } from '@shared/providers';
 import { z } from 'zod';
 import { parseJsonObject } from './json';
 import { normalizeUrl } from './links';
+import { completeTopicBrief } from './topic';
 import type { GenerationContext, Outline } from './types';
 
 export const OutlineSchema = z.object({
@@ -19,6 +20,7 @@ export const OutlineSchema = z.object({
 
 export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
   const canLink = ctx.linkCandidates.length > 0 && ctx.maxInternalLinks > 0;
+  const topic = completeTopicBrief(ctx);
 
   const system = [
     'You are an expert SEO content strategist.',
@@ -32,7 +34,15 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     'meta_description between 120 and 160 chars; slug is kebab-case; at least 3 sections.',
     '"internal_links" may contain ONLY URLs copied verbatim from the candidate list.',
     'Never invent, shorten, or modify a URL, and never use a placeholder such as "#".',
-  ].join('\n');
+    topic?.topic_role === 'pillar'
+      ? 'Topic scope: produce a broad, authoritative cluster overview and hub that orients readers across the subject. Do not exhaustively replace the narrower support articles.'
+      : '',
+    topic?.topic_role === 'support'
+      ? 'Topic scope: go deep on the assigned content focus. Do not broaden it into a second cluster overview, and keep it distinct from the pillar and other article targets.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const user = [
     `Business: ${ctx.businessName} — ${ctx.businessDescription}`,
@@ -41,6 +51,11 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     `Target keyword: ${ctx.keyword}`,
     ctx.articleType ? `Article type: ${ctx.articleType}` : '',
     ctx.intent ? `Search intent: ${ctx.intent}` : '',
+    topic ? `Topic cluster: ${topic.topic_cluster_label}` : '',
+    topic ? `Topic role: ${topic.topic_role}` : '',
+    topic
+      ? `Assigned content focus (the intended scope of this article): ${topic.topic_content_focus}`
+      : '',
     ctx.competitors.length
       ? `Competitors to differentiate from (never promote them): ${ctx.competitors.join(', ')}`
       : '',
@@ -51,7 +66,13 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
       : '',
     canLink
       ? `Internal link candidates — already-published pages of this business. Pick at most ${ctx.maxInternalLinks}, and ONLY ones genuinely related to this article; pick none if none fit. Copy the URL exactly into "internal_links":\n${ctx.linkCandidates
-          .map((c) => `${c.title} — ${c.url}`)
+          .map((c) => {
+            const sameCluster = c.topic_cluster_id === topic?.topic_cluster_id;
+            const relationship = sameCluster
+              ? ` [same-cluster${c.topic_role ? ` ${c.topic_role}` : ''}]`
+              : '';
+            return `${c.title}${relationship} — ${c.url}`;
+          })
           .join('\n')}`
       : 'There are no internal link candidates: "internal_links" must be an empty array.',
     ctx.llmInstructions ? `Extra instructions: ${ctx.llmInstructions}` : '',

@@ -21,14 +21,18 @@ export { parseJsonObject } from './json';
 export { verifyCandidates } from './link-verify';
 export type { LinkCandidate, MarkdownLink, PublishedArticleInput } from './links';
 export {
+  deduplicateLinkCandidates,
   deriveCandidates,
   extractLinks,
   normalizeUrl,
+  prioritizeLinkCandidates,
   publishedArticleUrl,
   sanitizeLinks,
 } from './links';
 export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
+export type { CompleteTopicBrief, TopicBriefFields } from './topic';
+export { completeTopicBrief } from './topic';
 export type * from './types';
 export { countWords, validateArticle } from './validate';
 export type { VideoPickInput } from './video';

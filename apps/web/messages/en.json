@@ -5,6 +5,104 @@
     "retry": "Retry",
     "workspaceError": "Could not check your workspace. Try again."
   },
+  "AnalyticsPage": {
+    "chart": {
+      "description": "Daily search performance for the selected period.",
+      "empty": "No search performance data is available for this period yet.",
+      "label": "Search performance trend chart",
+      "modes": {
+        "searchMetrics": "CTR & position",
+        "traffic": "Clicks & impressions"
+      },
+      "title": "Performance trend"
+    },
+    "controls": {
+      "rangeLabel": "Date range",
+      "ranges": {
+        "7d": "7 days",
+        "30d": "1 month",
+        "90d": "3 months"
+      },
+      "scopeLabel": "Page scope",
+      "scopes": {
+        "articles": "SEO Potion articles",
+        "site": "All site pages"
+      }
+    },
+    "description": "See how your articles and site perform in Google Search.",
+    "detail": {
+      "awaitingData": "Search Console has not reported data for this article yet.",
+      "awaitingTitle": "Awaiting data",
+      "back": "Back to analytics",
+      "chartDescription": "Daily clicks and impressions from the publication date to today.",
+      "chartTitle": "Performance since publication",
+      "daysLive": "{count, plural, one {# day live} other {# days live}}",
+      "description": "Follow this article's search performance from publication to today.",
+      "gatheringTitle": "Still gathering data",
+      "notFound": "This article could not be found or does not belong to this organization.",
+      "notFoundTitle": "Article not found",
+      "notPublished": "Publish this article before tracking its search performance.",
+      "notPublishedTitle": "Article not published",
+      "stillGathering": "Still gathering data — check back after day 14.",
+      "title": "Article analytics"
+    },
+    "gated": {
+      "cta": "Open Search Console settings",
+      "description": "Connect or reconnect Google Search Console to unlock analytics for your site and articles.",
+      "title": "Connect Google Search Console"
+    },
+    "states": {
+      "errorTitle": "Analytics unavailable",
+      "loadError": "Analytics data could not be loaded. Try again.",
+      "noOrganization": "No completed organization was found for this workspace."
+    },
+    "summary": {
+      "clicks": "Clicks",
+      "ctr": "CTR",
+      "deltaComparison": "Compared with the previous equal-length period",
+      "impressions": "Impressions",
+      "label": "Search performance summary",
+      "position": "Avg. position"
+    },
+    "table": {
+      "articleCount": "{count, plural, one {# article} other {# articles}}",
+      "attentionBadge": "Attention",
+      "awaitingData": "Awaiting data",
+      "columns": {
+        "clicks": "Clicks",
+        "ctr": "CTR",
+        "daysLive": "Days live",
+        "impressions": "Impressions",
+        "position": "Avg. position",
+        "publishedDate": "Published",
+        "title": "Title",
+        "trend": "Trend"
+      },
+      "description": "Compare published articles and find opportunities to improve.",
+      "empty": "No published articles are available yet.",
+      "filterLabel": "Filter articles by title",
+      "filterPlaceholder": "Filter articles…",
+      "needsAttention": "Needs attention",
+      "noMatches": "No articles match the current filters.",
+      "openArticle": "Open analytics for {title}",
+      "pagination": {
+        "emptyRange": "No articles to show",
+        "label": "Article analytics pagination",
+        "next": "Next",
+        "page": "Page {page} of {total}",
+        "previous": "Previous",
+        "range": "Showing {start}–{end} of {total}"
+      },
+      "stillGathering": "Still gathering data",
+      "title": "Article performance",
+      "trends": {
+        "down": "Trending down",
+        "flat": "No change",
+        "up": "Trending up"
+      }
+    },
+    "title": "Analytics"
+  },
   "BillingPage": {
     "activating": {
       "continue": "Continue to dashboard",
@@ -207,72 +305,9 @@
       "title": "Content Calendar"
     },
     "description": "Plan one article per day across the next 45 days.",
-    "editor": {
-      "actions": {
-        "close": "Close editor",
-        "continueEditing": "Continue editing",
-        "discard": "Discard changes",
-        "retry": "Try again",
-        "save": "Save",
-        "saved": "Saved"
-      },
-      "articleStatuses": {
-        "deleted": "Deleted",
-        "generated": "Generated",
-        "published": "Published"
-      },
-      "closeConfirmation": {
-        "description": "You have unsaved changes. Discard them or continue editing."
-      },
-      "fields": {
-        "content": "Markdown content",
-        "featuredImage": "Featured image",
-        "featuredImagePlaceholder": "Featured image preview will appear here",
-        "metaDescription": "Meta description",
-        "metaTitle": "Meta title",
-        "slug": "Slug",
-        "title": "Article title"
-      },
-      "imageStatuses": {
-        "complete": "Image complete",
-        "failed": "Image failed",
-        "pending": "Image pending"
-      },
-      "preview": {
-        "empty": "Nothing to preview yet."
-      },
-      "sections": {
-        "context": "Context"
-      },
-      "status": {
-        "loadError": "We couldn't load this article. Check your connection and try again.",
-        "loading": "Loading article…",
-        "notFound": "This article no longer exists. It may have been deleted.",
-        "notGenerated": "This article has not been generated yet.",
-        "saveError": "We couldn't save your changes. Check your connection and try again.",
-        "saveFailed": "Not saved",
-        "saveInvalid": "Some fields were rejected. Fix the highlighted fields and save again.",
-        "saveNotFound": "This article no longer exists, so your changes were not saved.",
-        "saving": "Saving…",
-        "unsavedChanges": "Unsaved changes",
-        "updatedAt": "Last updated {date}"
-      },
-      "tabs": {
-        "editor": "Editor",
-        "label": "Article editor mode",
-        "preview": "Preview"
-      },
-      "title": "Article editor",
-      "validation": {
-        "metaDescriptionRange": "Outside the 120-160 character target.",
-        "metaDescriptionTarget": "Target: 120-160 characters.",
-        "metaTitleTooLong": "Over the 60 character target.",
-        "required": "Required",
-        "serverRejected": "Rejected by the server."
-      }
-    },
     "modal": {
       "keyword": "Keyword",
+      "notGenerated": "This article has not been generated yet.",
       "scheduledDate": "Scheduled date",
       "status": "Status",
       "title": "Article details",
@@ -468,6 +503,8 @@
   "ArticleDetailPage": {
     "actions": {
       "back": "Back to content history",
+      "cancelEdit": "Cancel",
+      "edit": "Edit article",
       "publishSite": "Publish to site",
       "publishWordPress": "Send to WordPress",
       "publishingSite": "Publishing to site...",
@@ -479,6 +516,7 @@
     },
     "labels": {
       "createdAt": "Created",
+      "keyword": "Keyword",
       "keywordId": "Keyword ID",
       "notPublished": "Not published",
       "publishedAt": "Published",
@@ -499,6 +537,7 @@
       "viewCommit": "View the commit"
     },
     "status": {
+      "editingBlocksPublish": "Save or discard your changes before publishing.",
       "loadError": "Could not load this article. Try again when the API is available.",
       "loading": "Loading article...",
       "notFound": "Article not found."
@@ -517,6 +556,69 @@
       "sentBadge": "Sent to WordPress · #{id}",
       "updated": "The WordPress post was updated from the stored article.",
       "warnings": "WordPress completed the request with warnings:"
+    }
+  },
+  "ArticleEditor": {
+    "actions": {
+      "close": "Close editor",
+      "continueEditing": "Continue editing",
+      "discard": "Discard changes",
+      "retry": "Try again",
+      "save": "Save",
+      "saved": "Saved"
+    },
+    "articleStatuses": {
+      "deleted": "Deleted",
+      "generated": "Generated",
+      "published": "Published"
+    },
+    "closeConfirmation": {
+      "description": "You have unsaved changes. Discard them or continue editing."
+    },
+    "fields": {
+      "content": "Markdown content",
+      "featuredImage": "Featured image",
+      "featuredImagePlaceholder": "Featured image preview will appear here",
+      "metaDescription": "Meta description",
+      "metaTitle": "Meta title",
+      "slug": "Slug",
+      "title": "Article title"
+    },
+    "imageStatuses": {
+      "complete": "Image complete",
+      "failed": "Image failed",
+      "pending": "Image pending"
+    },
+    "preview": {
+      "empty": "Nothing to preview yet."
+    },
+    "sections": {
+      "context": "Context"
+    },
+    "status": {
+      "loadError": "We couldn't load this article. Check your connection and try again.",
+      "loading": "Loading article…",
+      "notFound": "This article no longer exists. It may have been deleted.",
+      "saveError": "We couldn't save your changes. Check your connection and try again.",
+      "saveFailed": "Not saved",
+      "saveInvalid": "Some fields were rejected. Fix the highlighted fields and save again.",
+      "saveNotFound": "This article no longer exists, so your changes were not saved.",
+      "saving": "Saving…",
+      "unsavedChanges": "Unsaved changes",
+      "updatedAt": "Last updated {date}"
+    },
+    "tabs": {
+      "editor": "Editor",
+      "label": "Article editor mode",
+      "preview": "Preview"
+    },
+    "title": "Article editor",
+    "validation": {
+      "metaDescriptionRange": "Outside the 120-160 character target.",
+      "metaDescriptionTarget": "Target: 120-160 characters.",
+      "metaTitleTooLong": "Over the 60 character target.",
+      "required": "Required",
+      "serverRejected": "Rejected by the server."
     }
   },
   "ArticleSettingsPage": {
@@ -574,7 +676,10 @@
       "upgradeCta": "View plans"
     },
     "googleSearchConsole": {
-      "badges": { "connected": "Connected", "notConnected": "Not connected" },
+      "badges": {
+        "connected": "Connected",
+        "notConnected": "Not connected"
+      },
       "benefit1": "Clicks, impressions, CTR and average position for the last 28 days",
       "benefit2": "Your best-performing articles, ranked by real Google Search clicks",
       "changeConnection": "Change account or property",
@@ -599,10 +704,11 @@
       "title": "Google Search Console"
     },
     "placeholders": {
-      "competitorUrl": "https://competitor.com"
+      "competitorUrl": "competitor.com"
     },
     "staticSite": {
       "beforeRedirect": "You'll continue on github.com to choose which repositories SeoPotion can write to, then come back here to pick a branch and folder.",
+      "setupGuide": "How to render published articles on your site →",
       "changeRepository": "Change repository",
       "connect": "Connect repository",
       "connectedSuccess": "Your repository is connected. Publish an article to commit it.",
@@ -814,7 +920,9 @@
       "youtubeVideos": "YouTube videos"
     },
     "audience": {
-      "competitorUrls": "Competitor website URLs",
+      "competitorUrls": "Competitor websites (optional)",
+      "competitorsHelp": "If you know genuinely comparable companies, add their domains as an optional supplementary signal. Your strategy works without competitor domains.",
+      "competitorsHint": "Optional: enter a genuinely comparable company's domain, like competitor.com. A company name will not work.",
       "targetAudience": "Target audience",
       "targetAudiencePlaceholder": "",
       "title": "Target Audience And Competitors"
@@ -920,8 +1028,10 @@
     "validation": {
       "articleStyleRequired": "Article style is required.",
       "businessNameRequired": "Business name is required.",
-      "competitorUrl": "Enter a valid competitor URL.",
-      "competitorsValidUrls": "Each competitor must be a valid URL.",
+      "competitorDomain": "Enter a valid website domain, like competitor.com.",
+      "competitorsDuplicate": "That competitor is already on the list.",
+      "competitorsMax": "You can add up to {max} competitors.",
+      "competitorsValidDomains": "Each competitor must be a website domain.",
       "countryRequired": "Country is required.",
       "labels": {
         "blogPageUrl": "Blog page URL",

@@ -88,6 +88,11 @@ export interface SearchAnalyticsParams {
   endDate: string;
   dimensions?: string[];
   rowLimit?: number;
+  // Pass-through filter groups (issue #208: per-article `page equals <url>`).
+  dimensionFilterGroups?: Array<{
+    groupType?: string;
+    filters: Array<{ dimension: string; operator: string; expression: string }>;
+  }>;
 }
 
 export interface SearchAnalyticsRow {

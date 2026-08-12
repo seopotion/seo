@@ -49,8 +49,15 @@ content history + editor, WordPress publishing, Google Search Console + Home car
 (en/tr).
 
 **Hold — do NOT document as available** (roadmap page only): Ads, Analytics, Backlinks, Article
-Improvements (placeholder pages); Domain Rating (backend-only, not in UI); non-WordPress
-integrations (Notion, Webflow, Shopify, …); auto-publish on generation; multi-org switching.
+Improvements (placeholder pages); Domain Rating (backend-only, not in UI); hosted-CMS integrations
+(Notion, Webflow, Shopify, …); auto-publish on generation; multi-org switching.
+
+> **Amended 2026-08-08.** The hold above used to read "non-WordPress integrations", which now
+> over-reaches: the **custom site (GitHub)** integration shipped (#7, `static-site-integration.md`)
+> and is documented at `/docs/custom-site`. Only the *hosted-CMS* members of that group are still
+> unbuilt. The hold list is written from what ships, so re-check it against the product before
+> citing it — a stale hold blocks documenting something real just as effectively as a stale "live"
+> entry ships a lie.
 
 Two amendments from this review's cross-check: **auto-publish** belongs on the hold list *even
 though its toggle is visible and persists* (§1.4.3), and marketing copy currently promises several

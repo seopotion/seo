@@ -11,3 +11,4 @@ apps/web/public/downloads/
 !.env.example
 alperProgress.md
 alperNotes/
+.snapshots/

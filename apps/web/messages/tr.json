@@ -5,6 +5,104 @@
     "retry": "Tekrar dene",
     "workspaceError": "Çalışma alanınız kontrol edilemedi. Tekrar deneyin."
   },
+  "AnalyticsPage": {
+    "chart": {
+      "description": "Seçilen dönem için günlük arama performansı.",
+      "empty": "Bu dönem için henüz arama performansı verisi yok.",
+      "label": "Arama performansı trend grafiği",
+      "modes": {
+        "searchMetrics": "TO ve konum",
+        "traffic": "Tıklamalar ve gösterimler"
+      },
+      "title": "Performans trendi"
+    },
+    "controls": {
+      "rangeLabel": "Tarih aralığı",
+      "ranges": {
+        "7d": "7 gün",
+        "30d": "1 ay",
+        "90d": "3 ay"
+      },
+      "scopeLabel": "Sayfa kapsamı",
+      "scopes": {
+        "articles": "SEO Potion makaleleri",
+        "site": "Tüm site sayfaları"
+      }
+    },
+    "description": "Makalelerinizin ve sitenizin Google Arama performansını görün.",
+    "detail": {
+      "awaitingData": "Search Console bu makale için henüz veri bildirmedi.",
+      "awaitingTitle": "Veri bekleniyor",
+      "back": "Analitiğe dön",
+      "chartDescription": "Yayın tarihinden bugüne günlük tıklamalar ve gösterimler.",
+      "chartTitle": "Yayından bu yana performans",
+      "daysLive": "{count, plural, other {# gündür yayında}}",
+      "description": "Bu makalenin yayınlandığı günden bugüne arama performansını takip edin.",
+      "gatheringTitle": "Veri toplanmaya devam ediyor",
+      "notFound": "Bu makale bulunamadı veya bu organizasyona ait değil.",
+      "notFoundTitle": "Makale bulunamadı",
+      "notPublished": "Arama performansını takip etmek için önce bu makaleyi yayınlayın.",
+      "notPublishedTitle": "Makale yayınlanmadı",
+      "stillGathering": "Veri toplanmaya devam ediyor — 14. günden sonra tekrar kontrol edin.",
+      "title": "Makale analitiği"
+    },
+    "gated": {
+      "cta": "Search Console ayarlarını aç",
+      "description": "Sitenizin ve makalelerinizin analitiğini görmek için Google Search Console'u bağlayın veya yeniden bağlayın.",
+      "title": "Google Search Console'u bağlayın"
+    },
+    "states": {
+      "errorTitle": "Analitik kullanılamıyor",
+      "loadError": "Analitik verileri yüklenemedi. Tekrar deneyin.",
+      "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı."
+    },
+    "summary": {
+      "clicks": "Tıklamalar",
+      "ctr": "TO",
+      "deltaComparison": "Önceki eşit uzunluktaki dönemle karşılaştırma",
+      "impressions": "Gösterimler",
+      "label": "Arama performansı özeti",
+      "position": "Ort. konum"
+    },
+    "table": {
+      "articleCount": "{count, plural, other {# makale}}",
+      "attentionBadge": "İlgilenilmeli",
+      "awaitingData": "Veri bekleniyor",
+      "columns": {
+        "clicks": "Tıklamalar",
+        "ctr": "TO",
+        "daysLive": "Yayındaki gün",
+        "impressions": "Gösterimler",
+        "position": "Ort. konum",
+        "publishedDate": "Yayın tarihi",
+        "title": "Başlık",
+        "trend": "Eğilim"
+      },
+      "description": "Yayınlanan makaleleri karşılaştırın ve iyileştirme fırsatlarını bulun.",
+      "empty": "Henüz yayınlanmış makale yok.",
+      "filterLabel": "Makaleleri başlığa göre filtrele",
+      "filterPlaceholder": "Makaleleri filtrele…",
+      "needsAttention": "İlgilenilmesi gerekenler",
+      "noMatches": "Geçerli filtrelerle eşleşen makale yok.",
+      "openArticle": "{title} için analitiği aç",
+      "pagination": {
+        "emptyRange": "Gösterilecek makale yok",
+        "label": "Makale analitiği sayfalandırması",
+        "next": "Sonraki",
+        "page": "Sayfa {page} / {total}",
+        "previous": "Önceki",
+        "range": "{total} makalenin {start}–{end} arası gösteriliyor"
+      },
+      "stillGathering": "Veri toplanmaya devam ediyor",
+      "title": "Makale performansı",
+      "trends": {
+        "down": "Düşüş trendinde",
+        "flat": "Değişiklik yok",
+        "up": "Yükseliş trendinde"
+      }
+    },
+    "title": "Analitik"
+  },
   "BillingPage": {
     "activating": {
       "continue": "Panele devam et",
@@ -207,72 +305,9 @@
       "title": "İçerik Takvimi"
     },
     "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
-    "editor": {
-      "actions": {
-        "close": "Editörü kapat",
-        "continueEditing": "Düzenlemeye devam et",
-        "discard": "Değişiklikleri at",
-        "retry": "Yeniden dene",
-        "save": "Kaydet",
-        "saved": "Kaydedildi"
-      },
-      "articleStatuses": {
-        "deleted": "Silindi",
-        "generated": "Oluşturuldu",
-        "published": "Yayınlandı"
-      },
-      "closeConfirmation": {
-        "description": "Kaydedilmemiş değişiklikler var. Değişiklikleri atın veya düzenlemeye devam edin."
-      },
-      "fields": {
-        "content": "Markdown içerik",
-        "featuredImage": "Öne çıkan görsel",
-        "featuredImagePlaceholder": "Öne çıkan görsel önizlemesi burada görünecek",
-        "metaDescription": "Meta açıklama",
-        "metaTitle": "Meta başlık",
-        "slug": "Slug",
-        "title": "Makale başlığı"
-      },
-      "imageStatuses": {
-        "complete": "Görsel tamamlandı",
-        "failed": "Görsel başarısız",
-        "pending": "Görsel bekliyor"
-      },
-      "preview": {
-        "empty": "Önizlenecek içerik yok."
-      },
-      "sections": {
-        "context": "Bağlam"
-      },
-      "status": {
-        "loadError": "Bu makale yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
-        "loading": "Makale yükleniyor…",
-        "notFound": "Bu makale artık mevcut değil. Silinmiş olabilir.",
-        "notGenerated": "Bu makale henüz oluşturulmadı.",
-        "saveError": "Değişiklikleriniz kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
-        "saveFailed": "Kaydedilmedi",
-        "saveInvalid": "Bazı alanlar reddedildi. İşaretlenen alanları düzeltip yeniden kaydedin.",
-        "saveNotFound": "Bu makale artık mevcut olmadığı için değişiklikleriniz kaydedilmedi.",
-        "saving": "Kaydediliyor…",
-        "unsavedChanges": "Kaydedilmemiş değişiklikler",
-        "updatedAt": "Son güncelleme {date}"
-      },
-      "tabs": {
-        "editor": "Editör",
-        "label": "Makale editörü modu",
-        "preview": "Önizleme"
-      },
-      "title": "Makale editörü",
-      "validation": {
-        "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
-        "metaDescriptionTarget": "Hedef: 120-160 karakter.",
-        "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
-        "required": "Zorunlu",
-        "serverRejected": "Sunucu tarafından reddedildi."
-      }
-    },
     "modal": {
       "keyword": "Anahtar kelime",
+      "notGenerated": "Bu makale henüz oluşturulmadı.",
       "scheduledDate": "Planlanan tarih",
       "status": "Durum",
       "title": "Makale detayları",
@@ -468,6 +503,8 @@
   "ArticleDetailPage": {
     "actions": {
       "back": "İçerik geçmişine dön",
+      "cancelEdit": "Vazgeç",
+      "edit": "Makaleyi düzenle",
       "publishSite": "Siteye yayınla",
       "publishWordPress": "WordPress'e gönder",
       "publishingSite": "Siteye yayınlanıyor...",
@@ -479,6 +516,7 @@
     },
     "labels": {
       "createdAt": "Oluşturulma",
+      "keyword": "Anahtar kelime",
       "keywordId": "Anahtar kelime ID",
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
@@ -499,6 +537,7 @@
       "viewCommit": "Commit'i görüntüle"
     },
     "status": {
+      "editingBlocksPublish": "Yayınlamadan önce değişikliklerinizi kaydedin veya geri alın.",
       "loadError": "Bu makale yüklenemedi. API kullanılabilir olduğunda tekrar deneyin.",
       "loading": "Makale yükleniyor...",
       "notFound": "Makale bulunamadı."
@@ -517,6 +556,69 @@
       "sentBadge": "WordPress'e gönderildi · #{id}",
       "updated": "WordPress yazısı kayıtlı makaleden güncellendi.",
       "warnings": "WordPress isteği uyarılarla tamamladı:"
+    }
+  },
+  "ArticleEditor": {
+    "actions": {
+      "close": "Editörü kapat",
+      "continueEditing": "Düzenlemeye devam et",
+      "discard": "Değişiklikleri at",
+      "retry": "Yeniden dene",
+      "save": "Kaydet",
+      "saved": "Kaydedildi"
+    },
+    "articleStatuses": {
+      "deleted": "Silindi",
+      "generated": "Oluşturuldu",
+      "published": "Yayınlandı"
+    },
+    "closeConfirmation": {
+      "description": "Kaydedilmemiş değişiklikler var. Değişiklikleri atın veya düzenlemeye devam edin."
+    },
+    "fields": {
+      "content": "Markdown içerik",
+      "featuredImage": "Öne çıkan görsel",
+      "featuredImagePlaceholder": "Öne çıkan görsel önizlemesi burada görünecek",
+      "metaDescription": "Meta açıklama",
+      "metaTitle": "Meta başlık",
+      "slug": "Slug",
+      "title": "Makale başlığı"
+    },
+    "imageStatuses": {
+      "complete": "Görsel tamamlandı",
+      "failed": "Görsel başarısız",
+      "pending": "Görsel bekliyor"
+    },
+    "preview": {
+      "empty": "Önizlenecek içerik yok."
+    },
+    "sections": {
+      "context": "Bağlam"
+    },
+    "status": {
+      "loadError": "Bu makale yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+      "loading": "Makale yükleniyor…",
+      "notFound": "Bu makale artık mevcut değil. Silinmiş olabilir.",
+      "saveError": "Değişiklikleriniz kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+      "saveFailed": "Kaydedilmedi",
+      "saveInvalid": "Bazı alanlar reddedildi. İşaretlenen alanları düzeltip yeniden kaydedin.",
+      "saveNotFound": "Bu makale artık mevcut olmadığı için değişiklikleriniz kaydedilmedi.",
+      "saving": "Kaydediliyor…",
+      "unsavedChanges": "Kaydedilmemiş değişiklikler",
+      "updatedAt": "Son güncelleme {date}"
+    },
+    "tabs": {
+      "editor": "Editör",
+      "label": "Makale editörü modu",
+      "preview": "Önizleme"
+    },
+    "title": "Makale editörü",
+    "validation": {
+      "metaDescriptionRange": "120-160 karakter hedefinin dışında.",
+      "metaDescriptionTarget": "Hedef: 120-160 karakter.",
+      "metaTitleTooLong": "60 karakter hedefinin üzerinde.",
+      "required": "Zorunlu",
+      "serverRejected": "Sunucu tarafından reddedildi."
     }
   },
   "ArticleSettingsPage": {
@@ -574,7 +676,10 @@
       "upgradeCta": "Planları görüntüle"
     },
     "googleSearchConsole": {
-      "badges": { "connected": "Bağlı", "notConnected": "Bağlı değil" },
+      "badges": {
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil"
+      },
       "benefit1": "Son 28 günün tıklama, gösterim, TO ve ortalama konum verileri",
       "benefit2": "Gerçek Google Arama tıklamalarına göre en iyi performans gösteren makaleleriniz",
       "changeConnection": "Hesabı veya mülkü değiştir",
@@ -599,10 +704,11 @@
       "title": "Google Search Console"
     },
     "placeholders": {
-      "competitorUrl": "https://rakip.com"
+      "competitorUrl": "rakip.com"
     },
     "staticSite": {
       "beforeRedirect": "github.com üzerinden devam edip SeoPotion'ın yazabileceği depoları seçeceksiniz, sonra dal ve klasör seçmek için buraya döneceksiniz.",
+      "setupGuide": "Yayınlanan makaleleri sitenizde nasıl gösterirsiniz →",
       "changeRepository": "Depoyu değiştir",
       "connect": "Depo bağla",
       "connectedSuccess": "Deponuz bağlandı. Bir makaleyi yayınlayarak commit edin.",
@@ -814,7 +920,9 @@
       "youtubeVideos": "YouTube videoları"
     },
     "audience": {
-      "competitorUrls": "Rakip web sitesi URL'leri",
+      "competitorUrls": "Rakip web siteleri (isteğe bağlı)",
+      "competitorsHelp": "İşletmenizle gerçekten karşılaştırılabilir şirketler biliyorsanız alan adlarını isteğe bağlı ek bir sinyal olarak ekleyin. Stratejiniz rakip alan adları olmadan da çalışır.",
+      "competitorsHint": "İsteğe bağlı: işletmenizle gerçekten karşılaştırılabilir bir şirketin competitor.com gibi alan adını girin. Şirket adı işe yaramaz.",
       "targetAudience": "Hedef kitle",
       "targetAudiencePlaceholder": "",
       "title": "Hedef Kitle ve Rakipler"
@@ -920,8 +1028,10 @@
     "validation": {
       "articleStyleRequired": "Makale stili zorunludur.",
       "businessNameRequired": "İşletme adı zorunludur.",
-      "competitorUrl": "Geçerli bir rakip URL'si girin.",
-      "competitorsValidUrls": "Her rakip geçerli bir URL olmalıdır.",
+      "competitorDomain": "competitor.com gibi geçerli bir web sitesi alan adı girin.",
+      "competitorsDuplicate": "Bu rakip zaten listede.",
+      "competitorsMax": "En fazla {max} rakip ekleyebilirsiniz.",
+      "competitorsValidDomains": "Her rakip bir web sitesi alan adı olmalıdır.",
       "countryRequired": "Ülke zorunludur.",
       "labels": {
         "blogPageUrl": "Blog sayfası URL'si",

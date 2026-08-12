@@ -5,7 +5,11 @@ import type { Emitter } from '../types';
 import { EXIT, fail } from '../types';
 
 export const outputOption = {
-  output: { type: 'string' as const, description: 'Output format: text or json', default: 'text' },
+  output: {
+    type: 'string' as const,
+    description: 'Output format: text or json (json: run via `npm run --silent cli --`)',
+    default: 'text',
+  },
 };
 
 export const verboseOption = {

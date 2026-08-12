@@ -1,0 +1,30 @@
+'use client';
+
+import { Cable } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { Link } from '@/i18n/navigation';
+
+export function AnalyticsGatedCard() {
+  const t = useTranslations('AnalyticsPage');
+
+  return (
+    <Card className="border-slate-200 shadow-none">
+      <CardHeader>
+        <span className="flex size-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+          <Cable className="size-5" aria-hidden="true" />
+        </span>
+        <CardTitle className="mt-2">{t('gated.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        <p className="max-w-2xl text-slate-600 text-sm">{t('gated.description')}</p>
+        <Link
+          className="w-fit font-medium text-emerald-700 text-sm hover:underline"
+          href="/settings?tab=googleSearchConsole"
+        >
+          {t('gated.cta')}
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}

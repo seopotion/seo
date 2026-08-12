@@ -12,7 +12,9 @@
  * pulling `globals.css` and the next-intl server entrypoints into Vitest.
  */
 export const CLIENT_NAMESPACES = [
+  'AnalyticsPage',
   'ArticleDetailPage',
+  'ArticleEditor',
   'ArticleSettingsPage',
   'AuthGuard',
   'BillingPage',

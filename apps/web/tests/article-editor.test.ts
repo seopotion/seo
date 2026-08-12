@@ -1,16 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import {
+  type ArticleDetailResponse,
+  type ArticleEditorDraft,
   getArticleEditorValidation,
   getArticleSaveApiError,
   getServerInvalidFields,
   hasEditableArticleChanges,
   mapArticleDetail,
   toArticleUpdateBody,
-} from '../app/[locale]/(authenticated)/(product)/content-planner/article-editor-utils';
-import type {
-  ArticleDetailResponse,
-  ArticleEditorDraft,
-} from '../app/[locale]/(authenticated)/(product)/content-planner/types';
+} from '../lib/article-editor';
 
 const response: ArticleDetailResponse = {
   content: '# body',
@@ -19,10 +17,12 @@ const response: ArticleDetailResponse = {
   id: 'art_1',
   images_status: 'complete',
   keyword: 'technical seo checklist',
+  keyword_id: 'kw_1',
   meta_description: 'd'.repeat(130),
   meta_title: 'Technical SEO Checklist',
   published_at: null,
   slug: 'technical-seo-checklist',
+  static_site_published_at: null,
   status: 'generated',
   title: 'Technical SEO Checklist for Growing Websites',
   updated_at: '2026-07-10T10:30:00.000Z',

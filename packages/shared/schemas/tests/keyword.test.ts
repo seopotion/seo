@@ -20,6 +20,11 @@ describe('KeywordSchema brief fields', () => {
     expect(k.intent).toBeNull();
     expect(k.opportunity_score).toBeNull();
     expect(k.serp_competitors).toBeNull();
+    expect(k.topic_cluster_id).toBeNull();
+    expect(k.topic_cluster_label).toBeNull();
+    expect(k.topic_role).toBeNull();
+    expect(k.topic_content_focus).toBeNull();
+    expect(k.topic_primary_keyword).toBeNull();
   });
 
   test('brief fields round-trip when present', () => {
@@ -30,9 +35,21 @@ describe('KeywordSchema brief fields', () => {
       intent: 'informational',
       opportunity_score: 0.8,
       serp_competitors: [entry],
+      topic_cluster_id: 'topic:crm',
+      topic_cluster_label: 'CRM software',
+      topic_role: 'pillar',
+      topic_content_focus: 'A broad CRM software guide',
+      topic_primary_keyword: 'best crm',
     });
     expect(k.article_type).toBe('how_to_guide');
     expect(k.serp_competitors).toEqual([entry]);
+    expect(k).toMatchObject({
+      topic_cluster_id: 'topic:crm',
+      topic_cluster_label: 'CRM software',
+      topic_role: 'pillar',
+      topic_content_focus: 'A broad CRM software guide',
+      topic_primary_keyword: 'best crm',
+    });
   });
 
   test('legacy domain-only serp_competitors normalize to entries (#144)', () => {

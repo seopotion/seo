@@ -1,3 +1,4 @@
+import { MAX_COMPETITORS, normalizeCompetitorDomain } from './competitors';
 import { MAX_TARGET_AUDIENCES } from './constants';
 import type { Errors, OnboardingForm, ScanState } from './types';
 import { isValidHttpUrl } from './utils';
@@ -63,12 +64,18 @@ export function validateStep({
       nextErrors.targetAudience = t('targetAudienceMax', { max: MAX_TARGET_AUDIENCES });
     }
 
-    if (competitorDraft.trim() && !isValidHttpUrl(competitorDraft)) {
-      nextErrors.competitorDraft = t('competitorUrl');
+    const competitorCount = form.competitors.length + (competitorDraft.trim() ? 1 : 0);
+
+    if (competitorDraft.trim() && !normalizeCompetitorDomain(competitorDraft).ok) {
+      nextErrors.competitorDraft = t('competitorDomain');
     }
 
-    if (form.competitors.some((competitor) => !isValidHttpUrl(competitor.value))) {
-      nextErrors.competitors = t('competitorsValidUrls');
+    if (competitorCount > MAX_COMPETITORS) {
+      nextErrors.competitors = t('competitorsMax', { max: MAX_COMPETITORS });
+    } else if (
+      form.competitors.some((competitor) => !normalizeCompetitorDomain(competitor.value).ok)
+    ) {
+      nextErrors.competitors = t('competitorsValidDomains');
     }
   }
 

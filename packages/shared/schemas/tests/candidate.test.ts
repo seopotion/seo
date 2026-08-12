@@ -5,6 +5,7 @@ import {
   CreateCandidateInput,
   normalizeKeyword,
   REJECTION_REASONS,
+  TOPIC_ROLES,
 } from '../src';
 
 describe('normalizeKeyword', () => {
@@ -14,7 +15,7 @@ describe('normalizeKeyword', () => {
 });
 
 describe('CandidateSchema', () => {
-  test('parses a full candidate with nullable metrics and scores', () => {
+  test('parses a legacy candidate and defaults topic signals', () => {
     const c = CandidateSchema.parse({
       id: 'c1',
       org_id: 'o1',
@@ -36,6 +37,30 @@ describe('CandidateSchema', () => {
     });
     expect(c.opportunity_score).toBeNull();
     expect(c.intent).toBe('informational');
+    expect(c.core_keyword).toBeNull();
+    expect(c.category_ids).toEqual([]);
+    expect(c.topic_cluster_id).toBeNull();
+    expect(c.topic_cluster_label).toBeNull();
+    expect(c.topic_role).toBeNull();
+    expect(c.topic_content_focus).toBeNull();
+    expect(c.topic_primary_keyword).toBeNull();
+  });
+
+  test('accepts a core keyword and integer category IDs', () => {
+    const c = CandidateSchema.parse({
+      id: 'c1',
+      org_id: 'o1',
+      keyword: 'reverse osmosis membranes',
+      normalized_keyword: 'reverse osmosis membranes',
+      source: 'keyword_suggestions',
+      core_keyword: 'reverse osmosis membrane',
+      category_ids: [220, 110],
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    expect(c.core_keyword).toBe('reverse osmosis membrane');
+    expect(c.category_ids).toEqual([220, 110]);
+    expect(() => CandidateSchema.parse({ ...c, category_ids: [1.5] })).toThrow();
   });
 });
 
@@ -49,6 +74,38 @@ describe('CreateCandidateInput', () => {
     expect(parsed.status).toBe('candidate');
     expect(parsed.search_volume).toBeNull();
     expect(parsed.opportunity_score).toBeNull();
+    expect(parsed.core_keyword).toBeNull();
+    expect(parsed.category_ids).toEqual([]);
+    expect(parsed.topic_cluster_id).toBeNull();
+    expect(parsed.topic_cluster_label).toBeNull();
+    expect(parsed.topic_role).toBeNull();
+    expect(parsed.topic_content_focus).toBeNull();
+    expect(parsed.topic_primary_keyword).toBeNull();
+  });
+
+  test('accepts complete topic metadata and the topic duplicate reason', () => {
+    const parsed = CreateCandidateInput.parse({
+      org_id: 'o1',
+      keyword: 'reverse osmosis membranes',
+      source: 'keyword_suggestions',
+      topic_cluster_id: 'topic:reverse osmosis membrane',
+      topic_cluster_label: 'Reverse osmosis membranes',
+      topic_role: 'pillar',
+      topic_content_focus: 'How reverse osmosis membranes work',
+      topic_primary_keyword: 'reverse osmosis membrane',
+      rejection_reason: 'topic_duplicate',
+      status: 'rejected',
+    });
+
+    expect(parsed).toMatchObject({
+      topic_cluster_id: 'topic:reverse osmosis membrane',
+      topic_cluster_label: 'Reverse osmosis membranes',
+      topic_role: 'pillar',
+      topic_content_focus: 'How reverse osmosis membranes work',
+      topic_primary_keyword: 'reverse osmosis membrane',
+      rejection_reason: 'topic_duplicate',
+    });
+    expect(() => CreateCandidateInput.parse({ ...parsed, topic_role: 'lead' })).toThrow();
   });
 
   test('omits server-assigned + derived fields', () => {
@@ -120,5 +177,7 @@ describe('candidate #54 fields', () => {
     expect(ARTICLE_TYPES).toContain('case_study');
     expect(ARTICLE_TYPES).toContain('other');
     expect(REJECTION_REASONS).toContain('difficulty_ceiling');
+    expect(REJECTION_REASONS).toContain('topic_duplicate');
+    expect(TOPIC_ROLES).toEqual(['pillar', 'support']);
   });
 });

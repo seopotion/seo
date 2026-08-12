@@ -31,6 +31,12 @@ jobs:
   deploy-staging:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Staging and prod now live in separate AWS accounts, so the account id and
+    # deploy-role ARN can no longer be one repo-level secret. Declaring the
+    # environment scopes those secrets per stage, and makes the OIDC subject
+    # `repo:seopotion/seo:environment:staging` — what the staging deploy role's
+    # trust policy allows. No protection rules; this is purely for scoping.
+    environment: staging
     # One staging deploy at a time.
     concurrency:
       group: deploy-backend-staging

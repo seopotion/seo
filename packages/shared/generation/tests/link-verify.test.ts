@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { verifyCandidates } from '../src/link-verify';
 
-const candidate = (n: number) => ({ title: `P${n}`, url: `https://a.com/blog/p${n}` });
+const candidate = (n: number) => ({
+  title: `P${n}`,
+  url: `https://a.com/blog/p${n}`,
+  topic_cluster_id: null,
+  topic_role: null,
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
