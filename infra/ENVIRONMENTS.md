@@ -1,17 +1,38 @@
 # Backend environments
 
-> Migrating to a new multi-account AWS organization. The account/identity
-> foundation is set up separately — see [`ACCOUNT-SETUP.md`](ACCOUNT-SETUP.md).
-> This document still describes the current single-account setup.
+**Each stage lives in its own AWS account**, inside the `clewas` organization
+(`o-snqpg05rx9`). How the accounts and human access were set up is a separate
+document — [`ACCOUNT-SETUP.md`](ACCOUNT-SETUP.md).
 
-Two stacks, one AWS account (`personal` / 859998284061 / us-east-1):
+| Stage | Account | ID | Deployed by |
+| ----- | ------- | -- | ----------- |
+| staging | `seo-staging` | `977476318001` | merge `dev` → `master` |
+| prod | `seo-prod` | `672093561569` | publishing a GitHub Release |
+| — | `clewas` (management) | `849445096310` | billing + identity only, no workloads |
 
-- `SeoApiStack-staging` — deployed on merge `dev` → `master`. (Pushes to `dev` deploy nothing.)
-- `SeoApiStack-prod` — deployed by publishing a GitHub Release. Termination
-  protection is on. See [Deploying prod](#deploying-prod).
+Pushes to `dev` deploy nothing. Prod carries `terminationProtection: true` — see
+[Deploying prod](#deploying-prod).
+
+Because the stages are in different accounts, `AWS_ACCOUNT_ID` and
+`AWS_DEPLOY_ROLE_ARN` are **GitHub _environment_ secrets**, not repo-level ones —
+each of the `staging` / `prod` environments carries its own pair. Each account
+has its own OIDC provider and `github-actions-seo-deploy` role, whose trust
+policy is scoped to that environment's subject
+(`repo:seopotion/seo:environment:<stage>`).
+
+Current endpoints:
+
+| | staging | prod |
+| --- | --- | --- |
+| API | `https://jc55q74rd2.execute-api.us-east-1.amazonaws.com` | `https://etcsla3cub.execute-api.us-east-1.amazonaws.com` |
+| Admin API | `https://s0plnqjsa4.execute-api.us-east-1.amazonaws.com` | `https://hob5t9w1i7.execute-api.us-east-1.amazonaws.com` |
+| Web | `staging.seopotion.co` | `www.seopotion.co` (apex 301s to www) |
+| Images CDN | `d1j2qr4p4hoxbs.cloudfront.net` | `d1aklxjf6zd9yy.cloudfront.net` |
 
 Config lives in `infra/lib/config.ts` (non-secret values + SSM parameter NAMES).
-Secret values are provisioned out-of-band and resolved at Lambda runtime.
+Secret values are provisioned out-of-band and resolved at Lambda runtime. The
+SSM parameter *names* are identical in both accounts (`/seo/<stage>/…`); isolation
+comes from the account boundary, not the path.
 
 ## One-time prerequisites (per account)
 
@@ -134,14 +155,22 @@ Secret values are provisioned out-of-band and resolved at Lambda runtime.
    sets it per checkout to `<WEB_ORIGIN>/billing?checkout=success`, so it is
    stage-aware automatically.
 
-4. **GitHub OIDC provider + deploy role** — see [GitHub OIDC deploy
+4. **GitHub OIDC provider + deploy role**, per account — see [GitHub OIDC deploy
    role](#github-oidc-deploy-role) below. Store its ARN and the account id as
-   secrets:
+   **environment** secrets, scoped to the matching stage. Repo-level secrets are
+   deliberately absent: one value cannot serve two accounts, and a repo-level
+   fallback silently pointing at the wrong account is exactly the failure this
+   avoids.
 
    ```sh
-   gh secret set AWS_ACCOUNT_ID     --repo seopotion/seo --body '859998284061'
-   gh secret set AWS_DEPLOY_ROLE_ARN --repo seopotion/seo --body 'arn:aws:iam::859998284061:role/github-actions-seo-deploy'
+   gh secret set AWS_ACCOUNT_ID      --env staging --body '977476318001'
+   gh secret set AWS_DEPLOY_ROLE_ARN --env staging --body 'arn:aws:iam::977476318001:role/github-actions-seo-deploy'
+   gh secret set AWS_ACCOUNT_ID      --env prod    --body '672093561569'
+   gh secret set AWS_DEPLOY_ROLE_ARN --env prod    --body 'arn:aws:iam::672093561569:role/github-actions-seo-deploy'
    ```
+
+   Both deploy jobs declare `environment:`, so every job resolving these secrets
+   gets its own stage's values.
 
 ## Google OAuth clients
 
@@ -172,12 +201,16 @@ per environment (`console.cloud.google.com` → APIs & Services → Credentials)
 
 ## GitHub OIDC deploy role
 
-One-time, with admin AWS credentials. Bootstrap CDK (creates the execution roles
-the deploy assumes), create the OIDC provider if absent, then a role scoped to
-this repo's `dev`/`master` branches:
+**Once per account.** Run it against `seo-staging` and `seo-prod` separately,
+substituting `$ACCOUNT` and `$STAGE` — the two roles are independent and neither
+can deploy the other's stage.
 
 ```sh
-cd infra && npx cdk bootstrap aws://859998284061/us-east-1
+# staging: ACCOUNT=977476318001 STAGE=staging PROFILE=seo-staging
+# prod:    ACCOUNT=672093561569 STAGE=prod    PROFILE=seo-prod
+export ACCOUNT=977476318001 STAGE=staging AWS_PROFILE=seo-staging
+
+cd infra && npx cdk bootstrap "aws://$ACCOUNT/us-east-1"
 
 # Only one provider per URL per account — skip if `aws iam list-open-id-connect-providers` shows it:
 aws iam create-open-id-connect-provider \
@@ -185,25 +218,24 @@ aws iam create-open-id-connect-provider \
   --client-id-list sts.amazonaws.com \
   --thumbprint-list 1c58a3a8518e8759bf075b76b750d4f2df264fca
 
-cat > /tmp/trust.json <<'JSON'
+cat > /tmp/trust.json <<JSON
 {
   "Version": "2012-10-17",
   "Statement": [{
     "Effect": "Allow",
-    "Principal": { "Federated": "arn:aws:iam::859998284061:oidc-provider/token.actions.githubusercontent.com" },
+    "Principal": { "Federated": "arn:aws:iam::$ACCOUNT:oidc-provider/token.actions.githubusercontent.com" },
     "Action": "sts:AssumeRoleWithWebIdentity",
     "Condition": {
-      "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-      "StringLike": { "token.actions.githubusercontent.com:sub": [
-        "repo:seopotion/seo:ref:refs/heads/master",
-        "repo:seopotion/seo:environment:prod"
-      ]}
+      "StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+        "token.actions.githubusercontent.com:sub": "repo:seopotion/seo:environment:$STAGE"
+      }
     }
   }]
 }
 JSON
 
-cat > /tmp/perms.json <<'JSON'
+cat > /tmp/perms.json <<JSON
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -211,13 +243,13 @@ cat > /tmp/perms.json <<'JSON'
       "Sid": "AssumeCdkBootstrapRoles",
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::859998284061:role/cdk-hnb659fds-*"
+      "Resource": "arn:aws:iam::$ACCOUNT:role/cdk-hnb659fds-*"
     },
     {
       "Sid": "PreflightReadSsm",
       "Effect": "Allow",
       "Action": "ssm:GetParameter",
-      "Resource": "arn:aws:ssm:us-east-1:859998284061:parameter/seo/*"
+      "Resource": "arn:aws:ssm:us-east-1:$ACCOUNT:parameter/seo/*"
     }
   ]
 }
@@ -228,6 +260,19 @@ aws iam create-role --role-name github-actions-seo-deploy \
 aws iam put-role-policy --role-name github-actions-seo-deploy \
   --policy-name cdk-deploy --policy-document file:///tmp/perms.json
 ```
+
+The frontend workflow needs two further grants on the same role — see
+[Deploy-role policy addition](#deploy-role-policy-addition).
+
+The trust condition uses `StringEquals` on a single `environment:` subject, not
+`StringLike` over branch refs. Both deploy jobs declare an `environment`, so the
+OIDC token's subject is always `repo:seopotion/seo:environment:<stage>` — a
+branch-based subject would no longer match, and each role trusts exactly one
+stage.
+
+This is also why prod deploys used to fail before they reached AWS: the role
+trusted only `refs/heads/*` subjects, while the prod job's `environment: prod`
+produced `repo:seopotion/seo:environment:prod`, which matched nothing.
 
 Two grants: the role **assumes the CDK bootstrap roles** (`cdk-hnb659fds-*`) — the
 CDK CLI does the actual deploy through them — and reads `/seo/*` SSM parameters so
@@ -270,9 +315,14 @@ Run the preflight above first, then:
 
 ```sh
 cd infra && npm ci
-CDK_DEFAULT_ACCOUNT=859998284061 CDK_DEFAULT_REGION=us-east-1 \
+AWS_PROFILE=seo-staging CDK_DEFAULT_ACCOUNT=977476318001 CDK_DEFAULT_REGION=us-east-1 \
   npx cdk deploy SeoApiStack-staging
 ```
+
+For prod, swap the profile/account (`seo-prod` / `672093561569`) and the stack
+name. **Deploy from `master`, not a feature branch** — `cdk deploy` ships
+whatever is checked out, with no relationship to what staging validated. The
+Release flow below exists precisely to make that impossible.
 
 ## Deploying prod
 
@@ -327,18 +377,27 @@ refuse until it is turned off deliberately.
 
 ## Migration note
 
-The pre-split single `SeoApiStack` (if it was ever deployed) is superseded by
-these two. After confirming staging is healthy, remove the old stack manually:
-`npx cdk deploy` will not delete it because it is no longer in `bin/app.ts`.
-Run `aws cloudformation delete-stack --stack-name SeoApiStack` once you are sure
-nothing depends on it.
+Both stages previously ran in a single personal account, `859998284061`. That
+account was emptied on 2026-08-12 and left dormant — it holds no stacks, buckets,
+Lambdas, roles or SSM parameters, and nothing depends on it. The move is recorded
+in [#203](https://github.com/seopotion/seo/issues/203).
+
+Two consequences worth carrying forward:
+
+- **Article images generated before the migration are gone.** `images[].url` and
+  `featured_image_url` store an *absolute* URL built from `IMAGES_CDN_DOMAIN` at
+  generation time, so staging records still point at the old account's CDN. Any
+  future account move has the same property: moving the bucket does not move the
+  URLs.
+- **The old account is still its own organization's management account**, so it
+  cannot be invited into `o-snqpg05rx9` until that organization is deleted.
 
 # Frontend (SeoWebStack)
 
-Two more stacks, same account, deployed by `.github/workflows/deploy-frontend.yml`
-with the same triggers/guards as the backend (push to `master` → staging;
-published Release → prod, gated on the release commit being on `master` with
-its own successful staging run):
+Two more stacks, each in the **same account as its stage's backend**, deployed by
+`.github/workflows/deploy-frontend.yml` with the same triggers/guards as the
+backend (push to `master` → staging; published Release → prod, gated on the
+release commit being on `master` with its own successful staging run):
 
 - `SeoWebStack-staging` — `https://staging.seopotion.co`
 - `SeoWebStack-prod` — `https://www.seopotion.co`, with the apex

@@ -12,3 +12,6 @@ apps/web/public/downloads/
 alperProgress.md
 alperNotes/
 .snapshots/
+
+# cdk deploy --outputs-file artifacts
+infra/outputs*.json
