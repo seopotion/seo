@@ -1,0 +1,352 @@
+'use client';
+
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsUpDown,
+  Minus,
+  Search,
+} from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { useMemo, useState } from 'react';
+import { Badge, Button, Input } from '@/components/ui';
+import { useRouter } from '@/i18n/navigation';
+import { formatCount, formatCtr, formatPosition, needsAttention } from '@/lib/analytics';
+import { cn } from '@/lib/utils';
+import type { AnalyticsArticle } from '../types';
+
+const ARTICLES_PER_PAGE = 10;
+
+type SortDirection = 'asc' | 'desc';
+type SortKey = 'published_at' | 'days_live' | 'clicks' | 'impressions' | 'ctr' | 'position';
+
+export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle[] }) {
+  const t = useTranslations('AnalyticsPage');
+  const locale = useLocale();
+  const router = useRouter();
+  const [filter, setFilter] = useState('');
+  const [attentionOnly, setAttentionOnly] = useState(false);
+  const [sort, setSort] = useState<{ direction: SortDirection; key: SortKey }>({
+    direction: 'desc',
+    key: 'impressions',
+  });
+  const [page, setPage] = useState(1);
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
+    [locale],
+  );
+
+  const filteredArticles = useMemo(() => {
+    const normalizedFilter = filter.trim().toLocaleLowerCase(locale);
+    const matching = articles.filter(
+      (article) =>
+        (!normalizedFilter || article.title.toLocaleLowerCase(locale).includes(normalizedFilter)) &&
+        (!attentionOnly || needsAttention(article)),
+    );
+
+    return matching.toSorted((left, right) => {
+      const comparison = sortValue(left, sort.key) - sortValue(right, sort.key);
+      if (comparison !== 0) return sort.direction === 'asc' ? comparison : -comparison;
+      return left.title.localeCompare(right.title, locale);
+    });
+  }, [articles, attentionOnly, filter, locale, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredArticles.length / ARTICLES_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const visibleArticles = filteredArticles.slice(startIndex, startIndex + ARTICLES_PER_PAGE);
+
+  function updateSort(key: SortKey) {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc',
+    }));
+    setPage(1);
+  }
+
+  function openArticle(articleId: string) {
+    router.push(`/analytics/${articleId}`);
+  }
+
+  const rangeLabel =
+    filteredArticles.length === 0
+      ? t('table.pagination.emptyRange')
+      : t('table.pagination.range', {
+          start: startIndex + 1,
+          end: startIndex + visibleArticles.length,
+          total: filteredArticles.length,
+        });
+
+  return (
+    <section aria-labelledby="analytics-articles-title" className="grid gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 id="analytics-articles-title" className="font-semibold text-base text-slate-950">
+            {t('table.title')}
+          </h2>
+          <p className="mt-1 text-slate-600 text-sm">{t('table.description')}</p>
+        </div>
+        <Badge variant="secondary" className="w-fit bg-slate-200 text-slate-700">
+          {t('table.articleCount', { count: articles.length })}
+        </Badge>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label className="relative block flex-1" htmlFor="analytics-article-filter">
+          <span className="sr-only">{t('table.filterLabel')}</span>
+          <Search
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+            aria-hidden="true"
+          />
+          <Input
+            id="analytics-article-filter"
+            value={filter}
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(1);
+            }}
+            placeholder={t('table.filterPlaceholder')}
+            className="bg-white pl-9"
+          />
+        </label>
+        <Button
+          variant={attentionOnly ? 'secondary' : 'outline'}
+          aria-pressed={attentionOnly}
+          onClick={() => {
+            setAttentionOnly((current) => !current);
+            setPage(1);
+          }}
+        >
+          {t('table.needsAttention')}
+        </Button>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table className="w-full min-w-5xl border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-slate-200 border-b bg-slate-50 text-slate-600">
+              <th className="px-4 py-3 font-semibold">{t('table.columns.title')}</th>
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.publishedDate')}
+                sortKey="published_at"
+                updateSort={updateSort}
+              />
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.daysLive')}
+                sortKey="days_live"
+                updateSort={updateSort}
+              />
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.clicks')}
+                sortKey="clicks"
+                updateSort={updateSort}
+              />
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.impressions')}
+                sortKey="impressions"
+                updateSort={updateSort}
+              />
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.ctr')}
+                sortKey="ctr"
+                updateSort={updateSort}
+              />
+              <SortableHeader
+                activeSort={sort}
+                label={t('table.columns.position')}
+                sortKey="position"
+                updateSort={updateSort}
+              />
+              <th className="px-4 py-3 font-semibold">{t('table.columns.trend')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {visibleArticles.map((article) => (
+              <ArticleRow
+                key={article.article_id}
+                article={article}
+                dateFormatter={dateFormatter}
+                locale={locale}
+                openArticle={openArticle}
+              />
+            ))}
+          </tbody>
+        </table>
+        {visibleArticles.length === 0 ? (
+          <div className="grid min-h-40 place-items-center px-4 text-center text-slate-600 text-sm">
+            {articles.length === 0 ? t('table.empty') : t('table.noMatches')}
+          </div>
+        ) : null}
+      </div>
+
+      <nav
+        aria-label={t('table.pagination.label')}
+        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p className="text-slate-600 text-sm">{rangeLabel}</p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 1 || filteredArticles.length === 0}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            <ChevronLeft className="size-4" aria-hidden="true" />
+            {t('table.pagination.previous')}
+          </Button>
+          <span className="min-w-20 text-center text-slate-600 text-sm">
+            {t('table.pagination.page', { page: currentPage, total: totalPages })}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === totalPages || filteredArticles.length === 0}
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          >
+            {t('table.pagination.next')}
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </nav>
+    </section>
+  );
+}
+
+function SortableHeader({
+  activeSort,
+  label,
+  sortKey,
+  updateSort,
+}: {
+  activeSort: { direction: SortDirection; key: SortKey };
+  label: string;
+  sortKey: SortKey;
+  updateSort: (key: SortKey) => void;
+}) {
+  const active = activeSort.key === sortKey;
+  const Icon = !active ? ChevronsUpDown : activeSort.direction === 'asc' ? ArrowUp : ArrowDown;
+
+  return (
+    <th className="px-4 py-3 font-semibold">
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 whitespace-nowrap hover:text-slate-950"
+        onClick={() => updateSort(sortKey)}
+      >
+        {label}
+        <Icon className="size-3.5" aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
+function ArticleRow({
+  article,
+  dateFormatter,
+  locale,
+  openArticle,
+}: {
+  article: AnalyticsArticle;
+  dateFormatter: Intl.DateTimeFormat;
+  locale: string;
+  openArticle: (articleId: string) => void;
+}) {
+  const t = useTranslations('AnalyticsPage');
+  const attention = needsAttention(article);
+
+  return (
+    <tr
+      tabIndex={0}
+      aria-label={t('table.openArticle', { title: article.title })}
+      className="cursor-pointer text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      onClick={() => openArticle(article.article_id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openArticle(article.article_id);
+        }
+      }}
+    >
+      <td className="max-w-80 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="truncate font-medium text-slate-950">{article.title}</span>
+          {attention ? (
+            <Badge className="border-transparent bg-amber-100 text-amber-800" variant="secondary">
+              {t('table.attentionBadge')}
+            </Badge>
+          ) : null}
+        </div>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+        {article.published_at ? (
+          <time dateTime={article.published_at}>
+            {formatDate(article.published_at, dateFormatter)}
+          </time>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td className="px-4 py-3 tabular-nums">{formatCount(article.days_live, locale)}</td>
+      {article.data_state === 'awaiting' ? (
+        <td colSpan={5} className="px-4 py-3 font-medium text-slate-500">
+          {t('table.awaitingData')}
+        </td>
+      ) : (
+        <>
+          <td className="px-4 py-3 tabular-nums">{formatCount(article.clicks, locale)}</td>
+          <td className="px-4 py-3 tabular-nums">{formatCount(article.impressions, locale)}</td>
+          <td className="px-4 py-3 tabular-nums">{formatCtr(article.ctr, locale)}</td>
+          <td className="px-4 py-3 tabular-nums">{formatPosition(article.position, locale)}</td>
+          <td className="px-4 py-3">
+            {article.data_state === 'gathering' ? (
+              <span className="whitespace-nowrap text-slate-500">{t('table.stillGathering')}</span>
+            ) : (
+              <Trend trend={article.trend} />
+            )}
+          </td>
+        </>
+      )}
+    </tr>
+  );
+}
+
+function Trend({ trend }: { trend: AnalyticsArticle['trend'] }) {
+  const t = useTranslations('AnalyticsPage');
+  const normalizedTrend = trend ?? 'flat';
+  const Icon = normalizedTrend === 'up' ? ArrowUp : normalizedTrend === 'down' ? ArrowDown : Minus;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 font-medium',
+        normalizedTrend === 'up'
+          ? 'text-emerald-700'
+          : normalizedTrend === 'down'
+            ? 'text-rose-700'
+            : 'text-slate-500',
+      )}
+    >
+      <Icon className="size-4" aria-hidden="true" />
+      <span className="sr-only">{t(`table.trends.${normalizedTrend}`)}</span>
+    </span>
+  );
+}
+
+function sortValue(article: AnalyticsArticle, key: SortKey): number {
+  if (key === 'published_at') {
+    return article.published_at ? new Date(article.published_at).getTime() : 0;
+  }
+  return article[key];
+}
+
+function formatDate(value: string, formatter: Intl.DateTimeFormat): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : formatter.format(date);
+}
