@@ -328,6 +328,20 @@ export async function stagePlan(
     coverage = { ...result.coverage, repairRetried: true };
   }
 
+  // A pool that reached the plan call but got NOTHING accepted is not a valid
+  // empty plan — it is a stage that judged everything away. #211's stance is
+  // that "gathered keywords but accepted none" is a failed stage wearing an
+  // empty plan, and it must never reach the persist stage silently. This is a
+  // plain Error (not PlanParseError/PlanCoverageError), fired only AFTER
+  // materialization succeeds, so it does not trigger the repair retry above.
+  if (state.candidates.length > 0 && accepted.length === 0) {
+    throw new Error(
+      `strategy aborted: ${state.candidates.length} finalists reached the plan call but 0 ` +
+        'were accepted, so the plan would be empty. Check rejectedByReason / plan coverage ' +
+        'for which verdict consumed them.',
+    );
+  }
+
   return {
     ...state,
     candidates: accepted,

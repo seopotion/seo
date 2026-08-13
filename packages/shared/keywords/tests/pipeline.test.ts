@@ -722,7 +722,11 @@ describe('runKeywordPipeline', () => {
     // a FULLY judged pool that the model explicitly rejected end to end is a
     // legitimate empty plan, not a failure — unlike an under-answered stage,
     // nothing here was left unjudged.
-    it('completes with an empty plan when the model explicitly rejects every candidate', async () => {
+    // #211's stance: "gathered keywords but accepted none" is a failed stage
+    // wearing an empty plan, and it must never reach the persist stage
+    // silently — even when every candidate was fully judged and explicitly
+    // rejected, not merely under-answered.
+    it('FAILS the run when the model explicitly rejects every candidate, leaving nothing accepted', async () => {
       const rejectAll = llmWith(
         'building a content plan',
         JSON.stringify({
@@ -735,9 +739,9 @@ describe('runKeywordPipeline', () => {
           targets: [],
         }),
       );
-      const { stats } = await runWith(rejectAll);
-      expect(stats.accepted).toBe(0);
-      expect(stats.plan).toMatchObject({ finalists: 2, verdicts: 2, accepted: 0 });
+      await expect(runWith(rejectAll)).rejects.toThrow(
+        /strategy aborted: 2 finalists reached the plan call but 0 were accepted/,
+      );
     });
 
     it('does not fire the empty-pool guard when nothing was gathered at all, and skips the plan call', async () => {

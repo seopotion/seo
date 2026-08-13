@@ -196,6 +196,27 @@ describe('stagePlan', () => {
     expect(out.stats.plan).toMatchObject({ accepted: 1, repairRetried: false });
   });
 
+  it('throws when a valid, fully-judged response accepts nothing, so an empty plan never ships silently', async () => {
+    const llm: LlmClient = {
+      complete: vi.fn(async () =>
+        reply(
+          JSON.stringify({
+            verdicts: [{ index: 0, intent_ok: false, locality_ok: true, article_type: 'other' }],
+            targets: [],
+          }),
+        ),
+      ),
+    };
+    const ctx = makeCtx({ clients: { dataForSeo: noopDataForSeo, llm } });
+    const state = stateWith(planCandidates());
+
+    await expect(stagePlan(state, ctx)).rejects.toThrow(
+      /strategy aborted: 1 finalists reached the plan call but 0 were accepted/,
+    );
+    // A plain Error, not a repair-triggering PlanParseError/PlanCoverageError.
+    expect(llm.complete).toHaveBeenCalledTimes(1);
+  });
+
   it('repair ladder: garbage then valid JSON succeeds, marks repairRetried, and the retry carries the error text', async () => {
     const validText = JSON.stringify({
       verdicts: [{ index: 0, intent_ok: true, locality_ok: true, article_type: 'other' }],
