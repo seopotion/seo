@@ -25,8 +25,8 @@ vi.mock('@shared/db', () => ({
   OrgRepo: { setPlan, findById, claimStrategy, setStrategyStatus },
 }));
 
-const { enqueueStrategyTask } = vi.hoisted(() => ({ enqueueStrategyTask: vi.fn() }));
-vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask }));
+const { launchStrategy } = vi.hoisted(() => ({ launchStrategy: vi.fn() }));
+vi.mock('@shared/strategy', () => ({ launchStrategy }));
 
 const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
 vi.mock('../src/logger', () => ({ logger: { warn } }));
@@ -86,33 +86,33 @@ describe('applyBillingEvent', () => {
     expect(cancelSubscription).toHaveBeenCalledWith('sub_0');
   });
 
-  test('activated on a finalized org: claims + enqueues the 30-day strategy', async () => {
+  test('activated on a finalized org: claims + launches the 30-day strategy', async () => {
     upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
     findById.mockResolvedValue(finalizedOrg);
     await applyBillingEvent(activated, provider);
     expect(claimStrategy).toHaveBeenCalledWith('o1');
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'o1' });
+    expect(launchStrategy).toHaveBeenCalledWith('o1');
   });
 
   test('activated on an unfinalized org: no strategy kickoff (finalize will do it)', async () => {
     upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
     await applyBillingEvent(activated, provider);
     expect(claimStrategy).not.toHaveBeenCalled();
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 
-  test('activated replay: strategy already claimed -> no second enqueue', async () => {
+  test('activated replay: strategy already claimed -> no second launch', async () => {
     upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
     findById.mockResolvedValue(finalizedOrg);
     claimStrategy.mockResolvedValue(false);
     await applyBillingEvent(activated, provider);
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 
-  test('activated: strategy enqueue failure reverts the claim and rethrows (webhook retries)', async () => {
+  test('activated: strategy launch failure reverts the claim and rethrows (webhook retries)', async () => {
     upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
     findById.mockResolvedValue(finalizedOrg);
-    enqueueStrategyTask.mockRejectedValueOnce(new Error('no queue'));
+    launchStrategy.mockRejectedValueOnce(new Error('no queue'));
     await expect(applyBillingEvent(activated, provider)).rejects.toThrow('no queue');
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'failed');
   });

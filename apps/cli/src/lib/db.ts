@@ -28,6 +28,7 @@ import {
   createOpenRouterClient,
   resolveProviderSecret,
 } from '@shared/providers';
+import { launchStrategy } from '@shared/strategy';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
 import {
   type DbInitData,
@@ -144,34 +145,33 @@ export async function setOrgPlan(input: {
     if (!matched) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
 
     // Flipping the plan alone doesn't start anything: the keyword/article
-    // pipeline is only ever bootstrapped by the strategy worker, which
-    // POST /setup/finalize enqueues for orgs paid *at finalize time*. Escalating
+    // pipeline is only ever bootstrapped by the strategy launcher, which
+    // POST /setup/finalize triggers for orgs paid *at finalize time*. Escalating
     // to paid afterwards would otherwise leave the org permanently dormant, so
     // kick off the strategy here the same way finalize does — claimStrategy keeps
     // it to exactly one job across retries / a later re-finalize.
-    let strategyEnqueued = false;
+    let strategyLaunched = false;
     if (plan === 'paid' || plan === 'expert') {
       const org = await OrgRepo.findById(orgId);
       const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
       if (finalized && (await OrgRepo.claimStrategy(orgId))) {
         try {
-          const { enqueueStrategyTask } = await import('./sqs');
-          await enqueueStrategyTask({ org_id: orgId });
-          strategyEnqueued = true;
+          await launchStrategy(orgId);
+          strategyLaunched = true;
         } catch (e) {
           // The claim already flipped strategy_status to `pending`; revert it so
           // a later re-run can reclaim, and surface the failure — the plan is set
           // but the pipeline did not start.
           await OrgRepo.setStrategyStatus(orgId, 'failed');
           return fail(
-            'STRATEGY_ENQUEUE_FAILED',
-            `Plan set to paid, but enqueueing the strategy task failed: ${(e as Error).message}`,
-            'Is STRATEGY_QUEUE_URL set (and SQS reachable)? Re-run set-plan to retry.',
+            'STRATEGY_LAUNCH_FAILED',
+            `Plan set to paid, but launching the strategy run failed: ${(e as Error).message}`,
+            'Re-run set-plan to retry.',
           );
         }
       }
     }
-    return ok({ org_id: orgId, plan, strategy_enqueued: strategyEnqueued });
+    return ok({ org_id: orgId, plan, strategy_launched: strategyLaunched });
   } finally {
     await closeDb();
   }

@@ -61,7 +61,7 @@ export interface SetPlanData {
   org_id: string;
   plan: string;
   /** True when escalating to paid kicked off the 30-day strategy pipeline. */
-  strategy_enqueued: boolean;
+  strategy_launched: boolean;
 }
 
 export interface ResetUserData {

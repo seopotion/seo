@@ -1,6 +1,6 @@
 import { OrgRepo, SubscriptionRepo } from '@shared/db';
 import type { BillingEvent, BillingProvider } from '@shared/providers';
-import { enqueueStrategyTask } from '../../clients/sqs';
+import { launchStrategy } from '@shared/strategy';
 import { logger } from '../../logger';
 
 /** Non-activation events can reference a sub we never stored (e.g. one created
@@ -52,7 +52,7 @@ export async function applyBillingEvent(
         (await OrgRepo.claimStrategy(org.id))
       ) {
         try {
-          await enqueueStrategyTask({ org_id: org.id });
+          await launchStrategy(org.id);
         } catch (err) {
           // Revert the claim so the provider's retry of this (idempotent)
           // event can reclaim and start the pipeline.

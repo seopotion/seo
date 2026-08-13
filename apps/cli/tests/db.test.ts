@@ -18,7 +18,7 @@ const {
   deleteSubscriptionsByOrgId,
   listActiveByOrg,
   deleteUserById,
-  enqueueStrategyTask,
+  launchStrategy,
   cancelSubscription,
 } = vi.hoisted(() => ({
   ensureIndexes: vi.fn(async () => {}),
@@ -54,7 +54,7 @@ const {
   deleteSubscriptionsByOrgId: vi.fn(async () => 1),
   listActiveByOrg: vi.fn(async (): Promise<{ provider_subscription_id: string }[]> => []),
   deleteUserById: vi.fn(async () => true),
-  enqueueStrategyTask: vi.fn(async () => {}),
+  launchStrategy: vi.fn(async () => ({ run_id: 'run_1' })),
   cancelSubscription: vi.fn(async () => {}),
 }));
 
@@ -78,7 +78,7 @@ vi.mock('@shared/db', () => ({
   SubscriptionRepo: { deleteByOrgId: deleteSubscriptionsByOrgId, listActiveByOrg },
 }));
 
-vi.mock('../src/lib/sqs', () => ({ enqueueStrategyTask }));
+vi.mock('@shared/strategy', () => ({ launchStrategy }));
 
 vi.mock('@shared/providers', () => ({
   createLemonSqueezyProvider: () => ({ cancelSubscription }),
@@ -134,11 +134,11 @@ describe('setOrgPlan', () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'paid' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'paid');
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'org_1' });
+    expect(launchStrategy).toHaveBeenCalledWith('org_1');
     expect(closeDb).toHaveBeenCalledOnce();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_enqueued: true });
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_launched: true });
   });
 
   test('resolves the org from a user email', async () => {
@@ -152,52 +152,52 @@ describe('setOrgPlan', () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'expert' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'expert');
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'org_1' });
+    expect(launchStrategy).toHaveBeenCalledWith('org_1');
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data).toEqual({ org_id: 'org_1', plan: 'expert', strategy_enqueued: true });
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'expert', strategy_launched: true });
   });
 
-  test('does not enqueue strategy when setting a non-paid plan', async () => {
+  test('does not launch strategy when setting a non-paid plan', async () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'free' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'free');
     expect(claimStrategy).not.toHaveBeenCalled();
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data).toEqual({ org_id: 'org_1', plan: 'free', strategy_enqueued: false });
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'free', strategy_launched: false });
   });
 
-  test('does not enqueue strategy when the org has not finalized setup', async () => {
+  test('does not launch strategy when the org has not finalized setup', async () => {
     findById.mockResolvedValueOnce({ setup_status: 'setup_scan_completed', presets: null });
     const res = await setOrgPlan({ org: 'org_1', plan: 'paid' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'paid');
     expect(claimStrategy).not.toHaveBeenCalled();
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_enqueued: false });
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_launched: false });
   });
 
-  test('does not enqueue strategy when it was already claimed', async () => {
+  test('does not launch strategy when it was already claimed', async () => {
     claimStrategy.mockResolvedValueOnce(false);
     const res = await setOrgPlan({ org: 'org_1', plan: 'paid' });
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
-    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_enqueued: false });
+    expect(res.data).toEqual({ org_id: 'org_1', plan: 'paid', strategy_launched: false });
   });
 
-  test('reverts the strategy claim and fails when enqueue throws', async () => {
-    enqueueStrategyTask.mockRejectedValueOnce(new Error('no queue url'));
+  test('reverts the strategy claim and fails when the launch throws', async () => {
+    launchStrategy.mockRejectedValueOnce(new Error('run failed'));
     const res = await setOrgPlan({ org: 'org_1', plan: 'paid' });
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
     expect(setStrategyStatus).toHaveBeenCalledWith('org_1', 'failed');
     expect(closeDb).toHaveBeenCalledOnce();
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('expected failure');
-    expect(res.error.code).toBe('STRATEGY_ENQUEUE_FAILED');
+    expect(res.error.code).toBe('STRATEGY_LAUNCH_FAILED');
   });
 
   test('rejects a plan outside the entitlement set', async () => {

@@ -198,21 +198,21 @@ export function buildDryRunReport(input: {
       }; the other ${sent - returned} carry a NULL relevance_score — never judged, so the floor leaves them alone and they simply rank lower.`,
     );
   }
-  const judgment = stats.judgment;
-  if (judgment.unparseable > 0) {
+  const planCoverage = stats.plan;
+  if (planCoverage.unjudged > 0) {
     notes.push(
-      `SERP judge: ${judgment.unparseable} of ${judgment.sent} keywords got no parseable verdict${
-        judgment.failedBatches > 0
-          ? ` (${judgment.failedBatches} batch body/bodies were empty)`
-          : ''
-      } and FAILED OPEN — accepted as suitable without ever being judged.`,
+      `Plan: ${planCoverage.unjudged} of ${planCoverage.finalists} finalists got no verdict from the plan call — NOT fail-opened into accepted; they land in the below-N tier, unschedulable.`,
     );
   }
-  const classification = stats.classification;
-  if (classification.assigned < classification.sent) {
+  const repairedTotal = Object.values(planCoverage.repaired).reduce((a, b) => a + b, 0);
+  if (repairedTotal > 0) {
     notes.push(
-      `Classify: the LLM typed ${classification.assigned} of ${classification.sent} keywords; the other ${classification.sent - classification.assigned} kept the 'other' seed. ` +
-        `rows returned ${classification.returned}, matched to a keyword ${classification.matched}, valid article_type ${classification.typed}, dead batches ${classification.failedBatches} of ${classification.batches}.`,
+      `Plan: the materializer repaired ${repairedTotal} structural issue(s) in the model's response (${Object.entries(
+        planCoverage.repaired,
+      )
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${k} ${v}`)
+        .join(', ')})${planCoverage.repairRetried ? ' after a repair retry' : ''}.`,
     );
   }
   const backfill = plan.filter((r) => r.from_below_n).length;
@@ -395,7 +395,18 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
     `  SERP checked ${s.serpChecked}   validated ${s.serpValidated}   accepted targets ${s.accepted}`,
   );
   out.push(
-    `  topic clusters ${s.topicClustering.clusters}   candidates ${s.topicClustering.candidates}   targets ${s.topicClustering.targets}   duplicates ${s.topicClustering.duplicates}   pillars ${s.topicClustering.pillars}   supports ${s.topicClustering.supports}`,
+    `  plan        finalists ${s.plan.finalists}  verdicts ${s.plan.verdicts}  UNJUDGED ${s.plan.unjudged}  accepted ${s.plan.accepted}`,
+  );
+  out.push(
+    `  plan targets ${s.plan.targets}   clusters ${s.plan.clusters}   singletons ${s.plan.singletons}   duplicates ${s.plan.duplicates}   pillars ${s.plan.pillars}   supports ${s.plan.supports}`,
+  );
+  out.push(
+    `  plan repaired ${
+      Object.entries(s.plan.repaired)
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${k} ${v}`)
+        .join('  ') || '(none)'
+    }   repairRetried ${s.plan.repairRetried}`,
   );
   out.push(
     `  rejectedByReason  ${Object.entries(s.rejectedByReason)
@@ -405,12 +416,6 @@ export function renderStrategyDryRun(d: StrategyDryRunData): string {
   );
   out.push(
     `  relevance   sent ${s.relevance.sent}  scored ${s.relevance.returned}  UNSCORED ${s.relevance.sent - s.relevance.returned} (null, not 0)  batches ${s.relevance.batches}  dead ${s.relevance.failedBatches}`,
-  );
-  out.push(
-    `  serpJudge   sent ${s.judgment.sent}  judged ${s.judgment.returned}  UNPARSEABLE ${s.judgment.unparseable} (failed open)  batches ${s.judgment.batches}  dead ${s.judgment.failedBatches}`,
-  );
-  out.push(
-    `  classify    sent ${s.classification.sent}  typed ${s.classification.assigned}  rows ${s.classification.returned}  matched ${s.classification.matched}  validType ${s.classification.typed}  batches ${s.classification.batches}  dead ${s.classification.failedBatches}`,
   );
   out.push('');
 
