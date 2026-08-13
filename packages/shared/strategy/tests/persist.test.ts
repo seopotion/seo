@@ -219,6 +219,49 @@ describe('stagePersistSchedule', () => {
     );
   });
 
+  test('a cluster whose pillar-primary has a null metric drops its support instead of throwing (final-review finding 1)', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    // The pillar itself gets filtered out of the semantic target pool (null
+    // difficulty fails semanticTargetPool's metric check), but its same-cluster
+    // support survives the pool filter — this used to make selectionClusters
+    // throw TopicClusterValidationError, retry-forever at the last stage.
+    const orphanedPillar: WorkingCandidate = {
+      ...candidate('Orphan pillar', 100, {
+        topic_cluster_id: 'topic:orphan',
+        topic_cluster_label: 'Orphan',
+      }),
+      difficulty: null,
+    };
+    const orphanedSupport = candidate('Orphan support', 90, {
+      topic_cluster_id: 'topic:orphan',
+      topic_cluster_label: 'Orphan',
+      topic_role: 'support',
+    });
+    const healthyPillar = candidate('Healthy pillar', 80, {
+      topic_cluster_id: 'topic:healthy',
+      topic_cluster_label: 'Healthy',
+    });
+    const healthySupport = candidate('Healthy support', 70, {
+      topic_cluster_id: 'topic:healthy',
+      topic_cluster_label: 'Healthy',
+      topic_role: 'support',
+    });
+
+    await expect(
+      stagePersistSchedule(
+        state([orphanedPillar, orphanedSupport, healthyPillar, healthySupport]),
+        { orgId: 'o1' },
+      ),
+    ).resolves.toBeDefined();
+
+    expect(scheduleCandidate.mock.calls.map(([row]) => row.keyword)).toEqual([
+      'Healthy pillar',
+      'Healthy support',
+    ]);
+    expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
+  });
+
   test('under-fills the plan rather than padding it, logs the shortfall, and still completes', async () => {
     findById.mockResolvedValue(org);
     listByOrg.mockResolvedValue([]);

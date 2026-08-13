@@ -160,7 +160,10 @@ export async function setOrgPlan(input: {
       const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
       if (finalized && (await OrgRepo.claimStrategy(orgId))) {
         try {
-          await launchStrategy(orgId);
+          // wait: true — the CLI process exits (and closeDb() runs) right after
+          // this returns, which would otherwise race a fire-and-forget local run
+          // (final-review finding 3).
+          await launchStrategy(orgId, { wait: true });
           strategyEnqueued = true;
         } catch (e) {
           // The claim already flipped strategy_status to `pending`; revert it so

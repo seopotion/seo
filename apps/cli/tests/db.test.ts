@@ -139,7 +139,7 @@ describe('setOrgPlan', () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'paid' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'paid');
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
-    expect(launchStrategy).toHaveBeenCalledWith('org_1');
+    expect(launchStrategy).toHaveBeenCalledWith('org_1', { wait: true });
     expect(closeDb).toHaveBeenCalledOnce();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
@@ -157,7 +157,7 @@ describe('setOrgPlan', () => {
     const res = await setOrgPlan({ org: 'org_1', plan: 'expert' });
     expect(setPlan).toHaveBeenCalledWith('org_1', 'expert');
     expect(claimStrategy).toHaveBeenCalledWith('org_1');
-    expect(launchStrategy).toHaveBeenCalledWith('org_1');
+    expect(launchStrategy).toHaveBeenCalledWith('org_1', { wait: true });
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
     expect(res.data).toEqual({ org_id: 'org_1', plan: 'expert', strategy_enqueued: true });

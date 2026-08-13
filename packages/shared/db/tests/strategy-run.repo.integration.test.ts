@@ -136,6 +136,57 @@ describe('StrategyRunRepo (integration)', () => {
     expect(reloaded!.updated_at.getTime()).toBeGreaterThanOrEqual(run.updated_at.getTime());
   });
 
+  test('saveStageResult on an already-completed stage is fenced and leaves the doc unchanged (final-review finding 2)', async () => {
+    const run = await StrategyRunRepo.create(makeInput('org_strategy_run'));
+    const startedAt = new Date();
+    const finishedAt = new Date();
+
+    await StrategyRunRepo.saveStageResult(
+      run.id,
+      'gather',
+      {
+        candidates: [workingCandidate],
+        below_n: [],
+        rejected: [],
+        seeds: ['seo'],
+        stats: { total_found: 1 },
+      },
+      {
+        status: 'completed',
+        started_at: startedAt,
+        finished_at: finishedAt,
+        stats: {},
+        error: null,
+      },
+    );
+    const completed = await StrategyRunRepo.findById(run.id);
+
+    // A stale writer (e.g. a zombie Lambda whose SFN taskTimeout already fired,
+    // still running to completion after a retry already succeeded) tries to
+    // overwrite the already-completed stage with different working state.
+    await StrategyRunRepo.saveStageResult(
+      run.id,
+      'gather',
+      {
+        candidates: [],
+        below_n: [],
+        rejected: [],
+        seeds: ['stale-writer'],
+        stats: { total_found: 999 },
+      },
+      {
+        status: 'completed',
+        started_at: new Date(),
+        finished_at: new Date(),
+        stats: { stale: true },
+        error: null,
+      },
+    );
+
+    const reloaded = await StrategyRunRepo.findById(run.id);
+    expect(reloaded).toEqual(completed);
+  });
+
   test('markStageFailed stamps stage meta without touching working state', async () => {
     const run = await StrategyRunRepo.create(makeInput('org_strategy_run'));
     await StrategyRunRepo.saveStageResult(

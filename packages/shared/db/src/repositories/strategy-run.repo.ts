@@ -61,12 +61,14 @@ export const StrategyRunRepo = {
   ): Promise<void> {
     if (!ObjectId.isValid(id)) return;
     const db = await getDb();
-    await db
-      .collection<StrategyRunDoc>(COLLECTION)
-      .updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { ...state, [`stages.${stage}`]: meta, updated_at: new Date() } },
-      );
+    await db.collection<StrategyRunDoc>(COLLECTION).updateOne(
+      // Fenced against a stale writer (final-review finding 2): a zombie Lambda
+      // whose SFN taskTimeout already fired can still run to completion and
+      // clobber a newer checkpoint written by the successful retry. Once a stage
+      // is marked completed, no further write to it is accepted.
+      { _id: new ObjectId(id), [`stages.${stage}.status`]: { $ne: 'completed' } },
+      { $set: { ...state, [`stages.${stage}`]: meta, updated_at: new Date() } },
+    );
   },
 
   async markStageFailed(id: string, stage: StrategyStageName, meta: StageState): Promise<void> {

@@ -139,4 +139,34 @@ describe('launchStrategy', () => {
     expect(sfnSend).not.toHaveBeenCalled();
     expect(runLocalStrategyMock).toHaveBeenCalledWith('run1');
   });
+
+  // Final-review finding 3: short-lived callers (the CLI) exit their process
+  // right after launchStrategy resolves, which would race a fire-and-forget
+  // local run. `wait: true` awaits it instead.
+  test('wait: true without an ARN awaits the local run before resolving', async () => {
+    vi.stubEnv('STRATEGY_STATE_MACHINE_ARN', '');
+    delete process.env.STRATEGY_STATE_MACHINE_ARN;
+    const order: string[] = [];
+    runLocalStrategyMock.mockImplementationOnce(async () => {
+      order.push('runLocalStrategy resolved');
+    });
+
+    const result = await launchStrategy('org1', { wait: true });
+    order.push('launchStrategy resolved');
+
+    expect(result).toEqual({ run_id: 'run1' });
+    expect(sfnSend).not.toHaveBeenCalled();
+    expect(runLocalStrategyMock).toHaveBeenCalledWith('run1');
+    expect(order).toEqual(['runLocalStrategy resolved', 'launchStrategy resolved']);
+  });
+
+  test('wait: true with an ARN still starts a Step Functions execution, not a local run', async () => {
+    vi.stubEnv('STRATEGY_STATE_MACHINE_ARN', 'arn:aws:states:us-east-1:123:stateMachine:strategy');
+
+    const result = await launchStrategy('org1', { wait: true });
+
+    expect(result).toEqual({ run_id: 'run1' });
+    expect(sfnSend).toHaveBeenCalledTimes(1);
+    expect(runLocalStrategyMock).not.toHaveBeenCalled();
+  });
 });

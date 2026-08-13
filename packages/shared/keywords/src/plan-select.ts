@@ -72,10 +72,20 @@ function selectionClusters(materialized: MaterializedTopicClusters): SelectionCl
     .map((topicClusterId) => {
       const targets = targetsByCluster.get(topicClusterId) as MaterializedTopicTarget[];
       const pillars = targets.filter((target) => target.topic_role === 'pillar');
-      if (pillars.length !== 1) {
+      if (pillars.length > 1) {
         throw new TopicClusterValidationError(
           `Topic cluster ${topicClusterId} must contain exactly one pillar target`,
         );
+      }
+      if (pillars.length === 0) {
+        // Final-review finding 1: a pool filter upstream (persist.ts's
+        // semanticTargetPool) can drop a cluster's pillar while a support survives
+        // — e.g. the pillar has a null search_volume/difficulty. That support could
+        // never schedule anyway (scheduling gates supports on a confirmed pillar),
+        // so drop the whole cluster instead of throwing. >1 pillar stays an error:
+        // it's structurally impossible from the materializer and only guards
+        // hand-written data.
+        return null;
       }
       const scoredTargets = targets.filter((target) => target.opportunity_score !== null);
       const priority =
@@ -100,6 +110,7 @@ function selectionClusters(materialized: MaterializedTopicClusters): SelectionCl
         supports,
       };
     })
+    .filter((cluster): cluster is SelectionCluster => cluster !== null)
     .sort((left, right) => {
       if (left.priority === null)
         return right.priority === null ? compareText(left.topicClusterId, right.topicClusterId) : 1;
