@@ -4,7 +4,6 @@ import { useLocale, useTranslations } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { use } from 'react';
 import { routeLocale } from '@/i18n/locale';
-import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { languageAlternates, localizedPath, localizedUrl } from '@/i18n/urls';
 import { absoluteUrl, SITE_NAME } from '@/lib/seo';
@@ -157,17 +156,6 @@ const features = [
 ];
 
 const starKeys = ['star-1', 'star-2', 'star-3', 'star-4', 'star-5'];
-
-function LogoMark() {
-  const t = useTranslations('Navbar');
-
-  return (
-    <div className="flex items-center gap-2">
-      <Image src="/android-chrome-192x192.png" alt={t('logoAlt')} width={32} height={32} />
-      <span className="text-2xl font-bold text-gray-900">Seopotion</span>
-    </div>
-  );
-}
 
 export default function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
   // Opts this page into static rendering: without it next-intl resolves the
@@ -532,29 +520,6 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
           </div>
         </section>
       </main>
-
-      <footer className="border-gray-100 border-t px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <LogoMark />
-            <div className="flex items-center gap-8 text-gray-600">
-              <Link href="/#features" className="transition-colors hover:text-gray-900">
-                {t('footer.features')}
-              </Link>
-              <Link href="/pricing" className="transition-colors hover:text-gray-900">
-                {t('footer.pricing')}
-              </Link>
-              <Link href="/blog" className="transition-colors hover:text-gray-900">
-                {t('footer.blog')}
-              </Link>
-              <Link href="/guides" className="transition-colors hover:text-gray-900">
-                {t('footer.support')}
-              </Link>
-            </div>
-            <p className="text-gray-500 text-sm">{t('footer.copyright')}</p>
-          </div>
-        </div>
-      </footer>
     </>
   );
 }

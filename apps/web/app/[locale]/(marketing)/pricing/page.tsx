@@ -9,18 +9,14 @@ import { localizedUrl } from '@/i18n/urls';
 const TIER_PRICES = [
   {
     id: 'growth',
-    monthlyPrice: 80,
-    annualPrice: 720,
-    listMonthly: null,
-    listAnnual: 960,
+    monthlyPrice: 60,
+    annualPrice: 540,
     highlight: true,
   },
   {
     id: 'expertledgrowth',
     monthlyPrice: 400,
     annualPrice: 3600,
-    listMonthly: null,
-    listAnnual: 4000,
     highlight: false,
   },
 ] as const;
@@ -170,14 +166,6 @@ export default function PricingPage() {
               <div className="mb-6">
                 {card.monthlyPrice !== null ? (
                   <div className="flex items-baseline gap-1.5">
-                    {(annual ? card.listAnnual : card.listMonthly) !== null && (
-                      <span className="text-gray-400 text-sm line-through">
-                        $
-                        {annual && card.listAnnual !== null
-                          ? Math.round(card.listAnnual / 12)
-                          : card.listMonthly}
-                      </span>
-                    )}
                     <span className="font-bold text-3xl text-gray-900">
                       ${annual ? Math.round(card.annualPrice / 12) : card.monthlyPrice}
                     </span>

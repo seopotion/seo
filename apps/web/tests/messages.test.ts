@@ -31,7 +31,6 @@ const SAME_IN_EVERY_LOCALE = new Set([
   'BillingPage.tiers.paid.name',
   'ContentPlannerPage.researchKeywords.form.characterCount',
   'ContentPlannerPage.targetKeywords.notAvailable',
-  'LandingPage.footer.blog',
   'Onboarding.integrations.providers.framer',
   'Onboarding.options.referralSources.linkedin',
   'Onboarding.options.referralSources.twitterX',
