@@ -59,6 +59,7 @@ export const StrategyRunRepo = {
     state: StrategyWorkStatePatch,
     meta: StageState,
   ): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
     const db = await getDb();
     await db
       .collection<StrategyRunDoc>(COLLECTION)
@@ -69,6 +70,7 @@ export const StrategyRunRepo = {
   },
 
   async markStageFailed(id: string, stage: StrategyStageName, meta: StageState): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
     const db = await getDb();
     await db
       .collection<StrategyRunDoc>(COLLECTION)
@@ -79,6 +81,7 @@ export const StrategyRunRepo = {
   },
 
   async setStatus(id: string, status: StrategyRun['status']): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
     const db = await getDb();
     await db
       .collection<StrategyRunDoc>(COLLECTION)

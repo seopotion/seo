@@ -1,4 +1,4 @@
-import type { CreateStrategyRunInput, WorkingCandidate } from '@shared/schemas';
+import type { CreateStrategyRunInput, StageState, WorkingCandidate } from '@shared/schemas';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '../src/client';
 import { ensureIndexes } from '../src/ensure-indexes';
@@ -198,5 +198,28 @@ describe('StrategyRunRepo (integration)', () => {
     expect(latest!.id).toBe(second.id);
     expect(latest!.id).not.toBe(first.id);
     expect(await StrategyRunRepo.latestByOrg('org_with_no_runs')).toBeNull();
+  });
+
+  test('mutators are a silent no-op for an invalid id', async () => {
+    const invalidId = 'not-an-object-id';
+    const meta: StageState = {
+      status: 'failed',
+      started_at: new Date(),
+      finished_at: new Date(),
+      stats: {},
+      error: 'boom',
+    };
+    await expect(
+      StrategyRunRepo.saveStageResult(
+        invalidId,
+        'gather',
+        { candidates: [], below_n: [], rejected: [], seeds: [], stats: {} },
+        meta,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      StrategyRunRepo.markStageFailed(invalidId, 'gather', meta),
+    ).resolves.toBeUndefined();
+    await expect(StrategyRunRepo.setStatus(invalidId, 'completed')).resolves.toBeUndefined();
   });
 });
