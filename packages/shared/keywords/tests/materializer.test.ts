@@ -76,6 +76,28 @@ describe('materializePlan', () => {
       expect(a.topic_role).toBe('pillar');
     }
     expect(out.coverage.singletons).toBe(2);
+    expect(out.coverage.repaired.singleton_created).toBe(2);
+  });
+
+  it('out-of-range and duplicate verdict indices are dropped and counted; first verdict wins', () => {
+    const candidates = [c('a'), c('b')];
+    const response: PlanResponse = {
+      verdicts: [
+        { index: 0, intent_ok: true, locality_ok: true, article_type: 'other' },
+        // duplicate index 0 — dropped, first verdict (intent_ok: true) wins
+        { index: 0, intent_ok: false, locality_ok: true, article_type: 'other' },
+        { index: 1, intent_ok: true, locality_ok: true, article_type: 'other' },
+        // out of range for a 2-candidate pool
+        { index: 99, intent_ok: true, locality_ok: true, article_type: 'other' },
+      ],
+      targets: [],
+      droppedRows: 0,
+    };
+    const out = materializePlan(candidates, response, 0.5);
+
+    expect(out.coverage.repaired.verdict_index_invalid).toBe(1);
+    expect(out.coverage.repaired.verdict_duplicate).toBe(1);
+    expect(out.accepted.map((a) => a.keyword)).toContain('a');
   });
 
   it('failed verdicts reject with serp_intent / serp_locality', () => {
@@ -124,6 +146,7 @@ describe('materializePlan', () => {
     const out = materializePlan(candidates, response, 0.5);
 
     expect(out.coverage.repaired.target_empty).toBe(1);
+    expect(out.coverage.repaired.target_member_unaccepted).toBe(2);
     expect(out.accepted).toHaveLength(0);
   });
 
