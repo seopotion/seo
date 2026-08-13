@@ -124,9 +124,9 @@
     },
     "tiers": {
       "expert": {
-        "cta": "Upgrade to Expert-led Growth",
-        "description": "Everything in Growth, plus hands-on expert support for your content strategy.",
-        "name": "Expert-led Growth"
+        "cta": "Upgrade to Business",
+        "description": "Everything in Growth, plus human review of up to 10 Seopotion-generated articles per month.",
+        "name": "Business"
       },
       "paid": {
         "cta": "Upgrade to Growth",
@@ -196,11 +196,6 @@
       "planned": "Planned",
       "published": "Published",
       "title": "Articles"
-    },
-    "backlinks": {
-      "description": "Disabled during free trial.",
-      "title": "Backlink Exchange",
-      "upgrade": "Upgrade to unlock"
     },
     "bestArticles": {
       "clicks": "{count, plural, one {# click} other {# clicks}}",
@@ -577,7 +572,7 @@
         "repoNotFound": "The configured GitHub repository or branch could not be found.",
         "slugConflict": "Another article owns this static-site slug. Edit the slug before retrying.",
         "staticPublishInProgress": "Another static-site publication is in progress. Try again shortly.",
-        "subscriptionRequired": "Automatic publishing requires a paid or expert plan.",
+        "subscriptionRequired": "Automatic publishing requires a paid subscription.",
         "unknown": "Automatic publishing could not be completed. Try again or review the destination settings.",
         "wordpressAuthFailed": "WordPress rejected the saved credentials. Reconnect WordPress.",
         "wordpressPublishInProgress": "This WordPress publication is already in progress. Try again shortly.",
@@ -752,8 +747,8 @@
           "checkFailedEnabled": "Auto-publish is still on, but destination readiness could not be verified. Future automatic attempts may not run.",
           "checking": "Destination readiness is still being checked. Wait for verification before turning on auto-publish.",
           "checkingEnabled": "Auto-publish is still on while destination readiness is being checked. Future automatic attempts may not run until verification finishes.",
-          "entitlement": "A paid or expert plan is required to turn on auto-publish.",
-          "entitlementEnabled": "Auto-publish is still on, but future automatic attempts may not run without a paid or expert plan.",
+          "entitlement": "A paid subscription is required to turn on auto-publish.",
+          "entitlementEnabled": "Auto-publish is still on, but future automatic attempts may not run without a paid subscription.",
           "noDestination": "Connect at least one publishing destination before turning on auto-publish.",
           "noDestinationEnabled": "Auto-publish is still on, but future automatic attempts may not run until a publishing destination is connected."
         }
@@ -913,66 +908,78 @@
     }
   },
   "LandingPage": {
+    "controls": {
+      "cards": [
+        {
+          "description": "Open every generated article in the Seopotion editor and revise the title, body, metadata and featured image.",
+          "title": "Review and edit"
+        },
+        {
+          "description": "Send an approved article to WordPress as a draft or publish it according to your connected WordPress settings.",
+          "title": "Publish manually"
+        },
+        {
+          "description": "Enable automatic publishing when you want future generated articles to follow your configured publishing workflow.",
+          "title": "Automate when ready"
+        }
+      ],
+      "description": "Generated articles stay in your workspace, where you decide how and when they are published.",
+      "title": "You control what goes live"
+    },
     "features": [
       {
-        "description": "We find the best search terms to bring real buyers to your website, not just empty traffic.",
-        "title": "Smart Keyword Research"
+        "description": "Seopotion scans your website to understand your business, services, audience, language and important pages.",
+        "title": "Website Analysis"
       },
       {
-        "description": "We write engaging blog posts that perfectly match your brand's unique voice and style.",
-        "title": "On-Brand Content"
+        "description": "Discover relevant topics and keywords based on your website, audience and content gaps.",
+        "title": "Topic & Keyword Discovery"
       },
       {
-        "description": "We secure trusted links from other websites to push your domain higher in search results.",
-        "title": "Quality Backlink Building"
+        "description": "Turn content opportunities into an organized publishing calendar.",
+        "title": "Content Planning"
       },
       {
-        "description": "We structure your content so that ChatGPT and other AI models recommend your brand to users.",
-        "title": "AI Search Optimization"
+        "description": "Generate SEO-oriented article drafts based on your business profile, content settings and selected topics.",
+        "title": "Article Generation"
       },
       {
-        "description": "We handle all internal linking and publish the finished articles directly to your blog for you.",
-        "title": "Seamless CMS Publishing"
+        "description": "Automatically add relevant links to pages already on your website.",
+        "title": "Internal Linking"
       },
       {
-        "description": "We track your search rankings daily and tweak our strategy to keep your traffic growing.",
-        "title": "Continuous SEO Tuning"
+        "description": "Add AI-assisted images and relevant YouTube videos to generated articles.",
+        "title": "Images & Video"
+      },
+      {
+        "description": "Review and edit every article inside Seopotion before it goes live.",
+        "title": "Review & Editing"
+      },
+      {
+        "description": "Send articles directly to WordPress as drafts or publish them from Seopotion.",
+        "title": "WordPress Publishing"
+      },
+      {
+        "description": "Choose your publishing settings and allow future generated articles to publish automatically.",
+        "title": "Automatic Publishing"
       }
     ],
-    "featuresDescription": "We handle all steps you need to rank higher in Google searches and get mentioned by ChatGPT and other LLMs.",
-    "featuresTitle": "Everything you need for SEO",
+    "featuresDescription": "Seopotion brings website analysis, content research, AI-assisted writing, editing and publishing into one software workflow.",
+    "featuresTitle": "SEO content software from research to publishing",
     "finalCta": {
-      "description": "Join startups, agencies, and teams who use Seopotion to scale their SEO without hiring a marketing team.",
-      "title": "Ready to Boost your SEO?"
+      "description": "Add your website, review the business profile Seopotion extracts and turn relevant topics into a publishing plan.",
+      "title": "Start with your website"
     },
     "hero": {
-      "subtitle": "We make your brand show up on both Google and ChatGPT, on autopilot.",
-      "titleLine1": "Stand Out on",
-      "titleLine2": "Google and ChatGPT"
+      "cta": "Get started",
+      "subtitle": "Seopotion is a self-service software platform that analyzes your website, finds relevant content opportunities, generates articles with internal links and lets you review, edit and publish them directly to WordPress.",
+      "titleLine1": "Plan, create and publish SEO content",
+      "titleLine2": "from one workspace"
     },
     "images": {
       "afterAlt": "Google Search Console after Seopotion growth",
       "beforeAlt": "Google Search Console before Seopotion growth"
     },
-    "testimonials": [
-      {
-        "author": "Melisa Ozturk",
-        "quote": "This tool transformed how I handle SEO. I just connected my WordPress, approved a few topics, and it automated my entire content calendar. It's magical.",
-        "role": "Indie Developer"
-      },
-      {
-        "author": "Marcus Johnson",
-        "quote": "We put our entire content pipeline on autopilot. The team loves how it instantly learns the brand voice, and we love the steady growth in organic traffic.",
-        "role": "Agency Owner"
-      },
-      {
-        "author": "Emily Rodriguez",
-        "quote": "Finally, an SEO solution that doesn't require me to spend hours doing keyword research or writing drafts. It scanned my site and took care of the rest perfectly.",
-        "role": "SaaS Founder"
-      }
-    ],
-    "testimonialsDescription": "Join others who've simplified their SEO.",
-    "testimonialsTitle": "Loved by users",
     "useCases": [
       {
         "name": "Indie Developers & Solopreneurs"
@@ -987,7 +994,7 @@
         "name": "Anyone who wants to be visible on the web"
       }
     ],
-    "useCasesTitle": "Perfect for"
+    "useCasesTitle": "Built for"
   },
   "Footer": {
     "copyright": "© 2026 Seopotion. All rights reserved.",
@@ -997,14 +1004,15 @@
     "pricing": "Pricing",
     "privacyPolicy": "Privacy Policy",
     "refundPolicy": "Refund Policy",
+    "supportEmail": "support@seopotion.co",
     "termsOfService": "Terms of Service"
   },
   "LocaleSwitcher": {
     "label": "Language"
   },
   "Metadata": {
-    "defaultDescription": "Seopotion helps teams rank on Google and get mentioned by AI search with keyword research, on-brand SEO content, CMS publishing, and continuous tuning.",
-    "defaultTitle": "Seopotion | AI SEO Content for Google and ChatGPT",
+    "defaultDescription": "Analyze your website, discover content opportunities, generate SEO-oriented articles, review and edit them, and publish directly to WordPress with Seopotion.",
+    "defaultTitle": "Seopotion — SEO Content Planning, Writing & Publishing Software",
     "keywords": [
       "AI SEO",
       "SEO automation",
@@ -1014,7 +1022,7 @@
       "AI search optimization"
     ],
     "openGraphLocale": "en_US",
-    "socialImageAlt": "Seopotion SEO growth dashboard preview"
+    "socialImageAlt": "Seopotion logo"
   },
   "Navbar": {
     "homeLabel": "Seopotion home",
@@ -1185,19 +1193,15 @@
     }
   },
   "PricingMetadata": {
-    "description": "Compare Seopotion plans for automated AI SEO content, CMS publishing, keyword research, and expert-led SEO growth.",
+    "description": "Compare Seopotion software plans for website analysis, content planning, AI-assisted article generation, editing and WordPress publishing.",
     "openGraphTitle": "Pricing | Seopotion",
     "title": "Pricing"
   },
   "PricingPage": {
     "annual": "Annual",
-    "banner": {
-      "description": "Start with automated content production, then bring in expert strategy when you want a hands-on growth partner.",
-      "title": "Scale SEO without hiring a full team"
-    },
     "comparison": {
       "expand": "Tap to expand comparison table",
-      "expertLedGrowth": "Expert-Led Growth",
+      "business": "Business",
       "feature": "Feature",
       "title": "Compare plans"
     },
@@ -1208,100 +1212,117 @@
         "label": "Articles / month"
       },
       {
-        "expert": "Unlimited",
-        "growth": "Unlimited",
-        "label": "Users"
+        "expert": true,
+        "growth": true,
+        "label": "Website and business analysis"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "Automatic keyword research"
+        "label": "Topic and keyword research"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "CMS publishing integrations"
+        "label": "Content calendar"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "AI images"
+        "label": "SEO-oriented article generation"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "Relevant YouTube videos"
+        "label": "Internal linking"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "Unlimited AI rewrites"
+        "label": "AI-assisted images and relevant videos"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Article editor and manual review"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "WordPress publishing"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Automatic publishing option"
+      },
+      {
+        "expert": "Up to 10",
+        "growth": false,
+        "label": "Human-reviewed Seopotion-generated articles / month"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Dedicated SEO expert"
+        "label": "Brand and business-fit review"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "SEO strategy and roadmap"
+        "label": "Readability, clarity and structure review"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Manual content review"
+        "label": "Internal-link and on-page SEO review"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "On-page SEO recommendations"
+        "label": "Factual red-flag review"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Backlink opportunity review"
-      },
-      {
-        "expert": true,
-        "growth": false,
-        "label": "Monthly SEO reporting"
+        "label": "Reasonable edits to selected drafts"
       }
     ],
-    "description": "Choose automated SEO content on autopilot, or add an expert to guide strategy, execution, and reporting.",
+    "description": "Choose a Seopotion software subscription for planning, creating, reviewing and publishing SEO content.",
     "faq": [
       {
-        "a": "Growth gives you the AI SEO content engine: keyword research, content generation, CMS publishing, images, relevant YouTube videos, and rewrites. Expert-Led Growth adds a dedicated human SEO expert for strategy, planning, review, optimization recommendations, distribution, backlink opportunity review, and reporting.",
-        "q": "What is the difference between Growth and Expert-Led Growth?"
+        "a": "Growth provides the complete self-service Seopotion software workflow. Business includes the same software plus human review of up to 10 selected Seopotion-generated articles per month. It does not include agency campaign management, human-written-from-scratch content, backlink outreach, paid advertising or external marketing distribution.",
+        "q": "What is the difference between Growth and Business?"
       },
       {
-        "a": "Yes. Growth includes connections to WordPress, Webflow, and more, so Seopotion can help publish finished SEO content directly to your site.",
-        "q": "Can Seopotion publish to my CMS?"
+        "a": "Growth includes 30 articles per month, website and business analysis, topic and keyword research, a content calendar, SEO-oriented article generation, internal linking, AI-assisted images, relevant YouTube videos, the article editor, WordPress publishing and optional automatic publishing.",
+        "q": "What is included in Growth?"
       },
       {
-        "a": "No. Growth includes automatic keyword research. On Expert-Led Growth, an SEO expert also helps shape the strategy, roadmap, and content priorities.",
-        "q": "Do I need to do keyword research myself?"
+        "a": "Yes. Connect WordPress, review and edit an article in Seopotion, then send it to WordPress according to your configured draft or publishing settings.",
+        "q": "Can Seopotion publish to WordPress?"
       },
       {
-        "a": "Yes. Both plans include AI images and relevant YouTube video suggestions for the content Seopotion creates.",
+        "a": "Yes. Generated articles remain editable in Seopotion. You can review them before publishing manually, or enable automatic publishing for future generated articles when you want that workflow.",
+        "q": "Can I review articles before they are published?"
+      },
+      {
+        "a": "Yes. Growth includes AI-assisted images and relevant YouTube video insertion for generated articles.",
         "q": "Are images and videos included?"
       },
       {
-        "a": "Yes. Both plans include unlimited AI rewrites, so you can keep refining content until it matches your brand and SEO goals.",
-        "q": "Can I rewrite generated content?"
-      },
-      {
-        "a": "You can pay monthly or annually. Annual billing gives you the same plan at a lower effective monthly rate.",
+        "a": "You can pay monthly or annually. Growth costs $60 per month or $540 per year. Business costs $400 per month or $3,600 per year. Every initial subscription purchase includes a 30-day money-back guarantee.",
         "q": "How does billing work?"
       },
       {
-        "a": "Yes. You can move from Growth to Expert-Led Growth when you want a dedicated SEO expert involved in strategy, execution, and reporting.",
-        "q": "Can I switch plans later?"
+        "a": "No. Seopotion does not currently offer a free trial. Initial purchases are covered by the 30-day money-back guarantee described in the Refund Policy.",
+        "q": "Is there a free trial?"
       }
     ],
     "faqTitle": "Frequently asked questions",
-    "footerNote": "Questions? Choose the plan that matches how hands-on you want your SEO growth to be.",
+    "annualTotal": "${price}/year, billed annually",
+    "footerNote": "Choose Growth for the complete self-service software workflow, or Business for the same platform with human review of up to 10 selected Seopotion-generated articles per month.",
     "free": "Free",
+    "guarantee": "30-day money-back guarantee on your initial subscription purchase",
     "included": "Included",
     "monthShort": "mo",
     "monthly": "Monthly",
@@ -1309,38 +1330,43 @@
     "notIncluded": "Not included",
     "save": "Save 25%",
     "tiers": {
-      "expertledgrowth": {
-        "cta": "Talk to an SEO expert",
-        "description": "A dedicated SEO expert handles your SEO strategy, execution, and reporting.",
+      "business": {
+        "clarification": "Does not include agency services, from-scratch writing, backlink outreach, paid ads, or off-platform distribution.",
+        "cta": "Choose Business",
+        "description": "For businesses that want Seopotion's automated content workflow with an additional human quality-control layer.",
         "features": [
           "Everything in Growth",
-          "Dedicated SEO expert",
-          "SEO strategy and roadmap",
-          "Content planning and prioritization",
-          "Manual content review and optimization",
-          "On-page SEO recommendations",
-          "Community and Reddit distribution when relevant",
-          "Manual backlink opportunity review",
-          "Monthly SEO reporting"
+          "Human review of up to 10 Seopotion-generated articles / month",
+          "Brand and business-fit review",
+          "Readability and clarity review",
+          "Internal-link review",
+          "Article structure and on-page SEO review",
+          "Factual red-flag review",
+          "Reasonable edits to selected platform-generated drafts"
         ],
-        "name": "Expert-Led Growth"
+        "name": "Business"
       },
       "growth": {
-        "cta": "Rank higher on auto-pilot",
-        "description": "AI SEO content engine for growth on auto-pilot.",
+        "cta": "Get started",
+        "description": "Automated SEO content workflow for your website.",
         "features": [
-          "30 Articles a month",
-          "Unlimited Users",
-          "Auto Keyword Research",
-          "Connect to Wordpress, Webflow and more",
-          "AI Images",
+          "30 articles / month",
+          "Website and business analysis",
+          "Automatic topic and keyword research",
+          "Content calendar",
+          "SEO-oriented article generation",
+          "Internal linking",
+          "AI-assisted images",
           "Relevant YouTube videos",
-          "Unlimited AI rewrites"
+          "Article editor",
+          "Manual review before publication",
+          "WordPress publishing",
+          "Automatic publishing option"
         ],
         "name": "Growth"
       }
     },
-    "title": "Pricing for SEO growth",
+    "title": "Software plans and pricing",
     "toggleAnnualBilling": "Toggle annual billing",
     "year": "year"
   },
@@ -1371,10 +1397,6 @@
       "articleSettings": {
         "description": "Set your preferences for all future articles.",
         "label": "Article Settings"
-      },
-      "backlinks": {
-        "description": "Track backlink opportunities, exchange status, and outreach progress.",
-        "label": "Backlinks"
       },
       "contentPlanner": {
         "description": "Plan topics, keywords, publishing cadence, and content priorities.",

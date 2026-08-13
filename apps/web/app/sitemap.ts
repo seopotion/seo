@@ -6,6 +6,7 @@ import { loadDocFrontmatter } from './[locale]/(marketing)/docs/content';
 import { DOCS, docPath } from './[locale]/(marketing)/docs/registry';
 
 const defaultLastModified = new Date('2026-07-01');
+const englishOnlyPaths = new Set(['/terms', '/privacy', '/refunds']);
 const publicPaths = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/pricing', changeFrequency: 'monthly', priority: 0.8 },
@@ -51,20 +52,26 @@ async function docEntries(): Promise<SitemapEntry[]> {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const entries: SitemapEntry[] = [...publicPaths, ...(await docEntries())];
 
-  return entries.flatMap((entry) =>
-    routing.locales.map((locale) => ({
+  return entries.flatMap((entry) => {
+    const locales = englishOnlyPaths.has(entry.path) ? [routing.defaultLocale] : routing.locales;
+
+    return locales.map((locale) => ({
       url: localizedUrl(entry.path, locale),
       lastModified: entry.lastModified?.[locale] ?? defaultLastModified,
       changeFrequency: entry.changeFrequency,
       priority: entry.priority,
-      alternates: {
-        languages: Object.fromEntries(
-          Object.entries(languageAlternates(entry.path)).map(([alternateLocale, path]) => [
-            alternateLocale,
-            absoluteUrl(path),
-          ]),
-        ),
-      },
-    })),
-  );
+      ...(englishOnlyPaths.has(entry.path)
+        ? {}
+        : {
+            alternates: {
+              languages: Object.fromEntries(
+                Object.entries(languageAlternates(entry.path)).map(([alternateLocale, path]) => [
+                  alternateLocale,
+                  absoluteUrl(path),
+                ]),
+              ),
+            },
+          }),
+    }));
+  });
 }

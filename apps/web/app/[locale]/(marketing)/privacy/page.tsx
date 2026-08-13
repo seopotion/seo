@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import type { Locale } from '@/i18n/routing';
-import { languageAlternates, localizedPath } from '@/i18n/urls';
 
 type PrivacyPageProps = {
   params: Promise<{ locale: Locale }>;
@@ -44,7 +44,7 @@ const sections: PrivacySection[] = [
       {
         title: 'Subscription and Transaction Information',
         paragraphs: [
-          'When you purchase a Seopotion subscription through Paddle, we may receive limited information about the transaction, such as:',
+          'When you purchase a Seopotion subscription through Lemon Squeezy, we may receive limited information about the transaction, such as:',
         ],
         bullets: [
           'your name;',
@@ -58,9 +58,9 @@ const sections: PrivacySection[] = [
           'refund or cancellation status.',
         ],
         afterBullets: [
-          'Payment transactions are processed by Paddle, which acts as the Merchant of Record.',
+          'Payment transactions are processed by Lemon Squeezy, which acts as the Merchant of Record.',
           'Seopotion does not directly process or store your complete payment-card details.',
-          'Paddle processes payment and checkout information in accordance with its own privacy policy and applicable terms.',
+          'Lemon Squeezy processes payment and checkout information in accordance with its own privacy policy and applicable terms.',
         ],
       },
     ],
@@ -150,21 +150,19 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '6. Expert-Led Growth',
+    title: '6. Business',
     paragraphs: [
-      'If you subscribe to Expert-Led Growth, limited additional information may be reviewed by a Seopotion SEO expert in order to provide the human component of the subscription.',
+      'If you subscribe to Business, an authorized Seopotion reviewer may access limited information as necessary to provide human review of up to 10 selected Seopotion-generated articles per month.',
       'This may include:',
     ],
     bullets: [
-      'your Seopotion account settings;',
+      'account information necessary to identify and provide the review feature;',
       'website and business information;',
-      'generated content;',
-      'content priorities;',
-      'publishing information; and',
-      'communications relating to your account.',
+      'your business profile information; and',
+      'the Seopotion-generated article drafts selected for review.',
     ],
     afterBullets: [
-      'The expert component consists of limited account management and review of selected content generated through the Seopotion platform.',
+      'Human access is limited to the information reasonably necessary to review and edit the selected drafts.',
       'We do not use access to your account for purposes unrelated to providing your Seopotion subscription.',
     ],
   },
@@ -219,7 +217,7 @@ const sections: PrivacySection[] = [
           'generate content;',
           'provide editing and publishing functionality;',
           'operate CMS integrations;',
-          'provide Expert-Led Growth features;',
+          'provide the Business article-review feature;',
           'administer subscriptions; and',
           'provide customer support.',
         ],
@@ -282,7 +280,7 @@ const sections: PrivacySection[] = [
   {
     title: '10. Marketing Communications',
     paragraphs: [
-      'We will not use personal data received from Paddle solely for product fulfillment or transaction administration to send unrelated direct marketing unless we have an appropriate legal basis or consent where required.',
+      'We will not use personal data received from Lemon Squeezy solely for product fulfillment or transaction administration to send unrelated direct marketing unless we have an appropriate legal basis or consent where required.',
       'If you separately choose to receive marketing communications from Seopotion, you may unsubscribe at any time using the unsubscribe mechanism provided or by contacting support@seopotion.co.',
       'Service-related communications, such as security notices, transaction-related information, or important changes to the Service, are not marketing communications and may still be sent when necessary.',
     ],
@@ -311,11 +309,11 @@ const sections: PrivacySection[] = [
     ],
     subsections: [
       {
-        title: 'Paddle',
+        title: 'Lemon Squeezy',
         paragraphs: [
-          'Paddle processes purchases as Merchant of Record.',
-          'Paddle independently collects and processes payment and transaction information under its own privacy policy.',
-          'Paddle may provide Seopotion with limited customer and transaction information necessary to:',
+          'Lemon Squeezy processes purchases as Merchant of Record.',
+          'Lemon Squeezy independently collects and processes payment and transaction information under its own privacy policy.',
+          'Lemon Squeezy may provide Seopotion with limited customer and transaction information necessary to:',
         ],
         bullets: [
           'deliver the Service;',
@@ -429,7 +427,7 @@ const sections: PrivacySection[] = [
     paragraphs: [
       'You may request closure of your Seopotion account by contacting support@seopotion.co.',
       'When an account is closed, we will delete or anonymize personal data that is no longer necessary, subject to information we must retain for legitimate legal, security, fraud-prevention, transaction, or recordkeeping purposes.',
-      "Information processed independently by Paddle remains subject to Paddle's retention practices and privacy policy.",
+      "Information processed independently by Lemon Squeezy remains subject to Lemon Squeezy's retention practices and privacy policy.",
     ],
   },
   {
@@ -556,16 +554,12 @@ const sections: PrivacySection[] = [
   },
 ];
 
-export async function generateMetadata({ params }: PrivacyPageProps): Promise<Metadata> {
-  const { locale } = await params;
-  const canonical = localizedPath('/privacy', locale);
-
+export function generateMetadata(): Metadata {
   return {
     title: 'Privacy Policy',
     description: 'Privacy Policy for Seopotion.',
     alternates: {
-      canonical,
-      languages: languageAlternates('/privacy'),
+      canonical: '/privacy',
     },
   };
 }
@@ -604,7 +598,10 @@ function PolicyContent({
   );
 }
 
-export default function PrivacyPage() {
+export default async function PrivacyPage({ params }: PrivacyPageProps) {
+  const { locale } = await params;
+  if (locale !== 'en') redirect('/privacy');
+
   return (
     <main className="bg-white px-6 py-16 text-gray-700 sm:py-24">
       <article className="mx-auto max-w-3xl">
