@@ -1,5 +1,4 @@
 import { normalizeKeyword, type TopicRole } from '@shared/schemas';
-import type { MaterializedTopicClusters } from './topic-clusters';
 
 export interface MaterializedTopicTarget {
   topic_cluster_id: string;
@@ -10,6 +9,17 @@ export interface MaterializedTopicTarget {
   member_indices: number[];
   content_focus: string;
   opportunity_score: number | null;
+}
+
+export interface TopicDuplicateMapping {
+  duplicate_index: number;
+  primary_index: number;
+  topic_cluster_id: string;
+}
+
+export interface MaterializedTopicClusters {
+  targets: MaterializedTopicTarget[];
+  duplicates: TopicDuplicateMapping[];
 }
 
 export interface TopicCandidateTarget {

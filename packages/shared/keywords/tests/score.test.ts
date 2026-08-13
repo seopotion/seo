@@ -138,19 +138,18 @@ describe('applyRelevance', () => {
   });
 
   // One bad body must cost its own 50 keywords and nothing else — the whole
-  // reason the stage was batched (#211).
-  it('degrades per batch: an unparseable body leaves only its own keywords unscored', async () => {
-    let call = 0;
+  // reason the stage was batched (#211). The dead batch here fails BOTH its
+  // first attempt and its repair retry, so it is still counted failed.
+  it('degrades per batch: a body unparseable on both attempts leaves only its own keywords unscored', async () => {
     const good = scoringLlm(() => 0.5);
+    const empty = {
+      text: '',
+      model: 'm',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+    };
     const llm: LlmClient = {
       complete: vi.fn(async (params) =>
-        call++ === 1
-          ? {
-              text: '', // the empty-completion failure, reproduced
-              model: 'm',
-              usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
-            }
-          : good.complete(params),
+        promptKeywords(params)[0] === 'kw 50' ? empty : good.complete(params),
       ),
     };
 
@@ -167,6 +166,42 @@ describe('applyRelevance', () => {
     expect(candidates.slice(0, 50).every((c) => c.relevance_score === 0.5)).toBe(true);
     expect(candidates.slice(50, 100).every((c) => c.relevance_score === null)).toBe(true);
     expect(candidates.slice(100).every((c) => c.relevance_score === 0.5)).toBe(true);
+    // One initial attempt + one repair retry for the dead batch, one call each
+    // for the two healthy batches.
+    expect(llm.complete).toHaveBeenCalledTimes(4);
+  });
+
+  it('retries a batch once after an unparseable body, before counting it failed', async () => {
+    let calls = 0;
+    const llm: LlmClient = {
+      complete: vi.fn(async (params) => {
+        calls++;
+        if (calls === 1) {
+          return {
+            text: '',
+            model: 'm',
+            usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+          };
+        }
+        const keywords = promptKeywords(params);
+        return {
+          text: JSON.stringify({
+            scores: keywords.map((_k, index) => ({ index, relevance: 0.5 })),
+          }),
+          model: 'm',
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
+        };
+      }),
+    };
+
+    const { candidates, coverage } = await applyRelevance([cand({})], { llm, presets });
+
+    expect(llm.complete).toHaveBeenCalledTimes(2);
+    expect(candidates[0]!.relevance_score).toBe(0.5);
+    expect(coverage).toEqual({ sent: 1, returned: 1, zero: 0, batches: 1, failedBatches: 0 });
+    const secondMessages = (llm.complete as ReturnType<typeof vi.fn>).mock.calls[1]![0].messages;
+    expect(secondMessages.some((m: { role: string }) => m.role === 'assistant')).toBe(true);
+    expect(secondMessages.at(-1)!.content).toMatch(/could not be parsed/i);
   });
 
   it('passes the per-stage model override to every batch', async () => {

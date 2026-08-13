@@ -1,14 +1,10 @@
 import type { SetupPresets } from '@shared/schemas';
 import { describe, expect, it } from 'vitest';
 import {
-  buildClassifyPrompt,
   buildRelevancePrompt,
   buildSeedPrompt,
-  buildSerpJudgmentPrompt,
-  parseClassification,
   parseRelevance,
   parseSeeds,
-  parseSerpJudgments,
   toArticleType,
 } from '../src/llm-prompts';
 
@@ -153,84 +149,6 @@ describe('parseRelevance', () => {
   });
 });
 
-describe('buildSerpJudgmentPrompt', () => {
-  const items = [
-    { keyword: 'dog food', serp: [{ rank: 1, url: 'u', domain: 'd.com', title: 'T' }] },
-    { keyword: 'puppy diet', serp: [{ rank: 1, url: 'u2', domain: 'e.com', title: 'U' }] },
-  ];
-
-  // Batching is a change to how many keywords share a call, never to what the
-  // judge decides — so the criteria sentences must survive verbatim (#211).
-  it('carries the intent and locality criteria over unchanged', () => {
-    const [system] = buildSerpJudgmentPrompt(items, presets);
-    expect(system!.content).toContain(
-      'intentSuitable=false if results are product/navigational pages, not informational articles.',
-    );
-    expect(system!.content).toContain(
-      'localitySuitable=false if results are dominated by local businesses/directories for a ' +
-        'location that does not match the business country.',
-    );
-  });
-
-  it('numbers each keyword and keeps its own results with it', () => {
-    const [, user] = buildSerpJudgmentPrompt(items, presets);
-    expect(user!.content).toContain('Keyword 0: dog food');
-    expect(user!.content).toContain('Keyword 1: puppy diet');
-    expect(user!.content).toContain('1. T — d.com');
-    expect(user!.content).toContain('1. U — e.com');
-  });
-});
-
-describe('parseSerpJudgments', () => {
-  it('reads a verdict per index', () => {
-    const { judgments, unparseable, parsed } = parseSerpJudgments(
-      '{"judgments":[{"index":0,"intentSuitable":false,"localitySuitable":true,"reason":"nav"},{"index":1,"intentSuitable":true,"localitySuitable":false,"reason":"local"}]}',
-      2,
-    );
-    expect(judgments).toEqual([
-      { intentSuitable: false, localitySuitable: true, reason: 'nav' },
-      { intentSuitable: true, localitySuitable: false, reason: 'local' },
-    ]);
-    expect(unparseable).toBe(0);
-    expect(parsed).toBe(true);
-  });
-
-  // The blast radius rule: batching must not let one bad row decide its
-  // neighbours. Row 0 is malformed, row 2 is missing entirely — both fail open,
-  // row 1's real verdict survives.
-  it('degrades a malformed or missing row per-keyword, not per-batch', () => {
-    const { judgments, unparseable, parsed } = parseSerpJudgments(
-      '{"judgments":[{"index":0,"intentSuitable":"no","localitySuitable":true},{"index":1,"intentSuitable":false,"localitySuitable":true,"reason":"nav"}]}',
-      3,
-    );
-    expect(judgments[0]).toEqual({ intentSuitable: true, localitySuitable: true, reason: null });
-    expect(judgments[1]).toEqual({ intentSuitable: false, localitySuitable: true, reason: 'nav' });
-    expect(judgments[2]).toEqual({ intentSuitable: true, localitySuitable: true, reason: null });
-    expect(unparseable).toBe(2);
-    expect(parsed).toBe(true);
-  });
-
-  it('ignores an out-of-range index rather than writing past the batch', () => {
-    const { judgments, unparseable } = parseSerpJudgments(
-      '{"judgments":[{"index":7,"intentSuitable":false,"localitySuitable":false,"reason":"x"}]}',
-      2,
-    );
-    expect(judgments).toHaveLength(2);
-    expect(judgments.every((j) => j.intentSuitable && j.localitySuitable)).toBe(true);
-    expect(unparseable).toBe(2);
-  });
-
-  // The observed production failure: the model burns its output budget on
-  // reasoning and returns "". Every keyword fails open, and `parsed` says so.
-  it('fails the whole batch open on an empty body and flags it', () => {
-    const { judgments, unparseable, parsed } = parseSerpJudgments('', 3);
-    expect(judgments).toHaveLength(3);
-    expect(judgments.every((j) => j.intentSuitable && j.localitySuitable)).toBe(true);
-    expect(unparseable).toBe(3);
-    expect(parsed).toBe(false);
-  });
-});
-
 describe('toArticleType', () => {
   // The enum is snake_case; models write prose. The old exact-match check sent
   // every one of these to `other` silently (#211).
@@ -244,74 +162,5 @@ describe('toArticleType', () => {
   it('rejects a value that is not an article type', () => {
     expect(toArticleType('tweet')).toBeNull();
     expect(toArticleType('')).toBeNull();
-  });
-});
-
-describe('buildClassifyPrompt', () => {
-  it('numbers the keywords and states the allowed values as exact literals', () => {
-    const [system, user] = buildClassifyPrompt(['how to bathe a dog', 'what is kibble'], presets);
-    expect(system!.content).toContain('"how_to_guide"');
-    expect(system!.content).toContain('"case_study"');
-    expect(system!.content).toContain('{"types":[{"index":number,"article_type":string}]}');
-    expect(user!.content).toContain('0. how to bathe a dog');
-    expect(user!.content).toContain('1. what is kibble');
-  });
-});
-
-describe('parseClassification', () => {
-  it('reads rows by index and normalizes the article_type', () => {
-    const { types, coverage } = parseClassification(
-      '{"types":[{"index":0,"article_type":"How-To Guide"},{"index":1,"article_type":"tweet"}]}',
-      ['how to bathe a dog', 'x', 'missing'],
-    );
-    expect(types.get('how to bathe a dog')).toBe('how_to_guide');
-    expect(types.get('x')).toBe('other');
-    expect(types.get('missing')).toBe('other');
-    expect(coverage).toEqual({
-      sent: 3,
-      returned: 2,
-      matched: 2,
-      typed: 1,
-      assigned: 1,
-      failedBatches: 0,
-    });
-  });
-
-  // A model that ignores the index contract and echoes keywords still works —
-  // matched through normalizeKeyword, so casing and spacing drift is tolerated.
-  it('falls back to matching an echoed keyword, case- and space-insensitively', () => {
-    const { types, coverage } = parseClassification(
-      '{"types":[{"keyword":"  How To Bathe   A Dog ","article_type":"how_to_guide"}]}',
-      ['how to bathe a dog'],
-    );
-    expect(types.get('how to bathe a dog')).toBe('how_to_guide');
-    expect(coverage.matched).toBe(1);
-    expect(coverage.assigned).toBe(1);
-  });
-
-  // The production failure: an empty body. Every keyword keeps the seed, and the
-  // counters are what make that distinguishable from a genuine all-`other` call.
-  it('counts an empty body as a dead batch instead of silently seeding other', () => {
-    const { types, coverage } = parseClassification('', ['a', 'b']);
-    expect(types.get('a')).toBe('other');
-    expect(coverage).toEqual({
-      sent: 2,
-      returned: 0,
-      matched: 0,
-      typed: 0,
-      assigned: 0,
-      failedBatches: 1,
-    });
-  });
-
-  it('separates a keyword miss from an article_type miss in the counters', () => {
-    const { coverage } = parseClassification(
-      '{"types":[{"index":9,"article_type":"listicle"},{"index":0,"article_type":"nonsense"}]}',
-      ['a'],
-    );
-    expect(coverage.returned).toBe(2);
-    expect(coverage.matched).toBe(1);
-    expect(coverage.typed).toBe(1);
-    expect(coverage.assigned).toBe(0);
   });
 });
