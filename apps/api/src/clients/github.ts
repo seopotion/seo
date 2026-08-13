@@ -278,6 +278,24 @@ export interface CommitFile {
   content: string | null;
 }
 
+export interface CommitPreparationContext {
+  headCommitSha: string;
+  readFile(path: string): Promise<string | null>;
+}
+
+type CommitFilesOptions = {
+  installationId: number;
+  repo: string;
+  branch: string;
+  message: string;
+} & (
+  | { files: CommitFile[]; prepare?: never }
+  | {
+      files?: never;
+      prepare(context: CommitPreparationContext): Promise<CommitFile[]>;
+    }
+);
+
 async function headCommit(
   token: string,
   repo: string,
@@ -301,6 +319,31 @@ async function headCommit(
     throw new GithubError('github_request_failed', `Commit read failed (${commit.status})`);
   }
   return { commit_sha: ref.data.object.sha, tree_sha: commit.data.tree.sha };
+}
+
+function contentPath(path: string): string {
+  return path
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
+async function readFileAtCommit(
+  token: string,
+  repo: string,
+  commitSha: string,
+  path: string,
+): Promise<string | null> {
+  const result = await request<{ content?: string; encoding?: string }>(
+    token,
+    'GET',
+    `/repos/${repo}/contents/${contentPath(path)}?ref=${encodeURIComponent(commitSha)}`,
+  );
+  if (result.status === 404) return null;
+  if (result.status !== 200 || result.data.encoding !== 'base64' || !result.data.content) {
+    throw new GithubError('github_request_failed', `File read failed (${result.status})`);
+  }
+  return Buffer.from(result.data.content.replace(/\s/g, ''), 'base64').toString('utf8');
 }
 
 /** One tree carrying every write and delete, layered over the branch's current tree. */
@@ -346,18 +389,19 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Never `PUT /contents/{path}` per file: that is N commits, N builds, and a race
  * between them.
  */
-export async function commitFiles(opts: {
-  installationId: number;
-  repo: string;
-  branch: string;
-  message: string;
-  files: CommitFile[];
-}): Promise<string> {
+export async function commitFiles(opts: CommitFilesOptions): Promise<string> {
   const token = await installationToken(opts.installationId, opts.repo);
 
   for (let attempt = 0; attempt < REF_ATTEMPTS; attempt++) {
     const base = await headCommit(token, opts.repo, opts.branch);
-    const tree = await buildTree(token, opts.repo, base.tree_sha, opts.files);
+    const files = opts.prepare
+      ? await opts.prepare({
+          headCommitSha: base.commit_sha,
+          readFile: (path) => readFileAtCommit(token, opts.repo, base.commit_sha, path),
+        })
+      : opts.files;
+    const tree = await buildTree(token, opts.repo, base.tree_sha, files);
+    if (tree === base.tree_sha) return base.commit_sha;
     const created = await request<{ sha?: string }>(
       token,
       'POST',

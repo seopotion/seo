@@ -7,6 +7,8 @@ import type { ArticleDetailResponse, ArticleUpdateBody } from './article-editor'
  */
 const FIXTURE_ARTICLE_DETAILS: Record<string, ArticleDetailResponse> = {
   'dev-article-content-editor': {
+    auto_publish_attempts: [],
+    auto_publish_error: null,
     content: [
       '# Content Calendar for SaaS: A Practical Planning Guide',
       'A content calendar keeps a SaaS marketing team honest. It turns a vague ambition to "publish more" into dated, owned, reviewable work.',
@@ -29,6 +31,7 @@ const FIXTURE_ARTICLE_DETAILS: Record<string, ArticleDetailResponse> = {
       'Build a SaaS content calendar you can actually hold: pick a sustainable cadence, map topics across the funnel, and review what shipped each month.',
     meta_title: 'Content Calendar for SaaS: A Practical Guide',
     published_at: null,
+    publications: [],
     slug: 'content-calendar-for-saas',
     static_site_published_at: null,
     status: 'generated',
@@ -36,6 +39,8 @@ const FIXTURE_ARTICLE_DETAILS: Record<string, ArticleDetailResponse> = {
     updated_at: null,
   },
   'dev-article-meta-editor': {
+    auto_publish_attempts: [],
+    auto_publish_error: null,
     content: [
       '# Technical SEO Checklist for Growing Websites',
       'Technical SEO is what makes the rest of your content work. This checklist covers what tends to break first as a site grows past a few hundred pages.',
@@ -58,6 +63,7 @@ const FIXTURE_ARTICLE_DETAILS: Record<string, ArticleDetailResponse> = {
       'A practical technical SEO checklist for growing websites, covering crawlability, indexation, Core Web Vitals, and structured data that stays valid.',
     meta_title: 'Technical SEO Checklist for Growing Sites',
     published_at: null,
+    publications: [],
     slug: 'technical-seo-checklist',
     static_site_published_at: null,
     status: 'generated',

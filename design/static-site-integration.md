@@ -4,8 +4,8 @@
 [`lib/static-site.ts`](../apps/api/src/lib/static-site.ts) renders these bytes and
 `POST /dashboard/articles/{id}/publish` commits them. **Revised 2026-07-30: images are no longer
 committed** — they stay on our CDN and articles reference them by absolute URL. The
-contract stays `version: 1` because nothing has shipped and there are zero adapters in the
-wild to break; after the first install this would have been a v2. Extends the integration model in
+contract stays `version: 1`; the 2026-08-12 `source_article_id` ownership field is additive,
+historical manifests without it still parse, and adapters may ignore it. Extends the integration model in
 issue [#7](https://github.com/seopotion/seo/issues/7). Builds on the image pipeline
 ([`article-images.md`](article-images.md), #51) and the YouTube embed (#85).
 First target is a Vue + `vite-ssg` marketing site; the contract is deliberately
@@ -115,6 +115,7 @@ opening a single Markdown file.
   "generated_at": "2026-07-29T10:15:00.000Z",
   "articles": [
     {
+      "source_article_id": "<SeoPotion Article.id>",
       "slug": "ai-outfit-generator",
       "title": "How AI Outfit Generators Work",
       "meta_title": "How AI Outfit Generators Work | Guide",
@@ -144,6 +145,8 @@ opening a single Markdown file.
   an unknown major — that is the whole point of carrying it.
 - `articles` is sorted by `published_at` descending, so a naive adapter that renders the
   array in order gets a correct reverse-chronological index for free.
+- `source_article_id` is the stable ownership key used by the publisher to reconcile a
+  remote commit that landed before Mongo recorded it. Adapters may ignore it.
 - `path` is repo-root-relative, so an adapter never has to reconstruct
   `content_path` itself.
 - Dates are ISO 8601 UTC strings. `updated_at` is `null` until first edit.
@@ -171,6 +174,7 @@ YAML, because Astro, Nuxt and Hugo all parse it natively.
 
 ```yaml
 ---
+source_article_id: "<SeoPotion Article.id>"
 slug: ai-outfit-generator
 title: How AI Outfit Generators Work
 meta_title: How AI Outfit Generators Work | Guide
@@ -248,17 +252,40 @@ per file — that is N commits, N builds, and a race between them. Two text blob
 (the Markdown and the updated `manifest.json`), so the manifest can never reference a file
 that is not there.
 
-**Concurrency.** Two publishes racing produce a non-fast-forward `PATCH /git/refs`. That
-is the desired failure: re-read the head commit, rebuild the tree on it, retry with a
-small bounded backoff.
+**Concurrency.** The shared static-site publisher used by the manual route and automatic
+worker atomically claims an expiring lease on the static-site Integration. The lease spans
+the complete read → validate → Git commit → `recordPublication()` sequence, so our own
+publishes cannot both make semantic decisions from the same manifest. Active contention is
+transient; a crashed owner can be replaced after the lease expires.
 
-**The manifest is rebuilt, not patched.** Every publish regenerates the whole file from
-what the database says is live (`ArticleRepo.listPublishedTo`), so the index cannot drift
-from our own records and a hand-edit in the client's repo self-heals on the next publish.
-That makes the committed bytes a pure function of the data, which is worth protecting:
-the publish route passes **one timestamp** to both the manifest and
-`recordPublication`, because a `new Date()` on each side would put a millisecond-wide diff
-on an untouched entry the next time some *other* article rebuilds the file.
+The Git ref remains a second concurrency boundary because a human or another GitHub client
+can still move the branch. `commitFiles()` reads the current head, then invokes semantic
+preparation for that exact commit. A non-fast-forward ref update restarts the whole
+preparation callback: it rereads the new head's manifest, reloads database publications,
+revalidates slug ownership, and rerenders. It never layers stale prepared files onto a new
+tree.
+
+**The manifest is rebuilt from remote and local state.** Each manifest entry carries
+`source_article_id`. Preparation starts with the remote head's entries and reconciles every
+locally recorded publication onto them before adding the current article. This deliberately
+preserves a remote entry whose Git commit succeeded before its local publication write: a
+later article cannot remove it or claim its slug, and the original retry can reconcile the
+already-landed tree without another commit. A normal automatic first publication uses its
+stable `requested_at` as `published_at` and stores `updated_at: null`; attempt time is not an
+edit timestamp. Recovery reconstructs the source-owned remote entry's exact `published_at`
+and nullable `updated_at`, then compares the complete desired manifest entry and Markdown
+bytes. An exact recovery retains both timestamps and the remote manifest's existing
+`generated_at`, so the desired tree stays byte-identical even after complete request loss.
+If current content differs after an orphaned first commit, the publisher keeps the remote
+original `published_at` and uses a newer durable `article.updated_at` for `updated_at`. When
+no newer durable edit timestamp exists, it deterministically reuses the remote version time
+as an explicit non-null update marker. Mongo records this exact timestamp pair; equality is
+never interpreted as proof that no update occurred. Each ref-retry preparation derives these
+decisions again from the exact head it is extending.
+
+Lease release matches the owning token and is best-effort after the primary operation. A
+Mongo cleanup outage therefore cannot turn an already recorded success into an API failure
+or replace a specific publishing error; the lease expiry remains crash recovery.
 
 **Republish** overwrites in place — same slug, same path, manifest entry updated with a
 new `updated_at`; `published_at` keeps meaning "first went live". A slug **renamed** since
@@ -277,9 +304,9 @@ one publication.
 ([`ensure-indexes.ts`](../packages/shared/db/src/ensure-indexes.ts) indexes `org_id` +
 `created_at` / `status` only), so under a filename-addressed contract the second article to
 claim a slug would silently overwrite the first. **Resolved 2026-07-31 by rejecting at the
-publish route** (`409 slug_conflict`) when another article is already published under that
-slug — the check is free, because the publisher has just listed every live article to
-rebuild the manifest. The alternative, a unique index on `{ org_id, slug }`, was not taken:
+publish operation** (`409 slug_conflict`) when another local or remote manifest entry is
+owned by a different source article. The check runs under the provider lease and reruns for
+every Git head after a ref conflict. The alternative, a unique index on `{ org_id, slug }`, was not taken:
 it can fail to build on existing duplicate data, and it would move the failure to the
 editor's slug field, where a collision with an article the user cannot see is a confusing
 500. The cost of rejecting instead is that the collision surfaces at publish time rather

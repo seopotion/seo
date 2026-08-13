@@ -14,6 +14,11 @@ const {
   testWordPressIntegration: vi.fn(),
 }));
 
+const { enqueuePublishTask } = vi.hoisted(() => ({
+  enqueuePublishTask: vi.fn(async () => {}),
+}));
+vi.mock('../src/clients/sqs', () => ({ enqueuePublishTask }));
+
 // Google verification is mocked — no network, no real token needed.
 vi.mock('../src/clients/google', () => ({
   verifyGoogleIdToken: vi.fn(async () => ({ sub: 'g-sub-123', email: 'u@example.com', name: 'U' })),
@@ -508,8 +513,8 @@ vi.mock('@shared/db', () => {
       recordPublication: vi.fn(
         async (
           id: string,
-          entry: { provider: string; ref: string; slug: string },
-          at: Date = new Date(),
+          entry: { provider: string; ref: string; slug: string; remote_url?: string | null },
+          options?: { publishedAt?: Date; updatedAt?: Date | null },
         ) => {
           const found = articles.find((a) => a.id === id) as
             | { publications?: Record<string, unknown>[] }
@@ -517,8 +522,15 @@ vi.mock('@shared/db', () => {
           if (!found) return false;
           if (!found.publications) found.publications = [];
           const existing = found.publications.find((p) => p.provider === entry.provider);
-          if (existing) Object.assign(existing, entry, { updated_at: at });
-          else found.publications.push({ ...entry, published_at: at, updated_at: null });
+          if (existing) {
+            Object.assign(existing, entry, { updated_at: options?.updatedAt ?? new Date() });
+          } else {
+            found.publications.push({
+              ...entry,
+              published_at: options?.publishedAt ?? new Date(),
+              updated_at: options?.updatedAt ?? null,
+            });
+          }
           return true;
         },
       ),
@@ -528,6 +540,10 @@ vi.mock('@shared/db', () => {
         Object.assign(article, patch, { updated_at: new Date() });
         return article;
       }),
+      initializeAutoPublishAttempt: vi.fn(async () => true),
+      resetAutoPublishAttempt: vi.fn(async () => true),
+      recordAutoPublishPreflightError: vi.fn(async () => {}),
+      clearAutoPublishPreflightError: vi.fn(async () => {}),
     },
     IntegrationRepo: {
       listByOrgId: vi.fn(async (orgId: string) =>
@@ -551,6 +567,8 @@ vi.mock('@shared/db', () => {
           last_error: null,
         });
       }),
+      claimPublishLease: vi.fn(async () => true),
+      releasePublishLease: vi.fn(async () => true),
       deleteByOrgAndProvider: vi.fn(async (orgId: string, provider: string) =>
         integrations.delete(`${orgId}:${provider}`),
       ),
@@ -562,7 +580,7 @@ vi.mock('@shared/db', () => {
   };
 });
 
-import { ArticleRepo } from '@shared/db';
+import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import { decryptSecret, encryptSecret } from '../src/lib/crypto';
 import { logger } from '../src/logger';
@@ -583,7 +601,17 @@ beforeEach(async () => {
   testWordPressIntegration.mockReset();
   testWordPressIntegration.mockResolvedValue({ success: true });
   commitFiles.mockReset();
-  commitFiles.mockResolvedValue('sha-new');
+  commitFiles.mockImplementation(async (options) => {
+    if (options.prepare) {
+      options.files = await options.prepare({
+        headCommitSha: 'base',
+        readFile: async () => null,
+      });
+    }
+    return 'sha-new';
+  });
+  enqueuePublishTask.mockReset();
+  enqueuePublishTask.mockResolvedValue(undefined);
   // Connections persist across cases like the article fixture does; reset so a
   // test that connects cannot change what the next one reads.
   integrations.clear();
@@ -600,6 +628,25 @@ beforeEach(async () => {
     // Empty, not absent: the repo parses `publications` through a `.default([])`,
     // so an entity that reached a handler always has the array.
     seededCreateArticle.publications = [];
+    delete (seededCreateArticle as { auto_publish?: unknown }).auto_publish;
+  }
+  const primaryOrg = (await OrgRepo.findById('org_1')) as unknown as {
+    plan?: string;
+    presets?: { article_preferences: { publishing: { auto_publish: boolean } } };
+  } | null;
+  if (primaryOrg) {
+    primaryOrg.plan = 'free';
+    if (primaryOrg.presets) {
+      primaryOrg.presets.article_preferences.publishing.auto_publish = false;
+    }
+  }
+  const emptyOrg = (await OrgRepo.findById('org_2')) as unknown as {
+    plan?: string;
+    presets?: { article_preferences: { publishing: { auto_publish: boolean } } };
+  } | null;
+  if (emptyOrg) {
+    emptyOrg.plan = 'free';
+    if (emptyOrg.presets) emptyOrg.presets.article_preferences.publishing.auto_publish = false;
   }
   // Same reason, for the static-site fixtures: publishing writes onto them.
   await resetStaticSiteFixtures();
@@ -985,6 +1032,7 @@ describe('dashboard WordPress article routes', () => {
         // The WordPress post id as a string — one `ref` shape across providers.
         ref: '321',
         slug: 'landing-pages',
+        remote_url: null,
         published_at: expect.any(Date),
         updated_at: null,
       },
@@ -994,6 +1042,32 @@ describe('dashboard WordPress article routes', () => {
     await client.api.v0.dashboard.articles[':id'].wordpress.$put({ param: { id: 'art_1' } }, opts);
     expect(article.publications).toHaveLength(1);
     expect(article.publications?.[0]).toMatchObject({ updated_at: expect.any(Date) });
+  });
+
+  test('stores null rather than an invalid manual WordPress permalink', async () => {
+    submitWordPressArticle.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        success: true,
+        post_id: 321,
+        slug: 'landing-pages',
+        permalink: 'not-an-http-url',
+        post_status: 'draft',
+      },
+    });
+
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    const stored = (await ArticleRepo.findById('art_1')) as unknown as {
+      publications: Array<{ provider: string; remote_url: string | null }>;
+    };
+    expect(
+      stored.publications.find((entry) => entry.provider === 'wordpress')?.remote_url,
+    ).toBeNull();
   });
 
   test('rejects create until article images are complete', async () => {
@@ -1062,8 +1136,11 @@ describe('dashboard WordPress article routes', () => {
   });
 
   test.each([
-    400, 403, 409, 500,
-  ] as const)('passes through a plugin %s create response without persisting', async (status) => {
+    [400, 'WordPress rejected the article payload.'],
+    [403, 'WordPress rejected the integration credentials. Reconnect the site.'],
+    [409, 'WordPress already has another post using this slug.'],
+    [500, 'WordPress could not publish the article. Retry shortly.'],
+  ] as const)('normalizes a plugin %s create response without persisting', async (status, message) => {
     submitWordPressArticle.mockResolvedValueOnce({
       status,
       body: { error: `plugin-${status}` },
@@ -1075,7 +1152,7 @@ describe('dashboard WordPress article routes', () => {
     );
 
     expect(res.status).toBe(status);
-    expect(await res.json()).toEqual({ error: `plugin-${status}` });
+    expect(await res.json()).toEqual({ error: message });
     expect(setWordPressPostId).not.toHaveBeenCalled();
   });
 
@@ -1144,6 +1221,192 @@ describe('dashboard WordPress article routes', () => {
       });
     }
   });
+
+  test('maps a missing remote post on update to an accurate 404', async () => {
+    vi.mocked(ArticleRepo.recordPublication).mockClear();
+    editWordPressArticle.mockResolvedValueOnce({
+      status: 404,
+      body: { error: 'Post not found' },
+    });
+
+    const res = await client.api.v0.dashboard.articles[':id'].wordpress.$put(
+      { param: { id: 'art_2' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'The WordPress post no longer exists.' });
+    expect(ArticleRepo.recordPublication).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /dashboard/articles/{id}/auto-publish/retry', () => {
+  async function auth() {
+    const token = await login();
+    return { headers: { Authorization: `Bearer ${token}` } };
+  }
+
+  async function enable(orgId: 'org_1' | 'org_2') {
+    const org = (await OrgRepo.findById(orgId)) as unknown as {
+      plan: string;
+      presets: { article_preferences: { publishing: { auto_publish: boolean } } };
+    };
+    org.plan = 'paid';
+    org.presets.article_preferences.publishing.auto_publish = true;
+  }
+
+  test('enforces authentication, ownership, and image readiness', async () => {
+    const unauthenticated = await client.api.v0.dashboard.articles[':id'][
+      'auto-publish'
+    ].retry.$post({ param: { id: 'art_1' } });
+    expect(unauthenticated.status).toBe(401);
+
+    const opts = await auth();
+    const foreign = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_3' } },
+      opts,
+    );
+    expect(foreign.status).toBe(404);
+
+    const pending = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_5' } },
+      opts,
+    );
+    expect(pending.status).toBe(409);
+    if (pending.status === 409) expect((await pending.json()).code).toBe('images_incomplete');
+    expect(enqueuePublishTask).not.toHaveBeenCalled();
+  });
+
+  test('does not queue while automatic publishing is disabled', async () => {
+    const res = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) expect((await res.json()).code).toBe('auto_publish_disabled');
+    expect(enqueuePublishTask).not.toHaveBeenCalled();
+  });
+
+  test('persists actionable preflight state when no destination is connected', async () => {
+    await enable('org_2');
+
+    const res = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_4' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(409);
+    if (res.status === 409) expect((await res.json()).code).toBe('not_connected');
+    expect(ArticleRepo.recordAutoPublishPreflightError).toHaveBeenCalledWith(
+      'art_4',
+      expect.objectContaining({ code: 'not_connected', kind: 'permanent' }),
+    );
+    expect(enqueuePublishTask).not.toHaveBeenCalled();
+  });
+
+  test('resets failed targets and queues every connected unpublished provider', async () => {
+    await enable('org_1');
+    integrations.set('org_1:static-site', {
+      id: 'int_static',
+      org_id: 'org_1',
+      provider: 'static-site',
+      host: 'github',
+      installation_id: 4242,
+      repo: 'client/site',
+      branch: 'main',
+      content_path: 'seopotion/',
+      connected_at: new Date(),
+      last_error: null,
+    });
+    const target = (await ArticleRepo.findById('art_1')) as unknown as {
+      auto_publish: Record<string, unknown>;
+    };
+    target.auto_publish = {
+      preflight_error: null,
+      attempts: [
+        {
+          provider: 'wordpress',
+          status: 'failed',
+          attempt_count: 3,
+          requested_at: new Date(),
+          last_attempt_at: new Date(),
+          lease_expires_at: null,
+          last_error: {
+            code: 'network_error',
+            kind: 'transient',
+            message: 'WordPress could not be reached.',
+            at: new Date(),
+          },
+        },
+      ],
+    };
+
+    const res = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      expect(new Set((await res.json()).queued)).toEqual(new Set(['wordpress', 'static-site']));
+    }
+    expect(ArticleRepo.resetAutoPublishAttempt).toHaveBeenCalledWith(
+      'art_1',
+      'wordpress',
+      expect.any(Date),
+    );
+    expect(ArticleRepo.initializeAutoPublishAttempt).toHaveBeenCalledWith(
+      'art_1',
+      'static-site',
+      expect.any(Date),
+    );
+    expect(enqueuePublishTask).toHaveBeenCalledWith({
+      org_id: 'org_1',
+      article_id: 'art_1',
+      provider: 'wordpress',
+    });
+    expect(enqueuePublishTask).toHaveBeenCalledWith({
+      org_id: 'org_1',
+      article_id: 'art_1',
+      provider: 'static-site',
+    });
+  });
+
+  test('never queues a provider already recorded in publications', async () => {
+    await enable('org_1');
+    integrations.set('org_1:wordpress', {
+      id: 'int_wordpress',
+      org_id: 'org_1',
+      provider: 'wordpress',
+      site_url: 'https://clewas.com',
+      token_enc: 'encrypted',
+      connected_at: new Date(),
+      last_error: null,
+    });
+
+    const res = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_2' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status === 200) expect((await res.json()).queued).toEqual([]);
+    expect(enqueuePublishTask).not.toHaveBeenCalled();
+  });
+
+  test('surfaces queue failure so a caller can retry safely', async () => {
+    await enable('org_1');
+    enqueuePublishTask.mockRejectedValueOnce(new Error('SQS unavailable'));
+
+    const res = await client.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(502);
+    if (res.status === 502) expect((await res.json()).code).toBe('queue_send_failed');
+  });
 });
 
 describe('POST /dashboard/articles/{id}/publish (static site)', () => {
@@ -1151,6 +1414,8 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
   // the WordPress cases above would otherwise leave calls on this one.
   beforeEach(() => {
     vi.mocked(ArticleRepo.recordPublication).mockClear();
+    vi.mocked(IntegrationRepo.claimPublishLease).mockClear();
+    vi.mocked(IntegrationRepo.releasePublishLease).mockClear();
   });
 
   async function auth() {
@@ -1245,6 +1510,8 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
     }
 
     expect(commitFiles).toHaveBeenCalledTimes(1);
+    expect(IntegrationRepo.claimPublishLease).toHaveBeenCalledOnce();
+    expect(IntegrationRepo.releasePublishLease).toHaveBeenCalledOnce();
     const commit = committed();
     expect(commit.branch).toBe('main');
     expect(commit.message).toBe('seopotion: publish "Never Published"');
@@ -1277,8 +1544,13 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
 
     expect(ArticleRepo.recordPublication).toHaveBeenCalledWith(
       'art_7',
-      { provider: 'static-site', ref: 'sha-new', slug: 'never-published' },
-      expect.any(Date),
+      {
+        provider: 'static-site',
+        ref: 'sha-new',
+        slug: 'never-published',
+        remote_url: 'https://github.com/client/site/commit/sha-new',
+      },
+      { publishedAt: expect.any(Date), updatedAt: null },
     );
   });
 
@@ -1291,7 +1563,8 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
 
     const manifest = JSON.parse(committed().byPath['seopotion/manifest.json'] as string);
     const entry = manifest.articles.find((a: { slug: string }) => a.slug === 'never-published');
-    const storedAt = vi.mocked(ArticleRepo.recordPublication).mock.calls[0]![2] as Date;
+    const storedAt = vi.mocked(ArticleRepo.recordPublication).mock.calls[0]![2]
+      ?.publishedAt as Date;
 
     // Otherwise the next rebuild of this file — triggered by a different
     // article — produces a millisecond-wide diff on an untouched entry.
@@ -1334,7 +1607,8 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
       expect(body.code).toBe('slug_conflict');
       expect(body.error).toContain('old-guide');
     }
-    expect(commitFiles).not.toHaveBeenCalled();
+    expect(commitFiles).toHaveBeenCalledOnce();
+    expect(ArticleRepo.recordPublication).not.toHaveBeenCalled();
   });
 
   test('honours a custom content_path', async () => {
@@ -1360,7 +1634,10 @@ describe('POST /dashboard/articles/{id}/publish (static site)', () => {
 
     expect(res.status).toBe(422);
     if (res.status === 422) {
-      expect(await res.json()).toEqual({ error: 'Branch is protected', code: 'commit_rejected' });
+      expect(await res.json()).toEqual({
+        error: 'GitHub rejected the commit. Check branch protection and repository access.',
+        code: 'commit_rejected',
+      });
     }
     expect(ArticleRepo.recordPublication).not.toHaveBeenCalled();
   });
@@ -1534,6 +1811,83 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     expect(pubBody.total).toBeLessThan(allBody.total);
   });
 
+  test('GET /articles includes safe provider publishing state without leases or secrets', async () => {
+    const target = (await ArticleRepo.findById('art_1')) as unknown as {
+      publications: Record<string, unknown>[];
+      auto_publish: Record<string, unknown>;
+    };
+    const at = new Date('2026-08-12T10:00:00.000Z');
+    target.publications = [
+      {
+        provider: 'wordpress',
+        ref: '321',
+        slug: 'landing-pages-live',
+        remote_url: 'https://clewas.com/landing-pages-live/',
+        published_at: at,
+        updated_at: null,
+      },
+    ];
+    target.auto_publish = {
+      preflight_error: null,
+      attempts: [
+        {
+          provider: 'wordpress',
+          status: 'published',
+          attempt_count: 1,
+          requested_at: at,
+          last_attempt_at: at,
+          lease_expires_at: null,
+          last_error: null,
+        },
+        {
+          provider: 'static-site',
+          status: 'retrying',
+          attempt_count: 2,
+          requested_at: at,
+          last_attempt_at: at,
+          lease_expires_at: new Date('2026-08-12T10:05:00.000Z'),
+          last_error: {
+            code: 'github_request_failed',
+            kind: 'transient',
+            message: 'GitHub could not be reached.',
+            at,
+          },
+        },
+      ],
+    };
+
+    const res = await client.api.v0.dashboard.articles.$get(
+      { query: { org_id: 'org_1' } },
+      await auth(),
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    const row = (await res.json()).articles.find((entry) => entry.id === 'art_1');
+    expect(row?.publications).toEqual([
+      expect.objectContaining({
+        provider: 'wordpress',
+        ref: '321',
+        slug: 'landing-pages-live',
+        remote_url: 'https://clewas.com/landing-pages-live/',
+        published_at: at.toISOString(),
+      }),
+    ]);
+    expect(row?.auto_publish_error).toBeNull();
+    expect(row?.auto_publish_attempts).toEqual([
+      expect.objectContaining({ provider: 'wordpress', status: 'published', attempt_count: 1 }),
+      expect.objectContaining({
+        provider: 'static-site',
+        status: 'retrying',
+        attempt_count: 2,
+        last_error: expect.objectContaining({ code: 'github_request_failed' }),
+      }),
+    ]);
+    const serialized = JSON.stringify(row);
+    expect(serialized).not.toContain('lease_expires_at');
+    expect(serialized).not.toContain('wordpress_token');
+    expect(serialized).not.toContain('token_enc');
+  });
+
   test('GET /articles 404s for an org the caller does not own', async () => {
     const opts = await auth();
     const res = await client.api.v0.dashboard.articles.$get({ query: { org_id: 'org_3' } }, opts);
@@ -1584,6 +1938,70 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
       // Never edited since generation.
       expect(body.updated_at).toBeNull();
     }
+  });
+
+  test('GET /articles/:id exposes safe automatic-publishing state without leases', async () => {
+    const target = (await ArticleRepo.findById('art_1')) as unknown as {
+      publications: Record<string, unknown>[];
+      auto_publish: Record<string, unknown>;
+    };
+    const at = new Date('2026-08-12T10:00:00.000Z');
+    target.publications = [
+      {
+        provider: 'static-site',
+        ref: 'abc123',
+        slug: 'landing-pages',
+        remote_url: 'https://github.com/client/site/commit/abc123',
+        published_at: at,
+        updated_at: null,
+      },
+    ];
+    target.auto_publish = {
+      preflight_error: {
+        code: 'not_connected',
+        kind: 'permanent',
+        message: 'Connect a publishing destination.',
+        at,
+      },
+      attempts: [
+        {
+          provider: 'wordpress',
+          status: 'retrying',
+          attempt_count: 2,
+          requested_at: at,
+          last_attempt_at: at,
+          lease_expires_at: new Date('2026-08-12T10:05:00.000Z'),
+          last_error: {
+            code: 'network_error',
+            kind: 'transient',
+            message: 'WordPress could not be reached.',
+            at,
+          },
+        },
+      ],
+    };
+
+    const res = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_1' } },
+      await auth(),
+    );
+
+    expect(res.status).toBe(200);
+    if (res.status !== 200) return;
+    const body = await res.json();
+    expect(body.publications[0]).toMatchObject({
+      provider: 'static-site',
+      ref: 'abc123',
+      remote_url: 'https://github.com/client/site/commit/abc123',
+    });
+    expect(body.auto_publish_error?.code).toBe('not_connected');
+    expect(body.auto_publish_attempts[0]).toMatchObject({
+      provider: 'wordpress',
+      status: 'retrying',
+      attempt_count: 2,
+      last_error: { code: 'network_error', kind: 'transient' },
+    });
+    expect(body.auto_publish_attempts[0]).not.toHaveProperty('lease_expires_at');
   });
 
   test('GET /articles/:id reports the static-site publish state', async () => {

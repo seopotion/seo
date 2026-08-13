@@ -13,10 +13,12 @@ import {
   SelectValue,
   Switch,
 } from '@/components/ui';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import { getAutoPublishReadiness, isAutoPublishChangeAllowed } from '@/lib/auto-publishing';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
+import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -108,7 +110,9 @@ export default function ArticleSettingsPage() {
   const [initializedOrganizationId, setInitializedOrganizationId] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [saveState, setSaveState] = useState<ArticleSettingsSaveState>('idle');
+  const activeOrganizationIdRef = useRef<string | null>(null);
   const editRevisionRef = useRef(0);
+  activeOrganizationIdRef.current = organization?.id ?? null;
 
   const handleUnauthorized = useCallback(() => {
     setRedirecting(true);
@@ -144,6 +148,24 @@ export default function ArticleSettingsPage() {
     refetchOnWindowFocus: false,
     staleTime: 60 * 60 * 1000,
   });
+
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+    enabled: !redirecting && !organizationLoading,
+    onUnauthorized: handleUnauthorized,
+  });
+  const autoPublishReadiness = getAutoPublishReadiness({
+    destinationState: connectedIntegrationsQuery.isError
+      ? 'error'
+      : connectedIntegrationsQuery.data
+        ? 'ready'
+        : 'loading',
+    destinations: connectedIntegrationsQuery.data?.integrations ?? [],
+    hasEntitlement: organization?.capabilities.keyword_scheduling ?? false,
+  });
+  const autoPublishNoticeIds = [
+    ...autoPublishReadiness.blockers.map((blocker) => `auto-publish-${blocker}`),
+    ...(autoPublishReadiness.allDestinationsHaveErrors ? ['auto-publish-destination-errors'] : []),
+  ];
 
   useEffect(() => {
     if (!organization || !settingsQuery.data) return;
@@ -195,15 +217,21 @@ export default function ArticleSettingsPage() {
         data,
       );
 
-      if (editRevisionRef.current === saveRevision) {
+      if (
+        activeOrganizationIdRef.current === organizationId &&
+        editRevisionRef.current === saveRevision
+      ) {
         setSettings((currentSettings) => mergeArticleSettings(data, currentSettings));
         setSaveState('saved');
       }
     },
-    onError: (error, { saveRevision }) => {
+    onError: (error, { organizationId, saveRevision }) => {
       if (error instanceof Error && error.message === 'unauthorized') return;
 
-      if (editRevisionRef.current === saveRevision) {
+      if (
+        activeOrganizationIdRef.current === organizationId &&
+        editRevisionRef.current === saveRevision
+      ) {
         setSaveState('error');
       }
     },
@@ -223,6 +251,11 @@ export default function ArticleSettingsPage() {
       [field]: value,
     }));
     markEdited();
+  }
+
+  function updateAutoPublish(checked: boolean) {
+    if (!isAutoPublishChangeAllowed(settings.autoPublish, checked, autoPublishReadiness)) return;
+    updateSetting('autoPublish', checked);
   }
 
   function saveSettings(event: FormEvent<HTMLFormElement>) {
@@ -267,13 +300,94 @@ export default function ArticleSettingsPage() {
       {saveState === 'error' && <StatusPanel tone="error">{t('status.saveError')}</StatusPanel>}
 
       <div className="rounded-md border border-slate-200 bg-white">
-        <SwitchSetting
-          checked={settings.autoPublish}
-          description={t('fields.autoPublish.description')}
-          id="auto-publish"
-          label={t('fields.autoPublish.label')}
-          onCheckedChange={(checked) => updateSetting('autoPublish', checked)}
-        />
+        <div className="grid gap-3 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <Label htmlFor="auto-publish">{t('fields.autoPublish.label')}</Label>
+              <div id="auto-publish-description" className="mt-1 text-slate-500 text-sm">
+                <p>{t('fields.autoPublish.description')}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>{t('fields.autoPublish.details.futureArticles')}</li>
+                  <li>{t('fields.autoPublish.details.destinations')}</li>
+                  <li>{t('fields.autoPublish.details.wordpress')}</li>
+                  <li>{t('fields.autoPublish.details.failedAttempts')}</li>
+                </ul>
+              </div>
+            </div>
+            <Switch
+              id="auto-publish"
+              checked={settings.autoPublish}
+              aria-describedby={['auto-publish-description', ...autoPublishNoticeIds].join(' ')}
+              aria-disabled={!settings.autoPublish && !autoPublishReadiness.canActivate}
+              className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+              onCheckedChange={updateAutoPublish}
+            />
+          </div>
+
+          {autoPublishReadiness.blockers.includes('entitlement_required') ? (
+            <AutoPublishNotice id="auto-publish-entitlement_required">
+              <span>
+                {t(
+                  settings.autoPublish
+                    ? 'fields.autoPublish.requirements.entitlementEnabled'
+                    : 'fields.autoPublish.requirements.entitlement',
+                )}
+              </span>{' '}
+              <SettingsLink href="/settings?tab=billing">
+                {t('fields.autoPublish.links.billing')}
+              </SettingsLink>
+            </AutoPublishNotice>
+          ) : null}
+
+          {autoPublishReadiness.blockers.includes('destination_check_pending') ? (
+            <AutoPublishNotice id="auto-publish-destination_check_pending">
+              {t(
+                settings.autoPublish
+                  ? 'fields.autoPublish.requirements.checkingEnabled'
+                  : 'fields.autoPublish.requirements.checking',
+              )}
+            </AutoPublishNotice>
+          ) : null}
+
+          {autoPublishReadiness.blockers.includes('destination_check_failed') ? (
+            <AutoPublishNotice id="auto-publish-destination_check_failed">
+              <span>
+                {t(
+                  settings.autoPublish
+                    ? 'fields.autoPublish.requirements.checkFailedEnabled'
+                    : 'fields.autoPublish.requirements.checkFailed',
+                )}
+              </span>{' '}
+              <SettingsLink href="/settings?tab=integrations">
+                {t('fields.autoPublish.links.integrations')}
+              </SettingsLink>
+            </AutoPublishNotice>
+          ) : null}
+
+          {autoPublishReadiness.blockers.includes('no_destination') ? (
+            <AutoPublishNotice id="auto-publish-no_destination">
+              <span>
+                {t(
+                  settings.autoPublish
+                    ? 'fields.autoPublish.requirements.noDestinationEnabled'
+                    : 'fields.autoPublish.requirements.noDestination',
+                )}
+              </span>{' '}
+              <SettingsLink href="/settings?tab=integrations">
+                {t('fields.autoPublish.links.integrations')}
+              </SettingsLink>
+            </AutoPublishNotice>
+          ) : null}
+
+          {autoPublishReadiness.allDestinationsHaveErrors ? (
+            <AutoPublishNotice id="auto-publish-destination-errors">
+              <span>{t('fields.autoPublish.requirements.allDestinationsHaveErrors')}</span>{' '}
+              <SettingsLink href="/settings?tab=integrations">
+                {t('fields.autoPublish.links.integrations')}
+              </SettingsLink>
+            </AutoPublishNotice>
+          ) : null}
+        </div>
 
         <div className="grid gap-2 p-4">
           <div>
@@ -366,6 +480,26 @@ function StatusPanel({
   );
 }
 
+function AutoPublishNotice({ children, id }: { children: ReactNode; id: string }) {
+  return (
+    <p
+      id={id}
+      role="status"
+      className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 text-sm"
+    >
+      {children}
+    </p>
+  );
+}
+
+function SettingsLink({ children, href }: { children: ReactNode; href: string }) {
+  return (
+    <Link className="font-medium text-amber-950 underline underline-offset-2" href={href}>
+      {children}
+    </Link>
+  );
+}
+
 function SwitchSetting({
   checked,
   description,
@@ -383,9 +517,16 @@ function SwitchSetting({
     <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <Label htmlFor={id}>{label}</Label>
-        <p className="mt-1 text-slate-500 text-sm">{description}</p>
+        <p id={`${id}-description`} className="mt-1 text-slate-500 text-sm">
+          {description}
+        </p>
       </div>
-      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch
+        id={id}
+        checked={checked}
+        aria-describedby={`${id}-description`}
+        onCheckedChange={onCheckedChange}
+      />
     </div>
   );
 }

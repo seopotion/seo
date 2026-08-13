@@ -4,7 +4,7 @@ Tags: seo, content automation, article sync, ai blog
 Requires at least: 6.4  
 Tested up to: 6.9
 Requires PHP: 8.0  
-Stable tag: 1.0.0
+Stable tag: 1.2.0
 License: GPLv2 or later  
 License URI: https://www.gnu.org/licenses/gpl-2.0.html  
 
@@ -79,6 +79,12 @@ SEO Potion syncs articles to your site via a secure API connection.
 
 == Changelog ==
 
+= 1.2.0 =
+* Added completion-aware idempotent publishing for automatic article submissions.
+* Concurrent source submissions now return a retryable conflict until processing finishes.
+* Source publication locks now follow the request database connection, with deterministic
+  recovery of incomplete posts after a crashed connection closes.
+
 = 1.0.0 =
 * Initial SEO Potion fork, derived from Outrank 1.0.10.
 
@@ -144,5 +150,5 @@ SEO Potion syncs articles to your site via a secure API connection.
 
 == Upgrade Notice ==
 
-= 1.0.0 =
-Initial SEO Potion fork based on Outrank 1.0.10.
+= 1.2.0 =
+Required for safe automatic publishing. Earlier versions do not prove source-post completion.

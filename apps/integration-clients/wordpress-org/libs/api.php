@@ -90,7 +90,7 @@ function seo_potion_set_integration_id($request) {
 }
 
 function seo_potion_get_capabilities() {
-    $capabilities = ['publish', 'edit', 'list'];
+    $capabilities = ['publish', 'edit', 'list', 'idempotent_publish'];
 
     $plugin_file = SEO_POTION_PLUGIN_PATH . 'seo-potion.php';
     $plugin_data = get_file_data($plugin_file, ['Version' => 'Version']);
@@ -100,6 +100,93 @@ function seo_potion_get_capabilities() {
         'version' => $version,
         'capabilities' => $capabilities,
     ], 200);
+}
+
+function seo_potion_find_post_by_source_article_id($source_article_id) {
+    if (empty($source_article_id)) {
+        return 0;
+    }
+
+    $posts = get_posts([
+        'post_type' => 'post',
+        'post_status' => 'any',
+        'meta_key' => '_seo_potion_source_article_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+        'meta_value' => $source_article_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+        'numberposts' => 1,
+        'fields' => 'ids',
+    ]);
+
+    return empty($posts) ? 0 : (int) $posts[0];
+}
+
+function seo_potion_source_publish_is_complete($post_id) {
+    return get_post_meta($post_id, '_seo_potion_source_publish_complete', true) === '1';
+}
+
+function seo_potion_acquire_source_publish_lock($source_article_id) {
+    global $wpdb;
+
+    // MySQL advisory locks belong to the database connection, not a timestamp.
+    // A live request therefore remains fenced however long it runs, while a
+    // crashed request releases the lock when its connection closes.
+    $lock_name = 'seo_potion_' . substr(hash('sha256', $source_article_id), 0, 52);
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+    $acquired = $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, 0)', $lock_name));
+
+    if ((string) $acquired === '1') {
+        return $lock_name;
+    }
+    if ((string) $acquired === '0') {
+        return null;
+    }
+    return false;
+}
+
+function seo_potion_release_source_publish_lock($lock_name) {
+    global $wpdb;
+
+    if ($lock_name === '') {
+        return;
+    }
+
+    // RELEASE_LOCK only succeeds for the connection that owns this name, so an
+    // old request can never clear a lock held by another connection.
+    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+    $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock_name));
+}
+
+function seo_potion_delete_incomplete_source_post($post_id) {
+    global $wpdb;
+
+    $slug = (string) get_post_field('post_name', $post_id);
+    $thumbnail_id = (int) get_post_thumbnail_id($post_id);
+    $deleted = wp_delete_post($post_id, true);
+    if (!$deleted) {
+        return false;
+    }
+    if ($slug !== '') {
+        $table_name = $wpdb->prefix . 'seo_potion_manage';
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete($table_name, ['slug' => $slug]);
+    }
+    if ($thumbnail_id) {
+        wp_delete_attachment($thumbnail_id, true);
+    }
+    return true;
+}
+
+function seo_potion_publish_response($post_id, $warnings = []) {
+    $response = [
+        'success' => true,
+        'post_id' => (int) $post_id,
+        'slug' => (string) get_post_field('post_name', $post_id),
+        'permalink' => (string) get_permalink($post_id),
+        'post_status' => (string) get_post_field('post_status', $post_id),
+    ];
+    if (!empty($warnings)) {
+        $response['warnings'] = array_values(array_unique($warnings));
+    }
+    return new WP_REST_Response($response, 200);
 }
 
 function seo_potion_receive_article($request) {
@@ -117,98 +204,159 @@ function seo_potion_receive_article($request) {
         return new WP_REST_Response(['error' => 'Invalid or missing secret'], 403);
     }
 
-    $title = sanitize_text_field($params['title'] ?? 'Untitled');
-    $slug = sanitize_title($params['slug'] ?? $title);
-    $created_at = !empty($params['created_at']) ? gmdate('Y-m-d H:i:s', strtotime($params['created_at'])) : current_time('mysql');
-
-    $table_name = $wpdb->prefix . 'seo_potion_manage';
-
-    // Upload featured image
-    $imageId = seo_potion_upload_image_from_url($params['image_url'] ?? '');
-
-    // Handle author
-    $author = $params['author'] ?? '';
-    $author_id = 1;
-    if (!empty($author)) {
-        if (is_numeric($author)) {
-            $author_id = (int) $author;
-        } else {
-            $user = get_user_by('login', $author);
-            if ($user) $author_id = $user->ID;
-        }
+    $source_article_id = sanitize_text_field($params['source_article_id'] ?? '');
+    $requested_status = isset($params['status']) ? sanitize_key($params['status']) : '';
+    if ($requested_status !== '' && !in_array($requested_status, ['publish', 'draft'], true)) {
+        return new WP_REST_Response(['error' => 'Invalid status'], 400);
     }
 
-    $category_ids = seo_potion_resolve_category_ids($params['category'] ?? '');
-
-    $sanitized_content = seo_potion_sanitize_content($params['content'] ?? '');
-
-    // WordPress only deduplicates slugs for published posts, not drafts, so we
-    // resolve a slug that is unique against both the tracking table and WP posts
-    // before creating the post. This prevents the tracking table's slug_unique
-    // constraint from being violated when posts are created as drafts.
-    $unique_slug = seo_potion_generate_unique_slug($slug, $table_name);
-
-    $post_id = seo_potion_create_post_with_images([
-        'post_title'    => $title,
-        'post_content'  => $sanitized_content,
-        'post_status'   => get_option('seo_potion_post_as_draft', 'yes') === 'yes' ? 'draft' : 'publish',
-        'post_type'     => 'post',
-        'post_name'     => $unique_slug,
-        'post_category' => $category_ids,
-        'tags_input'    => isset($params['tags']) ? array_map('sanitize_text_field', $params['tags']) : [],
-        'post_author'   => $author_id,
-    ]);
-
-    if (is_wp_error($post_id)) {
-        // Clean up the uploaded image to avoid orphaned attachments
-        if (!empty($imageId)) {
-            wp_delete_attachment($imageId, true);
+    $source_lock_name = '';
+    if ($source_article_id !== '') {
+        $source_lock = seo_potion_acquire_source_publish_lock($source_article_id);
+        if ($source_lock === null) {
+            return new WP_REST_Response([
+                'error' => 'This source article is already being published',
+                'code' => 'source_publish_in_progress',
+            ], 409);
         }
-        return new WP_REST_Response(['error' => 'Failed to create post: ' . $post_id->get_error_message()], 500);
+        if ($source_lock === false) {
+            return new WP_REST_Response([
+                'error' => 'Source publication lock is unavailable',
+                'code' => 'source_publish_lock_unavailable',
+            ], 500);
+        }
+        $source_lock_name = $source_lock;
     }
 
-    $final_slug = get_post_field('post_name', $post_id);
-    $post_status = get_post_field('post_status', $post_id);
-
-    // Insert into custom table with the actual WordPress slug
-    // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-    $inserted = $wpdb->insert($table_name, [
-        'image'            => $imageId ? (string) $imageId : '',
-        'slug'             => $final_slug,
-        'title'            => $title,
-        'meta_description' => sanitize_text_field($params['meta_description'] ?? ''),
-        'status'           => $post_status,
-        'created_at'       => $created_at,
-    ]);
-
-    if (!$inserted) {
-        // If custom table insert fails, delete the post and image to maintain consistency
-        $db_error = $wpdb->last_error;
-        wp_delete_post($post_id, true);
-        if (!empty($imageId)) {
-            wp_delete_attachment($imageId, true);
+    try {
+        if ($source_article_id !== '') {
+            $existing_post_id = seo_potion_find_post_by_source_article_id($source_article_id);
+            if ($existing_post_id && seo_potion_source_publish_is_complete($existing_post_id)) {
+                if ($requested_status === 'publish' && get_post_field('post_status', $existing_post_id) !== 'publish') {
+                    $updated = wp_update_post(['ID' => $existing_post_id, 'post_status' => 'publish'], true);
+                    if (is_wp_error($updated)) {
+                        return new WP_REST_Response(['error' => 'Failed to publish existing post'], 500);
+                    }
+                }
+                return seo_potion_publish_response($existing_post_id);
+            }
+            if ($existing_post_id && !seo_potion_delete_incomplete_source_post($existing_post_id)) {
+                return new WP_REST_Response(['error' => 'Failed to recover incomplete source post'], 500);
+            }
         }
-        return new WP_REST_Response([
-            'error' => 'Failed to insert into tracking table' . ( $db_error ? ': ' . $db_error : '' )
-        ], 500);
-    }
 
-    // Set featured image and update its author/parent to match the post
-    if (!empty($imageId)) {
-        set_post_thumbnail($post_id, $imageId);
-        wp_update_post([
-            'ID'          => $imageId,
-            'post_author' => $author_id,
-            'post_parent' => $post_id,
+        $title = sanitize_text_field($params['title'] ?? 'Untitled');
+        $slug = sanitize_title($params['slug'] ?? $title);
+        $created_at = !empty($params['created_at']) ? gmdate('Y-m-d H:i:s', strtotime($params['created_at'])) : current_time('mysql');
+
+        $table_name = $wpdb->prefix . 'seo_potion_manage';
+
+        // Upload featured image
+        $imageId = seo_potion_upload_image_from_url($params['image_url'] ?? '');
+
+        // Handle author
+        $author = $params['author'] ?? '';
+        $author_id = 1;
+        if (!empty($author)) {
+            if (is_numeric($author)) {
+                $author_id = (int) $author;
+            } else {
+                $user = get_user_by('login', $author);
+                if ($user) $author_id = $user->ID;
+            }
+        }
+
+        $category_ids = seo_potion_resolve_category_ids($params['category'] ?? '');
+
+        $sanitized_content = seo_potion_sanitize_content($params['content'] ?? '');
+
+        // WordPress only deduplicates slugs for published posts, not drafts, so we
+        // resolve a slug that is unique against both the tracking table and WP posts
+        // before creating the post. This prevents the tracking table's slug_unique
+        // constraint from being violated when posts are created as drafts.
+        $unique_slug = seo_potion_generate_unique_slug($slug, $table_name);
+
+        $post_data = [
+            'post_title'    => $title,
+            'post_content'  => $sanitized_content,
+            'post_status'   => $requested_status !== ''
+                ? $requested_status
+                : (get_option('seo_potion_post_as_draft', 'yes') === 'yes' ? 'draft' : 'publish'),
+            'post_type'     => 'post',
+            'post_name'     => $unique_slug,
+            'post_category' => $category_ids,
+            'tags_input'    => isset($params['tags']) ? array_map('sanitize_text_field', $params['tags']) : [],
+            'post_author'   => $author_id,
+        ];
+        if ($source_article_id !== '') {
+            $post_data['meta_input'] = ['_seo_potion_source_article_id' => $source_article_id];
+        }
+        $post_id = seo_potion_create_post_with_images($post_data);
+
+        if (is_wp_error($post_id)) {
+            // Clean up the uploaded image to avoid orphaned attachments
+            if (!empty($imageId)) {
+                wp_delete_attachment($imageId, true);
+            }
+            return new WP_REST_Response(['error' => 'Failed to create post: ' . $post_id->get_error_message()], 500);
+        }
+
+        $final_slug = get_post_field('post_name', $post_id);
+        $post_status = get_post_field('post_status', $post_id);
+
+        // Insert into custom table with the actual WordPress slug
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $inserted = $wpdb->insert($table_name, [
+            'image'            => $imageId ? (string) $imageId : '',
+            'slug'             => $final_slug,
+            'title'            => $title,
+            'meta_description' => sanitize_text_field($params['meta_description'] ?? ''),
+            'status'           => $post_status,
+            'created_at'       => $created_at,
         ]);
+
+        if (!$inserted) {
+            // If custom table insert fails, delete the post and image to maintain consistency
+            $db_error = $wpdb->last_error;
+            wp_delete_post($post_id, true);
+            if (!empty($imageId)) {
+                wp_delete_attachment($imageId, true);
+            }
+            return new WP_REST_Response([
+                'error' => 'Failed to insert into tracking table' . ( $db_error ? ': ' . $db_error : '' )
+            ], 500);
+        }
+
+        // Set featured image and update its author/parent to match the post
+        if (!empty($imageId)) {
+            set_post_thumbnail($post_id, $imageId);
+            wp_update_post([
+                'ID'          => $imageId,
+                'post_author' => $author_id,
+                'post_parent' => $post_id,
+            ]);
+        }
+
+        $focus_keyword = sanitize_text_field($params['focus_keyword'] ?? $params['focus_keyphrase'] ?? '');
+        $meta_desc = sanitize_text_field($params['meta_description'] ?? '');
+        seo_potion_set_seo_meta($post_id, $title, $meta_desc, $focus_keyword);
+        seo_potion_set_squirrly_seo($post_id, $title, $meta_desc, $focus_keyword);
+
+        if ($source_article_id !== '') {
+            $completed = update_post_meta($post_id, '_seo_potion_source_publish_complete', '1');
+            if ($completed === false) {
+                $completion_thumbnail_id = (int) get_post_thumbnail_id($post_id);
+                seo_potion_delete_incomplete_source_post($post_id);
+                if (!empty($imageId) && $imageId !== $completion_thumbnail_id) {
+                    wp_delete_attachment($imageId, true);
+                }
+                return new WP_REST_Response(['error' => 'Failed to complete source publication'], 500);
+            }
+        }
+        return seo_potion_publish_response($post_id);
+    } finally {
+        seo_potion_release_source_publish_lock($source_lock_name);
     }
-
-    $focus_keyword = sanitize_text_field($params['focus_keyword'] ?? $params['focus_keyphrase'] ?? '');
-    $meta_desc = sanitize_text_field($params['meta_description'] ?? '');
-    seo_potion_set_seo_meta($post_id, $title, $meta_desc, $focus_keyword);
-    seo_potion_set_squirrly_seo($post_id, $title, $meta_desc, $focus_keyword);
-
-    return new WP_REST_Response(['success' => true, 'post_id' => $post_id], 200);
 }
 
 function seo_potion_edit_article($request) {
@@ -480,16 +628,7 @@ function seo_potion_edit_article($request) {
 
     seo_potion_clear_articles_cache();
 
-    $response = [
-        'success' => true,
-        'post_id' => $post->ID,
-    ];
-
-    if (!empty($warnings)) {
-        $response['warnings'] = array_values(array_unique($warnings));
-    }
-
-    return new WP_REST_Response($response, 200);
+    return seo_potion_publish_response($post->ID, $warnings);
 }
 
 function seo_potion_test_integration($request) {

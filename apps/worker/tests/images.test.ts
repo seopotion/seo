@@ -1,17 +1,39 @@
 import type { SQSEvent } from 'aws-lambda';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { findArticleById, setImagePlan, fillImageSlot, completeImages, failImages, findOrgById } =
-  vi.hoisted(() => ({
-    findArticleById: vi.fn(),
-    setImagePlan: vi.fn(async (_id: string, _images: unknown[]) => true),
-    fillImageSlot: vi.fn(
-      async (_id: string, _index: number, _fill: unknown, _newContent: string | null) => true,
-    ),
-    completeImages: vi.fn(async (_id: string, _coverUrl: string) => true),
-    failImages: vi.fn(async (_id: string) => {}),
-    findOrgById: vi.fn(),
-  }));
+const {
+  findArticleById,
+  setImagePlan,
+  fillImageSlot,
+  completeImages,
+  failImages,
+  findOrgById,
+  findWordPressMirror,
+  listIntegrations,
+  findIntegration,
+  connectWordPress,
+  recordPreflightError,
+  clearPreflightError,
+  initializeAttempt,
+  enqueuePublishTask,
+} = vi.hoisted(() => ({
+  findArticleById: vi.fn(),
+  setImagePlan: vi.fn(async (_id: string, _images: unknown[]) => true),
+  fillImageSlot: vi.fn(
+    async (_id: string, _index: number, _fill: unknown, _newContent: string | null) => true,
+  ),
+  completeImages: vi.fn(async (_id: string, _coverUrl: string) => true),
+  failImages: vi.fn(async (_id: string) => {}),
+  findOrgById: vi.fn(),
+  findWordPressMirror: vi.fn(),
+  listIntegrations: vi.fn(async (_orgId: string): Promise<unknown[]> => []),
+  findIntegration: vi.fn(),
+  connectWordPress: vi.fn(async () => {}),
+  recordPreflightError: vi.fn(async () => {}),
+  clearPreflightError: vi.fn(async () => {}),
+  initializeAttempt: vi.fn(async (_id: string, _provider: string, _requestedAt?: Date) => true),
+  enqueuePublishTask: vi.fn(async (_task: { provider: string }) => {}),
+}));
 vi.mock('@shared/db', () => ({
   ArticleRepo: {
     findById: findArticleById,
@@ -19,8 +41,27 @@ vi.mock('@shared/db', () => ({
     fillImageSlot,
     completeImages,
     failImages,
+    recordAutoPublishPreflightError: recordPreflightError,
+    clearAutoPublishPreflightError: clearPreflightError,
+    initializeAutoPublishAttempt: initializeAttempt,
   },
-  OrgRepo: { findById: findOrgById },
+  OrgRepo: {
+    findByIdWithoutSecrets: findOrgById,
+    findWordPressMirror,
+  },
+  IntegrationRepo: {
+    listByOrgId: listIntegrations,
+    findByOrgAndProvider: findIntegration,
+    connectWordPress,
+  },
+}));
+
+vi.mock('../src/queue', () => ({ enqueuePublishTask }));
+vi.mock('../../api/src/lib/secrets', () => ({
+  getGscTokenKey: vi.fn(async () => Buffer.alloc(32, 1)),
+}));
+vi.mock('../../api/src/lib/crypto', () => ({
+  encryptSecret: vi.fn(() => 'encrypted-token'),
 }));
 
 const { llmComplete, imageGenerate } = vi.hoisted(() => ({
@@ -163,6 +204,11 @@ beforeEach(() => {
   // mockReset, not just clearAllMocks: these tests queue `...Once` values, and
   // an unconsumed one would otherwise leak into the next test.
   findArticleById.mockReset();
+  findOrgById.mockReset().mockResolvedValue(org);
+  findWordPressMirror.mockReset().mockResolvedValue(null);
+  listIntegrations.mockReset().mockResolvedValue([]);
+  findIntegration.mockReset().mockResolvedValue(null);
+  enqueuePublishTask.mockReset().mockResolvedValue(undefined);
   fillImageSlot.mockReset().mockResolvedValue(true);
   imageGenerate.mockReset().mockResolvedValue({
     images: [{ url: 'https://fal.media/img.webp', width: 1200, height: 624 }],
@@ -436,5 +482,123 @@ describe('images worker', () => {
     findArticleById.mockResolvedValue(null);
     await handler(event({ org_id: 'o1', article_id: 'gone' }), {} as never, () => {});
     expect(imageGenerate).not.toHaveBeenCalled();
+  });
+
+  describe('auto-publish handoff', () => {
+    const enabledOrg = {
+      ...org,
+      presets: {
+        ...org.presets,
+        article_preferences: {
+          ...org.presets.article_preferences,
+          publishing: { auto_publish: true },
+        },
+      },
+    };
+    const completeArticle = { ...article, images_status: 'complete' as const };
+    const wordpress = {
+      id: 'i-wp',
+      org_id: 'o1',
+      provider: 'wordpress' as const,
+      site_url: 'https://x.com',
+      token_enc: 'enc',
+      connected_at: new Date(),
+      last_error: null,
+    };
+    const staticSite = {
+      id: 'i-static',
+      org_id: 'o1',
+      provider: 'static-site' as const,
+      host: 'github' as const,
+      installation_id: 1,
+      repo: 'o/r',
+      branch: 'main',
+      content_path: 'seopotion/',
+      connected_at: new Date(),
+      last_error: null,
+    };
+
+    test('disabled setting reads no integration or credential and sends no task', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue(org);
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(listIntegrations).not.toHaveBeenCalled();
+      expect(findWordPressMirror).not.toHaveBeenCalled();
+      expect(enqueuePublishTask).not.toHaveBeenCalled();
+    });
+
+    test('already-complete redelivery queues every connected provider', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue(enabledOrg);
+      listIntegrations.mockResolvedValue([wordpress, staticSite]);
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(initializeAttempt.mock.calls.map((call) => call[1])).toEqual([
+        'wordpress',
+        'static-site',
+      ]);
+      expect(enqueuePublishTask.mock.calls.map((call) => call[0].provider)).toEqual([
+        'wordpress',
+        'static-site',
+      ]);
+      expect(clearPreflightError).toHaveBeenCalledWith('a1');
+    });
+
+    test('missing destinations records an actionable preflight error', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue(enabledOrg);
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(recordPreflightError).toHaveBeenCalledWith(
+        'a1',
+        expect.objectContaining({ code: 'not_connected', kind: 'permanent' }),
+      );
+      expect(enqueuePublishTask).not.toHaveBeenCalled();
+    });
+
+    test('mirror-only WordPress connections are backfilled before queueing', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue({ ...enabledOrg, wordpress_connected_at: new Date() });
+      findWordPressMirror.mockResolvedValue({
+        website_url: 'https://x.com',
+        token: 'plain-token',
+        connected_at: new Date(),
+      });
+      findIntegration.mockResolvedValue(wordpress);
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(connectWordPress).toHaveBeenCalledWith('o1', 'https://x.com', 'encrypted-token');
+      expect(enqueuePublishTask).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'wordpress' }),
+      );
+    });
+
+    test('duplicate image deliveries only repeat safe idempotent initialization and messages', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue(enabledOrg);
+      listIntegrations.mockResolvedValue([wordpress]);
+
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+      await handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {});
+
+      expect(initializeAttempt).toHaveBeenCalledTimes(2);
+      expect(enqueuePublishTask).toHaveBeenCalledTimes(2);
+    });
+
+    test('queue send failure rethrows so the image message is redelivered', async () => {
+      findArticleById.mockResolvedValue(completeArticle);
+      findOrgById.mockResolvedValue(enabledOrg);
+      listIntegrations.mockResolvedValue([wordpress]);
+      enqueuePublishTask.mockRejectedValueOnce(new Error('sqs unavailable'));
+
+      await expect(
+        handler(event({ org_id: 'o1', article_id: 'a1' }), {} as never, () => {}),
+      ).rejects.toThrow('sqs unavailable');
+    });
   });
 });

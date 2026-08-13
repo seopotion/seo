@@ -156,7 +156,7 @@ describe('ArticleRepo (integration)', () => {
     await ArticleRepo.recordPublication(
       created.id,
       { provider: 'static-site', ref: 'sha1', slug: 'goes-live' },
-      at,
+      { publishedAt: at, updatedAt: null },
     );
 
     // Nothing used to write this, which left Content History, the published
@@ -170,7 +170,7 @@ describe('ArticleRepo (integration)', () => {
     await ArticleRepo.recordPublication(
       created.id,
       { provider: 'static-site', ref: 'sha2', slug: 'goes-live' },
-      later,
+      { updatedAt: later },
     );
     const republished = (await ArticleRepo.findById(created.id))!;
     expect(republished.status).toBe('published');
@@ -180,7 +180,7 @@ describe('ArticleRepo (integration)', () => {
     await ArticleRepo.recordPublication(
       created.id,
       { provider: 'wordpress', ref: '99', slug: 'goes-live' },
-      later,
+      { publishedAt: later, updatedAt: null },
     );
     expect((await ArticleRepo.findById(created.id))!.published_at).toEqual(at);
 
@@ -200,14 +200,91 @@ describe('ArticleRepo (integration)', () => {
     const entry = { provider: 'static-site' as const, ref: 'sha1', slug: 'stamped' };
 
     // The publisher passes the timestamp it already committed into manifest.json.
-    await ArticleRepo.recordPublication(created.id, entry, at);
+    await ArticleRepo.recordPublication(created.id, entry, {
+      publishedAt: at,
+      updatedAt: null,
+    });
     expect((await ArticleRepo.findById(created.id))!.publications[0]!.published_at).toEqual(at);
 
     const later = new Date('2026-07-31T12:00:00.000Z');
-    await ArticleRepo.recordPublication(created.id, { ...entry, ref: 'sha2' }, later);
+    await ArticleRepo.recordPublication(
+      created.id,
+      { ...entry, ref: 'sha2' },
+      {
+        updatedAt: later,
+      },
+    );
     const updated = (await ArticleRepo.findById(created.id))!.publications[0]!;
     expect(updated.updated_at).toEqual(later);
     expect(updated.published_at).toEqual(at);
+  });
+
+  test('recordPublication reconstructs an orphaned remote publish and later update', async () => {
+    const firstPublishedAt = new Date('2026-08-01T10:00:00.000Z');
+    const updatedAt = new Date('2026-08-02T10:00:00.000Z');
+    const created = await ArticleRepo.create(
+      base({ org_id: 'org_recovered', slug: 'recovered-static' }),
+    );
+
+    await ArticleRepo.recordPublication(
+      created.id,
+      {
+        provider: 'static-site',
+        ref: 'sha-recovered',
+        slug: 'recovered-static',
+      },
+      { publishedAt: firstPublishedAt, updatedAt },
+    );
+
+    const recovered = (await ArticleRepo.findById(created.id))!;
+    expect(recovered.publications[0]).toMatchObject({
+      published_at: firstPublishedAt,
+      updated_at: updatedAt,
+    });
+    expect(recovered.published_at).toEqual(firstPublishedAt);
+  });
+
+  test('recordPublication stores explicit insertion timestamps without equality inference', async () => {
+    const publishedAt = new Date('2026-08-03T10:00:00.000Z');
+    const updatedAt = new Date('2026-08-04T10:00:00.000Z');
+    const updated = await ArticleRepo.create(
+      base({ org_id: 'org_explicit_update', slug: 'explicit-update' }),
+    );
+    const unchanged = await ArticleRepo.create(
+      base({ org_id: 'org_explicit_null', slug: 'explicit-null' }),
+    );
+    const equal = await ArticleRepo.create(
+      base({ org_id: 'org_explicit_equal', slug: 'explicit-equal' }),
+    );
+
+    await ArticleRepo.recordPublication(
+      updated.id,
+      { provider: 'static-site', ref: 'sha-updated', slug: updated.slug },
+      { publishedAt, updatedAt },
+    );
+    await ArticleRepo.recordPublication(
+      unchanged.id,
+      { provider: 'static-site', ref: 'sha-unchanged', slug: unchanged.slug },
+      { publishedAt, updatedAt: null },
+    );
+    await ArticleRepo.recordPublication(
+      equal.id,
+      { provider: 'static-site', ref: 'sha-equal', slug: equal.slug },
+      { publishedAt, updatedAt: publishedAt },
+    );
+
+    expect((await ArticleRepo.findById(updated.id))!.publications[0]).toMatchObject({
+      published_at: publishedAt,
+      updated_at: updatedAt,
+    });
+    expect((await ArticleRepo.findById(unchanged.id))!.publications[0]).toMatchObject({
+      published_at: publishedAt,
+      updated_at: null,
+    });
+    expect((await ArticleRepo.findById(equal.id))!.publications[0]).toMatchObject({
+      published_at: publishedAt,
+      updated_at: publishedAt,
+    });
   });
 
   test('listPublishedTo returns only what is live with that provider (#7)', async () => {
@@ -284,5 +361,128 @@ describe('ArticleRepo (integration)', () => {
     };
     expect(await ArticleRepo.updateContent('not-an-objectid', patch)).toBeNull();
     expect(await ArticleRepo.updateContent('ffffffffffffffffffffffff', patch)).toBeNull();
+  });
+
+  test('auto-publish initialization is race-safe and one active lease wins', async () => {
+    const created = await ArticleRepo.create(base({ org_id: 'org_claim', slug: 'claim' }));
+    const requestedAt = new Date('2026-08-12T08:00:00.000Z');
+
+    const initialized = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        ArticleRepo.initializeAutoPublishAttempt(created.id, 'wordpress', requestedAt),
+      ),
+    );
+    expect(initialized.filter(Boolean)).toHaveLength(1);
+    expect((await ArticleRepo.findById(created.id))?.auto_publish.attempts).toHaveLength(1);
+
+    const now = new Date('2026-08-12T08:01:00.000Z');
+    const claims = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        ArticleRepo.claimAutoPublishAttempt(created.id, 'wordpress', now, 300_000),
+      ),
+    );
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(claims.find(Boolean)).toMatchObject({ status: 'publishing', attempt_count: 1 });
+    expect(
+      await ArticleRepo.claimAutoPublishAttempt(
+        created.id,
+        'wordpress',
+        new Date('2026-08-12T08:02:00.000Z'),
+        300_000,
+      ),
+    ).toBeNull();
+  });
+
+  test('expired claims are reclaimed and retry/failure/reset transitions stay provider-scoped', async () => {
+    const created = await ArticleRepo.create(base({ org_id: 'org_retry', slug: 'retry' }));
+    await ArticleRepo.initializeAutoPublishAttempt(created.id, 'wordpress');
+    await ArticleRepo.initializeAutoPublishAttempt(created.id, 'static-site');
+
+    const first = (await ArticleRepo.claimAutoPublishAttempt(
+      created.id,
+      'wordpress',
+      new Date('2026-08-12T09:00:00.000Z'),
+      60_000,
+    ))!;
+    const reclaimed = await ArticleRepo.claimAutoPublishAttempt(
+      created.id,
+      'wordpress',
+      new Date('2026-08-12T09:02:00.000Z'),
+      60_000,
+    );
+    expect(reclaimed).toMatchObject({ attempt_count: 2, status: 'publishing' });
+
+    const transient = {
+      code: 'network_error',
+      kind: 'transient' as const,
+      message: 'Provider could not be reached.',
+      at: new Date(),
+    };
+    expect(
+      await ArticleRepo.recordAutoPublishRetry(
+        created.id,
+        'wordpress',
+        reclaimed!.lease_expires_at!,
+        transient,
+      ),
+    ).toBe(true);
+    const retryClaim = (await ArticleRepo.claimAutoPublishAttempt(
+      created.id,
+      'wordpress',
+      new Date('2026-08-12T09:04:00.000Z'),
+      60_000,
+    ))!;
+    const permanent = {
+      code: 'wordpress_auth_failed',
+      kind: 'permanent' as const,
+      message: 'Reconnect WordPress.',
+      at: new Date(),
+    };
+    expect(
+      await ArticleRepo.failAutoPublishAttempt(
+        created.id,
+        'wordpress',
+        permanent,
+        retryClaim.lease_expires_at!,
+      ),
+    ).toBe(true);
+    expect(await ArticleRepo.resetAutoPublishAttempt(created.id, 'wordpress')).toBe(true);
+
+    const attempts = (await ArticleRepo.findById(created.id))!.auto_publish.attempts;
+    expect(attempts.find((attempt) => attempt.provider === 'wordpress')).toMatchObject({
+      status: 'queued',
+      attempt_count: 0,
+      last_error: null,
+    });
+    expect(attempts.find((attempt) => attempt.provider === 'static-site')).toMatchObject({
+      status: 'queued',
+      attempt_count: 0,
+    });
+    expect(first.requested_at).toBeInstanceOf(Date);
+  });
+
+  test('publication plus attempt completion reconciles without duplicate provider state', async () => {
+    const created = await ArticleRepo.create(base({ org_id: 'org_reconcile', slug: 'repair' }));
+    await ArticleRepo.initializeAutoPublishAttempt(created.id, 'static-site');
+    await ArticleRepo.recordPublication(created.id, {
+      provider: 'static-site',
+      ref: 'abc123',
+      slug: 'repair',
+      remote_url: 'https://github.com/o/r/commit/abc123',
+    });
+    expect(await ArticleRepo.completeAutoPublishAttempt(created.id, 'static-site')).toBe(true);
+
+    const reread = (await ArticleRepo.findById(created.id))!;
+    expect(reread.publications).toHaveLength(1);
+    expect(reread.publications[0]).toMatchObject({
+      ref: 'abc123',
+      remote_url: 'https://github.com/o/r/commit/abc123',
+    });
+    expect(reread.auto_publish.attempts).toEqual([
+      expect.objectContaining({ provider: 'static-site', status: 'published', last_error: null }),
+    ]);
+    expect(
+      await ArticleRepo.claimAutoPublishAttempt(created.id, 'static-site', new Date(), 60_000),
+    ).toBeNull();
   });
 });

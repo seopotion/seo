@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ArticleSchema, ImageTask } from '../src';
+import { ArticleSchema, ImageTask, PublishTask } from '../src';
 
 const baseDoc = {
   id: 'a1',
@@ -59,5 +59,19 @@ describe('ImageTask', () => {
       article_id: 'a',
     });
     expect(() => ImageTask.parse({ org_id: 'o' })).toThrow();
+  });
+});
+
+describe('PublishTask', () => {
+  test.each(['wordpress', 'static-site'] as const)('validates the %s provider', (provider) => {
+    expect(PublishTask.parse({ org_id: 'o', article_id: 'a', provider })).toEqual({
+      org_id: 'o',
+      article_id: 'a',
+      provider,
+    });
+  });
+
+  test('rejects unsupported providers', () => {
+    expect(() => PublishTask.parse({ org_id: 'o', article_id: 'a', provider: 'ghost' })).toThrow();
   });
 });

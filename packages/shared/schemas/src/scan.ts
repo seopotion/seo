@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INTEGRATION_PROVIDERS } from './integration';
 
 /**
  * Scan task message — the contract on the SQS queue between the API (producer,
@@ -41,3 +42,10 @@ export const ImageTask = z.object({
   article_id: z.string(),
 });
 export type ImageTask = z.infer<typeof ImageTask>;
+
+export const PublishTask = z.object({
+  org_id: z.string(),
+  article_id: z.string(),
+  provider: z.enum(INTEGRATION_PROVIDERS),
+});
+export type PublishTask = z.infer<typeof PublishTask>;

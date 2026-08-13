@@ -461,6 +461,19 @@
     "actions": {
       "openArticle": "{title} makalesini aç"
     },
+    "autoPublishing": {
+      "label": "Otomatik yayınlama: {status}",
+      "partialSuccess": "Bazı hedeflerde yayınlandı",
+      "shortLabel": "Otomatik: {status}",
+      "statuses": {
+        "needsAttention": "İlgilenmeniz gerekiyor",
+        "notQueued": "Kuyruğa alınmadı",
+        "published": "Yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      }
+    },
     "articleStatuses": {
       "deleted": "Silindi",
       "generated": "Oluşturuldu",
@@ -521,6 +534,94 @@
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
       "slug": "Slug"
+    },
+    "publishing": {
+      "actions": {
+        "articleSettings": "Otomatik yayın ayarlarını incele",
+        "billing": "Faturalandırmayı incele",
+        "integrations": "Entegrasyonları yönet",
+        "wordpressDocs": "WordPress rehberini aç"
+      },
+      "attemptCount": "{count} deneme",
+      "attemptStatuses": {
+        "cancelled": "İptal edildi",
+        "failed": "Başarısız",
+        "manual": "Elle yayınlandı",
+        "published": "Yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      },
+      "description": "Otomatik yayın durumunu bağlı her hedef için ayrı ayrı takip edin.",
+      "empty": "Bu makale için henüz otomatik yayın denemesi yok.",
+      "errorAt": "Bildirim zamanı: {date}",
+      "errors": {
+        "articleNotFound": "Bu makale artık kullanılamıyor.",
+        "autoPublishDisabled": "Otomatik yayınlama kapalı. Yeniden denemeden önce ayarı açın.",
+        "commitRejected": "GitHub commit'i reddetti. Depo erişimini ve dal korumasını kontrol edin.",
+        "githubRequestFailed": "GitHub'a ulaşılamadı veya geçersiz bir yanıt alındı. Tekrar deneyin.",
+        "imageGenerationFailed": "Görsel oluşturma başarısız olduğu için bu makale otomatik yayınlanamıyor.",
+        "imagesIncomplete": "Makale görselleri henüz tamamlanmadı. Görsel oluşturma bittikten sonra yeniden deneyin.",
+        "installationNotFound": "GitHub App kurulumu bulunamadı. Statik siteyi yeniden bağlayın.",
+        "installationSuspended": "GitHub App kurulumu askıya alınmış. Kurulumu etkinleştirin veya yeniden bağlayın.",
+        "invalidArticlePayload": "Makale verileri bu hedef için geçerli değil. Yeniden denemeden önce makaleyi düzeltin.",
+        "invalidCredentials": "Kayıtlı hedef kimlik bilgileri geçersiz. Entegrasyonu yeniden bağlayın.",
+        "invalidProviderResponse": "Yayın hedefi geçersiz bir yanıt verdi. Tekrar deneyin.",
+        "missingWritePermission": "GitHub App'in bu depoya yazma izni yok.",
+        "networkError": "Yayın hedefine ulaşılamadı. Tekrar deneyin.",
+        "notConnected": "Henüz yayınlanmamış bağlı bir yayın hedefi yok.",
+        "pluginUpgradeRequired": "Yeniden denemeden önce SeoPotion WordPress eklentisini 1.2.0 veya daha yeni bir sürüme güncelleyin.",
+        "queueSendFailed": "Yeniden deneme kuyruğa alınamadı. Tekrar deneyin.",
+        "recordFailed": "Uzak hedefte yayınlama tamamlandı ancak yerel kayıt kaydedilemedi. Güvenli biçimde eşitlemek için yeniden deneyin.",
+        "refConflict": "Yayınlama sırasında GitHub dalı sürekli değişti. Kısa süre sonra tekrar deneyin.",
+        "repoNotFound": "Yapılandırılmış GitHub deposu veya dalı bulunamadı.",
+        "slugConflict": "Bu statik site slug'ı başka bir makaleye ait. Yeniden denemeden önce slug'ı düzenleyin.",
+        "staticPublishInProgress": "Başka bir statik site yayını devam ediyor. Kısa süre sonra tekrar deneyin.",
+        "subscriptionRequired": "Otomatik yayınlama için ücretli veya uzman plan gerekir.",
+        "unknown": "Otomatik yayınlama tamamlanamadı. Tekrar deneyin veya hedef ayarlarını inceleyin.",
+        "wordpressAuthFailed": "WordPress kayıtlı kimlik bilgilerini reddetti. WordPress'i yeniden bağlayın.",
+        "wordpressPublishInProgress": "Bu WordPress yayını zaten devam ediyor. Kısa süre sonra tekrar deneyin.",
+        "wordpressRequestFailed": "WordPress yayınlama isteğini tamamlayamadı. Tekrar deneyin."
+      },
+      "labels": {
+        "attemptCount": "Denemeler",
+        "lastAttemptAt": "Son deneme",
+        "publishedAt": "İlk yayınlanma",
+        "requestedAt": "İstek zamanı",
+        "slug": "Hedef slug",
+        "updatedAt": "Son güncelleme"
+      },
+      "lastError": "Son hata",
+      "links": {
+        "static-site": "GitHub commit'ini görüntüle",
+        "wordpress": "Canlı WordPress yazısını görüntüle"
+      },
+      "notUpdated": "Güncellenmedi",
+      "partialSuccess": "Bu makale en az bir hedefte yayınlandı ancak başka bir hedef hâlâ ilgilenmenizi gerektiriyor.",
+      "preflightError": "Otomatik yayınlama ilgilenmenizi gerektiriyor",
+      "providers": {
+        "static-site": "Statik site",
+        "wordpress": "WordPress"
+      },
+      "retry": {
+        "accessibleLabel": "Başarısız otomatik yayın hedeflerini yeniden dene",
+        "alreadyPublished": "Bu makale bağlı hedeflerin tümünde zaten yayınlanmış.",
+        "button": "Başarısız yayını yeniden dene",
+        "editingBlocked": "Otomatik yayınlamayı yeniden denemeden önce makale değişikliklerini kaydedin veya geri alın.",
+        "queued": "{providers} için otomatik yayınlama kuyruğa alındı.",
+        "refreshing": "Durum yenileniyor...",
+        "submitting": "Yeniden deneme kuyruğa alınıyor..."
+      },
+      "settingsLink": "Otomatik yayın ayarlarını incele",
+      "statuses": {
+        "needsAttention": "İlgilenmeniz gerekiyor",
+        "notQueued": "Kuyruğa alınmadı",
+        "published": "Otomatik yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      },
+      "title": "Otomatik yayınlama"
     },
     "site": {
       "errors": {
@@ -633,8 +734,29 @@
         "placeholder": "Stil seç"
       },
       "autoPublish": {
-        "description": "Üretim tamamlandığında bitmiş makaleleri otomatik yayınlayın.",
-        "label": "Otomatik yayınlama"
+        "description": "Görselleri oluşturulan gelecek makaleleri otomatik olarak yayınlayın.",
+        "details": {
+          "destinations": "Bağlı yayınlama hedeflerinin tümü yayına dahil edilir.",
+          "failedAttempts": "Başarısız denemeleri daha sonra İçerik Geçmişi'ndeki makale sayfasından inceleyip yeniden deneyebilirsiniz.",
+          "futureArticles": "Bu ayar yalnızca gelecek makaleler için geçerlidir. Açılması, daha önce oluşturulmuş makaleleri yayınlamaz.",
+          "wordpress": "Otomatik WordPress yayını için SeoPotion WordPress eklentisinin 1.2.0 veya daha yeni bir sürümü gerekir."
+        },
+        "label": "Otomatik yayınlama",
+        "links": {
+          "billing": "Faturalandırmayı incele",
+          "integrations": "Entegrasyonları yönet"
+        },
+        "requirements": {
+          "allDestinationsHaveErrors": "Bağlı hedeflerin tümü şu anda ilgilenmenizi gerektiriyor. Bağlantılar düzeltilene kadar otomatik yayın denemeleri başarısız olabilir.",
+          "checkFailed": "Hedeflerin hazır olduğu doğrulanamadığı için otomatik yayınlama açılamıyor.",
+          "checkFailedEnabled": "Otomatik yayınlama açık kalır ancak hedeflerin hazır olduğu doğrulanamadı. Gelecekteki otomatik denemeler çalışmayabilir.",
+          "checking": "Hedeflerin hazır olup olmadığı hâlâ kontrol ediliyor. Otomatik yayınlamayı açmadan önce doğrulamanın bitmesini bekleyin.",
+          "checkingEnabled": "Hedeflerin hazır olup olmadığı kontrol edilirken otomatik yayınlama açık kalır. Doğrulama bitene kadar gelecekteki otomatik denemeler çalışmayabilir.",
+          "entitlement": "Otomatik yayınlamayı açmak için ücretli veya uzman plan gerekir.",
+          "entitlementEnabled": "Otomatik yayınlama açık kalır ancak ücretli veya uzman plan olmadan gelecekteki otomatik denemeler çalışmayabilir.",
+          "noDestination": "Otomatik yayınlamayı açmadan önce en az bir yayınlama hedefi bağlayın.",
+          "noDestinationEnabled": "Otomatik yayınlama açık kalır ancak bir yayınlama hedefi bağlanana kadar gelecekteki otomatik denemeler çalışmayabilir."
+        }
       },
       "internalLinks": {
         "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",

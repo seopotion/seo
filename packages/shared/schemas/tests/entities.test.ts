@@ -51,6 +51,37 @@ describe('ArticleSchema', () => {
     expect(a.topic_role).toBeNull();
     expect(a.topic_content_focus).toBeNull();
     expect(a.topic_primary_keyword).toBeNull();
+    expect(a.auto_publish).toEqual({ preflight_error: null, attempts: [] });
+  });
+
+  test('historical publications parse with a nullable remote URL', () => {
+    const a = ArticleSchema.parse({
+      id: 'a1',
+      org_id: 'o1',
+      keyword_id: 'k1',
+      title: 'Best Practices',
+      meta_title: 'Best Practices 2026',
+      slug: 'best-practices',
+      keyword: 'notion seo',
+      meta_description: 'meta',
+      featured_image_url: 'https://x/i.png',
+      content: '# body',
+      difficulty: 36,
+      search_volume: 170,
+      status: 'published',
+      created_at: new Date(),
+      published_at: new Date(),
+      publications: [
+        {
+          provider: 'wordpress',
+          ref: '42',
+          slug: 'best-practices',
+          published_at: new Date(),
+          updated_at: null,
+        },
+      ],
+    });
+    expect(a.publications[0]?.remote_url).toBeNull();
   });
 
   test.each(['pillar', 'support'] as const)('round-trips explicit %s topic metadata', (role) => {

@@ -25,6 +25,7 @@ const REFERENCE_LOCALE = routing.defaultLocale;
  */
 const SAME_IN_EVERY_LOCALE = new Set([
   'ArticleDetailPage.labels.slug',
+  'ArticleDetailPage.publishing.providers.wordpress',
   'ArticleEditor.fields.slug',
   'BillingPage.tiers.expert.name',
   'BillingPage.tiers.paid.name',

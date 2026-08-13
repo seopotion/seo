@@ -1,11 +1,11 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Pencil, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArticleContentPreview } from '@/components/article/ArticleContentPreview';
 import {
   ARTICLE_EDITOR_TITLE_ID,
@@ -21,6 +21,33 @@ import {
   useArticleEditor,
 } from '@/lib/article-editor';
 import { clearToken } from '@/lib/auth';
+import {
+  type AutoPublishAggregateStatus,
+  type AutoPublishAttempt,
+  type AutoPublishAttemptStatus,
+  type AutoPublishRetryState,
+  beginAutoPublishRetry,
+  completeAutoPublishRetryRequest,
+  createAutoPublishRetryState,
+  failAutoPublishRetryRequest,
+  getArticlePublishingStateVersion,
+  getAutoPublishAggregateState,
+  getAutoPublishRetryResult,
+  getPublishingErrorPresentation,
+  getSafePublicationUrl,
+  hasObservedManualPublishTarget,
+  isArticlePublishingBlocked,
+  joinPublishingProviders,
+  type ManualPublishRefreshTarget,
+  type ManualWordPressErrorState,
+  type ProviderPublishingState,
+  type PublishingErrorAction,
+  type PublishingErrorPresentation,
+  type PublishingProvider,
+  reconcileAutoPublishRetry,
+  reduceManualWordPressError,
+  shouldOfferAutoPublishRetry,
+} from '@/lib/auto-publishing';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
@@ -50,6 +77,24 @@ const SITE_ERROR_KEYS: Record<string, SiteErrorKey> = {
   record_failed: 'recordFailed',
 };
 
+const AUTO_PUBLISH_STATUS_KEYS = {
+  needs_attention: 'publishing.statuses.needsAttention',
+  not_queued: 'publishing.statuses.notQueued',
+  published: 'publishing.statuses.published',
+  publishing: 'publishing.statuses.publishing',
+  queued: 'publishing.statuses.queued',
+  retrying: 'publishing.statuses.retrying',
+} as const satisfies Record<AutoPublishAggregateStatus, string>;
+
+const ATTEMPT_STATUS_KEYS = {
+  cancelled: 'publishing.attemptStatuses.cancelled',
+  failed: 'publishing.attemptStatuses.failed',
+  published: 'publishing.attemptStatuses.published',
+  publishing: 'publishing.attemptStatuses.publishing',
+  queued: 'publishing.attemptStatuses.queued',
+  retrying: 'publishing.attemptStatuses.retrying',
+} as const satisfies Record<AutoPublishAttemptStatus, string>;
+
 export default function ArticleDetailPage() {
   const t = useTranslations('ArticleDetailPage');
   const editorT = useTranslations('ArticleEditor');
@@ -66,11 +111,24 @@ export default function ArticleDetailPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [wordpressActionState, setWordpressActionState] = useState<WordPressActionState>('idle');
-  const [wordpressError, setWordpressError] = useState<string | null>(null);
+  const [wordpressError, setWordpressError] = useState<ManualWordPressErrorState>(null);
   const [wordpressWarnings, setWordpressWarnings] = useState<string[]>([]);
   const [siteActionState, setSiteActionState] = useState<SiteActionState>('idle');
   const [siteErrorKey, setSiteErrorKey] = useState<SiteErrorKey>('failed');
   const [siteCommitUrl, setSiteCommitUrl] = useState<string | null>(null);
+  const [manualRefreshTargets, setManualRefreshTargets] = useState<ManualPublishRefreshTarget[]>(
+    [],
+  );
+  const [retryRequest, setRetryRequest] = useState<AutoPublishRetryState>(() =>
+    createAutoPublishRetryState(null),
+  );
+  const retryRequestRef = useRef(retryRequest);
+  const routeScope = organization && articleId ? `${organization.id}:${articleId}` : null;
+  const activeScopeRef = useRef(routeScope);
+  activeScopeRef.current = routeScope;
+  const forcePublishingStateRefresh =
+    (retryRequest.scope === routeScope && retryRequest.phase === 'awaiting_authoritative') ||
+    manualRefreshTargets.some((target) => target.scope === routeScope);
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }),
@@ -94,15 +152,83 @@ export default function ArticleDetailPage() {
   const editor = useArticleEditor({
     articleId: articleId ?? null,
     enabled: !redirecting && !organizationLoading && Boolean(organization),
+    forcePublishingStateRefresh,
     onClose: leaveEditMode,
     onUnauthorized: handleUnauthorized,
     organizationId: organization?.id ?? '',
+    pollPublishingState: true,
   });
   const { dirty, draftArticle, requestClose } = editor;
   const article = editor.article;
+  const providerPublishingStates = article
+    ? joinPublishingProviders(article.auto_publish_attempts, article.publications)
+    : [];
+  const autoPublishAggregate = article
+    ? getAutoPublishAggregateState({
+        autoPublishError: article.auto_publish_error,
+        attempts: article.auto_publish_attempts,
+        publications: article.publications,
+      })
+    : null;
+  const retryAvailable = article
+    ? shouldOfferAutoPublishRetry({
+        autoPublishError: article.auto_publish_error,
+        attempts: article.auto_publish_attempts,
+        publications: article.publications,
+      })
+    : false;
+  const retryScope = article && routeScope ? routeScope : null;
+  const articlePublishingStateVersion = article ? getArticlePublishingStateVersion(article) : null;
+  const retryPhase = retryRequest.scope === retryScope ? retryRequest.phase : 'idle';
+  const retryFeedback = retryRequest.scope === retryScope ? retryRequest.feedback : null;
   // Publishing pushes the *saved* record, so shipping mid-edit would silently
   // publish the old text. Blocked until the draft is saved or discarded.
-  const publishBlocked = editing || dirty;
+  const publishBlocked = isArticlePublishingBlocked(editing, dirty);
+
+  const updateRetryRequest = useCallback((next: AutoPublishRetryState) => {
+    retryRequestRef.current = next;
+    setRetryRequest(next);
+  }, []);
+
+  useEffect(() => {
+    if (retryRequestRef.current.scope !== routeScope) {
+      updateRetryRequest(createAutoPublishRetryState(routeScope));
+    }
+    setManualRefreshTargets([]);
+    setWordpressActionState('idle');
+    setWordpressError(null);
+    setWordpressWarnings([]);
+    setSiteActionState('idle');
+    setSiteCommitUrl(null);
+  }, [routeScope, updateRetryRequest]);
+
+  useEffect(() => {
+    if (
+      retryRequest.phase !== 'awaiting_authoritative' ||
+      !retryScope ||
+      !articlePublishingStateVersion
+    ) {
+      return;
+    }
+
+    const next = reconcileAutoPublishRetry(
+      retryRequestRef.current,
+      retryScope,
+      articlePublishingStateVersion,
+    );
+    if (next !== retryRequestRef.current) updateRetryRequest(next);
+  }, [articlePublishingStateVersion, retryRequest.phase, retryScope, updateRetryRequest]);
+
+  useEffect(() => {
+    if (!article || !routeScope) return;
+
+    setManualRefreshTargets((current) => {
+      const next = current.filter(
+        (target) => target.scope !== routeScope || !hasObservedManualPublishTarget(article, target),
+      );
+      return next.length === current.length ? current : next;
+    });
+  }, [article, routeScope]);
 
   // A reload or tab close is the one exit the in-app guards below cannot catch.
   useEffect(() => {
@@ -135,6 +261,26 @@ export default function ArticleDetailPage() {
   // which is how someone discovers publishing exists at all.
   const showSiteButton = staticSiteConnected === true;
   const showWordPressButton = wordpressConnected !== false || !showSiteButton;
+  const wordpressRefreshPending = manualRefreshTargets.some(
+    (target) => target.scope === routeScope && target.provider === 'wordpress',
+  );
+  const siteRefreshPending = manualRefreshTargets.some(
+    (target) => target.scope === routeScope && target.provider === 'static-site',
+  );
+
+  const refreshPublishingState = useCallback(async () => {
+    if (!organization || !articleId) return;
+
+    await Promise.all([
+      queryClient.invalidateQueries({
+        exact: true,
+        queryKey: dashboardQueryKeys.articleDetail(organization.id, articleId),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.articleLists(organization.id),
+      }),
+    ]);
+  }, [articleId, organization, queryClient]);
 
   const loadState: ArticleLoadState = !articleId
     ? 'not_found'
@@ -151,12 +297,21 @@ export default function ArticleDetailPage() {
               : 'not_found';
 
   async function syncWordPressArticle() {
-    if (!article || wordpressActionState === 'loading') return;
+    if (
+      !article ||
+      !routeScope ||
+      publishBlocked ||
+      wordpressRefreshPending ||
+      wordpressActionState === 'loading'
+    ) {
+      return;
+    }
 
     const isUpdate = Boolean(article.wordpress_post_id);
+    const scope = routeScope;
 
     setWordpressActionState('loading');
-    setWordpressError(null);
+    setWordpressError((current) => reduceManualWordPressError(current, { type: 'started' }));
     setWordpressWarnings([]);
 
     try {
@@ -173,7 +328,10 @@ export default function ArticleDetailPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setWordpressError('error' in data ? data.error : null);
+        if (activeScopeRef.current !== scope) return;
+        setWordpressError((current) =>
+          reduceManualWordPressError(current, { body: data, type: 'failed' }),
+        );
         setWordpressActionState('error');
         return;
       }
@@ -182,22 +340,39 @@ export default function ArticleDetailPage() {
         throw new Error('wordpress_response_invalid');
       }
 
-      queryClient.setQueryData<ArticleDetailResponse | null>(
-        dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
-        (currentArticle) =>
-          currentArticle ? { ...currentArticle, wordpress_post_id: data.post_id } : currentArticle,
-      );
+      if (activeScopeRef.current !== scope) {
+        await refreshPublishingState().catch(() => {});
+        return;
+      }
+      setWordpressError((current) => reduceManualWordPressError(current, { type: 'succeeded' }));
       setWordpressWarnings(data.warnings ?? []);
       setWordpressActionState(isUpdate ? 'updated' : 'published');
-    } catch {
-      setWordpressError(null);
+      setManualRefreshTargets((current) => [
+        ...current.filter((target) => target.scope !== scope || target.provider !== 'wordpress'),
+        { provider: 'wordpress', ref: String(data.post_id), scope },
+      ]);
+      await refreshPublishingState().catch(() => {});
+    } catch (error) {
+      if (activeScopeRef.current !== scope) return;
+      setWordpressError((current) =>
+        reduceManualWordPressError(current, { body: error, type: 'failed' }),
+      );
       setWordpressActionState('error');
     }
   }
 
   async function publishToSite() {
-    if (!article || siteActionState === 'loading') return;
+    if (
+      !article ||
+      !routeScope ||
+      publishBlocked ||
+      siteRefreshPending ||
+      siteActionState === 'loading'
+    ) {
+      return;
+    }
 
+    const scope = routeScope;
     setSiteActionState('loading');
     setSiteCommitUrl(null);
 
@@ -214,6 +389,7 @@ export default function ArticleDetailPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (activeScopeRef.current !== scope) return;
         const code = 'code' in data && typeof data.code === 'string' ? data.code : null;
         setSiteErrorKey((code && SITE_ERROR_KEYS[code]) || 'failed');
         setSiteActionState('error');
@@ -224,24 +400,83 @@ export default function ArticleDetailPage() {
         throw new Error('publish_response_invalid');
       }
 
-      // The article carries its first-publish date from here on, which is what
-      // flips the button to "Update".
-      queryClient.setQueryData<ArticleDetailResponse | null>(
-        dashboardQueryKeys.articleDetail(organization?.id ?? '', articleId ?? ''),
-        (currentArticle) =>
-          currentArticle
-            ? {
-                ...currentArticle,
-                static_site_published_at:
-                  currentArticle.static_site_published_at ?? new Date().toISOString(),
-              }
-            : currentArticle,
-      );
-      setSiteCommitUrl(data.commit_url);
+      if (activeScopeRef.current !== scope) {
+        await refreshPublishingState().catch(() => {});
+        return;
+      }
+      setSiteCommitUrl(getSafePublicationUrl(data.commit_url));
       setSiteActionState('published');
+      setManualRefreshTargets((current) => [
+        ...current.filter((target) => target.scope !== scope || target.provider !== 'static-site'),
+        { provider: 'static-site', ref: data.commit_sha, scope },
+      ]);
+      await refreshPublishingState().catch(() => {});
     } catch {
+      if (activeScopeRef.current !== scope) return;
       setSiteErrorKey('failed');
       setSiteActionState('error');
+    }
+  }
+
+  async function retryAutoPublish() {
+    if (!article || !organization || !retryScope || !articlePublishingStateVersion) return;
+
+    const scope = retryScope;
+    const started = beginAutoPublishRetry(retryRequestRef.current, {
+      publishBlocked,
+      publishingStateVersion: articlePublishingStateVersion,
+      retryAvailable,
+      scope,
+    });
+    if (started.state !== retryRequestRef.current) updateRetryRequest(started.state);
+    if (!started.shouldSubmit) return;
+
+    try {
+      const response = await api.api.v0.dashboard.articles[':id']['auto-publish'].retry.$post({
+        param: { id: article.id },
+      });
+
+      if ((response.status as number) === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const code =
+          'code' in data && typeof data.code === 'string'
+            ? data.code
+            : (response.status as number) === 404
+              ? 'article_not_found'
+              : 'unknown';
+        const failed = failAutoPublishRetryRequest(
+          retryRequestRef.current,
+          scope,
+          getPublishingErrorPresentation(code),
+        );
+        if (failed !== retryRequestRef.current) updateRetryRequest(failed);
+        return;
+      }
+
+      if (!('queued' in data)) {
+        throw new Error('retry_response_invalid');
+      }
+
+      const completed = completeAutoPublishRetryRequest(
+        retryRequestRef.current,
+        scope,
+        getAutoPublishRetryResult(data.queued),
+      );
+      if (completed !== retryRequestRef.current) updateRetryRequest(completed);
+      await refreshPublishingState().catch(() => {});
+    } catch {
+      const failed = failAutoPublishRetryRequest(
+        retryRequestRef.current,
+        scope,
+        getPublishingErrorPresentation('unknown'),
+      );
+      if (failed !== retryRequestRef.current) updateRetryRequest(failed);
     }
   }
 
@@ -305,9 +540,9 @@ export default function ArticleDetailPage() {
               {showSiteButton ? (
                 <Button
                   onClick={publishToSite}
-                  disabled={publishBlocked || siteActionState === 'loading'}
+                  disabled={publishBlocked || siteActionState === 'loading' || siteRefreshPending}
                 >
-                  {siteActionState === 'loading'
+                  {siteActionState === 'loading' || siteRefreshPending
                     ? t(
                         article.static_site_published_at
                           ? 'actions.updatingSite'
@@ -327,10 +562,11 @@ export default function ArticleDetailPage() {
                   disabled={
                     publishBlocked ||
                     wordpressActionState === 'loading' ||
+                    wordpressRefreshPending ||
                     wordpressConnected === false
                   }
                 >
-                  {wordpressActionState === 'loading'
+                  {wordpressActionState === 'loading' || wordpressRefreshPending
                     ? t(
                         article.wordpress_post_id
                           ? 'actions.updatingWordPress'
@@ -398,8 +634,8 @@ export default function ArticleDetailPage() {
       ) : null}
       {wordpressActionState === 'error' ? (
         <StatusPanel tone="error">
-          {wordpressError
-            ? t('wordpress.pluginError', { error: wordpressError })
+          {wordpressError?.kind === 'plugin'
+            ? t('wordpress.pluginError', { error: wordpressError.error })
             : t('wordpress.requestError')}
         </StatusPanel>
       ) : null}
@@ -412,6 +648,21 @@ export default function ArticleDetailPage() {
             ))}
           </ul>
         </StatusPanel>
+      ) : null}
+
+      {article && autoPublishAggregate ? (
+        <AutomaticPublishingPanel
+          aggregate={autoPublishAggregate}
+          article={article}
+          dateTimeFormatter={dateTimeFormatter}
+          onRetry={retryAutoPublish}
+          publishBlocked={publishBlocked}
+          providerStates={providerPublishingStates}
+          retryAvailable={retryAvailable}
+          retryFeedback={retryFeedback}
+          retryPhase={retryPhase}
+          t={t}
+        />
       ) : null}
 
       {editing && article && draftArticle ? (
@@ -508,6 +759,7 @@ function StatusPanel({
   return (
     <div
       aria-live="polite"
+      role={tone === 'error' ? 'alert' : 'status'}
       className={cn(
         'rounded-md border px-4 py-3 text-sm',
         tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
@@ -517,6 +769,409 @@ function StatusPanel({
     >
       {children}
     </div>
+  );
+}
+
+function AutomaticPublishingPanel({
+  aggregate,
+  article,
+  dateTimeFormatter,
+  onRetry,
+  publishBlocked,
+  providerStates,
+  retryAvailable,
+  retryFeedback,
+  retryPhase,
+  t,
+}: {
+  aggregate: ReturnType<typeof getAutoPublishAggregateState>;
+  article: ArticleDetailResponse;
+  dateTimeFormatter: Intl.DateTimeFormat;
+  onRetry: () => void;
+  publishBlocked: boolean;
+  providerStates: ProviderPublishingState[];
+  retryAvailable: boolean;
+  retryFeedback: AutoPublishRetryState['feedback'];
+  retryPhase: AutoPublishRetryState['phase'];
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>;
+}) {
+  const aggregateLabel = t(AUTO_PUBLISH_STATUS_KEYS[aggregate.status]);
+  const retryLocked = retryPhase !== 'idle';
+
+  return (
+    <section
+      aria-labelledby="automatic-publishing-title"
+      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 id="automatic-publishing-title" className="font-semibold text-slate-950 text-base">
+            {t('publishing.title')}
+          </h2>
+          <p className="mt-1 text-slate-600 text-sm">{t('publishing.description')}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <AutoPublishAggregateBadge status={aggregate.status} label={aggregateLabel} />
+          {retryAvailable ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={t('publishing.retry.accessibleLabel')}
+              aria-describedby={publishBlocked ? 'automatic-publishing-retry-blocked' : undefined}
+              disabled={publishBlocked || retryLocked}
+              onClick={onRetry}
+            >
+              <RotateCcw
+                className={cn('size-4', retryLocked && 'animate-spin')}
+                aria-hidden="true"
+              />
+              {t(
+                retryPhase === 'submitting'
+                  ? 'publishing.retry.submitting'
+                  : retryPhase === 'awaiting_authoritative'
+                    ? 'publishing.retry.refreshing'
+                    : 'publishing.retry.button',
+              )}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {retryAvailable && publishBlocked ? (
+        <p id="automatic-publishing-retry-blocked" className="text-slate-600 text-sm">
+          {t('publishing.retry.editingBlocked')}
+        </p>
+      ) : null}
+
+      {retryFeedback?.kind === 'queued' ? (
+        <StatusPanel tone="success">
+          {t('publishing.retry.queued', {
+            providers: formatProviderList(
+              retryFeedback.providers,
+              dateTimeFormatter.resolvedOptions().locale,
+              t,
+            ),
+          })}
+        </StatusPanel>
+      ) : null}
+      {retryFeedback?.kind === 'already_published' ? (
+        <StatusPanel tone="success">{t('publishing.retry.alreadyPublished')}</StatusPanel>
+      ) : null}
+      {retryFeedback?.kind === 'error' ? (
+        <StatusPanel tone="error">
+          <LocalizedPublishingError error={retryFeedback.error} t={t} />
+        </StatusPanel>
+      ) : null}
+
+      {article.auto_publish_error ? (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm"
+        >
+          <h3 className="font-medium">{t('publishing.preflightError')}</h3>
+          <div className="mt-1">
+            <LocalizedPublishingError
+              error={getPublishingErrorPresentation(article.auto_publish_error.code)}
+              t={t}
+            />
+          </div>
+          <p className="mt-1 text-red-700 text-xs">
+            {t('publishing.errorAt', {
+              date: formatDate(article.auto_publish_error.at, dateTimeFormatter),
+            })}
+          </p>
+        </div>
+      ) : null}
+
+      {aggregate.partialSuccess ? (
+        <StatusPanel tone="warning">{t('publishing.partialSuccess')}</StatusPanel>
+      ) : null}
+
+      {providerStates.length > 0 ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {providerStates.map((providerState) => (
+            <ProviderPublishingCard
+              key={providerState.provider}
+              dateTimeFormatter={dateTimeFormatter}
+              state={providerState}
+              t={t}
+            />
+          ))}
+        </div>
+      ) : article.auto_publish_error ? null : (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600 text-sm">
+          <p>{t('publishing.empty')}</p>
+          <Link
+            href="/article-settings"
+            className="mt-2 inline-flex font-medium text-slate-950 underline underline-offset-2"
+          >
+            {t('publishing.settingsLink')}
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AutoPublishAggregateBadge({
+  label,
+  status,
+}: {
+  label: string;
+  status: AutoPublishAggregateStatus;
+}) {
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        'w-fit border-transparent',
+        status === 'needs_attention'
+          ? 'bg-red-100 text-red-700'
+          : status === 'retrying'
+            ? 'bg-amber-100 text-amber-800'
+            : status === 'publishing'
+              ? 'bg-violet-100 text-violet-700'
+              : status === 'queued'
+                ? 'bg-sky-100 text-sky-700'
+                : status === 'published'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-600',
+      )}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+function ProviderPublishingCard({
+  dateTimeFormatter,
+  state,
+  t,
+}: {
+  dateTimeFormatter: Intl.DateTimeFormat;
+  state: ProviderPublishingState;
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>;
+}) {
+  const { attempt, provider, publication } = state;
+  const remoteUrl = getSafePublicationUrl(publication?.remote_url ?? null);
+
+  return (
+    <article className="grid min-w-0 gap-3 rounded-md border border-slate-200 p-4">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-medium text-slate-950">{t(`publishing.providers.${provider}`)}</h3>
+        <AttemptStatusBadge attempt={attempt} hasPublication={Boolean(publication)} t={t} />
+      </header>
+
+      {attempt ? (
+        <dl className="grid gap-2 text-sm sm:grid-cols-2">
+          <PublishingDetail
+            label={t('publishing.labels.attemptCount')}
+            value={t('publishing.attemptCount', { count: attempt.attempt_count })}
+          />
+          <PublishingDateDetail
+            dateTime={attempt.requested_at}
+            formatter={dateTimeFormatter}
+            label={t('publishing.labels.requestedAt')}
+          />
+          {attempt.last_attempt_at ? (
+            <PublishingDateDetail
+              dateTime={attempt.last_attempt_at}
+              formatter={dateTimeFormatter}
+              label={t('publishing.labels.lastAttemptAt')}
+            />
+          ) : null}
+        </dl>
+      ) : null}
+
+      {attempt?.last_error ? (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-800 text-sm"
+        >
+          <p className="font-medium">{t('publishing.lastError')}</p>
+          <LocalizedPublishingError
+            error={getPublishingErrorPresentation(attempt.last_error.code)}
+            t={t}
+          />
+          <p className="mt-1 text-red-700 text-xs">
+            {t('publishing.errorAt', {
+              date: formatDate(attempt.last_error.at, dateTimeFormatter),
+            })}
+          </p>
+        </div>
+      ) : null}
+
+      {publication ? (
+        <div className="grid gap-3 border-slate-200 border-t pt-3">
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <PublishingDetail label={t('publishing.labels.slug')} value={publication.slug} />
+            <PublishingDateDetail
+              dateTime={publication.published_at}
+              formatter={dateTimeFormatter}
+              label={t('publishing.labels.publishedAt')}
+            />
+            {publication.updated_at ? (
+              <PublishingDateDetail
+                dateTime={publication.updated_at}
+                formatter={dateTimeFormatter}
+                label={t('publishing.labels.updatedAt')}
+              />
+            ) : (
+              <PublishingDetail
+                label={t('publishing.labels.updatedAt')}
+                value={t('publishing.notUpdated')}
+              />
+            )}
+          </dl>
+          {remoteUrl ? (
+            <a
+              className="inline-flex w-fit items-center gap-1.5 font-medium text-slate-950 text-sm underline underline-offset-2"
+              href={remoteUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              {t(
+                provider === 'wordpress'
+                  ? 'publishing.links.wordpress'
+                  : 'publishing.links.static-site',
+              )}
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function AttemptStatusBadge({
+  attempt,
+  hasPublication,
+  t,
+}: {
+  attempt: AutoPublishAttempt | null;
+  hasPublication: boolean;
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>;
+}) {
+  const label = attempt
+    ? t(ATTEMPT_STATUS_KEYS[attempt.status])
+    : hasPublication
+      ? t('publishing.attemptStatuses.manual')
+      : t('publishing.statuses.notQueued');
+
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        'w-fit border-transparent',
+        attempt?.status === 'failed' || attempt?.status === 'cancelled'
+          ? 'bg-red-100 text-red-700'
+          : attempt?.status === 'retrying'
+            ? 'bg-amber-100 text-amber-800'
+            : attempt?.status === 'publishing'
+              ? 'bg-violet-100 text-violet-700'
+              : attempt?.status === 'queued'
+                ? 'bg-sky-100 text-sky-700'
+                : attempt?.status === 'published' || hasPublication
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-600',
+      )}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+function PublishingDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-slate-500 text-xs">{label}</dt>
+      <dd className="mt-0.5 break-words font-medium text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function PublishingDateDetail({
+  dateTime,
+  formatter,
+  label,
+}: {
+  dateTime: string;
+  formatter: Intl.DateTimeFormat;
+  label: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-slate-500 text-xs">{label}</dt>
+      <dd className="mt-0.5 font-medium text-slate-800">
+        <time dateTime={dateTime}>{formatDate(dateTime, formatter)}</time>
+      </dd>
+    </div>
+  );
+}
+
+function LocalizedPublishingError({
+  error,
+  t,
+}: {
+  error: PublishingErrorPresentation;
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>;
+}) {
+  return (
+    <>
+      <span>{t(error.messageKey)}</span>
+      <PublishingErrorActionLink action={error.action} t={t} />
+    </>
+  );
+}
+
+function PublishingErrorActionLink({
+  action,
+  t,
+}: {
+  action: PublishingErrorAction;
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>;
+}) {
+  if (!action || action === 'edit_slug') return null;
+
+  const destination = {
+    article_settings: {
+      href: '/article-settings',
+      key: 'publishing.actions.articleSettings',
+    },
+    billing: {
+      href: '/settings?tab=billing',
+      key: 'publishing.actions.billing',
+    },
+    integrations: {
+      href: '/settings?tab=integrations',
+      key: 'publishing.actions.integrations',
+    },
+    wordpress_docs: {
+      href: '/docs/wordpress',
+      key: 'publishing.actions.wordpressDocs',
+    },
+  } as const;
+  const target = destination[action];
+
+  return (
+    <>
+      {' '}
+      <Link className="font-medium underline underline-offset-2" href={target.href}>
+        {t(target.key)}
+      </Link>
+    </>
+  );
+}
+
+function formatProviderList(
+  providers: PublishingProvider[],
+  locale: string,
+  t: ReturnType<typeof useTranslations<'ArticleDetailPage'>>,
+) {
+  return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(
+    providers.map((provider) => t(`publishing.providers.${provider}`)),
   );
 }
 
