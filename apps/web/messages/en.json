@@ -945,13 +945,6 @@
       "description": "Join startups, agencies, and teams who use Seopotion to scale their SEO without hiring a marketing team.",
       "title": "Ready to Boost your SEO?"
     },
-    "footer": {
-      "blog": "Blog",
-      "copyright": "© 2026 Seopotion. All rights reserved.",
-      "features": "Features",
-      "pricing": "Pricing",
-      "support": "Support"
-    },
     "hero": {
       "subtitle": "We make your brand show up on both Google and ChatGPT, on autopilot.",
       "titleLine1": "Stand Out on",
@@ -995,6 +988,16 @@
       }
     ],
     "useCasesTitle": "Perfect for"
+  },
+  "Footer": {
+    "copyright": "© 2026 Seopotion. All rights reserved.",
+    "features": "Features",
+    "legalNavigationLabel": "Legal",
+    "navigationLabel": "Footer navigation",
+    "pricing": "Pricing",
+    "privacyPolicy": "Privacy Policy",
+    "refundPolicy": "Refund Policy",
+    "termsOfService": "Terms of Service"
   },
   "LocaleSwitcher": {
     "label": "Language"

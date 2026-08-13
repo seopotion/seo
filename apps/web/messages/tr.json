@@ -945,13 +945,6 @@
       "description": "Pazarlama ekibi işe almadan SEO'sunu büyütmek için Seopotion kullanan startup'lara, ajanslara ve ekiplere katılın.",
       "title": "SEO'nuzu büyütmeye hazır mısınız?"
     },
-    "footer": {
-      "blog": "Blog",
-      "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
-      "features": "Özellikler",
-      "pricing": "Fiyatlandırma",
-      "support": "Destek"
-    },
     "hero": {
       "subtitle": "Markanızın hem Google'da hem ChatGPT'de otomatik olarak görünmesini sağlarız.",
       "titleLine1": "Google ve ChatGPT'de",
@@ -995,6 +988,16 @@
       }
     ],
     "useCasesTitle": "Kimler için ideal?"
+  },
+  "Footer": {
+    "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
+    "features": "Özellikler",
+    "legalNavigationLabel": "Yasal",
+    "navigationLabel": "Alt bilgi navigasyonu",
+    "pricing": "Fiyatlandırma",
+    "privacyPolicy": "Gizlilik Politikası",
+    "refundPolicy": "İade Politikası",
+    "termsOfService": "Hizmet Şartları"
   },
   "LocaleSwitcher": {
     "label": "Dil"

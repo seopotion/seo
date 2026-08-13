@@ -1,5 +1,6 @@
 import { setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { Footer } from '@/components/footer';
 import { Navbar } from '@/components/navbar';
 import { routeLocale } from '@/i18n/locale';
 
@@ -17,6 +18,7 @@ export default async function MarketingLayout({
     <>
       <Navbar />
       {children}
+      <Footer />
     </>
   );
 }

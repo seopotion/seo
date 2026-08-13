@@ -9,6 +9,9 @@ const defaultLastModified = new Date('2026-07-01');
 const publicPaths = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/pricing', changeFrequency: 'monthly', priority: 0.8 },
+  { path: '/terms', changeFrequency: 'yearly', priority: 0.3 },
+  { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },
+  { path: '/refunds', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/docs', changeFrequency: 'weekly', priority: 0.7 },
 ] as const;
 
