@@ -2,7 +2,7 @@
  * db command — database management.
  */
 import { defineCommand } from 'citty';
-import { EXIT, fail, type OutputMode, ok } from '../types';
+import { EXIT, fail, type OutputMode } from '../types';
 import { createEmitter } from '../utils/emitter';
 import { emitInternal, outputOption, verboseOption } from './shared';
 
@@ -287,21 +287,18 @@ export const dbCommand = defineCommand({
       async run({ args }) {
         const emitter = createEmitter(args.output as OutputMode);
         try {
-          const { createStrategyRun, runLocalStrategy } = await import('@shared/strategy');
+          const { strategyRun } = await import('../lib/db');
 
           emitter.warn(
             'Writes to whatever MONGODB_URI targets and spends real provider credits — not a dry run.',
           );
           emitter.step('db:strategy-run', 'start');
 
-          const run = await createStrategyRun(args.org as string);
-          if (args.verbose) emitter.info(`strategy run ${run.id} created; executing…`);
-          await runLocalStrategy(run.id);
+          const result = await strategyRun({ orgId: args.org as string });
+          emitter.step('db:strategy-run', result.ok ? 'done' : 'fail');
+          emitter.result(result);
 
-          emitter.step('db:strategy-run', 'done');
-          emitter.result(ok({ run_id: run.id }));
-
-          process.exit(EXIT.SUCCESS);
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
         } catch (e) {
           return emitInternal(emitter, e);
         }
