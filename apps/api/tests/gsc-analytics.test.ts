@@ -149,7 +149,14 @@ describe('daysLive / articlePublishedAt', () => {
       articlePublishedAt({
         published_at: later,
         publications: [
-          { provider: 'wordpress', ref: '1', slug: 's', published_at: early, updated_at: null },
+          {
+            provider: 'wordpress',
+            ref: '1',
+            slug: 's',
+            published_at: early,
+            updated_at: null,
+            remote_url: null,
+          },
         ],
       }),
     ).toEqual(early);

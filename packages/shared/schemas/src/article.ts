@@ -8,6 +8,14 @@ export const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
 /** Image slot roles + article-level image pipeline states (#51). */
 export const ARTICLE_IMAGE_ROLES = ['cover', 'inline'] as const;
 export const IMAGES_STATUSES = ['pending', 'complete', 'failed'] as const;
+export const AUTO_PUBLISH_STATUSES = [
+  'queued',
+  'publishing',
+  'retrying',
+  'failed',
+  'published',
+  'cancelled',
+] as const;
 
 /** SEO meta length limits. Here (not @shared/generation) so `apps/web` can
  * import them without pulling the LLM provider clients into the bundle. */
@@ -67,8 +75,34 @@ export const ArticlePublicationSchema = z.object({
   slug: z.string(),
   published_at: z.date(),
   updated_at: z.date().nullable(),
+  remote_url: z.string().url().nullable().default(null),
 });
 export type ArticlePublication = z.infer<typeof ArticlePublicationSchema>;
+
+export const PublishingErrorSchema = z.object({
+  code: z.string(),
+  kind: z.enum(['transient', 'permanent']),
+  message: z.string(),
+  at: z.date(),
+});
+export type PublishingError = z.infer<typeof PublishingErrorSchema>;
+
+export const AutoPublishAttemptSchema = z.object({
+  provider: z.enum(INTEGRATION_PROVIDERS),
+  status: z.enum(AUTO_PUBLISH_STATUSES),
+  attempt_count: z.number().int().min(0),
+  requested_at: z.date(),
+  last_attempt_at: z.date().nullable(),
+  lease_expires_at: z.date().nullable(),
+  last_error: PublishingErrorSchema.nullable(),
+});
+export type AutoPublishAttempt = z.infer<typeof AutoPublishAttemptSchema>;
+
+export const AutoPublishStateSchema = z.object({
+  preflight_error: PublishingErrorSchema.nullable().default(null),
+  attempts: z.array(AutoPublishAttemptSchema).max(INTEGRATION_PROVIDERS.length).default([]),
+});
+export type AutoPublishState = z.infer<typeof AutoPublishStateSchema>;
 
 /**
  * Article entity. `title` is the generated SEO title (distinct from `keyword`);
@@ -100,6 +134,7 @@ export const ArticleSchema = z.object({
   // Per-provider publish state (#7). Defaulted so pre-#7 docs still parse; the
   // `db migrate` backfill seeds it from `wordpress_post_id`.
   publications: z.array(ArticlePublicationSchema).default([]),
+  auto_publish: AutoPublishStateSchema.default({ preflight_error: null, attempts: [] }),
   // Deprecated mirror of the `wordpress` entry in `publications`, kept for one
   // release: it is on the wire in ArticleDetailResponse and read by apps/web.
   wordpress_post_id: z.number().int().positive().optional(),
@@ -122,6 +157,7 @@ export const CreateArticleInput = ArticleSchema.omit({
   created_at: true,
   updated_at: true,
   publications: true,
+  auto_publish: true,
   wordpress_post_id: true,
 });
 // `z.input` (not `z.infer`) so the defaulted image fields stay optional in the

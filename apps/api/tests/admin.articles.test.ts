@@ -306,6 +306,26 @@ describe('PUT /admin/v0/articles/{article_id}/wordpress (update)', () => {
       expect.objectContaining({ action: 'article.wordpress_update' }),
     );
   });
+
+  test('returns an accurate 404 when the remote post was deleted', async () => {
+    const published = { ...article, wordpress_post_id: 42 };
+    repos.ArticleRepo.findById.mockResolvedValueOnce(published);
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    wp.editWordPressArticle.mockResolvedValueOnce({
+      status: 404,
+      body: { error: 'Post not found' },
+    });
+
+    const res = await client.admin.v0.articles[':article_id'].wordpress.$put(
+      { param: { article_id: article.id } },
+      await authed(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'The WordPress post no longer exists.' });
+    expect(repos.ArticleRepo.recordPublication).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /admin/v0/articles/{article_id}/images (replay)', () => {

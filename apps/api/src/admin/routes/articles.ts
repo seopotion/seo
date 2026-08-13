@@ -7,8 +7,9 @@ import {
   type Org,
 } from '@shared/schemas';
 import { enqueueImageTask } from '../../clients/sqs';
-import { editWordPressArticle, submitWordPressArticle } from '../../clients/wordpress';
 import { recordWordPressPublication } from '../../lib/publications';
+import { publishWordPressArticle, updateWordPressArticle } from '../../lib/publishers';
+import { PublishingFailure } from '../../lib/publishing-errors';
 import { audit } from '../audit';
 import { toAdminArticleDetail, toAdminArticleListItem } from '../dto';
 import type { AdminEnv } from '../middleware';
@@ -239,32 +240,39 @@ const articles = new OpenAPIHono<AdminEnv>()
       }
 
       try {
-        // wordpress_token presence is proven by wordpressConnected above.
-        const result = await submitWordPressArticle(
-          org.website_url,
-          org.wordpress_token as string,
+        const published = await publishWordPressArticle({
           article,
-        );
-        if (result.status === 200) {
-          const persisted = await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
-          if (!persisted) return c.json({ error: 'post_id_not_saved' }, 500);
-          await recordWordPressPublication(article, result.body.post_id);
-          await audit(c, {
-            action: 'article.wordpress_publish',
-            org_id: org.id,
-            entity: { type: 'article', id: article.id },
-            payload: { post_id: result.body.post_id },
-            before: { wordpress_post_id: null },
-          });
-          return c.json(result.body, 200);
+          websiteUrl: org.website_url,
+          token: org.wordpress_token as string,
+          automatic: false,
+        });
+        const persisted = await ArticleRepo.setWordPressPostId(article.id, published.post_id);
+        if (!persisted) return c.json({ error: 'post_id_not_saved' }, 500);
+        await recordWordPressPublication(article, {
+          post_id: published.post_id,
+          slug: published.slug,
+          remote_url: published.remote_url,
+          published_at: published.published_at,
+        });
+        await audit(c, {
+          action: 'article.wordpress_publish',
+          org_id: org.id,
+          entity: { type: 'article', id: article.id },
+          payload: { post_id: published.post_id },
+          before: { wordpress_post_id: null },
+        });
+        return c.json(published.response, 200);
+      } catch (err) {
+        if (!(err instanceof PublishingFailure)) {
+          return c.json({ error: 'wordpress_request_failed' }, 502);
         }
-        if (result.status === 400) return c.json(result.body, 400);
-        if (result.status === 403) return c.json(result.body, 403);
-        if (result.status === 404) return c.json(result.body, 404);
-        if (result.status === 409) return c.json(result.body, 409);
-        return c.json(result.body, 500);
-      } catch {
-        return c.json({ error: 'wordpress_request_failed' }, 502);
+        const body = { error: err.httpStatus === 502 ? 'wordpress_request_failed' : err.message };
+        if (err.httpStatus === 400) return c.json(body, 400);
+        if (err.httpStatus === 403) return c.json(body, 403);
+        if (err.httpStatus === 404) return c.json(body, 404);
+        if (err.httpStatus === 409) return c.json(body, 409);
+        if (err.httpStatus === 500) return c.json(body, 500);
+        return c.json(body, 502);
       }
     },
   )
@@ -323,29 +331,36 @@ const articles = new OpenAPIHono<AdminEnv>()
       }
 
       try {
-        const result = await editWordPressArticle(
-          org.website_url,
-          org.wordpress_token as string,
-          article.wordpress_post_id,
+        const published = await updateWordPressArticle({
           article,
-        );
-        if (result.status === 200) {
-          await recordWordPressPublication(article, article.wordpress_post_id);
-          await audit(c, {
-            action: 'article.wordpress_update',
-            org_id: org.id,
-            entity: { type: 'article', id: article.id },
-            payload: { post_id: article.wordpress_post_id },
-          });
-          return c.json(result.body, 200);
+          websiteUrl: org.website_url,
+          token: org.wordpress_token as string,
+          postId: article.wordpress_post_id,
+        });
+        await recordWordPressPublication(article, {
+          post_id: published.post_id,
+          slug: published.slug,
+          remote_url: published.remote_url,
+          published_at: published.published_at,
+        });
+        await audit(c, {
+          action: 'article.wordpress_update',
+          org_id: org.id,
+          entity: { type: 'article', id: article.id },
+          payload: { post_id: article.wordpress_post_id },
+        });
+        return c.json(published.response, 200);
+      } catch (err) {
+        if (!(err instanceof PublishingFailure)) {
+          return c.json({ error: 'wordpress_request_failed' }, 502);
         }
-        if (result.status === 400) return c.json(result.body, 400);
-        if (result.status === 403) return c.json(result.body, 403);
-        if (result.status === 404) return c.json(result.body, 404);
-        if (result.status === 409) return c.json(result.body, 409);
-        return c.json(result.body, 500);
-      } catch {
-        return c.json({ error: 'wordpress_request_failed' }, 502);
+        const body = { error: err.httpStatus === 502 ? 'wordpress_request_failed' : err.message };
+        if (err.httpStatus === 400) return c.json(body, 400);
+        if (err.httpStatus === 403) return c.json(body, 403);
+        if (err.httpStatus === 404) return c.json(body, 404);
+        if (err.httpStatus === 409) return c.json(body, 409);
+        if (err.httpStatus === 500) return c.json(body, 500);
+        return c.json(body, 502);
       }
     },
   )

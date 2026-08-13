@@ -25,6 +25,35 @@ export const OrgRepo = {
     return doc ? toEntity(doc) : null;
   },
 
+  async findByIdWithoutSecrets(id: string): Promise<Org | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOne(
+      { _id: new ObjectId(id) },
+      { projection: { wordpress_token: 0 } },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
+  async findWordPressMirror(
+    id: string,
+  ): Promise<{ website_url: string; token: string; connected_at: Date } | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const doc = await (await collection()).findOne(
+      {
+        _id: new ObjectId(id),
+        wordpress_token: { $type: 'string', $ne: '' },
+        wordpress_connected_at: { $type: 'date' },
+      },
+      { projection: { website_url: 1, wordpress_token: 1, wordpress_connected_at: 1 } },
+    );
+    if (!doc) return null;
+    return {
+      website_url: String(doc.website_url),
+      token: String(doc.wordpress_token),
+      connected_at: doc.wordpress_connected_at as Date,
+    };
+  },
+
   /**
    * Operator org search (epic #150): an exact-id hit, else a case-insensitive
    * `website_url` substring match (capped — a regex scan over the url index is

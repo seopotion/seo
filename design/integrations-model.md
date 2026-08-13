@@ -120,6 +120,12 @@ The `content_path` default (`seopotion/`) is applied **at the route**, not in th
 a stored document always carries the literal value it was connected with, so changing our
 default later cannot silently repoint an existing install's files.
 
+Static-site publishing also uses an internal nullable `publish_lease` field on this
+document. `IntegrationRepo.claimPublishLease` sets an opaque owner token and expiry with one
+atomic conditional update; release matches the token. The field is intentionally absent
+from `IntegrationSchema`, so repository parsing strips it and no API DTO can expose the
+token. Historical documents need no backfill because an absent field is an unclaimed lease.
+
 **Index** ([`ensure-indexes.ts`](../packages/shared/db/src/ensure-indexes.ts)):
 
 ```ts
@@ -272,21 +278,18 @@ current slug, not the published one. That only affects WordPress, which addresse
 id and does not care; static-site articles all postdate this change, so their values are
 exact.
 
-**The org→integration backfill is not there, and should not be.** It would have to encrypt
-each token, and `runMigrations` runs from the CLI and the `db init` Lambda — neither of
-which holds the data key. Getting one there means either lifting `lib/crypto.ts` into a
-shared package or threading an `encryptToken` callback through the migration API, both of
-which are real changes made *for a backfill whose value is zero today*: the plaintext
-`org.wordpress_token` is still sitting in the same database, so encrypting a duplicate
-protects nothing until the mirror goes.
+**There is no bulk org→integration migration.** It would have to encrypt each token, and
+`runMigrations` runs from the CLI and the `db init` Lambda — neither holds the data key.
 
 So the expand phase runs the other way round. `POST /integrations/wordpress` writes both
 the entity (encrypted) and the mirror; `GET /integrations/connected` reads the entity and
 **falls back to the mirror** when there is no row, which is exactly the state the admin
 connect lever leaves behind — it writes only the org fields, because the admin Lambda has
-no data key (§ Secrets). Publishing still reads the mirror everywhere, so `token_enc` is
-written and not yet read: normal for expand/contract, and covered by a repo round-trip test
-rather than by production traffic.
+no data key (§ Secrets). Automatic publishing reads only `Integration.token_enc`. When an
+enabled image handoff or explicit automatic retry encounters a mirror-only connection, the
+API/image worker encrypts that one token and creates the Integration row before queueing.
+This is a narrow, demand-driven compatibility transition rather than a destructive bulk
+migration. Manual/admin WordPress paths still use the mirror until the contract phase.
 
 The contract phase is one change: backfill + encrypt from the API side where the key
 already is, flip every token read to the entity, delete the fallback, then drop
@@ -296,16 +299,9 @@ levers' direct field access
 which is also the point at which the admin Lambda must be granted the data key, or lose the
 WordPress levers. **Until then the mirror is load-bearing, not vestigial.**
 
-**It did not ride along with the publish route** (`3.5`), as this section previously
-assumed it would. The static-site publisher holds no secret at all — that is the whole
-point of the installation-token design — so the two changes share nothing but a release,
-and bundling them would put a destructive schema change against live staging data in the
-same diff as a new endpoint. One thing genuinely does need deciding first: **what triggers
-the backfill.** "From the API side" names a place, not a mechanism — `runMigrations()` is
-the natural home and is exactly the process that cannot hold the key. A boot-time pass in
-the API Lambda, a one-off admin route, or threading an `encryptToken` callback into the
-migration API are all plausible; none is obviously right, and the answer sets the shape of
-the whole change.
+The final contract phase still removes the mirror only after every legitimate manual and
+admin caller has moved to the entity. The unrelated `DATA_KEY_PARAM` rename remains
+deferred.
 
 ## Onboarding vs. connected
 
@@ -328,5 +324,6 @@ distinction; this keeps it true.
 - ~~**Slug uniqueness.**~~ *Resolved 2026-07-31: the publish route rejects with
   `409 slug_conflict` rather than overwriting, and no unique index was added —
   see [`static-site-integration.md` § Publish semantics](static-site-integration.md#publish-semantics).*
-- **Auto-publish on generation** ([#53](https://github.com/seopotion/seo/issues/53)), which
-  is gated on this model existing but is its own behaviour question.
+- ~~**Auto-publish after image completion.**~~ *Implemented with a dedicated provider-task
+  queue, embedded leased attempts, and destination idempotency; see
+  [`auto-publishing.md`](auto-publishing.md).*

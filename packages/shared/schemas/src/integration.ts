@@ -37,8 +37,8 @@ export const IntegrationSchema = z.discriminatedUnion('provider', [
     // Denormalized from org.website_url at connect time: the org's URL can
     // change, the site we hold a token for cannot.
     site_url: z.string().url(),
-    // AES-256-GCM (apps/api lib/crypto.ts). The plaintext mirror on the org is
-    // still what the publish paths read — see design/integrations-model.md.
+    // AES-256-GCM (apps/api lib/crypto.ts). Automatic publishing reads only
+    // this entity; the org mirror remains for legacy manual/admin paths.
     token_enc: z.string(),
   }),
   IntegrationBase.extend({

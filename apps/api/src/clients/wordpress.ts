@@ -7,12 +7,17 @@ export type WordPressIntegrationResult = { success: true } | { success: false; e
 export type WordPressArticleResponse = {
   success: true;
   post_id: number;
+  slug?: string;
+  permalink?: string;
+  post_status?: string;
   warnings?: string[];
 };
 
 export type WordPressArticleResult =
   | { status: 200; body: WordPressArticleResponse }
-  | { status: 400 | 403 | 404 | 409 | 500; body: { error: string } };
+  | { status: 400 | 403 | 404 | 409 | 500; body: { error: string; code?: string } };
+
+export type WordPressCapabilities = { version: string; capabilities: string[] };
 
 type WordPressArticleSnapshot = {
   title: string;
@@ -69,6 +74,15 @@ async function sendWordPressArticle(
       body: {
         success: true,
         post_id: responseBody.post_id,
+        ...('slug' in responseBody && typeof responseBody.slug === 'string'
+          ? { slug: responseBody.slug }
+          : {}),
+        ...('permalink' in responseBody && typeof responseBody.permalink === 'string'
+          ? { permalink: responseBody.permalink }
+          : {}),
+        ...('post_status' in responseBody && typeof responseBody.post_status === 'string'
+          ? { post_status: responseBody.post_status }
+          : {}),
         ...('warnings' in responseBody ? { warnings: responseBody.warnings as string[] } : {}),
       },
     };
@@ -85,7 +99,15 @@ async function sendWordPressArticle(
     'error' in responseBody &&
     typeof responseBody.error === 'string'
   ) {
-    return { status: response.status, body: { error: responseBody.error } };
+    return {
+      status: response.status,
+      body: {
+        error: responseBody.error,
+        ...('code' in responseBody && typeof responseBody.code === 'string'
+          ? { code: responseBody.code }
+          : {}),
+      },
+    };
   }
 
   throw new Error('Invalid WordPress article response');
@@ -95,6 +117,7 @@ export function submitWordPressArticle(
   websiteUrl: string,
   token: string,
   article: Article,
+  options?: { sourceArticleId?: string; status?: 'publish' | 'draft' },
 ): Promise<WordPressArticleResult> {
   return sendWordPressArticle(websiteUrl, 'submit', 'POST', {
     secret: token,
@@ -105,6 +128,8 @@ export function submitWordPressArticle(
     ...(article.featured_image_url ? { image_url: article.featured_image_url } : {}),
     meta_description: article.meta_description,
     focus_keyword: article.keyword,
+    ...(options?.sourceArticleId ? { source_article_id: options.sourceArticleId } : {}),
+    ...(options?.status ? { status: options.status } : {}),
   });
 }
 
@@ -156,4 +181,27 @@ export async function testWordPressIntegration(
   }
 
   throw new Error('Invalid WordPress integration response');
+}
+
+export async function getWordPressCapabilities(
+  websiteUrl: string,
+): Promise<WordPressCapabilities | null> {
+  const response = await fetch(
+    `${websiteUrl.replace(/\/+$/, '')}/wp-json/seo-potion/v1/capabilities`,
+  );
+  if (response.status === 404) return null;
+  const body: unknown = await response.json();
+  if (
+    response.ok &&
+    typeof body === 'object' &&
+    body !== null &&
+    'version' in body &&
+    typeof body.version === 'string' &&
+    'capabilities' in body &&
+    Array.isArray(body.capabilities) &&
+    body.capabilities.every((capability) => typeof capability === 'string')
+  ) {
+    return { version: body.version, capabilities: body.capabilities };
+  }
+  throw new Error('Invalid WordPress capabilities response');
 }

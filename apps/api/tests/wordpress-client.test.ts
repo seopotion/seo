@@ -2,6 +2,7 @@ import type { Article } from '@shared/schemas';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   editWordPressArticle,
+  getWordPressCapabilities,
   submitWordPressArticle,
   testWordPressIntegration,
 } from '../src/clients/wordpress';
@@ -34,6 +35,7 @@ const article: Article = {
   images: [],
   images_status: 'complete',
   publications: [],
+  auto_publish: { preflight_error: null, attempts: [] },
   video: null,
 };
 
@@ -140,6 +142,65 @@ describe('WordPress client', () => {
     expect(payload).not.toHaveProperty('status');
     expect(payload).not.toHaveProperty('focus_keyphrase');
     expect(payload).not.toHaveProperty('meta_title');
+  });
+
+  test('automatic submit sends a stable source id and explicitly requests a live post', async () => {
+    fetchMock.mockResolvedValueOnce({
+      status: 200,
+      json: vi.fn(async () => ({
+        success: true,
+        post_id: 321,
+        slug: 'wordpress-article-2',
+        permalink: 'https://example.com/wordpress-article-2/',
+        post_status: 'publish',
+      })),
+    });
+
+    await expect(
+      submitWordPressArticle('https://example.com', 'site-token', article, {
+        sourceArticleId: article.id,
+        status: 'publish',
+      }),
+    ).resolves.toEqual({
+      status: 200,
+      body: {
+        success: true,
+        post_id: 321,
+        slug: 'wordpress-article-2',
+        permalink: 'https://example.com/wordpress-article-2/',
+        post_status: 'publish',
+      },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(init.body)).toMatchObject({
+      source_article_id: 'article-1',
+      status: 'publish',
+    });
+  });
+
+  test('reads the plugin idempotent-publish capability contract', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn(async () => ({
+        version: '1.1.0',
+        capabilities: ['submit', 'edit', 'idempotent_publish'],
+      })),
+    });
+
+    await expect(getWordPressCapabilities('https://example.com/')).resolves.toEqual({
+      version: '1.1.0',
+      capabilities: ['submit', 'edit', 'idempotent_publish'],
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'https://example.com/wp-json/seo-potion/v1/capabilities',
+    );
+  });
+
+  test('treats a missing capabilities endpoint as a legacy plugin', async () => {
+    fetchMock.mockResolvedValueOnce({ status: 404 });
+
+    await expect(getWordPressCapabilities('https://example.com')).resolves.toBeNull();
   });
 
   test('updates by stored WordPress ID with the current mutable snapshot and no status', async () => {

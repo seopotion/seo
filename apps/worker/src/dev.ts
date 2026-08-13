@@ -3,6 +3,7 @@ import type { SQSEvent, SQSHandler, SQSRecord } from 'aws-lambda';
 import { handler as generationHandler } from './generation';
 import { handler as imagesHandler } from './images';
 import { handler as scanHandler } from './index';
+import { handler as publishHandler } from './publish';
 import { handler as strategyHandler } from './strategy';
 
 /**
@@ -37,11 +38,20 @@ function toRecord(queueUrl: string, body: string, id: string, receiptHandle: str
   };
 }
 
-async function pollQueue(name: string, queueUrl: string, handler: SQSHandler): Promise<never> {
+async function pollQueue(
+  name: string,
+  queueUrl: string,
+  handler: SQSHandler,
+  maxMessages = 5,
+): Promise<never> {
   console.log(`[worker:${name}] polling ${queueUrl}`);
   for (;;) {
     const { Messages } = await sqs.send(
-      new ReceiveMessageCommand({ QueueUrl: queueUrl, MaxNumberOfMessages: 5, WaitTimeSeconds: 5 }),
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MaxNumberOfMessages: maxMessages,
+        WaitTimeSeconds: 5,
+      }),
     );
     if (!Messages?.length) continue;
     const records = Messages.map((m, i) =>
@@ -68,10 +78,12 @@ const scanUrl = process.env.SCAN_QUEUE_URL;
 const strategyUrl = process.env.STRATEGY_QUEUE_URL;
 const generationUrl = process.env.GENERATION_QUEUE_URL;
 const imagesUrl = process.env.IMAGES_QUEUE_URL;
+const publishUrl = process.env.PUBLISH_QUEUE_URL;
 if (!scanUrl) throw new Error('SCAN_QUEUE_URL is required for the local worker poller');
 
 const pollers = [pollQueue('scan', scanUrl, scanHandler)];
 if (strategyUrl) pollers.push(pollQueue('strategy', strategyUrl, strategyHandler));
 if (generationUrl) pollers.push(pollQueue('generation', generationUrl, generationHandler));
 if (imagesUrl) pollers.push(pollQueue('images', imagesUrl, imagesHandler));
+if (publishUrl) pollers.push(pollQueue('publish', publishUrl, publishHandler, 1));
 await Promise.all(pollers);

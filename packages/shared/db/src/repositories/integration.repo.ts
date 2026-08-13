@@ -94,6 +94,47 @@ export const IntegrationRepo = {
     );
   },
 
+  async claimPublishLease(
+    orgId: string,
+    provider: IntegrationProvider,
+    token: string,
+    now: Date,
+    leaseMs: number,
+  ): Promise<boolean> {
+    const res = await (await collection()).updateOne(
+      {
+        org_id: orgId,
+        provider,
+        $or: [
+          { publish_lease: { $exists: false } },
+          { publish_lease: null },
+          { 'publish_lease.expires_at': { $lte: now } },
+        ],
+      },
+      {
+        $set: {
+          publish_lease: {
+            token,
+            expires_at: new Date(now.getTime() + leaseMs),
+          },
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async releasePublishLease(
+    orgId: string,
+    provider: IntegrationProvider,
+    token: string,
+  ): Promise<boolean> {
+    const res = await (await collection()).updateOne(
+      { org_id: orgId, provider, 'publish_lease.token': token },
+      { $set: { publish_lease: null } },
+    );
+    return res.modifiedCount === 1;
+  },
+
   /** Disconnect. Returns true when a row matched. */
   async deleteByOrgAndProvider(orgId: string, provider: IntegrationProvider): Promise<boolean> {
     const res = await (await collection()).deleteOne({ org_id: orgId, provider });

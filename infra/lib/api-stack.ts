@@ -92,9 +92,7 @@ export class ApiStack extends Stack {
     // registration, minting per-publish installation tokens. Same out-of-band
     // SecureString pattern — `file://` so the PEM's newlines survive:
     //   aws ssm put-parameter --name /seo/<stage>/github-app-key --type SecureString --value file://seopotion.<stage>.private-key.pem
-    // API Lambda only, matching the JWT-secret boundary: the worker never
-    // publishes, so it is never granted a credential that can write to a
-    // customer's repository.
+    // Granted only to the API and dedicated publish worker.
     const githubAppKeyParam = StringParameter.fromSecureStringParameterAttributes(
       this,
       'GithubAppKeyParam',
@@ -188,6 +186,15 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
     });
 
+    const publishDlq = new Queue(this, 'PublishDlq', {
+      retentionPeriod: Duration.days(14),
+    });
+
+    const publishQueue = new Queue(this, 'PublishQueue', {
+      visibilityTimeout: Duration.minutes(6),
+      deadLetterQueue: { queue: publishDlq, maxReceiveCount: 3 },
+    });
+
     // Provider API credentials (#43). Same out-of-band SecureString pattern as
     // every other secret — only NAMEs reach this template; @shared/providers
     // `resolveProviderSecret` fetches + caches the values at runtime. Each
@@ -245,11 +252,13 @@ export class ApiStack extends Stack {
         ...dataForSeoEnv,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
       },
       bundling,
     });
     scanQueue.grantSendMessages(apiFn);
     strategyQueue.grantSendMessages(apiFn);
+    publishQueue.grantSendMessages(apiFn);
     grantDataForSeo(apiFn);
     jwtSecretParam.grantRead(apiFn);
     googleClientSecretParam.grantRead(apiFn);
@@ -384,6 +393,8 @@ export class ApiStack extends Stack {
         FAL_KEY_PARAM: cfg.falKeyParam,
         IMAGES_BUCKET: imagesBucket.bucketName,
         IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
+        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
+        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
       },
       bundling,
     });
@@ -391,7 +402,30 @@ export class ApiStack extends Stack {
     mongoUriParam.grantRead(imagesWorkerFn);
     openRouterApiKeyParam.grantRead(imagesWorkerFn);
     falKeyParam.grantRead(imagesWorkerFn);
+    gscTokenKeyParam.grantRead(imagesWorkerFn);
     imagesBucket.grantPut(imagesWorkerFn);
+    publishQueue.grantSendMessages(imagesWorkerFn);
+
+    const publishWorkerFn = new NodejsFunction(this, 'PublishWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/publish.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(5),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
+        GITHUB_APP_CLIENT_ID: cfg.githubAppClientId,
+        GITHUB_APP_KEY_PARAM: cfg.githubAppKeyParam,
+      },
+      bundling,
+    });
+    publishWorkerFn.addEventSource(new SqsEventSource(publishQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(publishWorkerFn);
+    gscTokenKeyParam.grantRead(publishWorkerFn);
+    githubAppKeyParam.grantRead(publishWorkerFn);
 
     // Generation worker Lambda — consumes generation tasks; produces articles.
     const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
