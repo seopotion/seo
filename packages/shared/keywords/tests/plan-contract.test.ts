@@ -75,13 +75,14 @@ describe('parsePlanResponse', () => {
           { index: 0, intent_ok: true, locality_ok: true },
           { index: 'nope', intent_ok: true, locality_ok: true },
           { intent_ok: false },
+          null,
         ],
         targets: [{ cluster: 5, member_indices: [0] }, null],
       }),
     );
     expect(r.verdicts).toHaveLength(1);
     expect(r.targets).toHaveLength(0);
-    expect(r.droppedRows).toBe(3);
+    expect(r.droppedRows).toBe(5);
   });
 
   it('tolerates missing targets entirely (all-singleton plan)', () => {

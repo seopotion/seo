@@ -190,10 +190,9 @@ export function parsePlanResponse(text: string): PlanResponse {
   let droppedRows = 0;
   const verdicts: PlanVerdict[] = [];
   for (const row of Array.isArray(parsed.verdicts) ? parsed.verdicts : []) {
-    // A literal `null` entry is a hole, not a malformed attempt — skip without counting it.
-    if (row === null) continue;
-    const r = row as Record<string, unknown>;
+    const r = row as Record<string, unknown> | null;
     if (
+      r === null ||
       typeof r !== 'object' ||
       typeof r.index !== 'number' ||
       !Number.isInteger(r.index) ||
@@ -212,10 +211,9 @@ export function parsePlanResponse(text: string): PlanResponse {
   }
   const targets: PlanTargetProposal[] = [];
   for (const row of Array.isArray(parsed.targets) ? parsed.targets : []) {
-    // A literal `null` entry is a hole, not a malformed attempt — skip without counting it.
-    if (row === null) continue;
-    const r = row as Record<string, unknown>;
+    const r = row as Record<string, unknown> | null;
     if (
+      r === null ||
       typeof r !== 'object' ||
       typeof r.cluster !== 'string' ||
       !Array.isArray(r.member_indices)
