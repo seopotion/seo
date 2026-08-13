@@ -8,6 +8,12 @@ import { Badge, Button, Card, CardContent, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
+import {
+  type ArticlePublishingState,
+  type AutoPublishAggregateStatus,
+  getAutoPublishAggregateState,
+  hasActiveAutoPublishAttempts,
+} from '@/lib/auto-publishing';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
@@ -15,7 +21,7 @@ import { cn } from '@/lib/utils';
 
 type ArticleListStatus = 'generated' | 'published' | 'deleted';
 
-type ArticleListItemResponse = {
+type ArticleListItemResponse = ArticlePublishingState & {
   created_at: string;
   difficulty: number;
   id: string;
@@ -26,7 +32,7 @@ type ArticleListItemResponse = {
   title: string;
 };
 
-type PublishedArticle = {
+type PublishedArticle = ArticlePublishingState & {
   difficulty: number;
   id: string;
   keyword: string;
@@ -46,6 +52,15 @@ const emptyContentHistoryData: ContentHistoryData = {
   articles: [],
   total: 0,
 };
+
+const AUTO_PUBLISH_STATUS_KEYS = {
+  needs_attention: 'autoPublishing.statuses.needsAttention',
+  not_queued: 'autoPublishing.statuses.notQueued',
+  published: 'autoPublishing.statuses.published',
+  publishing: 'autoPublishing.statuses.publishing',
+  queued: 'autoPublishing.statuses.queued',
+  retrying: 'autoPublishing.statuses.retrying',
+} as const satisfies Record<AutoPublishAggregateStatus, string>;
 
 export default function ContentHistoryPage() {
   const t = useTranslations('ContentHistoryPage');
@@ -111,6 +126,12 @@ export default function ContentHistoryPage() {
     },
     enabled: !redirecting && !organizationLoading && Boolean(organization),
     placeholderData: keepPreviousData,
+    refetchInterval: (query) =>
+      query.state.data?.articles.some((article) =>
+        hasActiveAutoPublishAttempts(article.auto_publish_attempts),
+      )
+        ? 4_000
+        : false,
     staleTime: 60 * 60 * 1000,
   });
 
@@ -169,7 +190,7 @@ export default function ContentHistoryPage() {
         aria-label={t('tableLabel')}
         className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
       >
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_7rem_6rem_6rem_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.8fr)_6rem_5rem_minmax(9rem,0.7fr)_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
           <span>{t('columns.articleName')}</span>
           <span>{t('columns.keyword')}</span>
           <span>{t('columns.volume')}</span>
@@ -241,7 +262,7 @@ function DesktopArticleRow({
 }) {
   const publishedDate = formatPublishedDate(article.publishedAt, dateFormatter);
   const rowClassName =
-    'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(10rem,0.8fr)_7rem_6rem_6rem_7rem] items-center gap-0 px-4 py-3 text-sm';
+    'grid min-h-14 grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.8fr)_6rem_5rem_minmax(9rem,0.7fr)_7rem] items-center gap-0 px-4 py-3 text-sm';
 
   return (
     <Link
@@ -260,8 +281,9 @@ function DesktopArticleRow({
       <span className="min-w-0 truncate text-slate-600">
         {formatNumber(article.difficulty, locale)}
       </span>
-      <span className="min-w-0">
+      <span className="grid min-w-0 gap-1 pr-2">
         <StatusBadge status={article.status} t={t} />
+        <AutoPublishStatusIndicator article={article} t={t} />
       </span>
       <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
         {publishedDate}
@@ -293,7 +315,10 @@ function MobileArticleCard({
         <CardContent className="grid gap-3 px-4">
           <div className="grid gap-2">
             <ArticleName title={article.title} linked />
-            <StatusBadge status={article.status} t={t} />
+            <div className="flex flex-wrap items-start gap-2">
+              <StatusBadge status={article.status} t={t} />
+              <AutoPublishStatusIndicator article={article} t={t} />
+            </div>
           </div>
           <Separator />
           <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -361,6 +386,49 @@ function StatusBadge({
     >
       {t(`articleStatuses.${status}`)}
     </Badge>
+  );
+}
+
+function AutoPublishStatusIndicator({
+  article,
+  t,
+}: {
+  article: PublishedArticle;
+  t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
+}) {
+  const aggregate = getAutoPublishAggregateState({
+    autoPublishError: article.auto_publish_error,
+    attempts: article.auto_publish_attempts,
+    publications: article.publications,
+  });
+  const status = t(AUTO_PUBLISH_STATUS_KEYS[aggregate.status]);
+
+  return (
+    <span className="grid w-fit gap-0.5">
+      <Badge
+        variant="secondary"
+        aria-label={t('autoPublishing.label', { status })}
+        className={cn(
+          'h-auto w-fit max-w-full whitespace-normal border-transparent px-2 py-0.5 text-left text-xs',
+          aggregate.status === 'needs_attention'
+            ? 'bg-red-100 text-red-700'
+            : aggregate.status === 'retrying'
+              ? 'bg-amber-100 text-amber-800'
+              : aggregate.status === 'publishing'
+                ? 'bg-violet-100 text-violet-700'
+                : aggregate.status === 'queued'
+                  ? 'bg-sky-100 text-sky-700'
+                  : aggregate.status === 'published'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-slate-100 text-slate-600',
+        )}
+      >
+        {t('autoPublishing.shortLabel', { status })}
+      </Badge>
+      {aggregate.partialSuccess ? (
+        <span className="text-slate-500 text-xs">{t('autoPublishing.partialSuccess')}</span>
+      ) : null}
+    </span>
   );
 }
 
@@ -484,10 +552,13 @@ function getHistoryStatusMessage({
 
 function mapArticleRows(articles: ArticleListItemResponse[]): PublishedArticle[] {
   return articles.map((article) => ({
+    auto_publish_attempts: article.auto_publish_attempts,
+    auto_publish_error: article.auto_publish_error,
     difficulty: article.difficulty,
     id: article.id,
     keyword: article.keyword,
     publishedAt: article.published_at ?? article.created_at,
+    publications: article.publications,
     status: article.status,
     title: article.title,
     volume: article.search_volume,

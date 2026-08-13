@@ -11,6 +11,17 @@ import {
 } from '../lib/article-editor';
 
 const response: ArticleDetailResponse = {
+  auto_publish_attempts: [
+    {
+      attempt_count: 1,
+      last_attempt_at: '2026-07-10T10:15:00.000Z',
+      last_error: null,
+      provider: 'static-site',
+      requested_at: '2026-07-10T10:00:00.000Z',
+      status: 'published',
+    },
+  ],
+  auto_publish_error: null,
   content: '# body',
   created_at: '2026-07-10T10:00:00.000Z',
   featured_image_url: 'https://x/1.png',
@@ -21,6 +32,16 @@ const response: ArticleDetailResponse = {
   meta_description: 'd'.repeat(130),
   meta_title: 'Technical SEO Checklist',
   published_at: null,
+  publications: [
+    {
+      provider: 'static-site',
+      published_at: '2026-07-10T10:15:00.000Z',
+      ref: 'abc123',
+      remote_url: 'https://github.com/example/site/commit/abc123',
+      slug: 'technical-seo-checklist',
+      updated_at: null,
+    },
+  ],
   slug: 'technical-seo-checklist',
   static_site_published_at: null,
   status: 'generated',
@@ -34,7 +55,7 @@ const draft = (over: Partial<ArticleEditorDraft> = {}): ArticleEditorDraft => ({
 });
 
 describe('mapArticleDetail / toArticleUpdateBody', () => {
-  test('maps every response field to its camelCase counterpart', () => {
+  test('maps the saved content fields to their camelCase draft counterparts', () => {
     expect(mapArticleDetail(response)).toEqual({
       content: '# body',
       createdAt: '2026-07-10T10:00:00.000Z',
@@ -67,13 +88,22 @@ describe('mapArticleDetail / toArticleUpdateBody', () => {
   });
 
   test('sends only the five editable fields', () => {
-    expect(Object.keys(toArticleUpdateBody(draft())).sort()).toEqual([
+    const mapped = mapArticleDetail(response);
+    const body = toArticleUpdateBody(mapped);
+
+    expect('publications' in mapped).toBe(false);
+    expect('auto_publish_attempts' in mapped).toBe(false);
+    expect('auto_publish_error' in mapped).toBe(false);
+    expect(Object.keys(body).sort()).toEqual([
       'content',
       'meta_description',
       'meta_title',
       'slug',
       'title',
     ]);
+    expect('publications' in body).toBe(false);
+    expect('auto_publish_attempts' in body).toBe(false);
+    expect('auto_publish_error' in body).toBe(false);
   });
 });
 

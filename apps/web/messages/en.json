@@ -461,6 +461,19 @@
     "actions": {
       "openArticle": "Open {title}"
     },
+    "autoPublishing": {
+      "label": "Automatic publishing: {status}",
+      "partialSuccess": "Some destinations published",
+      "shortLabel": "Auto: {status}",
+      "statuses": {
+        "needsAttention": "Needs attention",
+        "notQueued": "Not queued",
+        "published": "Published",
+        "publishing": "Publishing",
+        "queued": "Queued",
+        "retrying": "Retrying"
+      }
+    },
     "articleStatuses": {
       "deleted": "Deleted",
       "generated": "Generated",
@@ -521,6 +534,94 @@
       "notPublished": "Not published",
       "publishedAt": "Published",
       "slug": "Slug"
+    },
+    "publishing": {
+      "actions": {
+        "articleSettings": "Review auto-publish settings",
+        "billing": "Review billing",
+        "integrations": "Manage integrations",
+        "wordpressDocs": "Open the WordPress guide"
+      },
+      "attemptCount": "{count, plural, one {# attempt} other {# attempts}}",
+      "attemptStatuses": {
+        "cancelled": "Cancelled",
+        "failed": "Failed",
+        "manual": "Published manually",
+        "published": "Published",
+        "publishing": "Publishing",
+        "queued": "Queued",
+        "retrying": "Retrying"
+      },
+      "description": "Track automatic publishing separately for every connected destination.",
+      "empty": "This article has no automatic publishing attempts yet.",
+      "errorAt": "Reported {date}",
+      "errors": {
+        "articleNotFound": "This article is no longer available.",
+        "autoPublishDisabled": "Automatic publishing is turned off. Turn it on before retrying.",
+        "commitRejected": "GitHub rejected the commit. Check repository access and branch protection.",
+        "githubRequestFailed": "GitHub could not be reached or returned an invalid response. Try again.",
+        "imageGenerationFailed": "Image generation failed, so this article cannot be published automatically.",
+        "imagesIncomplete": "The article images are not complete yet. Retry after image generation finishes.",
+        "installationNotFound": "The GitHub App installation could not be found. Reconnect the static site.",
+        "installationSuspended": "The GitHub App installation is suspended. Restore or reconnect it.",
+        "invalidArticlePayload": "The article data is not valid for this destination. Fix the article before retrying.",
+        "invalidCredentials": "The saved destination credentials are invalid. Reconnect the integration.",
+        "invalidProviderResponse": "The publishing destination returned an invalid response. Try again.",
+        "missingWritePermission": "The GitHub App does not have permission to write to this repository.",
+        "networkError": "The publishing destination could not be reached. Try again.",
+        "notConnected": "No unpublished publishing destination is connected.",
+        "pluginUpgradeRequired": "Update the SeoPotion WordPress plugin to version 1.2.0 or newer before retrying.",
+        "queueSendFailed": "The retry could not be queued. Try again.",
+        "recordFailed": "Publishing completed remotely, but its local record could not be saved. Retry to reconcile it safely.",
+        "refConflict": "The GitHub branch kept changing during publishing. Try again shortly.",
+        "repoNotFound": "The configured GitHub repository or branch could not be found.",
+        "slugConflict": "Another article owns this static-site slug. Edit the slug before retrying.",
+        "staticPublishInProgress": "Another static-site publication is in progress. Try again shortly.",
+        "subscriptionRequired": "Automatic publishing requires a paid or expert plan.",
+        "unknown": "Automatic publishing could not be completed. Try again or review the destination settings.",
+        "wordpressAuthFailed": "WordPress rejected the saved credentials. Reconnect WordPress.",
+        "wordpressPublishInProgress": "This WordPress publication is already in progress. Try again shortly.",
+        "wordpressRequestFailed": "WordPress could not complete the publishing request. Try again."
+      },
+      "labels": {
+        "attemptCount": "Attempts",
+        "lastAttemptAt": "Last attempt",
+        "publishedAt": "First published",
+        "requestedAt": "Requested",
+        "slug": "Destination slug",
+        "updatedAt": "Last updated"
+      },
+      "lastError": "Last error",
+      "links": {
+        "static-site": "View GitHub commit",
+        "wordpress": "View live WordPress post"
+      },
+      "notUpdated": "Not updated",
+      "partialSuccess": "This article was published to at least one destination, but another destination still needs attention.",
+      "preflightError": "Automatic publishing needs attention",
+      "providers": {
+        "static-site": "Static site",
+        "wordpress": "WordPress"
+      },
+      "retry": {
+        "accessibleLabel": "Retry failed automatic publishing destinations",
+        "alreadyPublished": "This article is already published to every connected destination.",
+        "button": "Retry failed publishing",
+        "editingBlocked": "Save or discard your article changes before retrying automatic publishing.",
+        "queued": "Queued automatic publishing for {providers}.",
+        "refreshing": "Refreshing status...",
+        "submitting": "Queueing retry..."
+      },
+      "settingsLink": "Review auto-publish settings",
+      "statuses": {
+        "needsAttention": "Needs attention",
+        "notQueued": "Not queued",
+        "published": "Published automatically",
+        "publishing": "Publishing",
+        "queued": "Queued",
+        "retrying": "Retrying"
+      },
+      "title": "Automatic publishing"
     },
     "site": {
       "errors": {
@@ -633,8 +734,29 @@
         "placeholder": "Select style"
       },
       "autoPublish": {
-        "description": "Publish finished articles automatically when generation is complete.",
-        "label": "Auto-publish"
+        "description": "Automatically publish future articles after their images finish generating.",
+        "details": {
+          "destinations": "Every connected publishing destination is eligible.",
+          "failedAttempts": "Inspect and retry failed attempts later from the article page in Content History.",
+          "futureArticles": "This applies only to future articles. Turning it on does not publish older generated articles.",
+          "wordpress": "Automatic WordPress publishing requires the SeoPotion WordPress plugin version 1.2.0 or newer."
+        },
+        "label": "Auto-publish",
+        "links": {
+          "billing": "Review billing",
+          "integrations": "Manage integrations"
+        },
+        "requirements": {
+          "allDestinationsHaveErrors": "Every connected destination currently needs attention. Automatic attempts may fail until the connections are fixed.",
+          "checkFailed": "Destination readiness could not be verified, so auto-publish cannot be turned on.",
+          "checkFailedEnabled": "Auto-publish is still on, but destination readiness could not be verified. Future automatic attempts may not run.",
+          "checking": "Destination readiness is still being checked. Wait for verification before turning on auto-publish.",
+          "checkingEnabled": "Auto-publish is still on while destination readiness is being checked. Future automatic attempts may not run until verification finishes.",
+          "entitlement": "A paid or expert plan is required to turn on auto-publish.",
+          "entitlementEnabled": "Auto-publish is still on, but future automatic attempts may not run without a paid or expert plan.",
+          "noDestination": "Connect at least one publishing destination before turning on auto-publish.",
+          "noDestinationEnabled": "Auto-publish is still on, but future automatic attempts may not run until a publishing destination is connected."
+        }
       },
       "internalLinks": {
         "description": "Choose how many internal links generated articles should include (0–3).",

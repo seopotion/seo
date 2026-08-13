@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { createFixtureArticleDetail, saveFixtureArticleDetail } from './article-editor-fixtures';
+import { type ArticlePublishingState, shouldPollArticlePublishing } from './auto-publishing';
 import { dashboardQueryKeys } from './dashboard-query-keys';
 
 export type ArticleStatus = 'generated' | 'published' | 'deleted';
@@ -22,7 +23,7 @@ export type EditableArticleField = 'content' | 'metaDescription' | 'metaTitle' |
  * response under the same key, so they read it through this one type rather than
  * two partial ones that drift. `video` is omitted — nothing renders it yet.
  */
-export type ArticleDetailResponse = {
+export type ArticleDetailResponse = ArticlePublishingState & {
   content: string;
   created_at: string;
   featured_image_url: string;
@@ -212,6 +213,8 @@ export function useArticleEditor({
   onClose,
   onUnauthorized,
   organizationId,
+  pollPublishingState = false,
+  forcePublishingStateRefresh = false,
 }: {
   articleId: string | null;
   /** Extra gate ANDed with "we have what the request needs" (e.g. not redirecting). */
@@ -221,6 +224,8 @@ export function useArticleEditor({
   onClose: () => void;
   onUnauthorized: () => void;
   organizationId: string;
+  pollPublishingState?: boolean;
+  forcePublishingStateRefresh?: boolean;
 }): ArticleEditorController {
   const queryClient = useQueryClient();
   const previousArticleIdRef = useRef<string | null>(null);
@@ -262,6 +267,14 @@ export function useArticleEditor({
     // Fixtures render without an organization, so only the real path needs one.
     enabled:
       enabled && (fixturesEnabled ? Boolean(articleId) : Boolean(organizationId && articleId)),
+    refetchInterval: (query) =>
+      pollPublishingState &&
+      shouldPollArticlePublishing(
+        query.state.data?.auto_publish_attempts ?? [],
+        forcePublishingStateRefresh,
+      )
+        ? 4_000
+        : false,
     // The editor must never render content a concurrent save has replaced.
     staleTime: 0,
   });
