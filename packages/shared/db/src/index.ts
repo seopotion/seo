@@ -9,6 +9,10 @@ export { GscConnectionRepo } from './repositories/gsc-connection.repo';
 export { IntegrationRepo } from './repositories/integration.repo';
 export { KeywordRepo } from './repositories/keyword.repo';
 export { OrgRepo } from './repositories/org.repo';
+export {
+  StrategyRunRepo,
+  type StrategyWorkStatePatch,
+} from './repositories/strategy-run.repo';
 export { SubscriptionRepo } from './repositories/subscription.repo';
 export { UserRepo } from './repositories/user.repo';
 export { addCandidates } from './services/add-candidates';
