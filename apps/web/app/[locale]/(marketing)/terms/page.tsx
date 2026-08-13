@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import type { Locale } from '@/i18n/routing';
-import { languageAlternates, localizedPath } from '@/i18n/urls';
 
 type TermsPageProps = {
   params: Promise<{ locale: Locale }>;
@@ -38,13 +38,13 @@ const sections: TermsSection[] = [
     ],
   },
   {
-    title: '2. Expert-Led Growth',
+    title: '2. Business',
     paragraphs: [
-      'The Expert-Led Growth subscription includes access to the Seopotion software plus limited SEO expert account management and review of selected content generated through the platform.',
-      'The expert service is ancillary to the software subscription.',
-      'Expert-Led Growth is not a standalone consulting, marketing-agency, or advisory engagement. The primary product supplied under the subscription is access to and use of the Seopotion software platform.',
-      'The human component may include managing settings within the customer’s Seopotion account and reviewing or optimizing selected content produced through the platform.',
-      'Unless expressly agreed otherwise in writing, Expert-Led Growth does not include unlimited consulting, dedicated staff, guaranteed response times, guaranteed hours of professional services, or management of marketing activities outside Seopotion.',
+      'The Business subscription includes access to the Seopotion software plus human review of up to 10 articles per month that were generated through Seopotion.',
+      'The software platform remains the primary product supplied under the subscription. The human review is a limited quality-control layer for selected software-generated output.',
+      'An authorized reviewer may review and reasonably edit selected drafts for business and brand fit, readability and clarity, article structure, internal-link relevance, obvious factual issues or inconsistencies, and on-page SEO fundamentals.',
+      'Business is not an agency, consulting, or advisory engagement and does not include management of the customer’s overall SEO or marketing activities.',
+      'Business does not include custom SEO strategy or roadmaps, human-written articles from scratch, backlink outreach or manual link building, paid advertising, social media management, community distribution, public relations, off-platform campaign execution, dedicated staff, unlimited reviews, or unlimited reviewer hours.',
     ],
   },
   {
@@ -68,21 +68,21 @@ const sections: TermsSection[] = [
       'Growth',
       '$60 USD per month, billed monthly; or $540 USD per year, billed annually.',
       'Growth includes access to the Seopotion software and the applicable features and usage limits displayed on our pricing page or during checkout.',
-      'Expert-Led Growth',
+      'Business',
       '$400 USD per month, billed monthly; or $3,600 USD per year, billed annually.',
-      'Expert-Led Growth includes the Seopotion software plus the limited expert services described in Section 2.',
+      'Business includes the Seopotion software plus the limited article-review feature described in Section 2.',
       'The prices and features displayed on the Seopotion pricing page and at checkout at the time of purchase form part of your subscription terms.',
       'We may change prices for future purchases or renewal periods. Where required by applicable law, appropriate notice will be provided before a price change applies to an existing subscription.',
     ],
   },
   {
-    title: '5. Payments Through Paddle',
+    title: '5. Payments Through Lemon Squeezy',
     paragraphs: [
-      'Payments for Seopotion subscriptions are processed by Paddle, which acts as the authorized reseller and Merchant of Record for transactions processed through Paddle.',
-      'When you purchase a subscription through Paddle, your payment transaction is also subject to Paddle’s applicable Buyer Terms and policies.',
-      'Paddle is responsible for processing the transaction, collecting payment, handling applicable transaction taxes where required, issuing payment documentation, and administering payment-related matters in accordance with its terms.',
+      'Payments for Seopotion subscriptions are processed by Lemon Squeezy, which acts as the Merchant of Record for transactions processed through Lemon Squeezy.',
+      'When you purchase a subscription through Lemon Squeezy, your payment transaction is also subject to Lemon Squeezy’s applicable terms and policies.',
+      'Lemon Squeezy is responsible for processing the transaction, collecting payment, handling applicable transaction taxes where required, issuing payment documentation, and administering payment-related matters in accordance with its terms.',
       'These Terms govern your access to and use of the Seopotion product itself.',
-      'If there is a conflict between these Terms and Paddle’s terms regarding a matter handled by Paddle, including payment processing, billing, cancellation, statutory withdrawal rights, or transaction refunds, Paddle’s applicable terms will govern that transaction to the extent required.',
+      'If there is a conflict between these Terms and Lemon Squeezy’s terms regarding a matter handled by Lemon Squeezy, including payment processing, billing, cancellation, statutory withdrawal rights, or transaction refunds, Lemon Squeezy’s applicable terms will govern that transaction to the extent required.',
     ],
   },
   {
@@ -90,7 +90,7 @@ const sections: TermsSection[] = [
     paragraphs: [
       'Seopotion subscriptions are recurring subscriptions.',
       'Monthly subscriptions automatically renew each month and annual subscriptions automatically renew each year unless canceled before the next renewal.',
-      'You may cancel your subscription at any time using the subscription-management functionality made available through Paddle or another cancellation method provided to you.',
+      'You may cancel your subscription at any time using the subscription-management functionality made available through Lemon Squeezy or another cancellation method provided to you.',
       'Unless applicable law requires otherwise, cancellation takes effect at the end of your current paid billing period. You may continue using the Service until that period ends.',
       'Canceling a subscription prevents future renewals but does not automatically create a right to a refund for amounts already paid.',
     ],
@@ -101,10 +101,10 @@ const sections: TermsSection[] = [
       'Seopotion does not currently offer a free trial.',
       'We offer a 30-day money-back guarantee on the initial purchase of a Seopotion subscription.',
       'If you are not satisfied with the Service, you may request a refund within 30 calendar days following your initial purchase.',
-      'The guarantee applies to both monthly and annual subscriptions and to both Growth and Expert-Led Growth plans.',
-      'Refund requests for purchases processed by Paddle are administered through Paddle.',
-      "This voluntary guarantee does not limit any statutory cancellation, withdrawal, refund, or consumer-protection rights you may have under applicable law or under Paddle's applicable Buyer Terms and Refund Policy.",
-      "Renewals are not covered by Seopotion's voluntary initial-purchase money-back guarantee unless we expressly state otherwise. Any statutory or Paddle-provided rights relating to a renewal remain unaffected.",
+      'The guarantee applies to both monthly and annual subscriptions and to both Growth and Business plans.',
+      'Refund requests for purchases processed by Lemon Squeezy are administered through Lemon Squeezy.',
+      "This voluntary guarantee does not limit any statutory cancellation, withdrawal, refund, or consumer-protection rights you may have under applicable law or under Lemon Squeezy's applicable terms and policies.",
+      "Renewals are not covered by Seopotion's voluntary initial-purchase money-back guarantee unless we expressly state otherwise. Any statutory or Lemon Squeezy-provided rights relating to a renewal remain unaffected.",
     ],
   },
   {
@@ -265,7 +265,7 @@ const sections: TermsSection[] = [
     title: '20. Privacy',
     paragraphs: [
       'Our collection and processing of personal information is described in the Seopotion Privacy Policy, which should be read together with these Terms.',
-      'Paddle separately processes information relating to purchases and payments in accordance with Paddle’s own privacy notice.',
+      'Lemon Squeezy separately processes information relating to purchases and payments in accordance with Lemon Squeezy’s own privacy notice.',
     ],
   },
   {
@@ -283,7 +283,7 @@ const sections: TermsSection[] = [
       'These Terms are governed by the laws of the Republic of Türkiye, without regard to conflict-of-law principles.',
       'Subject to any mandatory rights available to consumers under applicable law, disputes arising from these Terms or the use of Seopotion will be subject to the jurisdiction of the competent courts and enforcement offices of Istanbul, Türkiye.',
       'If you are a consumer and the law of your country provides mandatory rights relating to applicable law, jurisdiction, dispute resolution, or consumer protection, those rights are not excluded by this section.',
-      'The terms governing your payment transaction with Paddle may contain separate governing-law and dispute provisions applicable to the transaction between you and Paddle.',
+      'The terms governing your payment transaction with Lemon Squeezy may contain separate governing-law and dispute provisions applicable to the transaction between you and Lemon Squeezy.',
     ],
   },
   {
@@ -296,7 +296,7 @@ const sections: TermsSection[] = [
     title: '24. Entire Agreement',
     paragraphs: [
       'These Terms, together with the Privacy Policy, applicable plan information, and any other terms expressly incorporated into them, form the agreement between you and Seopotion regarding your use of the Service.',
-      'Your purchase transaction through Paddle is additionally subject to Paddle’s applicable terms.',
+      'Your purchase transaction through Lemon Squeezy is additionally subject to Lemon Squeezy’s applicable terms.',
     ],
   },
   {
@@ -309,21 +309,20 @@ const sections: TermsSection[] = [
   },
 ];
 
-export async function generateMetadata({ params }: TermsPageProps): Promise<Metadata> {
-  const { locale } = await params;
-  const canonical = localizedPath('/terms', locale);
-
+export function generateMetadata(): Metadata {
   return {
     title: 'Terms of Service',
     description: 'Terms of Service for Seopotion.',
     alternates: {
-      canonical,
-      languages: languageAlternates('/terms'),
+      canonical: '/terms',
     },
   };
 }
 
-export default function TermsPage() {
+export default async function TermsPage({ params }: TermsPageProps) {
+  const { locale } = await params;
+  if (locale !== 'en') redirect('/terms');
+
   return (
     <main className="bg-white px-6 py-16 text-gray-700 sm:py-24">
       <article className="mx-auto max-w-3xl">

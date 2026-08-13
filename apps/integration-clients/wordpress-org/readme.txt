@@ -8,13 +8,15 @@ Stable tag: 1.2.0
 License: GPLv2 or later  
 License URI: https://www.gnu.org/licenses/gpl-2.0.html  
 
-SEO Potion automatically creates and publishes SEO-optimized articles to your WordPress site as blog posts or drafts.
+SEO Potion connects your WordPress site to the Seopotion SEO content software for draft and publishing workflows.
 
 == Description ==
 
-Grow Organic Traffic Without Lifting a Finger.
+Connect WordPress to Your Seopotion Workspace.
 
-SEO Potion is your behind-the-scenes content team powered by AI. It creates high-quality, SEO-optimized blog posts that drive traffic to your WordPress site – automatically. No brainstorming, no writing, no scheduling. Just pure growth on autopilot.
+Seopotion is a software platform that analyzes your website, discovers relevant content opportunities, and uses AI to generate SEO-oriented article drafts. You can review and edit generated articles in Seopotion, then send them to WordPress as drafts or publish them according to the settings you control.
+
+This plugin provides the secure connection between your Seopotion workspace and WordPress. It does not provide agency services, human-written content, link building, or guaranteed search rankings or traffic.
 
 SEO Potion plugin may embed external links or credits on the public site.
 
@@ -24,14 +26,12 @@ SEO Potion 1.0.0 is a modified fork of Outrank 1.0.10. The original plugin was p
 
 == Features ==
 
-1. Fully automatic content creation and keyword research – find hidden keyword gems and publish optimized articles daily.
-2. Write in 150+ languages – speak to your audience wherever they are.
-3. One-click integration with WordPress – set it up once and your content gets published like magic.
-4. SEO-friendly, fact-checked articles with media – includes internal links, videos, images, and credible citations.
-5. Your voice, your tone – match your brand’s style with AI-tuned tone control.
-6. Up to 4000 words per article – long-form, evergreen content designed to rank and convert.
-7. Smart daily publishing plan – a tailored 30-day strategy to keep content flowing.
-8. Multi-user and multi-site support – manage teams and scale across sites easily.
+1. Secure WordPress connection – link your site to your Seopotion workspace with an integration token.
+2. AI-assisted article workflow – receive articles generated in the Seopotion software.
+3. Customer-controlled publishing – choose whether incoming articles are saved as drafts or published.
+4. Media and internal links – preserve supported images, videos, citations, and links included in generated articles.
+5. Content synchronization – send new articles and updates from Seopotion to WordPress.
+6. Published-content access – allow Seopotion to retrieve your published posts for website analysis and content planning.
 
 == Installation ==
 
@@ -44,7 +44,7 @@ SEO Potion 1.0.0 is a modified fork of Outrank 1.0.10. The original plugin was p
 
 == Screenshots ==
 
-1. Grow Organic Traffic on Autopilot.
+1. Connect WordPress to Seopotion and choose your publishing mode.
 2. The Sync Dashboard and Setup Page.
 3. AI-generated blog posts ready to publish.
 
@@ -72,7 +72,7 @@ Use of the plugin requires authorization to connect the WordPress site to SEO Po
 == Frequently Asked Questions ==
 
 = Does this plugin automatically post articles? =  
-Yes. You can choose whether articles are saved as drafts or published instantly.
+Only when you choose a publishing mode that publishes incoming articles. You can instead save articles as drafts for review before publication.
 
 = How does the sync work? =
 SEO Potion syncs articles to your site via a secure API connection.

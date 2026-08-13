@@ -41,6 +41,10 @@ export function Footer() {
           <Link href="/refunds" className={linkClassName}>
             {t('refundPolicy')}
           </Link>
+          <span aria-hidden="true">·</span>
+          <a href="mailto:support@seopotion.co" className={linkClassName}>
+            {t('supportEmail')}
+          </a>
         </nav>
       </div>
     </footer>
