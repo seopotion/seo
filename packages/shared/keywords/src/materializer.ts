@@ -72,7 +72,19 @@ export function materializePlan(
   candidates: readonly WorkingCandidate[],
   response: PlanResponse,
   minCoverage: number,
-): { accepted: WorkingCandidate[]; rejected: WorkingCandidate[]; coverage: PlanCoverage } {
+): {
+  accepted: WorkingCandidate[];
+  rejected: WorkingCandidate[];
+  /**
+   * Candidates the plan call never returned a verdict for — NOT fail-opened
+   * into `accepted` (that was the #211 bug) and NOT rejected either, since no
+   * rejection reason was ever judged. Returned unchanged (still `status:
+   * 'candidate'`, `serp_validated: false`) so the caller can reconcile the
+   * result set instead of silently losing them.
+   */
+  unjudged: WorkingCandidate[];
+  coverage: PlanCoverage;
+} {
   const repaired = emptyRepairs();
 
   // 1. Verdicts by index — first row wins, invalid indexes dropped.
@@ -98,11 +110,11 @@ export function materializePlan(
   // 2. Apply verdicts: accepted set + intent/locality rejects; unjudged excluded.
   const acceptedIdx = new Set<number>();
   const rejected: WorkingCandidate[] = [];
-  let unjudged = 0;
+  const unjudged: WorkingCandidate[] = [];
   candidates.forEach((c, i) => {
     const v = verdicts.get(i);
     if (v === undefined) {
-      unjudged++;
+      unjudged.push(c);
       return;
     }
     if (!v.intent_ok) rejected.push(reject(c, 'serp_intent'));
@@ -215,10 +227,11 @@ export function materializePlan(
   return {
     accepted,
     rejected,
+    unjudged,
     coverage: {
       finalists: candidates.length,
       verdicts: verdicts.size,
-      unjudged,
+      unjudged: unjudged.length,
       accepted: acceptedIdx.size,
       targets: built.length,
       clusters: byCluster.size,

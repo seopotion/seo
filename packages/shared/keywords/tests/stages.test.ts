@@ -140,6 +140,21 @@ describe('stageSerpFetch', () => {
     ]);
     expect(out.stats).toMatchObject({ serpFetched: 2, authorityRejected: 1 });
   });
+
+  it('throws when every SERP is authority-dominated, so an empty plan never ships silently', async () => {
+    const dataForSeo = {
+      ...noopDataForSeo,
+      serpGoogleOrganic: vi
+        .fn()
+        .mockResolvedValue(serp(['wikipedia.org', 'amazon.com', 'blog-a.com', 'blog-b.com'])),
+    } as unknown as DataForSeoClient;
+    const ctx = makeCtx({ clients: { dataForSeo, llm: noopLlm } });
+    const state = stateWith([cand('a'), cand('b')]);
+
+    await expect(stageSerpFetch(state, ctx)).rejects.toThrow(
+      /strategy aborted: 2 candidates reached SERP fetch but 0 survived the authority filter/,
+    );
+  });
 });
 
 describe('stagePlan', () => {
@@ -215,6 +230,53 @@ describe('stagePlan', () => {
     );
     // A plain Error, not a repair-triggering PlanParseError/PlanCoverageError.
     expect(llm.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a partially-judged response: unjudged finalists land in belowN, not accepted', async () => {
+    const finalists = [
+      cand('accepted kw', { opportunity_score: 80 }),
+      cand('rejected kw', { opportunity_score: 70 }),
+      cand('unjudged kw', { opportunity_score: 60 }),
+    ];
+    const llm: LlmClient = {
+      complete: vi.fn(async () =>
+        reply(
+          JSON.stringify({
+            // Only indices 0 and 1 get a verdict — index 2 is never judged.
+            // 2/3 = 67% clears the default 50% minLlmCoverage, so this is a
+            // legitimate partial response, not a coverage failure.
+            verdicts: [
+              { index: 0, intent_ok: true, locality_ok: true, article_type: 'other' },
+              { index: 1, intent_ok: false, locality_ok: true, article_type: 'other' },
+            ],
+            targets: [],
+          }),
+        ),
+      ),
+    };
+    const ctx = makeCtx({ clients: { dataForSeo: noopDataForSeo, llm } });
+    const state: StrategyWorkState = {
+      ...stateWith(finalists),
+      belowN: [cand('preexisting belowN')],
+    };
+
+    const out = await stagePlan(state, ctx);
+
+    expect(out.candidates.map((c) => c.keyword)).toEqual(['accepted kw']);
+    expect(out.rejected.map((c) => c.keyword)).toEqual(['rejected kw']);
+    expect(out.belowN.map((c) => c.keyword)).toEqual(['preexisting belowN', 'unjudged kw']);
+    const unjudgedCandidate = out.belowN.find((c) => c.keyword === 'unjudged kw');
+    expect(unjudgedCandidate).toMatchObject({
+      status: 'candidate',
+      serp_validated: false,
+      rejection_reason: null,
+    });
+
+    // Reconciles: every finalist ends up accepted, in belowN, or rejected —
+    // never fail-opened into accepted and never silently dropped (#211).
+    const belowNAdditions = out.belowN.length - state.belowN.length;
+    const rejectedAdditions = out.rejected.length - state.rejected.length;
+    expect(out.candidates.length + belowNAdditions + rejectedAdditions).toBe(finalists.length);
   });
 
   it('repair ladder: garbage then valid JSON succeeds, marks repairRetried, and the retry carries the error text', async () => {

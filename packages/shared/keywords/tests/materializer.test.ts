@@ -199,7 +199,7 @@ describe('materializePlan', () => {
     ).toThrow(PlanCoverageError);
   });
 
-  it('unjudged candidates are excluded (not accepted, not rejected) and counted', () => {
+  it('unjudged candidates are excluded from accepted/rejected but returned unchanged, and counted', () => {
     const candidates = [c('judged one'), c('judged two'), c('unjudged')];
     const response: PlanResponse = {
       verdicts: [
@@ -213,6 +213,14 @@ describe('materializePlan', () => {
 
     const keywords = new Set([...out.accepted, ...out.rejected].map((x) => x.keyword));
     expect(keywords.has('unjudged')).toBe(false);
+    // Not lost — returned separately, exactly as it entered (never fail-opened
+    // into accepted, never rejected without a judged reason).
+    expect(out.unjudged.map((x) => x.keyword)).toEqual(['unjudged']);
+    expect(out.unjudged[0]).toMatchObject({
+      status: 'candidate',
+      serp_validated: false,
+      rejection_reason: null,
+    });
     expect(out.coverage.unjudged).toBe(1);
   });
 

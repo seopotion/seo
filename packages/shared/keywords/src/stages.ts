@@ -259,6 +259,17 @@ export async function stageSerpFetch(
     config: ctx.config,
   });
 
+  // A pool that reached SERP fetch but had every candidate authority-rejected
+  // is not a valid empty plan — it is a stage that consumed the whole pool
+  // silently. `stagePlan`'s own empty-finalist-pool guard never sees this
+  // case, since it early-returns before ever calling the LLM (#211).
+  if (serpFetched > 0 && accepted.length === 0) {
+    throw new Error(
+      `strategy aborted: ${serpFetched} candidates reached SERP fetch but 0 survived the ` +
+        'authority filter, so the plan would be empty. Check rejectedByReason.serp_authority.',
+    );
+  }
+
   return {
     ...state,
     candidates: accepted,
@@ -311,12 +322,14 @@ export async function stagePlan(
 
   let accepted: WorkingCandidate[];
   let rejected: WorkingCandidate[];
+  let unjudged: WorkingCandidate[];
   let coverage: PlanCoverage;
   try {
     const response = parsePlanResponse(first.text);
     const result = materializePlan(state.candidates, response, ctx.config.minLlmCoverage);
     accepted = result.accepted;
     rejected = result.rejected;
+    unjudged = result.unjudged;
     coverage = result.coverage;
   } catch (err) {
     if (!(err instanceof PlanParseError || err instanceof PlanCoverageError)) throw err;
@@ -325,6 +338,7 @@ export async function stagePlan(
     const result = materializePlan(state.candidates, response, ctx.config.minLlmCoverage);
     accepted = result.accepted;
     rejected = result.rejected;
+    unjudged = result.unjudged;
     coverage = { ...result.coverage, repairRetried: true };
   }
 
@@ -342,9 +356,15 @@ export async function stagePlan(
     );
   }
 
+  // Unjudged finalists are NOT fail-opened into accepted (that was the #211
+  // bug) — they go to the unvalidated tier instead, `serp_validated: false`
+  // keeps them unschedulable, so the result set still reconciles
+  // (accepted + belowN + rejected === the finalist pool) without silently
+  // losing anyone the model never got to.
   return {
     ...state,
     candidates: accepted,
+    belowN: [...state.belowN, ...unjudged],
     rejected: [...state.rejected, ...rejected],
     stats: { ...state.stats, plan: coverage },
   };
