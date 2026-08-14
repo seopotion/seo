@@ -1,4 +1,4 @@
-import { categorizeProviderHttpStatus, isRetryableProviderError, ProviderError } from '../errors';
+import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
 import type { LlmClient, LlmCompleteParams, LlmConfig, LlmResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -48,10 +48,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       clearTimeout(timer);
     }
 
-    if (!res.ok) {
-      const category = categorizeProviderHttpStatus(res.status);
-      throw new ProviderError(category, `OpenRouter request failed (${category})`);
-    }
+    if (!res.ok) throw await providerHttpError('OpenRouter', res);
 
     const json = (await res.json()) as {
       model?: string;

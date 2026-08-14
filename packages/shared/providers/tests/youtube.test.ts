@@ -79,6 +79,16 @@ describe('searchVideos', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  test('HTTP failure carries the status and a body snippet', async () => {
+    const body = JSON.stringify({ error: { code: 403, message: 'quotaExceeded' } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 403 })));
+    await expect(client().searchVideos('x')).rejects.toMatchObject({
+      category: 'auth',
+      status: 403,
+      message: expect.stringMatching(/HTTP 403.*quotaExceeded/),
+    });
+  });
+
   test('error messages never contain the API key', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('no', { status: 400 })));
     await expect(client().searchVideos('x')).rejects.toSatisfy(

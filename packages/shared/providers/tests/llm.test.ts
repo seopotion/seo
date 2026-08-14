@@ -117,6 +117,28 @@ describe('complete', () => {
     expect(out.usage.costUsd).toBeNull();
   });
 
+  // Regression for the 2026-08-14 staging outage: a 402 "insufficient credits"
+  // surfaced as a bare invalid_request with no status or body to diagnose it.
+  test('HTTP failure carries the status and a body snippet', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { message: 'This request requires more credits', code: 402 } }),
+          { status: 402 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      client().complete({ messages: [{ role: 'user', content: 'x' }] }),
+    ).rejects.toMatchObject({
+      name: 'ProviderError',
+      category: 'invalid_request',
+      status: 402,
+      message: expect.stringMatching(/HTTP 402.*requires more credits/),
+    });
+  });
+
   test('maps 401 to auth and does NOT retry', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('nope', { status: 401 }));
     vi.stubGlobal('fetch', fetchMock);
