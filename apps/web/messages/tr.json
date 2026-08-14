@@ -143,6 +143,7 @@
     "notConfigured": "Google ile oturum açma yapılandırılmamış",
     "retry": "Tekrar dene",
     "signInError": "Google ile oturum açılamadı. Tekrar deneyin.",
+    "signUp": "Kaydol",
     "signingIn": "Oturum açılıyor...",
     "workspaceError": "Çalışma alanınız kontrol edilemedi."
   },

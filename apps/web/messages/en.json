@@ -143,6 +143,7 @@
     "notConfigured": "Google sign-in is not configured",
     "retry": "Retry",
     "signInError": "Google sign-in failed. Try again.",
+    "signUp": "Sign Up",
     "signingIn": "Signing in...",
     "workspaceError": "Could not check your workspace."
   },
