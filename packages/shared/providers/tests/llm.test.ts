@@ -4,7 +4,7 @@ import { createOpenRouterClient } from '../src';
 function chatResponse(content: string) {
   return new Response(
     JSON.stringify({
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       choices: [{ message: { role: 'assistant', content } }],
       usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14, cost: 0.00014 },
     }),
@@ -32,14 +32,14 @@ describe('complete', () => {
 
     expect(out).toEqual({
       text: 'Hello there!',
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       usage: { promptTokens: 10, completionTokens: 4, totalTokens: 14, costUsd: 0.00014 },
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test');
     expect(JSON.parse(init.body as string)).toEqual({
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 100,
       temperature: 0.7,
