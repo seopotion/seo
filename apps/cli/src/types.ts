@@ -90,6 +90,37 @@ export interface DeleteUserData extends ResetUserData {
   user_deleted: boolean;
 }
 
+/**
+ * `db delete-org` report. The `orgs` list is populated in both modes, so a dry
+ * run shows exactly what `--apply` would remove; every `deleted` count is 0
+ * until `--apply`. Users are never touched — only org-scoped data.
+ */
+export interface DeleteOrgData {
+  apply: boolean;
+  orgs: {
+    id: string;
+    website_url: string;
+    user_id: string | null;
+    plan: string | null;
+    setup_status: string | null;
+  }[];
+  /** Active provider subscriptions found across the targets (counted in both modes). */
+  active_subscriptions: number;
+  /** Of those, how many were actually cancelled — 0 on a dry run. */
+  cancelled_subscriptions: number;
+  deleted: {
+    orgs: number;
+    keywords: number;
+    candidates: number;
+    articles: number;
+    gsc_connections: number;
+    subscriptions: number;
+    integrations: number;
+    strategy_runs: number;
+    gsc_analytics_cache: number;
+  };
+}
+
 export type Stage = 'staging' | 'prod';
 
 export interface PrereqCheck {

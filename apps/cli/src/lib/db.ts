@@ -8,11 +8,14 @@ import {
   CandidateRepo,
   closeDb,
   ensureIndexes,
+  GscAnalyticsCacheRepo,
   GscConnectionRepo,
+  IntegrationRepo,
   KeywordRepo,
   type MigrationReport,
   OrgRepo,
   runMigrations,
+  StrategyRunRepo,
   SubscriptionRepo,
   UserRepo,
 } from '@shared/db';
@@ -32,6 +35,7 @@ import { createStrategyRun, launchStrategy, runLocalStrategy } from '@shared/str
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
 import {
   type DbInitData,
+  type DeleteOrgData,
   type DeleteUserData,
   fail,
   ok,
@@ -452,16 +456,20 @@ export async function strategyRun(input: { orgId: string }): Promise<Result<Stra
   }
 }
 
+/** Every active provider subscription across the given orgs. */
+async function listActiveSubscriptions(orgIds: string[]) {
+  return (await Promise.all(orgIds.map((id) => SubscriptionRepo.listActiveByOrg(id)))).flat();
+}
+
 /**
  * Cancel every active provider subscription for the given orgs BEFORE any data
  * is deleted — wiping local records must not leave the user being billed for a
  * product that no longer exists. Throws when a sub exists but the LemonSqueezy
  * API key is unset or the cancel call fails.
  */
-async function cancelActiveSubscriptions(orgIds: string[]): Promise<number> {
-  const active = (
-    await Promise.all(orgIds.map((id) => SubscriptionRepo.listActiveByOrg(id)))
-  ).flat();
+async function cancelActiveSubscriptions(
+  active: Awaited<ReturnType<typeof listActiveSubscriptions>>,
+): Promise<number> {
   if (active.length === 0) return 0;
 
   const apiKey = process.env.LEMONSQUEEZY_API_KEY ?? '';
@@ -495,7 +503,7 @@ async function wipeUser(user: string | undefined, alsoDeleteUser: boolean) {
 
   let cancelled: number;
   try {
-    cancelled = await cancelActiveSubscriptions(orgIds);
+    cancelled = await cancelActiveSubscriptions(await listActiveSubscriptions(orgIds));
   } catch (e) {
     return fail(
       'SUB_CANCEL_FAILED',
@@ -552,6 +560,102 @@ export async function resetUser(input: { user?: string }): Promise<Result<ResetU
 export async function deleteUser(input: { user?: string }): Promise<Result<DeleteUserData>> {
   try {
     return (await wipeUser(input.user, true)) as Result<DeleteUserData>;
+  } finally {
+    await closeDb();
+  }
+}
+
+/**
+ * Delete whole orgs and every org-scoped document, leaving the owning users
+ * intact — the environment-cleanup counterpart to the user-scoped `resetUser`.
+ * Target either an explicit set of ids (`orgs`) or everything but a set
+ * (`keep`); the latter is the "one org survives" staging sweep, so an unknown
+ * id in EITHER list is a hard error rather than a silently wider delete.
+ *
+ * `admin_actions` are deliberately left behind: that collection is an
+ * append-only audit log by construction (see AdminActionRepo).
+ */
+export async function deleteOrgs(input: {
+  orgs?: string[];
+  keep?: string[];
+  apply: boolean;
+}): Promise<Result<DeleteOrgData>> {
+  const { orgs, keep, apply } = input;
+  if ((orgs?.length && keep?.length) || (!orgs?.length && !keep?.length)) {
+    return fail('BAD_TARGET', 'Provide exactly one of --org or --keep.');
+  }
+
+  try {
+    const all = await OrgRepo.listAllSummaries();
+    const known = new Set(all.map((o) => o.id));
+
+    const requested = keep?.length ? keep : (orgs as string[]);
+    const unknown = requested.filter((id) => !known.has(id));
+    if (unknown.length > 0) {
+      return fail(
+        'ORG_NOT_FOUND',
+        `Nothing was deleted: no org with id ${unknown.map((id) => `"${id}"`).join(', ')}.`,
+        keep?.length
+          ? 'A typo in --keep would delete the org you meant to save, so the whole sweep is refused.'
+          : undefined,
+      );
+    }
+
+    const selected = new Set(requested);
+    const targets = keep?.length
+      ? all.filter((o) => !selected.has(o.id))
+      : all.filter((o) => selected.has(o.id));
+
+    const deleted = {
+      orgs: 0,
+      keywords: 0,
+      candidates: 0,
+      articles: 0,
+      gsc_connections: 0,
+      subscriptions: 0,
+      integrations: 0,
+      strategy_runs: 0,
+      gsc_analytics_cache: 0,
+    };
+    const orgIds = targets.map((o) => o.id);
+    const active = await listActiveSubscriptions(orgIds);
+    const report = (cancelled: number): Result<DeleteOrgData> =>
+      ok({
+        apply,
+        orgs: targets,
+        active_subscriptions: active.length,
+        cancelled_subscriptions: cancelled,
+        deleted,
+      });
+
+    if (!apply) return report(0);
+
+    let cancelled: number;
+    try {
+      cancelled = await cancelActiveSubscriptions(active);
+    } catch (e) {
+      return fail(
+        'SUB_CANCEL_FAILED',
+        `Nothing was deleted: ${(e as Error).message}`,
+        'Set LEMONSQUEEZY_API_KEY (matching the targeted env), or cancel the subscription in the LemonSqueezy dashboard first.',
+      );
+    }
+
+    for (const id of orgIds) {
+      deleted.keywords += await KeywordRepo.deleteByOrgId(id);
+      deleted.candidates += await CandidateRepo.deleteByOrgId(id);
+      deleted.articles += await ArticleRepo.deleteByOrgId(id);
+      if (await GscConnectionRepo.deleteByOrgId(id)) deleted.gsc_connections += 1;
+      deleted.subscriptions += await SubscriptionRepo.deleteByOrgId(id);
+      deleted.integrations += await IntegrationRepo.deleteByOrgId(id);
+      deleted.strategy_runs += await StrategyRunRepo.deleteByOrgId(id);
+      deleted.gsc_analytics_cache += await GscAnalyticsCacheRepo.deleteByOrgId(id);
+      // The org doc goes last: a crash mid-purge leaves it findable, so a
+      // re-run picks the same target up instead of orphaning its data.
+      if (await OrgRepo.deleteById(id)) deleted.orgs += 1;
+    }
+
+    return report(cancelled);
   } finally {
     await closeDb();
   }

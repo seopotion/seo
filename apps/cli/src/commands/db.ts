@@ -349,6 +349,72 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'delete-org': defineCommand({
+      meta: {
+        name: 'delete-org',
+        description:
+          'Delete whole orgs and every org-scoped document (keywords, candidates, articles, ' +
+          'GSC connections + cache, subscriptions, integrations, strategy runs), cancelling ' +
+          'active LemonSqueezy subs first. Users are NOT touched, and the append-only ' +
+          'admin_actions audit log is left intact. Dry run by default.',
+      },
+      args: {
+        org: {
+          type: 'string',
+          description: 'Org id to delete. Repeatable or comma-separated.',
+        },
+        keep: {
+          type: 'string',
+          description:
+            'Invert: delete EVERY org except these ids. Repeatable or comma-separated. ' +
+            'An unknown id here aborts the whole sweep.',
+        },
+        apply: {
+          type: 'boolean',
+          description: 'Write the changes (default: dry run)',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { deleteOrgs } = await import('../lib/db');
+
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const list = (raw: string | string[] | undefined) =>
+            (Array.isArray(raw) ? raw : raw ? [raw] : [])
+              .flatMap((v) => v.split(','))
+              .map((v) => v.trim())
+              .filter(Boolean);
+
+          emitter.warn(
+            args.apply
+              ? 'IRREVERSIBLE — deletes from whatever MONGODB_URI targets. Never run this against prod.'
+              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Pass --apply to delete.',
+          );
+          emitter.step('db:delete-org', 'start');
+
+          const result = await deleteOrgs({
+            orgs: list(args.org as string | string[] | undefined),
+            keep: list(args.keep as string | string[] | undefined),
+            apply: args.apply as boolean,
+          });
+          emitter.step('db:delete-org', result.ok ? 'done' : 'fail');
+          if (result.ok && !result.data.apply) {
+            emitter.warn(
+              `${result.data.orgs.length} org(s) would be deleted, along with ${result.data.active_subscriptions} active subscription(s). Re-run with --apply.`,
+            );
+          }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'delete-user': defineCommand({
       meta: {
         name: 'delete-user',
