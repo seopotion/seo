@@ -2,7 +2,7 @@ import { isRetryableProviderError, ProviderError, providerHttpError } from '../e
 import type { LlmClient, LlmCompleteParams, LlmConfig, LlmResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const DEFAULT_MODEL = 'z-ai/glm-5.2';
+const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5';
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 200;
@@ -101,11 +101,12 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
 
       const result = await send(body);
       // An empty body is a 200 OK that says nothing: every caller parses JSON out
-      // of `text`, so there is no reading under which "" is an answer. A
-      // reasoning model produces it by spending its entire output budget on
-      // reasoning tokens and emitting no content — measured on GLM-5.2 at 65,536
-      // completion tokens for an empty classify body, and again on 2 of 15
-      // batched SERP-judge calls (#211). One retry, because the callers'
+      // of `text`, so there is no reading under which "" is an answer. Measured
+      // on the previous default (GLM-5.2), a reasoning model that spent its
+      // entire 65,536-token output budget on reasoning and emitted no content —
+      // once for a classify body, and again on 2 of 15 batched SERP-judge calls
+      // (#211). Haiku 4.5 does not reason by default, so this should now be
+      // dormant; it stays as a provider-agnostic guard, because the callers'
       // degradation paths (fail-open judge, `other` seed) are silent by design
       // and a second sample is far cheaper than a stage that quietly does
       // nothing. If it repeats, return the empty result and let those paths run

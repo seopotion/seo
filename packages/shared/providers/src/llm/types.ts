@@ -30,7 +30,7 @@ export interface LlmResult {
 
 export interface LlmConfig {
   apiKey: string;
-  /** Defaults to 'z-ai/glm-5.2'. */
+  /** Defaults to 'anthropic/claude-haiku-4.5'. */
   defaultModel?: string;
   /** Defaults to 'https://openrouter.ai/api/v1'. */
   baseUrl?: string;
