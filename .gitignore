@@ -13,5 +13,8 @@ alperProgress.md
 alperNotes/
 .snapshots/
 
+# agent session transcripts accidentally dropped in the repo root
+/*.jsonl
+
 # cdk deploy --outputs-file artifacts
 infra/outputs*.json
