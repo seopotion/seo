@@ -16,6 +16,10 @@ const {
   deleteArticlesByOrgId,
   deleteGscConnectionByOrgId,
   deleteSubscriptionsByOrgId,
+  deleteIntegrationsByOrgId,
+  deleteStrategyRunsByOrgId,
+  deleteGscCacheByOrgId,
+  listAllSummaries,
   listActiveByOrg,
   deleteUserById,
   launchStrategy,
@@ -55,6 +59,26 @@ const {
   deleteArticlesByOrgId: vi.fn(async () => 1),
   deleteGscConnectionByOrgId: vi.fn(async () => true),
   deleteSubscriptionsByOrgId: vi.fn(async () => 1),
+  deleteIntegrationsByOrgId: vi.fn(async () => 1),
+  deleteStrategyRunsByOrgId: vi.fn(async () => 4),
+  deleteGscCacheByOrgId: vi.fn(async () => 5),
+  // Two orgs: `keep` sweeps target whichever is not named.
+  listAllSummaries: vi.fn(async () => [
+    {
+      id: 'org_keep',
+      website_url: 'https://keep.example.com',
+      user_id: 'u_1',
+      plan: 'paid',
+      setup_status: 'setup_complete',
+    },
+    {
+      id: 'org_1',
+      website_url: 'https://nuke.example.com',
+      user_id: 'u_2',
+      plan: 'free',
+      setup_status: 'setup_complete',
+    },
+  ]),
   listActiveByOrg: vi.fn(async (): Promise<{ provider_subscription_id: string }[]> => []),
   deleteUserById: vi.fn(async () => true),
   launchStrategy: vi.fn(async () => ({ run_id: 'run_1' })),
@@ -73,6 +97,7 @@ vi.mock('@shared/db', () => ({
     claimStrategy,
     setStrategyStatus,
     findByUserId,
+    listAllSummaries,
     deleteById: deleteOrgById,
   },
   UserRepo: { findByEmail, deleteById: deleteUserById },
@@ -81,6 +106,9 @@ vi.mock('@shared/db', () => ({
   ArticleRepo: { deleteByOrgId: deleteArticlesByOrgId },
   GscConnectionRepo: { deleteByOrgId: deleteGscConnectionByOrgId },
   SubscriptionRepo: { deleteByOrgId: deleteSubscriptionsByOrgId, listActiveByOrg },
+  IntegrationRepo: { deleteByOrgId: deleteIntegrationsByOrgId },
+  StrategyRunRepo: { deleteByOrgId: deleteStrategyRunsByOrgId },
+  GscAnalyticsCacheRepo: { deleteByOrgId: deleteGscCacheByOrgId },
 }));
 
 vi.mock('@shared/strategy', () => ({ launchStrategy, createStrategyRun, runLocalStrategy }));
@@ -89,7 +117,15 @@ vi.mock('@shared/providers', () => ({
   createLemonSqueezyProvider: () => ({ cancelSubscription }),
 }));
 
-import { deleteUser, initDb, migrateDb, resetUser, setOrgPlan, strategyRun } from '../src/lib/db';
+import {
+  deleteOrgs,
+  deleteUser,
+  initDb,
+  migrateDb,
+  resetUser,
+  setOrgPlan,
+  strategyRun,
+} from '../src/lib/db';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -464,5 +500,117 @@ describe('deleteUser', () => {
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('expected failure');
     expect(res.error.code).toBe('USER_NOT_FOUND');
+  });
+});
+
+describe('deleteOrgs', () => {
+  test('dry run reports the targets and writes nothing', async () => {
+    const res = await deleteOrgs({ keep: ['org_keep'], apply: false });
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(deleteKeywordsByOrgId).not.toHaveBeenCalled();
+    expect(closeDb).toHaveBeenCalledOnce();
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.apply).toBe(false);
+    expect(res.data.orgs.map((o) => o.id)).toEqual(['org_1']);
+    expect(res.data.deleted.orgs).toBe(0);
+  });
+
+  test('--keep deletes every other org across all org-scoped collections', async () => {
+    const res = await deleteOrgs({ keep: ['org_keep'], apply: true });
+    for (const fn of [
+      deleteKeywordsByOrgId,
+      deleteCandidatesByOrgId,
+      deleteArticlesByOrgId,
+      deleteGscConnectionByOrgId,
+      deleteSubscriptionsByOrgId,
+      deleteIntegrationsByOrgId,
+      deleteStrategyRunsByOrgId,
+      deleteGscCacheByOrgId,
+      deleteOrgById,
+    ]) {
+      expect(fn).toHaveBeenCalledExactlyOnceWith('org_1');
+    }
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.deleted).toEqual({
+      orgs: 1,
+      keywords: 3,
+      candidates: 2,
+      articles: 1,
+      gsc_connections: 1,
+      subscriptions: 1,
+      integrations: 1,
+      strategy_runs: 4,
+      gsc_analytics_cache: 5,
+    });
+  });
+
+  test('never touches users', async () => {
+    await deleteOrgs({ keep: ['org_keep'], apply: true });
+    expect(deleteUserById).not.toHaveBeenCalled();
+  });
+
+  test('--org targets exactly the named ids', async () => {
+    const res = await deleteOrgs({ orgs: ['org_1'], apply: true });
+    expect(deleteOrgById).toHaveBeenCalledExactlyOnceWith('org_1');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.orgs.map((o) => o.id)).toEqual(['org_1']);
+  });
+
+  test('an unknown --keep id aborts the sweep rather than deleting everything', async () => {
+    const res = await deleteOrgs({ keep: ['org_typo'], apply: true });
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('ORG_NOT_FOUND');
+  });
+
+  test('an unknown --org id aborts before deleting the known ones', async () => {
+    const res = await deleteOrgs({ orgs: ['org_1', 'org_typo'], apply: true });
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('ORG_NOT_FOUND');
+  });
+
+  test('cancels active provider subscriptions before deleting anything', async () => {
+    process.env.LEMONSQUEEZY_API_KEY = 'test-key';
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await deleteOrgs({ keep: ['org_keep'], apply: true });
+    expect(cancelSubscription).toHaveBeenCalledWith('sub_9');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.cancelled_subscriptions).toBe(1);
+    delete process.env.LEMONSQUEEZY_API_KEY;
+  });
+
+  test('a dry run counts active subs but cancels none', async () => {
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await deleteOrgs({ keep: ['org_keep'], apply: false });
+    expect(cancelSubscription).not.toHaveBeenCalled();
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.data.active_subscriptions).toBe(1);
+    expect(res.data.cancelled_subscriptions).toBe(0);
+  });
+
+  test('fails before deleting when an active sub exists but LEMONSQUEEZY_API_KEY is unset', async () => {
+    listActiveByOrg.mockResolvedValueOnce([{ provider_subscription_id: 'sub_9' }]);
+    const res = await deleteOrgs({ keep: ['org_keep'], apply: true });
+    expect(deleteOrgById).not.toHaveBeenCalled();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('SUB_CANCEL_FAILED');
+  });
+
+  test('requires exactly one of --org or --keep', async () => {
+    for (const input of [{ apply: true }, { orgs: ['org_1'], keep: ['org_keep'], apply: true }]) {
+      const res = await deleteOrgs(input);
+      expect(res.ok).toBe(false);
+      if (res.ok) throw new Error('expected failure');
+      expect(res.error.code).toBe('BAD_TARGET');
+    }
   });
 });

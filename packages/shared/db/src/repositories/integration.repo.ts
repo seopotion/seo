@@ -140,4 +140,10 @@ export const IntegrationRepo = {
     const res = await (await collection()).deleteOne({ org_id: orgId, provider });
     return res.deletedCount === 1;
   },
+
+  /** Every provider row for the org (used by the `db delete-org` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };

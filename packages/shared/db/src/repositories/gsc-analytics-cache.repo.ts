@@ -29,4 +29,10 @@ export const GscAnalyticsCacheRepo = {
       { upsert: true },
     );
   },
+
+  /** Drop the org's cached rows (used by the `db delete-org` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const res = await (await collection()).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };
