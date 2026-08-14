@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Spy on the SQS enqueue (hoisted so the vi.mock factory can reference it).
 const { enqueueScanTask } = vi.hoisted(() => ({ enqueueScanTask: vi.fn(async () => {}) }));
-const { enqueueStrategyTask } = vi.hoisted(() => ({
-  enqueueStrategyTask: vi.fn(async () => {}),
+vi.mock('../src/clients/sqs', () => ({ enqueueScanTask }));
+
+const { launchStrategy } = vi.hoisted(() => ({
+  launchStrategy: vi.fn(async () => ({ run_id: 'run_1' })),
 }));
-vi.mock('../src/clients/sqs', () => ({ enqueueScanTask, enqueueStrategyTask }));
+vi.mock('@shared/strategy', () => ({ launchStrategy }));
 
 // A fully-populated presets object (matches SetupPresetsSchema) for the
 // completed org, so `/details` has something to return.
@@ -425,26 +427,26 @@ describe('setup routes', () => {
 
 describe('POST /finalize strategy trigger', () => {
   beforeEach(() => {
-    enqueueStrategyTask.mockClear();
+    launchStrategy.mockClear();
   });
 
-  test('paid org: claims and enqueues exactly one strategy job', async () => {
+  test('paid org: claims and launches exactly one strategy run', async () => {
     const res = await finalize('paid_ready');
     expect(res.status).toBe(200);
-    expect(enqueueStrategyTask).toHaveBeenCalledTimes(1);
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: 'paid_ready' });
+    expect(launchStrategy).toHaveBeenCalledTimes(1);
+    expect(launchStrategy).toHaveBeenCalledWith('paid_ready');
   });
 
-  test('free org: does not enqueue', async () => {
+  test('free org: does not launch', async () => {
     const res = await finalize('6650f1a2b3c4d5e6f7a8b9c0');
     expect(res.status).toBe(200);
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 
-  test('paid org, claim lost: does not enqueue', async () => {
+  test('paid org, claim lost: does not launch', async () => {
     vi.mocked(OrgRepo.claimStrategy).mockResolvedValueOnce(false);
     const res = await finalize('paid_ready');
     expect(res.status).toBe(200);
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 });

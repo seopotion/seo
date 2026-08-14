@@ -22,12 +22,6 @@ type LandingUseCase = {
   name: string;
 };
 
-type LandingTestimonial = {
-  author: string;
-  quote: string;
-  role: string;
-};
-
 export async function generateMetadata({ params }: LandingPageProps): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Metadata' });
@@ -156,19 +150,6 @@ const features = [
   },
 ];
 
-const starKeys = ['star-1', 'star-2', 'star-3', 'star-4', 'star-5'];
-
-function LogoMark() {
-  const t = useTranslations('Navbar');
-
-  return (
-    <div className="flex items-center gap-2">
-      <Image src="/android-chrome-192x192.png" alt={t('logoAlt')} width={32} height={32} />
-      <span className="text-2xl font-bold text-gray-900">Seopotion</span>
-    </div>
-  );
-}
-
 export default function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
   // Opts this page into static rendering: without it next-intl resolves the
   // locale from the request, which makes the route render on demand.
@@ -179,7 +160,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
   const metadataT = useTranslations('Metadata');
   const featureCards = t.raw('features') as LandingFeature[];
   const useCaseCards = t.raw('useCases') as LandingUseCase[];
-  const testimonialCards = t.raw('testimonials') as LandingTestimonial[];
+  const controlCards = t.raw('controls.cards') as LandingFeature[];
   const homeJsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -198,7 +179,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
         description: metadataT('defaultDescription'),
         offers: {
           '@type': 'Offer',
-          price: '80',
+          price: '60',
           priceCurrency: 'USD',
         },
       },
@@ -240,7 +221,13 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
             <h1 className="mb-6 font-bold text-4xl text-gray-800 leading-tight tracking-tight md:text-5xl">
               {t('hero.titleLine1')} <br /> {t('hero.titleLine2')}
             </h1>
-            <h2 className="mx-auto mb-10 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
+            <h2 className="mx-auto mb-8 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
+            <Link
+              href="/pricing"
+              className="inline-flex rounded-lg bg-orange-400 px-5 py-3 font-medium text-sm text-white transition-colors hover:bg-orange-500"
+            >
+              {t('hero.cta')}
+            </Link>
           </div>
         </section>
 
@@ -326,7 +313,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
                   className="rounded-2xl bg-gray-50 p-6 transition-shadow hover:shadow-lg"
                 >
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                    {features[index]?.icon}
+                    {features[index % features.length]?.icon}
                   </div>
                   <h3 className="mb-2 font-semibold text-gray-900 text-xl">{feature.title}</h3>
                   <p className="text-gray-600">{feature.description}</p>
@@ -489,34 +476,18 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
           <div className="mx-auto max-w-6xl">
             <div className="mb-16 text-center">
               <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
-                {t('testimonialsTitle')}
+                {t('controls.title')}
               </h2>
-              <p className="text-gray-600 text-lg">{t('testimonialsDescription')}</p>
+              <p className="text-gray-600 text-lg">{t('controls.description')}</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">
-              {testimonialCards.map((testimonial) => (
+              {controlCards.map((control) => (
                 <div
-                  key={testimonial.author}
+                  key={control.title}
                   className="rounded-2xl border border-gray-100 bg-white p-6"
                 >
-                  <div className="mb-4 flex gap-1 text-yellow-400">
-                    {starKeys.map((starKey) => (
-                      <svg
-                        key={starKey}
-                        aria-hidden="true"
-                        className="h-5 w-5"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <p className="mb-6 text-gray-700">&ldquo;{testimonial.quote}&rdquo;</p>
-                  <div>
-                    <p className="font-semibold text-gray-900">{testimonial.author}</p>
-                    <p className="text-gray-500 text-sm">{testimonial.role}</p>
-                  </div>
+                  <h3 className="font-semibold text-gray-900 text-xl">{control.title}</h3>
+                  <p className="mt-3 text-gray-600">{control.description}</p>
                 </div>
               ))}
             </div>
@@ -532,29 +503,6 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
           </div>
         </section>
       </main>
-
-      <footer className="border-gray-100 border-t px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <LogoMark />
-            <div className="flex items-center gap-8 text-gray-600">
-              <Link href="/#features" className="transition-colors hover:text-gray-900">
-                {t('footer.features')}
-              </Link>
-              <Link href="/pricing" className="transition-colors hover:text-gray-900">
-                {t('footer.pricing')}
-              </Link>
-              <Link href="/blog" className="transition-colors hover:text-gray-900">
-                {t('footer.blog')}
-              </Link>
-              <Link href="/guides" className="transition-colors hover:text-gray-900">
-                {t('footer.support')}
-              </Link>
-            </div>
-            <p className="text-gray-500 text-sm">{t('footer.copyright')}</p>
-          </div>
-        </div>
-      </footer>
     </>
   );
 }

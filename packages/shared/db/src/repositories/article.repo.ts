@@ -3,14 +3,22 @@ import {
   type ArticleImage,
   type ArticlePublication,
   ArticleSchema,
+  type AutoPublishAttempt,
   type CreateArticleInput,
   CreateArticleInput as CreateArticleInputSchema,
+  type IntegrationProvider,
+  type PublishingError,
   type TopicRole,
 } from '@shared/schemas';
 import { type Document, ObjectId, type UpdateFilter, type WithId } from 'mongodb';
 import { getDb } from '../client';
 
 const collection = async () => (await getDb()).collection('articles');
+
+export interface RecordPublicationOptions {
+  publishedAt?: Date;
+  updatedAt?: Date | null;
+}
 
 /** Map a Mongo document to a validated entity (`_id` -> string `id`). */
 function toEntity(doc: WithId<Document>): Article {
@@ -93,6 +101,213 @@ export const ArticleRepo = {
     return toEntity({ _id: res.insertedId, ...data, created_at });
   },
 
+  async initializeAutoPublishAttempt(
+    id: string,
+    provider: IntegrationProvider,
+    requestedAt: Date = new Date(),
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const entry: AutoPublishAttempt = {
+      provider,
+      status: 'queued',
+      attempt_count: 0,
+      requested_at: requestedAt,
+      last_attempt_at: null,
+      lease_expires_at: null,
+      last_error: null,
+    };
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        'publications.provider': { $ne: provider },
+        'auto_publish.attempts': { $not: { $elemMatch: { provider } } },
+      },
+      { $push: { 'auto_publish.attempts': entry } } as unknown as UpdateFilter<Document>,
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async claimAutoPublishAttempt(
+    id: string,
+    provider: IntegrationProvider,
+    now: Date,
+    leaseMs: number,
+  ): Promise<AutoPublishAttempt | null> {
+    if (!ObjectId.isValid(id)) return null;
+    const leaseExpiresAt = new Date(now.getTime() + leaseMs);
+    const doc = await (await collection()).findOneAndUpdate(
+      {
+        _id: new ObjectId(id),
+        'publications.provider': { $ne: provider },
+        'auto_publish.attempts': {
+          $elemMatch: {
+            provider,
+            $or: [
+              { status: { $in: ['queued', 'retrying'] } },
+              { status: 'publishing', lease_expires_at: { $lte: now } },
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'publishing',
+          'auto_publish.attempts.$.last_attempt_at': now,
+          'auto_publish.attempts.$.lease_expires_at': leaseExpiresAt,
+        },
+        $inc: { 'auto_publish.attempts.$.attempt_count': 1 },
+      },
+      { returnDocument: 'after' },
+    );
+    if (!doc) return null;
+    return (
+      toEntity(doc).auto_publish.attempts.find((attempt) => attempt.provider === provider) ?? null
+    );
+  },
+
+  async recordAutoPublishRetry(
+    id: string,
+    provider: IntegrationProvider,
+    leaseExpiresAt: Date,
+    error: PublishingError,
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        'auto_publish.attempts': {
+          $elemMatch: { provider, status: 'publishing', lease_expires_at: leaseExpiresAt },
+        },
+      },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'retrying',
+          'auto_publish.attempts.$.lease_expires_at': null,
+          'auto_publish.attempts.$.last_error': error,
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async failAutoPublishAttempt(
+    id: string,
+    provider: IntegrationProvider,
+    error: PublishingError,
+    leaseExpiresAt?: Date,
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const attemptFilter: Document = { provider, status: { $ne: 'published' } };
+    if (leaseExpiresAt) {
+      attemptFilter.status = 'publishing';
+      attemptFilter.lease_expires_at = leaseExpiresAt;
+    }
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        'auto_publish.attempts': { $elemMatch: attemptFilter },
+      },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'failed',
+          'auto_publish.attempts.$.lease_expires_at': null,
+          'auto_publish.attempts.$.last_error': error,
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async cancelAutoPublishAttempt(
+    id: string,
+    provider: IntegrationProvider,
+    error: PublishingError,
+    now: Date = new Date(),
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        'auto_publish.attempts': {
+          $elemMatch: {
+            provider,
+            $or: [
+              { status: { $in: ['queued', 'retrying'] } },
+              { status: 'publishing', lease_expires_at: { $lte: now } },
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'cancelled',
+          'auto_publish.attempts.$.lease_expires_at': null,
+          'auto_publish.attempts.$.last_error': error,
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async completeAutoPublishAttempt(id: string, provider: IntegrationProvider): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id), 'auto_publish.attempts.provider': provider },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'published',
+          'auto_publish.attempts.$.lease_expires_at': null,
+          'auto_publish.attempts.$.last_error': null,
+        },
+      },
+    );
+    return res.matchedCount === 1;
+  },
+
+  async resetAutoPublishAttempt(
+    id: string,
+    provider: IntegrationProvider,
+    requestedAt: Date = new Date(),
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      {
+        _id: new ObjectId(id),
+        'publications.provider': { $ne: provider },
+        'auto_publish.attempts': {
+          $elemMatch: { provider, status: { $in: ['failed', 'cancelled'] } },
+        },
+      },
+      {
+        $set: {
+          'auto_publish.attempts.$.status': 'queued',
+          'auto_publish.attempts.$.attempt_count': 0,
+          'auto_publish.attempts.$.requested_at': requestedAt,
+          'auto_publish.attempts.$.last_attempt_at': null,
+          'auto_publish.attempts.$.lease_expires_at': null,
+          'auto_publish.attempts.$.last_error': null,
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
+  async recordAutoPublishPreflightError(id: string, error: PublishingError): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { 'auto_publish.preflight_error': error } },
+    );
+  },
+
+  async clearAutoPublishPreflightError(id: string): Promise<void> {
+    if (!ObjectId.isValid(id)) return;
+    await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { 'auto_publish.preflight_error': null } },
+    );
+  },
+
   /**
    * Upsert the article's publish state for one provider (#7). A first publish
    * pushes the entry; a re-publish updates `ref`/`slug` and stamps
@@ -101,10 +316,11 @@ export const ArticleRepo = {
    * change on the article itself — that difference is what makes stale remote
    * paths detectable at the next publish.
    *
-   * `at` defaults to now. The static-site publisher passes the timestamp it
-   * already wrote into the committed `manifest.json`, so the next rebuild of
-   * that file from the database is byte-identical instead of producing a
-   * millisecond-wide diff on an untouched article.
+   * Callers may provide the exact provider timestamps they already committed.
+   * `publishedAt` defaults to now for a first publication. `updatedAt` defaults
+   * to null for an insertion and now for an existing provider, but an explicit
+   * Date or null is always stored as-is. In particular, equality between the
+   * two timestamps does not imply that no update occurred.
    *
    * This is also the ONLY place `article.status` advances to `'published'`.
    * It has to be here rather than in each publish route because every provider
@@ -115,33 +331,58 @@ export const ArticleRepo = {
    */
   async recordPublication(
     id: string,
-    entry: { provider: ArticlePublication['provider']; ref: string; slug: string },
-    at: Date = new Date(),
+    entry: {
+      provider: ArticlePublication['provider'];
+      ref: string;
+      slug: string;
+      remote_url?: string | null;
+    },
+    options?: RecordPublicationOptions,
   ): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;
     const col = await collection();
     const _id = new ObjectId(id);
+    const now = new Date();
+    const publishedAt = options?.publishedAt ?? now;
+    const updatedAt = options?.updatedAt === undefined ? now : options.updatedAt;
+    const updateSet: Document = {
+      'publications.$.ref': entry.ref,
+      'publications.$.slug': entry.slug,
+      'publications.$.updated_at': updatedAt,
+      status: 'published',
+    };
+    if (entry.remote_url !== undefined) updateSet['publications.$.remote_url'] = entry.remote_url;
     const updated = await col.updateOne(
       { _id, 'publications.provider': entry.provider },
-      {
-        $set: {
-          'publications.$.ref': entry.ref,
-          'publications.$.slug': entry.slug,
-          'publications.$.updated_at': at,
-          status: 'published',
-        },
-      },
+      { $set: updateSet },
     );
     let matched = updated.matchedCount > 0;
     if (!matched) {
       // The cast is the driver's `PushOperator<Document>` wrinkle: on an untyped
       // collection every field resolves to `undefined`, so no $push value is
       // assignable. Nothing here is dynamic — the shape is ArticlePublication.
-      const pushed = await col.updateOne({ _id }, {
-        $set: { status: 'published' },
-        $push: { publications: { ...entry, published_at: at, updated_at: null } },
-      } as unknown as UpdateFilter<Document>);
+      const pushed = await col.updateOne(
+        { _id, 'publications.provider': { $ne: entry.provider } },
+        {
+          $set: { status: 'published' },
+          $push: {
+            publications: {
+              ...entry,
+              remote_url: entry.remote_url ?? null,
+              published_at: publishedAt,
+              updated_at: options?.updatedAt ?? null,
+            },
+          },
+        } as unknown as UpdateFilter<Document>,
+      );
       matched = pushed.matchedCount > 0;
+      if (!matched) {
+        const raced = await col.updateOne(
+          { _id, 'publications.provider': entry.provider },
+          { $set: updateSet },
+        );
+        matched = raced.matchedCount > 0;
+      }
     }
     if (!matched) return false;
     // `article.published_at` means "first went live with ANY provider", so it is
@@ -149,7 +390,7 @@ export const ArticleRepo = {
     // live later. A separate write because that rule can't be expressed in the
     // same update as the $set above; `{published_at: null}` also matches the
     // pre-#7 documents where the field is absent entirely.
-    await col.updateOne({ _id, published_at: null }, { $set: { published_at: at } });
+    await col.updateOne({ _id, published_at: null }, { $set: { published_at: publishedAt } });
     return true;
   },
 

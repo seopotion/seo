@@ -4,6 +4,7 @@ import {
   articlePath,
   manifestPath,
   type PublishedArticle,
+  parseManifest,
   renderArticle,
   renderManifest,
 } from '../src/lib/static-site';
@@ -39,6 +40,7 @@ function article(over: Partial<Article> = {}): Article {
     created_at: new Date('2026-07-01T00:00:00.000Z'),
     published_at: null,
     publications: [],
+    auto_publish: { preflight_error: null, attempts: [] },
     updated_at: null,
     images: [
       {
@@ -92,6 +94,7 @@ describe('renderArticle', () => {
     expect(out).toBe(
       [
         '---',
+        'source_article_id: "art_1"',
         'slug: "ai-outfit-generator"',
         'title: "How AI Outfit Generators Work"',
         'meta_title: "How AI Outfit Generators Work | Guide"',
@@ -215,6 +218,7 @@ describe('renderManifest', () => {
     expect(manifest.generated_at).toBe('2026-07-29T10:15:00.000Z');
     expect(manifest.articles).toEqual([
       {
+        source_article_id: 'art_1',
         slug: 'ai-outfit-generator',
         title: 'How AI Outfit Generators Work',
         meta_title: 'How AI Outfit Generators Work | Guide',
@@ -294,5 +298,12 @@ describe('renderManifest', () => {
     const [entry] = JSON.parse(json).articles;
     expect(entry.slug).toBe('old-name');
     expect(entry.path).toBe('seopotion/articles/old-name.md');
+  });
+
+  test('parses a historical version-1 manifest without source ownership metadata', () => {
+    const manifest = JSON.parse(renderManifest([published()], 'seopotion/', generatedAt));
+    delete manifest.articles[0].source_article_id;
+
+    expect(parseManifest(JSON.stringify(manifest)).articles[0]?.source_article_id).toBeNull();
   });
 });

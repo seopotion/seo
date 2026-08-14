@@ -16,6 +16,7 @@
     "@shared/logger": "*",
     "@shared/providers": "*",
     "@shared/schemas": "*",
+    "@shared/strategy": "*",
     "@shared/types": "*"
   }
 }

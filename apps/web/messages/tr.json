@@ -124,9 +124,9 @@
     },
     "tiers": {
       "expert": {
-        "cta": "Expert-led Growth planına yükselt",
-        "description": "Growth planındaki her şeye ek olarak, içerik stratejiniz için uzman desteği.",
-        "name": "Expert-led Growth"
+        "cta": "Business'a yükselt",
+        "description": "Growth'taki her şeye ek olarak, ayda en fazla 10 Seopotion üretimi makale için insan incelemesi.",
+        "name": "Business"
       },
       "paid": {
         "cta": "Growth planına yükselt",
@@ -196,11 +196,6 @@
       "planned": "Planlanan",
       "published": "Yayınlanan",
       "title": "Makaleler"
-    },
-    "backlinks": {
-      "description": "Ücretsiz deneme sırasında devre dışı.",
-      "title": "Backlink Değişimi",
-      "upgrade": "Kilidi açmak için yükselt"
     },
     "bestArticles": {
       "clicks": "{count, plural, other {# tıklama}}",
@@ -461,6 +456,19 @@
     "actions": {
       "openArticle": "{title} makalesini aç"
     },
+    "autoPublishing": {
+      "label": "Otomatik yayınlama: {status}",
+      "partialSuccess": "Bazı hedeflerde yayınlandı",
+      "shortLabel": "Otomatik: {status}",
+      "statuses": {
+        "needsAttention": "İlgilenmeniz gerekiyor",
+        "notQueued": "Kuyruğa alınmadı",
+        "published": "Yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      }
+    },
     "articleStatuses": {
       "deleted": "Silindi",
       "generated": "Oluşturuldu",
@@ -521,6 +529,94 @@
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
       "slug": "Slug"
+    },
+    "publishing": {
+      "actions": {
+        "articleSettings": "Otomatik yayın ayarlarını incele",
+        "billing": "Faturalandırmayı incele",
+        "integrations": "Entegrasyonları yönet",
+        "wordpressDocs": "WordPress rehberini aç"
+      },
+      "attemptCount": "{count} deneme",
+      "attemptStatuses": {
+        "cancelled": "İptal edildi",
+        "failed": "Başarısız",
+        "manual": "Elle yayınlandı",
+        "published": "Yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      },
+      "description": "Otomatik yayın durumunu bağlı her hedef için ayrı ayrı takip edin.",
+      "empty": "Bu makale için henüz otomatik yayın denemesi yok.",
+      "errorAt": "Bildirim zamanı: {date}",
+      "errors": {
+        "articleNotFound": "Bu makale artık kullanılamıyor.",
+        "autoPublishDisabled": "Otomatik yayınlama kapalı. Yeniden denemeden önce ayarı açın.",
+        "commitRejected": "GitHub commit'i reddetti. Depo erişimini ve dal korumasını kontrol edin.",
+        "githubRequestFailed": "GitHub'a ulaşılamadı veya geçersiz bir yanıt alındı. Tekrar deneyin.",
+        "imageGenerationFailed": "Görsel oluşturma başarısız olduğu için bu makale otomatik yayınlanamıyor.",
+        "imagesIncomplete": "Makale görselleri henüz tamamlanmadı. Görsel oluşturma bittikten sonra yeniden deneyin.",
+        "installationNotFound": "GitHub App kurulumu bulunamadı. Statik siteyi yeniden bağlayın.",
+        "installationSuspended": "GitHub App kurulumu askıya alınmış. Kurulumu etkinleştirin veya yeniden bağlayın.",
+        "invalidArticlePayload": "Makale verileri bu hedef için geçerli değil. Yeniden denemeden önce makaleyi düzeltin.",
+        "invalidCredentials": "Kayıtlı hedef kimlik bilgileri geçersiz. Entegrasyonu yeniden bağlayın.",
+        "invalidProviderResponse": "Yayın hedefi geçersiz bir yanıt verdi. Tekrar deneyin.",
+        "missingWritePermission": "GitHub App'in bu depoya yazma izni yok.",
+        "networkError": "Yayın hedefine ulaşılamadı. Tekrar deneyin.",
+        "notConnected": "Henüz yayınlanmamış bağlı bir yayın hedefi yok.",
+        "pluginUpgradeRequired": "Yeniden denemeden önce SeoPotion WordPress eklentisini 1.2.0 veya daha yeni bir sürüme güncelleyin.",
+        "queueSendFailed": "Yeniden deneme kuyruğa alınamadı. Tekrar deneyin.",
+        "recordFailed": "Uzak hedefte yayınlama tamamlandı ancak yerel kayıt kaydedilemedi. Güvenli biçimde eşitlemek için yeniden deneyin.",
+        "refConflict": "Yayınlama sırasında GitHub dalı sürekli değişti. Kısa süre sonra tekrar deneyin.",
+        "repoNotFound": "Yapılandırılmış GitHub deposu veya dalı bulunamadı.",
+        "slugConflict": "Bu statik site slug'ı başka bir makaleye ait. Yeniden denemeden önce slug'ı düzenleyin.",
+        "staticPublishInProgress": "Başka bir statik site yayını devam ediyor. Kısa süre sonra tekrar deneyin.",
+        "subscriptionRequired": "Otomatik yayınlama için ücretli abonelik gerekir.",
+        "unknown": "Otomatik yayınlama tamamlanamadı. Tekrar deneyin veya hedef ayarlarını inceleyin.",
+        "wordpressAuthFailed": "WordPress kayıtlı kimlik bilgilerini reddetti. WordPress'i yeniden bağlayın.",
+        "wordpressPublishInProgress": "Bu WordPress yayını zaten devam ediyor. Kısa süre sonra tekrar deneyin.",
+        "wordpressRequestFailed": "WordPress yayınlama isteğini tamamlayamadı. Tekrar deneyin."
+      },
+      "labels": {
+        "attemptCount": "Denemeler",
+        "lastAttemptAt": "Son deneme",
+        "publishedAt": "İlk yayınlanma",
+        "requestedAt": "İstek zamanı",
+        "slug": "Hedef slug",
+        "updatedAt": "Son güncelleme"
+      },
+      "lastError": "Son hata",
+      "links": {
+        "static-site": "GitHub commit'ini görüntüle",
+        "wordpress": "Canlı WordPress yazısını görüntüle"
+      },
+      "notUpdated": "Güncellenmedi",
+      "partialSuccess": "Bu makale en az bir hedefte yayınlandı ancak başka bir hedef hâlâ ilgilenmenizi gerektiriyor.",
+      "preflightError": "Otomatik yayınlama ilgilenmenizi gerektiriyor",
+      "providers": {
+        "static-site": "Statik site",
+        "wordpress": "WordPress"
+      },
+      "retry": {
+        "accessibleLabel": "Başarısız otomatik yayın hedeflerini yeniden dene",
+        "alreadyPublished": "Bu makale bağlı hedeflerin tümünde zaten yayınlanmış.",
+        "button": "Başarısız yayını yeniden dene",
+        "editingBlocked": "Otomatik yayınlamayı yeniden denemeden önce makale değişikliklerini kaydedin veya geri alın.",
+        "queued": "{providers} için otomatik yayınlama kuyruğa alındı.",
+        "refreshing": "Durum yenileniyor...",
+        "submitting": "Yeniden deneme kuyruğa alınıyor..."
+      },
+      "settingsLink": "Otomatik yayın ayarlarını incele",
+      "statuses": {
+        "needsAttention": "İlgilenmeniz gerekiyor",
+        "notQueued": "Kuyruğa alınmadı",
+        "published": "Otomatik yayınlandı",
+        "publishing": "Yayınlanıyor",
+        "queued": "Kuyrukta",
+        "retrying": "Yeniden deneniyor"
+      },
+      "title": "Otomatik yayınlama"
     },
     "site": {
       "errors": {
@@ -633,8 +729,29 @@
         "placeholder": "Stil seç"
       },
       "autoPublish": {
-        "description": "Üretim tamamlandığında bitmiş makaleleri otomatik yayınlayın.",
-        "label": "Otomatik yayınlama"
+        "description": "Görselleri oluşturulan gelecek makaleleri otomatik olarak yayınlayın.",
+        "details": {
+          "destinations": "Bağlı yayınlama hedeflerinin tümü yayına dahil edilir.",
+          "failedAttempts": "Başarısız denemeleri daha sonra İçerik Geçmişi'ndeki makale sayfasından inceleyip yeniden deneyebilirsiniz.",
+          "futureArticles": "Bu ayar yalnızca gelecek makaleler için geçerlidir. Açılması, daha önce oluşturulmuş makaleleri yayınlamaz.",
+          "wordpress": "Otomatik WordPress yayını için SeoPotion WordPress eklentisinin 1.2.0 veya daha yeni bir sürümü gerekir."
+        },
+        "label": "Otomatik yayınlama",
+        "links": {
+          "billing": "Faturalandırmayı incele",
+          "integrations": "Entegrasyonları yönet"
+        },
+        "requirements": {
+          "allDestinationsHaveErrors": "Bağlı hedeflerin tümü şu anda ilgilenmenizi gerektiriyor. Bağlantılar düzeltilene kadar otomatik yayın denemeleri başarısız olabilir.",
+          "checkFailed": "Hedeflerin hazır olduğu doğrulanamadığı için otomatik yayınlama açılamıyor.",
+          "checkFailedEnabled": "Otomatik yayınlama açık kalır ancak hedeflerin hazır olduğu doğrulanamadı. Gelecekteki otomatik denemeler çalışmayabilir.",
+          "checking": "Hedeflerin hazır olup olmadığı hâlâ kontrol ediliyor. Otomatik yayınlamayı açmadan önce doğrulamanın bitmesini bekleyin.",
+          "checkingEnabled": "Hedeflerin hazır olup olmadığı kontrol edilirken otomatik yayınlama açık kalır. Doğrulama bitene kadar gelecekteki otomatik denemeler çalışmayabilir.",
+          "entitlement": "Otomatik yayınlamayı açmak için ücretli abonelik gerekir.",
+          "entitlementEnabled": "Otomatik yayınlama açık kalır ancak ücretli abonelik olmadan gelecekteki otomatik denemeler çalışmayabilir.",
+          "noDestination": "Otomatik yayınlamayı açmadan önce en az bir yayınlama hedefi bağlayın.",
+          "noDestinationEnabled": "Otomatik yayınlama açık kalır ancak bir yayınlama hedefi bağlanana kadar gelecekteki otomatik denemeler çalışmayabilir."
+        }
       },
       "internalLinks": {
         "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
@@ -791,73 +908,78 @@
     }
   },
   "LandingPage": {
+    "controls": {
+      "cards": [
+        {
+          "description": "Üretilen her makaleyi Seopotion editöründe açın; başlığı, gövdeyi, meta verileri ve kapak görselini düzenleyin.",
+          "title": "İnceleyin ve düzenleyin"
+        },
+        {
+          "description": "Onayladığınız makaleyi WordPress'e taslak olarak gönderin veya bağlı WordPress ayarlarınıza göre yayınlayın.",
+          "title": "Elle yayınlayın"
+        },
+        {
+          "description": "Gelecekte üretilecek makalelerin yapılandırdığınız yayın akışını izlemesini istediğinizde otomatik yayınlamayı etkinleştirin.",
+          "title": "Hazır olduğunuzda otomatikleştirin"
+        }
+      ],
+      "description": "Üretilen makaleler çalışma alanınızda kalır; nasıl ve ne zaman yayınlanacağına siz karar verirsiniz.",
+      "title": "Neyin yayına alınacağını siz kontrol edin"
+    },
     "features": [
       {
-        "description": "Sitenize boş trafik değil, gerçek alıcılar getirecek en iyi arama terimlerini buluruz.",
-        "title": "Akıllı Anahtar Kelime Araştırması"
+        "description": "Seopotion; işletmenizi, hizmetlerinizi, hedef kitlenizi, dilinizi ve önemli sayfalarınızı anlamak için web sitenizi tarar.",
+        "title": "Web Sitesi Analizi"
       },
       {
-        "description": "Markanızın benzersiz sesi ve tarzıyla uyumlu, etkileyici blog yazıları üretiriz.",
-        "title": "Markaya Uygun İçerik"
+        "description": "Web sitenize, hedef kitlenize ve içerik boşluklarına göre ilgili konuları ve anahtar kelimeleri keşfedin.",
+        "title": "Konu ve Anahtar Kelime Keşfi"
       },
       {
-        "description": "Alan adınızı arama sonuçlarında yukarı taşımak için güvenilir sitelerden bağlantılar kazanırız.",
-        "title": "Kaliteli Backlink Çalışması"
+        "description": "İçerik fırsatlarını düzenli bir yayın takvimine dönüştürün.",
+        "title": "İçerik Planlama"
       },
       {
-        "description": "İçeriğinizi ChatGPT ve diğer AI modellerinin markanızı önerebileceği şekilde yapılandırırız.",
-        "title": "AI Arama Optimizasyonu"
+        "description": "İşletme profilinize, içerik ayarlarınıza ve seçtiğiniz konulara göre SEO odaklı makale taslakları üretin.",
+        "title": "Makale Üretimi"
       },
       {
-        "description": "İç bağlantıları yönetir, tamamlanan makaleleri doğrudan blogunuza yayınlarız.",
-        "title": "Sorunsuz CMS Yayını"
+        "description": "Web sitenizdeki mevcut sayfalara ilgili bağlantıları otomatik olarak ekleyin.",
+        "title": "İç Bağlantılar"
       },
       {
-        "description": "Arama sıralamalarınızı günlük takip eder, trafiğinizin büyümesi için stratejiyi sürekli iyileştiririz.",
-        "title": "Sürekli SEO İyileştirme"
+        "description": "Üretilen makalelere AI destekli görseller ve ilgili YouTube videoları ekleyin.",
+        "title": "Görseller ve Video"
+      },
+      {
+        "description": "Her makaleyi yayına girmeden önce Seopotion içinde inceleyip düzenleyin.",
+        "title": "İnceleme ve Düzenleme"
+      },
+      {
+        "description": "Makaleleri WordPress'e doğrudan taslak olarak gönderin veya Seopotion'dan yayınlayın.",
+        "title": "WordPress'te Yayınlama"
+      },
+      {
+        "description": "Yayın ayarlarınızı seçin ve gelecekte üretilecek makalelerin otomatik olarak yayınlanmasına izin verin.",
+        "title": "Otomatik Yayınlama"
       }
     ],
-    "featuresDescription": "Google aramalarında yükselmeniz ve ChatGPT ile diğer LLM'lerde anılmanız için gereken tüm adımları yönetiriz.",
-    "featuresTitle": "SEO için ihtiyacınız olan her şey",
+    "featuresDescription": "Seopotion; web sitesi analizi, içerik araştırması, AI destekli yazım, düzenleme ve yayınlamayı tek bir yazılım akışında birleştirir.",
+    "featuresTitle": "Araştırmadan yayınlamaya SEO içerik yazılımı",
     "finalCta": {
-      "description": "Pazarlama ekibi işe almadan SEO'sunu büyütmek için Seopotion kullanan startup'lara, ajanslara ve ekiplere katılın.",
-      "title": "SEO'nuzu büyütmeye hazır mısınız?"
-    },
-    "footer": {
-      "blog": "Blog",
-      "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
-      "features": "Özellikler",
-      "pricing": "Fiyatlandırma",
-      "support": "Destek"
+      "description": "Web sitenizi ekleyin, Seopotion'ın çıkardığı işletme profilini inceleyin ve ilgili konuları bir yayın planına dönüştürün.",
+      "title": "Web sitenizle başlayın"
     },
     "hero": {
-      "subtitle": "Markanızın hem Google'da hem ChatGPT'de otomatik olarak görünmesini sağlarız.",
-      "titleLine1": "Google ve ChatGPT'de",
-      "titleLine2": "Öne Çıkın"
+      "cta": "Başlayın",
+      "subtitle": "Seopotion; web sitenizi analiz eden, ilgili içerik fırsatlarını bulan, iç bağlantılı makaleler üreten ve bunları WordPress'e göndermeden önce inceleyip düzenlemenizi sağlayan self servis bir yazılım platformudur.",
+      "titleLine1": "SEO içeriğini tek çalışma alanında",
+      "titleLine2": "planlayın, üretin ve yayınlayın"
     },
     "images": {
       "afterAlt": "Seopotion büyümesinden sonra Google Search Console",
       "beforeAlt": "Seopotion büyümesinden önce Google Search Console"
     },
-    "testimonials": [
-      {
-        "author": "Melisa Ozturk",
-        "quote": "Bu araç SEO yönetimimi tamamen değiştirdi. WordPress'i bağladım, birkaç konuyu onayladım ve tüm içerik takvimim otomatikleşti. Harika.",
-        "role": "Bağımsız Geliştirici"
-      },
-      {
-        "author": "Marcus Johnson",
-        "quote": "Tüm içerik hattımızı otomatik pilota aldık. Ekip marka dilini hemen öğrenmesini seviyor, biz de organik trafikteki düzenli büyümeyi seviyoruz.",
-        "role": "Ajans Sahibi"
-      },
-      {
-        "author": "Emily Rodriguez",
-        "quote": "Sonunda saatlerce anahtar kelime araştırması veya taslak yazımı gerektirmeyen bir SEO çözümü. Sitemi taradı ve geri kalanını kusursuzca halletti.",
-        "role": "SaaS Kurucusu"
-      }
-    ],
-    "testimonialsDescription": "SEO'sunu sadeleştiren diğer ekiplere katılın.",
-    "testimonialsTitle": "Kullanıcılar seviyor",
     "useCases": [
       {
         "name": "Bağımsız geliştiriciler ve tek kişilik girişimler"
@@ -872,14 +994,25 @@
         "name": "Web'de görünür olmak isteyen herkes"
       }
     ],
-    "useCasesTitle": "Kimler için ideal?"
+    "useCasesTitle": "Kimler için geliştirildi?"
+  },
+  "Footer": {
+    "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
+    "features": "Özellikler",
+    "legalNavigationLabel": "Yasal",
+    "navigationLabel": "Alt bilgi navigasyonu",
+    "pricing": "Fiyatlandırma",
+    "privacyPolicy": "Gizlilik Politikası",
+    "refundPolicy": "İade Politikası",
+    "supportEmail": "support@seopotion.co",
+    "termsOfService": "Hizmet Şartları"
   },
   "LocaleSwitcher": {
     "label": "Dil"
   },
   "Metadata": {
-    "defaultDescription": "Seopotion; anahtar kelime araştırması, markaya uygun SEO içeriği, CMS yayını ve sürekli iyileştirmeyle ekiplerin Google'da yükselmesine ve AI aramalarında anılmasına yardımcı olur.",
-    "defaultTitle": "Seopotion | Google ve ChatGPT için AI SEO İçeriği",
+    "defaultDescription": "Seopotion ile web sitenizi analiz edin, içerik fırsatlarını keşfedin, SEO odaklı makaleler üretip düzenleyin ve doğrudan WordPress'e yayınlayın.",
+    "defaultTitle": "Seopotion — SEO İçerik Planlama, Yazma ve Yayınlama Yazılımı",
     "keywords": [
       "AI SEO",
       "SEO otomasyonu",
@@ -889,7 +1022,7 @@
       "AI arama optimizasyonu"
     ],
     "openGraphLocale": "tr_TR",
-    "socialImageAlt": "Seopotion SEO büyüme paneli önizlemesi"
+    "socialImageAlt": "Seopotion logosu"
   },
   "Navbar": {
     "homeLabel": "Seopotion ana sayfa",
@@ -1060,19 +1193,15 @@
     }
   },
   "PricingMetadata": {
-    "description": "Otomatik AI SEO içeriği, CMS yayını, anahtar kelime araştırması ve uzman destekli SEO büyümesi için Seopotion planlarını karşılaştırın.",
+    "description": "Web sitesi analizi, içerik planlama, AI destekli makale üretimi, düzenleme ve WordPress yayını için Seopotion yazılım planlarını karşılaştırın.",
     "openGraphTitle": "Fiyatlandırma | Seopotion",
     "title": "Fiyatlandırma"
   },
   "PricingPage": {
     "annual": "Yıllık",
-    "banner": {
-      "description": "Otomatik içerik üretimiyle başlayın, uygulamalı bir büyüme ortağı istediğinizde uzman stratejiyi ekleyin.",
-      "title": "Tam ekip kurmadan SEO'yu büyütün"
-    },
     "comparison": {
       "expand": "Karşılaştırma tablosunu açmak için dokunun",
-      "expertLedGrowth": "Uzman Destekli Büyüme",
+      "business": "Business",
       "feature": "Özellik",
       "title": "Planları karşılaştır"
     },
@@ -1083,100 +1212,117 @@
         "label": "Makale / ay"
       },
       {
-        "expert": "Sınırsız",
-        "growth": "Sınırsız",
-        "label": "Kullanıcılar"
+        "expert": true,
+        "growth": true,
+        "label": "Web sitesi ve işletme analizi"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "Otomatik anahtar kelime araştırması"
+        "label": "Konu ve anahtar kelime araştırması"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "CMS yayın entegrasyonları"
+        "label": "İçerik takvimi"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "AI görselleri"
+        "label": "SEO odaklı makale üretimi"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "İlgili YouTube videoları"
+        "label": "İç bağlantılar"
       },
       {
         "expert": true,
         "growth": true,
-        "label": "Sınırsız AI yeniden yazım"
+        "label": "AI destekli görseller ve ilgili videolar"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Makale editörü ve manuel inceleme"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "WordPress yayını"
+      },
+      {
+        "expert": true,
+        "growth": true,
+        "label": "Otomatik yayınlama seçeneği"
+      },
+      {
+        "expert": "En fazla 10",
+        "growth": false,
+        "label": "İnsan tarafından incelenen Seopotion üretimi makale / ay"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Özel SEO uzmanı"
+        "label": "Marka ve işletmeye uygunluk incelemesi"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "SEO stratejisi ve yol haritası"
+        "label": "Okunabilirlik, açıklık ve yapı incelemesi"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Manuel içerik incelemesi"
+        "label": "İç bağlantı ve sayfa içi SEO incelemesi"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Sayfa içi SEO önerileri"
+        "label": "Olası olgusal sorunların incelenmesi"
       },
       {
         "expert": true,
         "growth": false,
-        "label": "Backlink fırsatı incelemesi"
-      },
-      {
-        "expert": true,
-        "growth": false,
-        "label": "Aylık SEO raporu"
+        "label": "Seçilen taslaklarda makul düzenlemeler"
       }
     ],
-    "description": "Otomatik SEO içeriğini seçin ya da strateji, uygulama ve raporlama için bir uzman ekleyin.",
+    "description": "SEO içeriğini planlamak, üretmek, incelemek ve yayınlamak için bir Seopotion yazılım aboneliği seçin.",
     "faq": [
       {
-        "a": "Growth size AI SEO içerik motorunu sunar: anahtar kelime araştırması, içerik üretimi, CMS yayını, görseller, ilgili YouTube videoları ve yeniden yazımlar. Expert-Led Growth ise strateji, planlama, inceleme, optimizasyon önerileri, dağıtım, backlink fırsatı incelemesi ve raporlama için özel bir insan SEO uzmanı ekler.",
-        "q": "Growth ile Expert-Led Growth arasındaki fark nedir?"
+        "a": "Growth, eksiksiz self servis Seopotion yazılım akışını sunar. Business aynı yazılıma ek olarak ayda en fazla 10 seçili Seopotion üretimi makalenin insan tarafından incelenmesini içerir. Ajans kampanya yönetimi, insan tarafından sıfırdan yazılmış içerik, backlink edinmek için iletişim çalışması, ücretli reklam veya harici pazarlama dağıtımı içermez.",
+        "q": "Growth ile Business arasındaki fark nedir?"
       },
       {
-        "a": "Evet. Growth; WordPress, Webflow ve daha fazlasına bağlantılar içerir, böylece Seopotion tamamlanan SEO içeriklerini doğrudan sitenize yayınlamanıza yardımcı olur.",
-        "q": "Seopotion CMS'ime yayın yapabilir mi?"
+        "a": "Growth; ayda 30 makale, web sitesi ve işletme analizi, konu ve anahtar kelime araştırması, içerik takvimi, SEO odaklı makale üretimi, iç bağlantılar, AI destekli görseller, ilgili YouTube videoları, makale editörü, WordPress yayını ve isteğe bağlı otomatik yayınlama içerir.",
+        "q": "Growth'a neler dahil?"
       },
       {
-        "a": "Hayır. Growth otomatik anahtar kelime araştırması içerir. Expert-Led Growth'ta bir SEO uzmanı stratejiyi, yol haritasını ve içerik önceliklerini şekillendirmeye de yardımcı olur.",
-        "q": "Anahtar kelime araştırmasını kendim yapmam gerekir mi?"
+        "a": "Evet. WordPress'i bağlayın, makaleyi Seopotion'da inceleyip düzenleyin ve ardından yapılandırdığınız taslak veya yayın ayarlarına göre WordPress'e gönderin.",
+        "q": "Seopotion WordPress'e yayın yapabilir mi?"
       },
       {
-        "a": "Evet. İki planda da Seopotion'ın ürettiği içerikler için AI görselleri ve ilgili YouTube video önerileri bulunur.",
+        "a": "Evet. Üretilen makaleler Seopotion içinde düzenlenebilir kalır. Elle yayınlamadan önce inceleyebilir veya bu akışı istediğinizde gelecekte üretilecek makaleler için otomatik yayınlamayı etkinleştirebilirsiniz.",
+        "q": "Makaleleri yayınlanmadan önce inceleyebilir miyim?"
+      },
+      {
+        "a": "Evet. Growth, üretilen makaleler için AI destekli görseller ve ilgili YouTube videolarının eklenmesini içerir.",
         "q": "Görseller ve videolar dahil mi?"
       },
       {
-        "a": "Evet. İki planda da sınırsız AI yeniden yazım bulunur, böylece içerikleri markanıza ve SEO hedeflerinize uyana kadar iyileştirebilirsiniz.",
-        "q": "Üretilen içeriği yeniden yazabilir miyim?"
-      },
-      {
-        "a": "Aylık veya yıllık ödeme yapabilirsiniz. Yıllık ödeme aynı planı daha düşük efektif aylık ücretle sunar.",
+        "a": "Aylık veya yıllık ödeme yapabilirsiniz. Growth aylık 60 $ veya yıllık 540 $'dır. Business aylık 400 $ veya yıllık 3.600 $'dır. Her ilk abonelik satın alımı 30 günlük para iade garantisi içerir.",
         "q": "Faturalandırma nasıl işler?"
       },
       {
-        "a": "Evet. Strateji, uygulama ve raporlamada özel bir SEO uzmanı istediğinizde Growth'tan Expert-Led Growth'a geçebilirsiniz.",
-        "q": "Daha sonra plan değiştirebilir miyim?"
+        "a": "Hayır. Seopotion şu anda ücretsiz deneme sunmaz. İlk satın alımlar İade Politikası'nda açıklanan 30 günlük para iade garantisi kapsamındadır.",
+        "q": "Ücretsiz deneme var mı?"
       }
     ],
     "faqTitle": "Sık sorulan sorular",
-    "footerNote": "Sorularınız mı var? SEO büyümenizde ne kadar uygulamalı destek istediğinize uygun planı seçin.",
+    "annualTotal": "Yıllık {price} $, yıllık faturalandırılır",
+    "footerNote": "Eksiksiz self servis yazılım akışı için Growth'u; aynı platforma ek olarak ayda en fazla 10 seçili Seopotion üretimi makalenin insan tarafından incelenmesi için Business'ı seçin.",
     "free": "Ücretsiz",
+    "guarantee": "İlk abonelik satın alımınız için 30 günlük para iade garantisi",
     "included": "Dahil",
     "monthShort": "ay",
     "monthly": "Aylık",
@@ -1184,38 +1330,43 @@
     "notIncluded": "Dahil değil",
     "save": "%25 tasarruf",
     "tiers": {
-      "expertledgrowth": {
-        "cta": "Bir SEO uzmanıyla görüş",
-        "description": "Özel bir SEO uzmanı SEO stratejinizi, uygulamayı ve raporlamayı yönetir.",
+      "business": {
+        "clarification": "Ajans hizmetleri, sıfırdan içerik yazımı, backlink edinme çalışması, ücretli reklam veya platform dışı dağıtım içermez.",
+        "cta": "Business'ı seç",
+        "description": "Seopotion'ın otomatik içerik akışına ek bir insan kalite kontrol katmanı isteyen işletmeler için.",
         "features": [
           "Growth'taki her şey",
-          "Özel SEO uzmanı",
-          "SEO stratejisi ve yol haritası",
-          "İçerik planlama ve önceliklendirme",
-          "Manuel içerik inceleme ve optimizasyon",
-          "Sayfa içi SEO önerileri",
-          "Uygun olduğunda topluluk ve Reddit dağıtımı",
-          "Manuel backlink fırsatı incelemesi",
-          "Aylık SEO raporu"
+          "Ayda en fazla 10 Seopotion üretimi makale için insan incelemesi",
+          "Marka ve işletmeye uygunluk incelemesi",
+          "Okunabilirlik ve açıklık incelemesi",
+          "İç bağlantı incelemesi",
+          "Makale yapısı ve sayfa içi SEO incelemesi",
+          "Olası olgusal sorunların incelenmesi",
+          "Seçilen platform taslaklarında makul düzenlemeler"
         ],
-        "name": "Expert-Led Growth"
+        "name": "Business"
       },
       "growth": {
-        "cta": "Otomatik pilotta daha üst sıralara çık",
-        "description": "Otomatik pilotta büyüme için AI SEO içerik motoru.",
+        "cta": "Başlayın",
+        "description": "Web siteniz için otomatik SEO içerik akışı.",
         "features": [
           "Ayda 30 makale",
-          "Sınırsız kullanıcı",
-          "Otomatik anahtar kelime araştırması",
-          "Wordpress, Webflow ve daha fazlasına bağlanma",
-          "AI görselleri",
+          "Web sitesi ve işletme analizi",
+          "Otomatik konu ve anahtar kelime araştırması",
+          "İçerik takvimi",
+          "SEO odaklı makale üretimi",
+          "İç bağlantılar",
+          "AI destekli görseller",
           "İlgili YouTube videoları",
-          "Sınırsız AI yeniden yazım"
+          "Makale editörü",
+          "Yayın öncesi manuel inceleme",
+          "WordPress yayını",
+          "Otomatik yayınlama seçeneği"
         ],
         "name": "Growth"
       }
     },
-    "title": "SEO büyümesi için fiyatlandırma",
+    "title": "Yazılım planları ve fiyatlandırma",
     "toggleAnnualBilling": "Yıllık ödemeyi aç/kapat",
     "year": "yıl"
   },
@@ -1246,10 +1397,6 @@
       "articleSettings": {
         "description": "Gelecekteki tüm makaleler için tercihlerinizi belirleyin.",
         "label": "Makale Ayarları"
-      },
-      "backlinks": {
-        "description": "Backlink fırsatlarını, değişim durumunu ve iletişim ilerlemesini takip edin.",
-        "label": "Backlinkler"
       },
       "contentPlanner": {
         "description": "Konuları, anahtar kelimeleri, yayın temposunu ve içerik önceliklerini planlayın.",

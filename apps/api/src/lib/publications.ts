@@ -11,10 +11,27 @@ import type { Article } from '@shared/schemas';
  * `article.slug` afterwards, and that difference is what makes a stale remote
  * path detectable at the next publish (design/integrations-model.md).
  */
-export async function recordWordPressPublication(article: Article, postId: number): Promise<void> {
-  await ArticleRepo.recordPublication(article.id, {
-    provider: 'wordpress',
-    ref: String(postId),
-    slug: article.slug,
-  });
+export async function recordWordPressPublication(
+  article: Article,
+  publication:
+    | number
+    | { post_id: number; slug: string; remote_url: string | null; published_at?: Date },
+): Promise<void> {
+  const postId = typeof publication === 'number' ? publication : publication.post_id;
+  const publishedAt = typeof publication === 'number' ? undefined : publication.published_at;
+  const existing = article.publications.some((entry) => entry.provider === 'wordpress');
+  await ArticleRepo.recordPublication(
+    article.id,
+    {
+      provider: 'wordpress',
+      ref: String(postId),
+      slug: typeof publication === 'number' ? article.slug : publication.slug,
+      remote_url: typeof publication === 'number' ? undefined : publication.remote_url,
+    },
+    publishedAt
+      ? existing
+        ? { updatedAt: publishedAt }
+        : { publishedAt, updatedAt: null }
+      : undefined,
+  );
 }

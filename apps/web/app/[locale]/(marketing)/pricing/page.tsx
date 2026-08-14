@@ -9,23 +9,20 @@ import { localizedUrl } from '@/i18n/urls';
 const TIER_PRICES = [
   {
     id: 'growth',
-    monthlyPrice: 80,
-    annualPrice: 720,
-    listMonthly: null,
-    listAnnual: 960,
+    monthlyPrice: 60,
+    annualPrice: 540,
     highlight: true,
   },
   {
-    id: 'expertledgrowth',
+    id: 'business',
     monthlyPrice: 400,
     annualPrice: 3600,
-    listMonthly: null,
-    listAnnual: 4000,
     highlight: false,
   },
 ] as const;
 
 type TierContent = {
+  clarification?: string;
   cta: string;
   description: string;
   features: string[];
@@ -166,23 +163,28 @@ export default function PricingPage() {
 
               <h2 className="font-bold text-gray-900 text-xl">{card.name}</h2>
               <p className="mt-1 mb-4 text-gray-500 text-sm">{card.description}</p>
+              {card.clarification ? (
+                <p className="-mt-2 mb-4 text-gray-500 text-xs">{card.clarification}</p>
+              ) : null}
 
               <div className="mb-6">
                 {card.monthlyPrice !== null ? (
-                  <div className="flex items-baseline gap-1.5">
-                    {(annual ? card.listAnnual : card.listMonthly) !== null && (
-                      <span className="text-gray-400 text-sm line-through">
-                        $
-                        {annual && card.listAnnual !== null
-                          ? Math.round(card.listAnnual / 12)
-                          : card.listMonthly}
+                  <>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-bold text-3xl text-gray-900">
+                        ${annual ? Math.round(card.annualPrice / 12) : card.monthlyPrice}
                       </span>
-                    )}
-                    <span className="font-bold text-3xl text-gray-900">
-                      ${annual ? Math.round(card.annualPrice / 12) : card.monthlyPrice}
-                    </span>
-                    <span className="text-gray-500 text-sm">/{t('monthShort')}</span>
-                  </div>
+                      <span className="text-gray-500 text-sm">/{t('monthShort')}</span>
+                    </div>
+                    <p
+                      aria-hidden={!annual}
+                      className={`mt-1 h-4 text-gray-500 text-xs ${annual ? '' : 'invisible'}`}
+                    >
+                      {t('annualTotal', {
+                        price: card.annualPrice.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'),
+                      })}
+                    </p>
+                  </>
                 ) : (
                   <span className="font-bold text-3xl text-gray-900">{t('free')}</span>
                 )}
@@ -210,6 +212,9 @@ export default function PricingPage() {
                 ))}
               </ul>
 
+              <p className="mb-3 text-center font-medium text-green-700 text-xs">
+                {t('guarantee')}
+              </p>
               <Link
                 href="/"
                 className={`block w-full rounded-lg px-4 py-2.5 text-center font-medium text-sm transition-colors ${
@@ -222,11 +227,6 @@ export default function PricingPage() {
               </Link>
             </section>
           ))}
-        </div>
-
-        <div className="mb-16 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
-          <p className="font-semibold text-amber-800 text-base">{t('banner.title')}</p>
-          <p className="mt-1 text-amber-700 text-sm">{t('banner.description')}</p>
         </div>
 
         <section className="mb-16">
@@ -243,7 +243,7 @@ export default function PricingPage() {
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-amber-600">Growth</th>
                   <th className="px-4 py-3 text-center font-medium text-gray-500">
-                    {t('comparison.expertLedGrowth')}
+                    {t('comparison.business')}
                   </th>
                 </tr>
               </thead>
@@ -283,7 +283,7 @@ export default function PricingPage() {
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-amber-600">Growth</th>
                   <th className="px-4 py-3 text-center font-medium text-gray-500">
-                    {t('comparison.expertLedGrowth')}
+                    {t('comparison.business')}
                   </th>
                 </tr>
               </thead>

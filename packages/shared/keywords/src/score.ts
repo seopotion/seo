@@ -50,6 +50,10 @@ function ease(difficulty: number | null, searchVolume: number | null): number {
  * run — structurally the failure that broke classify (#211). A batch that comes
  * back unparseable now costs only its own keywords: they stay NULL, which is
  * "never judged", not "scored 0". The caller enforces a coverage floor on top.
+ *
+ * An unparseable batch gets one repair retry — the same ladder the plan call
+ * uses — before it is counted failed, since a single dead body otherwise costs
+ * the whole batch for what is often a transient formatting slip.
  */
 export async function applyRelevance(
   candidates: WorkingCandidate[],
@@ -62,13 +66,31 @@ export async function applyRelevance(
     RELEVANCE_BATCH_SIZE,
   );
   const results = await mapWithConcurrency(batches, RELEVANCE_CONCURRENCY, async (keywords) => {
-    const res = await deps.llm.complete({
-      messages: buildRelevancePrompt(keywords, deps.presets),
+    const messages = buildRelevancePrompt(keywords, deps.presets);
+    const first = await deps.llm.complete({
+      messages,
       model: deps.model,
       temperature: 0,
       responseFormat: 'json',
     });
-    return parseRelevance(res.text, keywords);
+    const parsed = parseRelevance(first.text, keywords);
+    if (parsed.parsed) return parsed;
+
+    const retry = await deps.llm.complete({
+      messages: [
+        ...messages,
+        { role: 'assistant', content: first.text },
+        {
+          role: 'user',
+          content:
+            'Your previous response could not be parsed. Return the complete corrected JSON — nothing else.',
+        },
+      ],
+      model: deps.model,
+      temperature: 0,
+      responseFormat: 'json',
+    });
+    return parseRelevance(retry.text, keywords);
   });
 
   const scores = new Map(results.flatMap((r) => [...r.scores]));

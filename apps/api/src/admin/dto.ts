@@ -133,7 +133,7 @@ export function toAdminScheduledKeyword(k: Keyword): z.infer<typeof schemas.Admi
   };
 }
 
-/** Customer `toArticleListItem` field set plus images_status + wordpress_post_id. */
+/** Admin history row with operational image and legacy WordPress state. */
 export function toAdminArticleListItem(
   a: Article,
 ): z.infer<typeof schemas.AdminArticlesResponse>['articles'][number] {
@@ -155,6 +155,12 @@ export function toAdminArticleListItem(
 
 /** Same field set as the customer `toArticleDetail` (it contains no secrets). */
 export function toAdminArticleDetail(a: Article): z.infer<typeof schemas.ArticleDetailResponse> {
+  const publications = a.publications ?? [];
+  const autoPublish = a.auto_publish ?? { preflight_error: null, attempts: [] };
+  const mapError = (error: (typeof a.auto_publish)['preflight_error']) =>
+    error
+      ? { code: error.code, kind: error.kind, message: error.message, at: error.at.toISOString() }
+      : null;
   return {
     id: a.id,
     keyword_id: a.keyword_id,
@@ -168,7 +174,24 @@ export function toAdminArticleDetail(a: Article): z.infer<typeof schemas.Article
     status: a.status,
     ...(a.wordpress_post_id ? { wordpress_post_id: a.wordpress_post_id } : {}),
     static_site_published_at:
-      a.publications.find((p) => p.provider === 'static-site')?.published_at.toISOString() ?? null,
+      publications.find((p) => p.provider === 'static-site')?.published_at.toISOString() ?? null,
+    publications: publications.map((publication) => ({
+      provider: publication.provider,
+      ref: publication.ref,
+      slug: publication.slug,
+      remote_url: publication.remote_url ?? null,
+      published_at: publication.published_at.toISOString(),
+      updated_at: publication.updated_at?.toISOString() ?? null,
+    })),
+    auto_publish_error: mapError(autoPublish.preflight_error),
+    auto_publish_attempts: autoPublish.attempts.map((attempt) => ({
+      provider: attempt.provider,
+      status: attempt.status,
+      attempt_count: attempt.attempt_count,
+      requested_at: attempt.requested_at.toISOString(),
+      last_attempt_at: attempt.last_attempt_at?.toISOString() ?? null,
+      last_error: mapError(attempt.last_error),
+    })),
     images_status: a.images_status,
     created_at: a.created_at.toISOString(),
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,

@@ -133,6 +133,50 @@ describe('IntegrationRepo (integration)', () => {
     expect(rows[0]?.provider === 'static-site' && rows[0].branch).toBe('release');
   });
 
+  test('publish lease has one winner, blocks while active, and permits stale takeover', async () => {
+    await IntegrationRepo.connectStaticSite('org_lease', {
+      installationId: 333445,
+      repo: 'acme/site',
+      branch: 'main',
+      contentPath: 'seopotion/',
+    });
+    const now = new Date('2026-08-12T10:00:00.000Z');
+
+    const claims = await Promise.all([
+      IntegrationRepo.claimPublishLease('org_lease', 'static-site', 'owner-a', now, 60_000),
+      IntegrationRepo.claimPublishLease('org_lease', 'static-site', 'owner-b', now, 60_000),
+    ]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(
+      await IntegrationRepo.claimPublishLease(
+        'org_lease',
+        'static-site',
+        'blocked',
+        new Date('2026-08-12T10:00:30.000Z'),
+        60_000,
+      ),
+    ).toBe(false);
+    expect(
+      await IntegrationRepo.claimPublishLease(
+        'org_lease',
+        'static-site',
+        'recovered',
+        new Date('2026-08-12T10:01:01.000Z'),
+        60_000,
+      ),
+    ).toBe(true);
+    expect(
+      await IntegrationRepo.releasePublishLease(
+        'org_lease',
+        'static-site',
+        claims[0] ? 'owner-a' : 'owner-b',
+      ),
+    ).toBe(false);
+    expect(await IntegrationRepo.releasePublishLease('org_lease', 'static-site', 'recovered')).toBe(
+      true,
+    );
+  });
+
   test('connectStaticSite returns false for an installation another org already claimed', async () => {
     await IntegrationRepo.connectStaticSite('org_claim_1', {
       installationId: 555666,

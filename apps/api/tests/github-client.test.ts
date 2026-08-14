@@ -361,6 +361,31 @@ describe('commitFiles', () => {
     expect(calls.at(-1)!.body).toEqual({ sha: 'new-commit' });
   });
 
+  test('reconciles the current head when the desired tree already landed', async () => {
+    const id = freshInstallation();
+    serve({
+      [`POST /app/installations/${id}/access_tokens`]: TOKEN,
+      ...headRefs('acme/site', 'main'),
+      'POST /repos/acme/site/git/blobs': { status: 201, body: { sha: 'blob-md' } },
+      'POST /repos/acme/site/git/trees': { status: 201, body: { sha: 'base-tree' } },
+    });
+
+    await expect(
+      commitFiles({
+        installationId: id,
+        repo: 'acme/site',
+        branch: 'main',
+        message: 'Publish',
+        files: [{ path: 'a.md', content: 'same content' }],
+      }),
+    ).resolves.toBe('base-commit');
+
+    expect(
+      calls.filter((call) => call.path.endsWith('/git/commits') && call.method === 'POST'),
+    ).toHaveLength(0);
+    expect(calls.filter((call) => call.method === 'PATCH')).toHaveLength(0);
+  });
+
   test('rebuilds on the new head when a concurrent publish wins the ref', async () => {
     const id = freshInstallation();
     serve({
@@ -400,6 +425,62 @@ describe('commitFiles', () => {
     const trees = calls.filter((c) => c.path.endsWith('/git/trees'));
     expect(trees).toHaveLength(2);
     expect((trees[1]!.body as { base_tree: string }).base_tree).toBe('their-tree');
+  });
+
+  test('reruns semantic preparation against the exact new head after a ref conflict', async () => {
+    const id = freshInstallation();
+    serve({
+      [`POST /app/installations/${id}/access_tokens`]: TOKEN,
+      'GET /repos/acme/site/git/ref/heads/main': [
+        { status: 200, body: { object: { sha: 'base-commit' } } },
+        { status: 200, body: { object: { sha: 'their-commit' } } },
+      ],
+      'GET /repos/acme/site/git/commits/base-commit': {
+        status: 200,
+        body: { tree: { sha: 'base-tree' } },
+      },
+      'GET /repos/acme/site/git/commits/their-commit': {
+        status: 200,
+        body: { tree: { sha: 'their-tree' } },
+      },
+      'GET /repos/acme/site/contents/seopotion/manifest.json?ref=base-commit': {
+        status: 200,
+        body: { encoding: 'base64', content: Buffer.from('base manifest').toString('base64') },
+      },
+      'GET /repos/acme/site/contents/seopotion/manifest.json?ref=their-commit': {
+        status: 200,
+        body: { encoding: 'base64', content: Buffer.from('their manifest').toString('base64') },
+      },
+      'POST /repos/acme/site/git/blobs': { status: 201, body: { sha: 'blob-manifest' } },
+      'POST /repos/acme/site/git/trees': { status: 201, body: { sha: 'new-tree' } },
+      'POST /repos/acme/site/git/commits': { status: 201, body: { sha: 'new-commit' } },
+      'PATCH /repos/acme/site/git/refs/heads/main': [
+        { status: 422, body: { message: 'Update is not a fast forward' } },
+        { status: 200 },
+      ],
+    });
+    const prepared: Array<{ head: string; manifest: string | null }> = [];
+
+    await commitFiles({
+      installationId: id,
+      repo: 'acme/site',
+      branch: 'main',
+      message: 'Publish',
+      prepare: async ({ headCommitSha, readFile }) => {
+        const manifest = await readFile('seopotion/manifest.json');
+        prepared.push({ head: headCommitSha, manifest });
+        return [{ path: 'seopotion/manifest.json', content: `${manifest}: merged` }];
+      },
+    });
+
+    expect(prepared).toEqual([
+      { head: 'base-commit', manifest: 'base manifest' },
+      { head: 'their-commit', manifest: 'their manifest' },
+    ]);
+    const blobs = calls.filter((call) => call.path.endsWith('/git/blobs'));
+    expect(blobs.at(-1)?.body).toMatchObject({
+      content: 'their manifest: merged',
+    });
   });
 
   test('gives up as ref_conflict when every attempt loses the race', async () => {

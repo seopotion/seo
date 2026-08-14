@@ -19,6 +19,7 @@ import {
   ViewerProtocolPolicy,
 } from 'aws-cdk-lib/aws-cloudfront';
 import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
+import { Alarm, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
@@ -28,6 +29,14 @@ import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
+import {
+  DefinitionBody,
+  JsonPath,
+  StateMachine,
+  TaskInput,
+  Timeout,
+} from 'aws-cdk-lib/aws-stepfunctions';
+import { LambdaInvoke } from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import { Provider } from 'aws-cdk-lib/custom-resources';
 import type { Construct } from 'constructs';
 import { STAGE_CONFIG, type Stage } from './config';
@@ -92,9 +101,7 @@ export class ApiStack extends Stack {
     // registration, minting per-publish installation tokens. Same out-of-band
     // SecureString pattern — `file://` so the PEM's newlines survive:
     //   aws ssm put-parameter --name /seo/<stage>/github-app-key --type SecureString --value file://seopotion.<stage>.private-key.pem
-    // API Lambda only, matching the JWT-secret boundary: the worker never
-    // publishes, so it is never granted a credential that can write to a
-    // customer's repository.
+    // Granted only to the API and dedicated publish worker.
     const githubAppKeyParam = StringParameter.fromSecureStringParameterAttributes(
       this,
       'GithubAppKeyParam',
@@ -173,19 +180,13 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: scanDlq, maxReceiveCount: 3 },
     });
 
-    // Dead-letter queue: strategy tasks that fail repeatedly land here instead
-    // of retrying/expiring silently. 14-day retention gives time to inspect.
-    const strategyDlq = new Queue(this, 'StrategyDlq', {
+    const publishDlq = new Queue(this, 'PublishDlq', {
       retentionPeriod: Duration.days(14),
     });
 
-    // Strategy task queue. Visibility timeout > worker timeout (below: 15 min,
-    // the Lambda max) so an in-flight message isn't redelivered while the worker
-    // is still processing it. After maxReceiveCount failed deliveries the
-    // message moves to the DLQ.
-    const strategyQueue = new Queue(this, 'StrategyQueue', {
-      visibilityTimeout: Duration.minutes(16),
-      deadLetterQueue: { queue: strategyDlq, maxReceiveCount: 3 },
+    const publishQueue = new Queue(this, 'PublishQueue', {
+      visibilityTimeout: Duration.minutes(6),
+      deadLetterQueue: { queue: publishDlq, maxReceiveCount: 3 },
     });
 
     // Provider API credentials (#43). Same out-of-band SecureString pattern as
@@ -244,12 +245,12 @@ export class ApiStack extends Stack {
         ...authEnv,
         ...dataForSeoEnv,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
-        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
+        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
       },
       bundling,
     });
     scanQueue.grantSendMessages(apiFn);
-    strategyQueue.grantSendMessages(apiFn);
+    publishQueue.grantSendMessages(apiFn);
     grantDataForSeo(apiFn);
     jwtSecretParam.grantRead(apiFn);
     googleClientSecretParam.grantRead(apiFn);
@@ -280,14 +281,17 @@ export class ApiStack extends Stack {
     grantDataForSeo(workerFn);
     openRouterApiKeyParam.grantRead(workerFn);
 
-    // Strategy worker Lambda — consumes strategy tasks from the queue.
-    const strategyWorkerFn = new NodejsFunction(this, 'StrategyWorkerFn', {
+    // Strategy stage Lambda — invoked per pipeline stage by the Step Functions
+    // state machine below (#56), and by the EventBridge failure rule on a
+    // terminal execution failure. Timeout matches the Lambda ceiling; each
+    // stage's own progress is bounded by the shorter per-Task `taskTimeout`.
+    const strategyStageFn = new NodejsFunction(this, 'StrategyStageFn', {
       entry: join(projectRoot, 'apps/worker/src/strategy.ts'),
       projectRoot,
       depsLockFilePath,
       handler: 'handler',
       runtime: Runtime.NODEJS_22_X,
-      timeout: Duration.minutes(15),
+      timeout: Duration.minutes(10),
       memorySize: 512,
       environment: {
         ...mongoEnv,
@@ -296,10 +300,74 @@ export class ApiStack extends Stack {
       },
       bundling,
     });
-    strategyWorkerFn.addEventSource(new SqsEventSource(strategyQueue, { batchSize: 1 }));
-    mongoUriParam.grantRead(strategyWorkerFn);
-    grantDataForSeo(strategyWorkerFn);
-    openRouterApiKeyParam.grantRead(strategyWorkerFn);
+    mongoUriParam.grantRead(strategyStageFn);
+    grantDataForSeo(strategyStageFn);
+    openRouterApiKeyParam.grantRead(strategyStageFn);
+
+    // Strategy state machine (#56): one Task state per pipeline stage, all invoking
+    // the same stage Lambda with {run_id, org_id, stage}. Retries are per stage and
+    // only for StrategyRetryableError (+ Lambda service errors + state timeouts);
+    // a StrategyFatalError fails the execution immediately. No Catch states — a
+    // failed execution must stay redrivable from the failed state, so org-failure
+    // stamping happens via the EventBridge rule below instead.
+    const stageState = (stage: string, timeout: Duration) => {
+      const task = new LambdaInvoke(this, `Strategy_${stage}`, {
+        lambdaFunction: strategyStageFn,
+        payload: TaskInput.fromObject({
+          run_id: JsonPath.stringAt('$.run_id'),
+          org_id: JsonPath.stringAt('$.org_id'),
+          stage,
+        }),
+        resultPath: JsonPath.DISCARD, // keep {run_id, org_id} flowing to the next state
+        taskTimeout: Timeout.duration(timeout),
+      });
+      task.addRetry({
+        errors: ['StrategyRetryableError', 'States.Timeout'],
+        maxAttempts: 3,
+        interval: Duration.seconds(30),
+        backoffRate: 2,
+      });
+      return task;
+    };
+
+    const strategyDefinition = stageState('gather', Duration.minutes(5))
+      .next(stageState('enrich', Duration.minutes(5)))
+      .next(stageState('triage', Duration.minutes(5)))
+      .next(stageState('serp_fetch', Duration.minutes(8)))
+      .next(stageState('plan', Duration.minutes(5)))
+      .next(stageState('persist_schedule', Duration.minutes(5)));
+
+    const strategyStateMachine = new StateMachine(this, 'StrategyStateMachine', {
+      definitionBody: DefinitionBody.fromChainable(strategyDefinition),
+      timeout: Duration.hours(1),
+    });
+
+    strategyStateMachine.grantStartExecution(apiFn);
+    apiFn.addEnvironment('STRATEGY_STATE_MACHINE_ARN', strategyStateMachine.stateMachineArn);
+
+    // Terminal-failure handling: Step Functions emits execution status changes to
+    // EventBridge; on FAILED/TIMED_OUT/ABORTED the stage Lambda (same fn, different
+    // event shape) marks the org + run failed. Kept OUT of the state machine so
+    // redrive resumes at the failed stage.
+    new Rule(this, 'StrategyExecutionFailedRule', {
+      eventPattern: {
+        source: ['aws.states'],
+        detailType: ['Step Functions Execution Status Change'],
+        detail: {
+          status: ['FAILED', 'TIMED_OUT', 'ABORTED'],
+          stateMachineArn: [strategyStateMachine.stateMachineArn],
+        },
+      },
+      targets: [new LambdaFunction(strategyStageFn)],
+    });
+
+    // Replaces the strategy DLQ as the "a customer got no plan" pager signal.
+    new Alarm(this, 'StrategyExecutionsFailedAlarm', {
+      metric: strategyStateMachine.metricFailed({ period: Duration.minutes(5) }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      treatMissingData: TreatMissingData.NOT_BREACHING,
+    });
 
     // Dead-letter queue: generation tasks that fail repeatedly land here.
     const generationDlq = new Queue(this, 'GenerationDlq', {
@@ -384,6 +452,8 @@ export class ApiStack extends Stack {
         FAL_KEY_PARAM: cfg.falKeyParam,
         IMAGES_BUCKET: imagesBucket.bucketName,
         IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
+        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
+        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
       },
       bundling,
     });
@@ -391,7 +461,30 @@ export class ApiStack extends Stack {
     mongoUriParam.grantRead(imagesWorkerFn);
     openRouterApiKeyParam.grantRead(imagesWorkerFn);
     falKeyParam.grantRead(imagesWorkerFn);
+    gscTokenKeyParam.grantRead(imagesWorkerFn);
     imagesBucket.grantPut(imagesWorkerFn);
+    publishQueue.grantSendMessages(imagesWorkerFn);
+
+    const publishWorkerFn = new NodejsFunction(this, 'PublishWorkerFn', {
+      entry: join(projectRoot, 'apps/worker/src/publish.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(5),
+      memorySize: 512,
+      environment: {
+        ...mongoEnv,
+        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
+        GITHUB_APP_CLIENT_ID: cfg.githubAppClientId,
+        GITHUB_APP_KEY_PARAM: cfg.githubAppKeyParam,
+      },
+      bundling,
+    });
+    publishWorkerFn.addEventSource(new SqsEventSource(publishQueue, { batchSize: 1 }));
+    mongoUriParam.grantRead(publishWorkerFn);
+    gscTokenKeyParam.grantRead(publishWorkerFn);
+    githubAppKeyParam.grantRead(publishWorkerFn);
 
     // Generation worker Lambda — consumes generation tasks; produces articles.
     const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
@@ -521,20 +614,20 @@ export class ApiStack extends Stack {
         ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
         GOOGLE_CLIENT_ID: cfg.googleClientId,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
-        STRATEGY_QUEUE_URL: strategyQueue.queueUrl,
         GENERATION_QUEUE_URL: generationQueue.queueUrl,
         IMAGES_QUEUE_URL: imagesQueue.queueUrl,
+        STRATEGY_STATE_MACHINE_ARN: strategyStateMachine.stateMachineArn,
       },
       bundling,
     });
     scanQueue.grantSendMessages(adminFn);
-    strategyQueue.grantSendMessages(adminFn);
     generationQueue.grantSendMessages(adminFn);
     imagesQueue.grantSendMessages(adminFn);
     mongoUriParam.grantRead(adminFn);
     grantDataForSeo(adminFn);
     adminJwtSecretParam.grantRead(adminFn);
     adminOperatorsParam.grantRead(adminFn);
+    strategyStateMachine.grantStartExecution(adminFn);
 
     const adminHttpApi = new HttpApi(this, 'AdminHttpApi');
     adminHttpApi.addRoutes({

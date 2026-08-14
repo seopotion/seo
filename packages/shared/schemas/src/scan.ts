@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { INTEGRATION_PROVIDERS } from './integration';
 
 /**
  * Scan task message — the contract on the SQS queue between the API (producer,
@@ -10,15 +11,6 @@ export const ScanTask = z.object({
   website_url: z.string().url(),
 });
 export type ScanTask = z.infer<typeof ScanTask>;
-
-/**
- * Strategy task message — the contract on the SQS strategy queue between the API
- * (producer, POST /setup/finalize for paid orgs) and the strategy worker.
- */
-export const StrategyTask = z.object({
-  org_id: z.string(),
-});
-export type StrategyTask = z.infer<typeof StrategyTask>;
 
 /**
  * Generate task message — the contract on the SQS generation queue between the
@@ -41,3 +33,10 @@ export const ImageTask = z.object({
   article_id: z.string(),
 });
 export type ImageTask = z.infer<typeof ImageTask>;
+
+export const PublishTask = z.object({
+  org_id: z.string(),
+  article_id: z.string(),
+  provider: z.enum(INTEGRATION_PROVIDERS),
+});
+export type PublishTask = z.infer<typeof PublishTask>;

@@ -2,6 +2,7 @@ import { z } from '@hono/zod-openapi';
 import {
   ARTICLE_TYPES,
   ArticleVideoSchema,
+  AUTO_PUBLISH_STATUSES,
   GENERATION_STATUSES,
   IMAGES_STATUSES,
   INTEGRATION_PROVIDERS,
@@ -167,6 +168,31 @@ export const PlannerResponse = z
  */
 const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
 
+const PublishingErrorResponse = z.object({
+  code: z.string(),
+  kind: z.enum(['transient', 'permanent']),
+  message: z.string(),
+  at: z.string(),
+});
+
+const ArticlePublicationResponse = z.object({
+  provider: z.enum(INTEGRATION_PROVIDERS),
+  ref: z.string(),
+  slug: z.string(),
+  remote_url: z.string().nullable(),
+  published_at: z.string(),
+  updated_at: z.string().nullable(),
+});
+
+const AutoPublishAttemptResponse = z.object({
+  provider: z.enum(INTEGRATION_PROVIDERS),
+  status: z.enum(AUTO_PUBLISH_STATUSES),
+  attempt_count: z.number().int().min(0),
+  requested_at: z.string(),
+  last_attempt_at: z.string().nullable(),
+  last_error: PublishingErrorResponse.nullable(),
+});
+
 const ArticleListItem = z
   .object({
     id: z.string(),
@@ -179,6 +205,9 @@ const ArticleListItem = z
     featured_image_url: z.string(),
     created_at: z.string(),
     published_at: z.string().nullable(),
+    publications: z.array(ArticlePublicationResponse),
+    auto_publish_error: PublishingErrorResponse.nullable(),
+    auto_publish_attempts: z.array(AutoPublishAttemptResponse),
   })
   .openapi('ArticleListItem');
 
@@ -237,6 +266,9 @@ export const ArticleDetailResponse = z
     // `wordpress_post_id` for the git target — publish and update are one route,
     // so the UI needs this only to label the button and badge the article.
     static_site_published_at: z.string().nullable(),
+    publications: z.array(ArticlePublicationResponse),
+    auto_publish_error: PublishingErrorResponse.nullable(),
+    auto_publish_attempts: z.array(AutoPublishAttemptResponse),
     images_status: z.enum(IMAGES_STATUSES),
     created_at: z.string(),
     // Last editor save, ISO; null until the article is first edited (#74).
@@ -257,6 +289,9 @@ export const WordPressArticleResponse = z
   .object({
     success: z.literal(true),
     post_id: z.number().int().positive(),
+    slug: z.string().optional(),
+    permalink: z.string().optional(),
+    post_status: z.string().optional(),
     warnings: z.array(z.string()).optional(),
   })
   .openapi('WordPressArticleResponse');
@@ -281,6 +316,14 @@ export const StaticSitePublishResponse = z
 export const StaticSitePublishErrorResponse = z
   .object({ error: z.string(), code: z.string() })
   .openapi('StaticSitePublishErrorResponse');
+
+export const AutoPublishRetryResponse = z
+  .object({ queued: z.array(z.enum(INTEGRATION_PROVIDERS)) })
+  .openapi('AutoPublishRetryResponse');
+
+export const AutoPublishRetryErrorResponse = z
+  .object({ error: z.string(), code: z.string() })
+  .openapi('AutoPublishRetryErrorResponse');
 
 // The editor's five editable fields. Deliberately permissive here: `apps/api`
 // has no `defaultHook`, so a Zod failure would return the library's error shape

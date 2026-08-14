@@ -41,8 +41,7 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   minLlmCoverage: 0.5,
   // Unset = the LlmClient's default model for that stage.
   models: {
-    classify: 'anthropic/claude-haiku-4.5',
-    topicClusters: 'anthropic/claude-haiku-4.5',
+    plan: 'anthropic/claude-haiku-4.5',
   },
   // Empty = ask the LLM for seeds, the production path. Pin them for benchmark
   // runs, where a non-deterministic seed list swings the pool +/-40% and swamps

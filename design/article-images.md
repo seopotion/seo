@@ -295,12 +295,14 @@ redeliveries cannot double-insert. The cover is not injected into content.
 
 Per SQS record:
 
-1. `ImageTask.parse` → load article; skip if missing or `images_status === 'complete'`.
+1. `ImageTask.parse` → load article; skip if missing. If images are already complete,
+   repeat the automatic-publish handoff and stop.
 2. If `images` is empty: run the image-plan LLM call, validate, persist slots
    (set-if-absent).
 3. For each slot without a `url`: generate (**WebP**) → download → S3 → update slot with
    the URL and fal's dimensions (+ inject markdown for inline).
-4. All slots done → `images_status: 'complete'`, `featured_image_url` = cover URL.
+4. All slots done → `images_status: 'complete'`, `featured_image_url` = cover URL, then
+   perform the automatic-publish handoff.
 5. On error: log, rethrow → SQS redelivery resumes at the first unfinished slot → DLQ
    after 3 receives → `images_status` left `'pending'` (visible for ops; a manual
    re-enqueue resumes idempotently). A plan that repeatedly fails validation marks
@@ -311,9 +313,11 @@ The generation worker (`generation.ts`) changes only at the end: after
 
 ## Publish gate
 
-Publishing isn't built yet; articles already stay `generated`. The gate is the
-invariant — **the future publisher must require `images_status === 'complete'`** —
-recorded here and on the field's schema comment. No enforcement code beyond the field.
+Automatic publishing is implemented in [`auto-publishing.md`](auto-publishing.md). The
+image worker queues provider tasks only after the durable complete transition. The publish
+worker independently reloads the article and enforces `images_status === 'complete'`
+before claiming or invoking a provider. A disabled setting returns before integration or
+credential reads.
 
 ## Secrets, config, infra
 
@@ -334,6 +338,8 @@ CDK (`api-stack.ts`), per stage:
 - Private S3 `ImagesBucket` + CloudFront `Distribution` with
   `S3BucketOrigin.withOriginAccessControl`; long default TTL.
 - `GenerationWorkerFn` gains `IMAGES_QUEUE_URL` + send permission.
+- `ImagesWorkerFn` gains `PUBLISH_QUEUE_URL` + send permission. It has the existing data
+  encryption key only for the narrow mirror-only WordPress Integration transition.
 
 Local dev: new ElasticMQ queue, `IMAGES_QUEUE_URL` env, one more poller line in
 `dev.ts`. Locally, S3 upload needs real AWS credentials or a local substitute — the

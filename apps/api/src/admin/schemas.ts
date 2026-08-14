@@ -283,7 +283,7 @@ export const AdminArticlesQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-/** Customer list row plus images_status + wordpress_post_id (epic #150 DTO spec). */
+/** Admin history row with operational image and legacy WordPress state. */
 const AdminArticleListItem = z
   .object({
     id: z.string(),

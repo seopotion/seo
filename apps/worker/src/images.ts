@@ -1,4 +1,4 @@
-import { ArticleRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
 import {
   buildImagePlanPrompt,
   extractH2s,
@@ -6,10 +6,14 @@ import {
   parseImagePlan,
 } from '@shared/generation';
 import type { ImageResult } from '@shared/providers';
-import { type ArticleImage, ImageTask } from '@shared/schemas';
+import { type ArticleImage, ImageTask, PublishTask } from '@shared/schemas';
 import type { SQSHandler } from 'aws-lambda';
+import { encryptSecret } from '../../api/src/lib/crypto';
+import { publishingFailure } from '../../api/src/lib/publishing-errors';
+import { getGscTokenKey } from '../../api/src/lib/secrets';
 import { logger } from './logger';
 import { getImageClients } from './providers';
+import { enqueuePublishTask } from './queue';
 import { storeImage } from './storage';
 
 /** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
@@ -71,6 +75,55 @@ function assertImageDimensions(
   }
 }
 
+async function handoffToPublishing(orgId: string, articleId: string): Promise<void> {
+  const [article, org] = await Promise.all([
+    ArticleRepo.findById(articleId),
+    OrgRepo.findByIdWithoutSecrets(orgId),
+  ]);
+  if (
+    !article ||
+    article.org_id !== orgId ||
+    article.images_status !== 'complete' ||
+    !org?.presets
+  ) {
+    return;
+  }
+  if (!org.presets.article_preferences.publishing.auto_publish) return;
+
+  let integrations = await IntegrationRepo.listByOrgId(orgId);
+  if (!integrations.some((integration) => integration.provider === 'wordpress')) {
+    const mirror = org.wordpress_connected_at ? await OrgRepo.findWordPressMirror(orgId) : null;
+    if (mirror) {
+      const tokenEnc = encryptSecret(mirror.token, await getGscTokenKey());
+      await IntegrationRepo.connectWordPress(orgId, mirror.website_url, tokenEnc);
+      const wordpress = await IntegrationRepo.findByOrgAndProvider(orgId, 'wordpress');
+      if (wordpress) integrations = [...integrations, wordpress];
+    }
+  }
+
+  const providers = [...new Set(integrations.map((integration) => integration.provider))];
+  if (providers.length === 0) {
+    await ArticleRepo.recordAutoPublishPreflightError(
+      articleId,
+      publishingFailure(
+        'not_connected',
+        'permanent',
+        'Connect WordPress or a static site to publish this article automatically.',
+        409,
+      ).error,
+    );
+    logger.warn('auto-publish handoff skipped: no connected destination');
+    return;
+  }
+
+  await ArticleRepo.clearAutoPublishPreflightError(articleId);
+  for (const provider of providers) {
+    await ArticleRepo.initializeAutoPublishAttempt(articleId, provider);
+    await enqueuePublishTask(PublishTask.parse({ org_id: orgId, article_id: articleId, provider }));
+    logger.info('auto-publish task queued', { provider });
+  }
+}
+
 /**
  * Images worker — triggered by SQS (enqueued by the generation worker after an
  * article persists). Plans cover + inline images once (set-if-absent), then
@@ -96,7 +149,8 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         continue;
       }
       if (article.images_status === 'complete') {
-        logger.info('images skipped: already complete');
+        await handoffToPublishing(task.org_id, articleId);
+        logger.info('images already complete; publish handoff checked');
         continue;
       }
 
@@ -104,7 +158,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
 
       // Plan once (set-if-absent): a redelivery never re-plans or reshuffles slots.
       if (article.images.length === 0) {
-        const org = await OrgRepo.findById(task.org_id);
+        const org = await OrgRepo.findByIdWithoutSecrets(task.org_id);
         if (!org?.presets) {
           logger.warn('images skipped: org or presets missing');
           continue;
@@ -234,6 +288,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
       const cover = filled?.images.find((s) => s.role === 'cover');
       if (!cover?.url) throw new Error('cover slot missing after fill');
       await ArticleRepo.completeImages(articleId, cover.url);
+      await handoffToPublishing(task.org_id, articleId);
       logger.info('article images complete');
     } catch (err) {
       // Rethrow so SQS redelivers (finished slots are skipped on resume; -> DLQ after 3).

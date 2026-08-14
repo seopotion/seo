@@ -1,28 +1,33 @@
 export { DEFAULT_CONFIG, resolveConfig } from './config';
+export type { PlanCoverage, PlanRepairKind } from './materializer';
+export { materializePlan, PLAN_REPAIR_KINDS, PlanCoverageError } from './materializer';
 export { runKeywordPipeline } from './pipeline';
-export { stampScheduledDates } from './schedule';
-export type {
-  MaterializedTopicClusters,
-  MaterializedTopicTarget,
-  TopicArticleTarget,
-  TopicCandidateTarget,
-  TopicCluster,
-  TopicClusterCandidate,
-  TopicClusterContext,
-  TopicClusterResult,
-  TopicDuplicateMapping,
-} from './topic-clusters';
+export type { PlanResponse, PlanTargetProposal, PlanVerdict } from './plan-contract';
 export {
-  assignTopicClusters,
-  buildTopicClusterPrompt,
-  materializeTopicClusters,
-  parseTopicClusterResponse,
+  buildPlanPrompt,
+  PLAN_MAX_CANDIDATES,
+  PLAN_SERP_NEIGHBORS,
+  PLAN_SERP_TOP,
+  PlanParseError,
+  parsePlanResponse,
+} from './plan-contract';
+export type { MaterializedTopicTarget, TopicCandidateTarget } from './plan-select';
+export {
   selectTopicCandidateTargets,
   selectTopicClusterTargets,
-  TOPIC_CLUSTER_MAX_CANDIDATES,
-  TOPIC_CLUSTER_SERP_NEIGHBORS,
   TopicClusterValidationError,
-} from './topic-clusters';
+} from './plan-select';
+export { stampScheduledDates } from './schedule';
+export type { StageContext, StrategyWorkState } from './stages';
+export {
+  emptyWorkState,
+  stageEnrich,
+  stageGather,
+  stagePlan,
+  stageSerpFetch,
+  stageTriage,
+  toEnriched,
+} from './stages';
 export type {
   CoreKeywordRelation,
   TopicSignalCandidate,

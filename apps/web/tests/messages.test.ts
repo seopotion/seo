@@ -25,18 +25,20 @@ const REFERENCE_LOCALE = routing.defaultLocale;
  */
 const SAME_IN_EVERY_LOCALE = new Set([
   'ArticleDetailPage.labels.slug',
+  'ArticleDetailPage.publishing.providers.wordpress',
   'ArticleEditor.fields.slug',
   'BillingPage.tiers.expert.name',
   'BillingPage.tiers.paid.name',
   'ContentPlannerPage.researchKeywords.form.characterCount',
   'ContentPlannerPage.targetKeywords.notAvailable',
-  'LandingPage.footer.blog',
+  'Footer.supportEmail',
   'Onboarding.integrations.providers.framer',
   'Onboarding.options.referralSources.linkedin',
   'Onboarding.options.referralSources.twitterX',
   // Internal status line; "Org" is used as-is in the Turkish product copy too.
   'Onboarding.websiteScan.orgStatus',
-  'PricingPage.tiers.expertledgrowth.name',
+  'PricingPage.comparison.business',
+  'PricingPage.tiers.business.name',
   'PricingPage.tiers.growth.name',
   'SettingsPage.googleSearchConsole.title',
   'SettingsPage.tabs.googleSearchConsole',

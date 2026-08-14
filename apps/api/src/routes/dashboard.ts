@@ -4,37 +4,61 @@ import { domainRatingFromRank } from '@shared/providers';
 import {
   type Article,
   type Integration,
+  isPaid,
   META_DESCRIPTION_MAX,
   META_DESCRIPTION_MIN,
   META_TITLE_MAX,
+  PublishTask,
 } from '@shared/schemas';
-import { type CommitFile, commitFiles, GithubError } from '../clients/github';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
-import {
-  editWordPressArticle,
-  submitWordPressArticle,
-  testWordPressIntegration,
-} from '../clients/wordpress';
+import { enqueuePublishTask } from '../clients/sqs';
+import { testWordPressIntegration } from '../clients/wordpress';
 import { encryptSecret } from '../lib/crypto';
 import { gscAccess } from '../lib/gsc-access';
 import { matchArticleByPage } from '../lib/gsc-urls';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { recordWordPressPublication } from '../lib/publications';
-import { getGscTokenKey } from '../lib/secrets';
 import {
-  articlePath,
-  manifestPath,
-  type PublishedArticle,
-  renderArticle,
-  renderManifest,
-} from '../lib/static-site';
+  publishStaticSiteArticle,
+  publishWordPressArticle,
+  updateWordPressArticle,
+} from '../lib/publishers';
+import { PublishingFailure, publishingFailure } from '../lib/publishing-errors';
+import { getGscTokenKey } from '../lib/secrets';
 import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/dashboard';
 
 /** Map an Article entity to the Content History list row (Date -> ISO string). */
+function toPublishingState(a: Article) {
+  const autoPublish = a.auto_publish ?? { preflight_error: null, attempts: [] };
+  const mapError = (error: (typeof a.auto_publish)['preflight_error']) =>
+    error
+      ? { code: error.code, kind: error.kind, message: error.message, at: error.at.toISOString() }
+      : null;
+  return {
+    publications: (a.publications ?? []).map((publication) => ({
+      provider: publication.provider,
+      ref: publication.ref,
+      slug: publication.slug,
+      remote_url: publication.remote_url ?? null,
+      published_at: publication.published_at.toISOString(),
+      updated_at: publication.updated_at?.toISOString() ?? null,
+    })),
+    auto_publish_error: mapError(autoPublish.preflight_error),
+    auto_publish_attempts: autoPublish.attempts.map((attempt) => ({
+      provider: attempt.provider,
+      status: attempt.status,
+      attempt_count: attempt.attempt_count,
+      requested_at: attempt.requested_at.toISOString(),
+      last_attempt_at: attempt.last_attempt_at?.toISOString() ?? null,
+      last_error: mapError(attempt.last_error),
+    })),
+  };
+}
+
 function toArticleListItem(a: Article) {
   return {
     id: a.id,
@@ -47,12 +71,14 @@ function toArticleListItem(a: Article) {
     featured_image_url: a.featured_image_url,
     created_at: a.created_at.toISOString(),
     published_at: a.published_at ? a.published_at.toISOString() : null,
+    ...toPublishingState(a),
   };
 }
 
 /** Map an Article entity to the full article record (Date -> ISO string). */
 function toArticleDetail(a: Article) {
-  const staticSite = a.publications.find((p) => p.provider === 'static-site');
+  const publications = a.publications ?? [];
+  const staticSite = publications.find((p) => p.provider === 'static-site');
   return {
     id: a.id,
     keyword_id: a.keyword_id,
@@ -66,6 +92,7 @@ function toArticleDetail(a: Article) {
     status: a.status,
     ...(a.wordpress_post_id ? { wordpress_post_id: a.wordpress_post_id } : {}),
     static_site_published_at: staticSite ? staticSite.published_at.toISOString() : null,
+    ...toPublishingState(a),
     images_status: a.images_status,
     created_at: a.created_at.toISOString(),
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,
@@ -84,47 +111,6 @@ function toConnectedIntegration(i: Integration) {
     connected_at: i.connected_at.toISOString(),
     last_error: i.last_error && { code: i.last_error.code, at: i.last_error.at.toISOString() },
   };
-}
-
-/**
- * An already-published article as the static-site contract sees it: addressed by
- * the slug we last committed under, not by `article.slug`, which the editor can
- * have renamed since. Callers only pass articles `listPublishedTo` returned, so
- * the entry is always there.
- */
-function toPublishedArticle(a: Article): PublishedArticle | null {
-  const publication = a.publications.find((p) => p.provider === 'static-site');
-  if (!publication) return null;
-  return {
-    article: a,
-    slug: publication.slug,
-    published_at: publication.published_at,
-    updated_at: publication.updated_at,
-  };
-}
-
-/**
- * GithubError -> HTTP for the publish route. A lost push race is the caller's to
- * retry (409); anything else GitHub refused is permanent for this request (422,
- * e.g. the branch became protected); a failure to reach GitHub is ours (502).
- */
-function publishFailure(err: unknown): {
-  status: 409 | 422 | 502;
-  body: { error: string; code: string };
-} {
-  if (err instanceof GithubError) {
-    if (err.code === 'ref_conflict') {
-      return {
-        status: 409,
-        body: { error: 'The branch moved while publishing — try again', code: err.code },
-      };
-    }
-    return {
-      status: err.code === 'github_request_failed' ? 502 : 422,
-      body: { error: err.message, code: err.code },
-    };
-  }
-  return { status: 502, body: { error: 'GitHub request failed', code: 'github_request_failed' } };
 }
 
 /**
@@ -232,6 +218,123 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         }
         return c.json({ articles: [], gated: true }, 200);
       }
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['dashboard'],
+      method: 'post',
+      path: '/articles/{id}/auto-publish/retry',
+      summary: 'Retry failed automatic publishing attempts',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: { params: schemas.ArticleParams },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.AutoPublishRetryResponse } },
+          description: 'Connected unpublished destinations were queued idempotently',
+        },
+        404: {
+          content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
+          description: 'Article not found or not owned by the caller',
+        },
+        409: {
+          content: { 'application/json': { schema: schemas.AutoPublishRetryErrorResponse } },
+          description: 'Article is not ready, automatic publishing is off, or none are connected',
+        },
+        422: {
+          content: { 'application/json': { schema: schemas.AutoPublishRetryErrorResponse } },
+          description: 'Automatic publishing requires a paid plan',
+        },
+        502: {
+          content: { 'application/json': { schema: schemas.AutoPublishRetryErrorResponse } },
+          description: 'The publish task could not be enqueued',
+        },
+      },
+    }),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const { userId } = c.get('auth');
+      const article = await ArticleRepo.findById(id);
+      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      if (!article || !org) return c.json({ error: 'Article not found' }, 404);
+      if (article.images_status !== 'complete') {
+        return c.json({ error: 'Article images are not complete', code: 'images_incomplete' }, 409);
+      }
+      if (!org.presets?.article_preferences.publishing.auto_publish) {
+        return c.json(
+          { error: 'Automatic publishing is disabled', code: 'auto_publish_disabled' },
+          409,
+        );
+      }
+      if (!isPaid(org)) {
+        return c.json(
+          { error: 'Automatic publishing requires a paid plan', code: 'subscription_required' },
+          422,
+        );
+      }
+
+      let integrations = await IntegrationRepo.listByOrgId(org.id);
+      if (
+        !integrations.some((integration) => integration.provider === 'wordpress') &&
+        org.wordpress_token &&
+        org.wordpress_connected_at
+      ) {
+        const tokenEnc = encryptSecret(org.wordpress_token, await getGscTokenKey());
+        await IntegrationRepo.connectWordPress(org.id, org.website_url, tokenEnc);
+        const wordpress = await IntegrationRepo.findByOrgAndProvider(org.id, 'wordpress');
+        if (wordpress) integrations = [...integrations, wordpress];
+      }
+
+      const publishedProviders = new Set(
+        (article.publications ?? []).map((publication) => publication.provider),
+      );
+      const providers = [
+        ...new Set(
+          integrations
+            .map((integration) => integration.provider)
+            .filter((provider) => !publishedProviders.has(provider)),
+        ),
+      ];
+      if (providers.length === 0) {
+        if (integrations.length > 0) {
+          await ArticleRepo.clearAutoPublishPreflightError(article.id);
+          return c.json({ queued: [] }, 200);
+        }
+        const failure = publishingFailure(
+          'not_connected',
+          'permanent',
+          'Connect an unpublished destination before retrying automatic publishing.',
+          409,
+        );
+        await ArticleRepo.recordAutoPublishPreflightError(article.id, failure.error);
+        return c.json({ error: failure.message, code: failure.error.code }, 409);
+      }
+
+      await ArticleRepo.clearAutoPublishPreflightError(article.id);
+      const requestedAt = new Date();
+      try {
+        for (const provider of providers) {
+          const attempt = article.auto_publish?.attempts.find(
+            (entry) => entry.provider === provider,
+          );
+          if (attempt?.status === 'published') continue;
+          if (attempt?.status === 'failed' || attempt?.status === 'cancelled') {
+            await ArticleRepo.resetAutoPublishAttempt(article.id, provider, requestedAt);
+          } else if (!attempt) {
+            await ArticleRepo.initializeAutoPublishAttempt(article.id, provider, requestedAt);
+          }
+          await enqueuePublishTask(
+            PublishTask.parse({ org_id: org.id, article_id: article.id, provider }),
+          );
+        }
+      } catch {
+        return c.json(
+          { error: 'The publish task could not be queued', code: 'queue_send_failed' },
+          502,
+        );
+      }
+      return c.json({ queued: providers }, 200);
     },
   )
   .openapi(
@@ -717,22 +820,33 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       }
 
       try {
-        const result = await submitWordPressArticle(org.website_url, org.wordpress_token, article);
-        if (result.status === 200) {
-          const persisted = await ArticleRepo.setWordPressPostId(article.id, result.body.post_id);
-          if (!persisted) {
-            return c.json({ error: 'WordPress post created but its ID could not be saved' }, 500);
-          }
-          await recordWordPressPublication(article, result.body.post_id);
-          return c.json(result.body, 200);
+        const published = await publishWordPressArticle({
+          article,
+          websiteUrl: org.website_url,
+          token: org.wordpress_token,
+          automatic: false,
+        });
+        const persisted = await ArticleRepo.setWordPressPostId(article.id, published.post_id);
+        if (!persisted) {
+          return c.json({ error: 'WordPress post created but its ID could not be saved' }, 500);
         }
-        if (result.status === 400) return c.json(result.body, 400);
-        if (result.status === 403) return c.json(result.body, 403);
-        if (result.status === 404) return c.json(result.body, 404);
-        if (result.status === 409) return c.json(result.body, 409);
-        return c.json(result.body, 500);
-      } catch {
-        return c.json({ error: 'WordPress request failed' }, 502);
+        await recordWordPressPublication(article, {
+          post_id: published.post_id,
+          slug: published.slug,
+          remote_url: published.remote_url || null,
+          published_at: published.published_at,
+        });
+        return c.json(published.response, 200);
+      } catch (err) {
+        if (!(err instanceof PublishingFailure)) {
+          return c.json({ error: 'WordPress request failed' }, 502);
+        }
+        if (err.httpStatus === 400) return c.json({ error: err.message }, 400);
+        if (err.httpStatus === 403) return c.json({ error: err.message }, 403);
+        if (err.httpStatus === 404) return c.json({ error: err.message }, 404);
+        if (err.httpStatus === 409) return c.json({ error: err.message }, 409);
+        if (err.httpStatus === 500) return c.json({ error: err.message }, 500);
+        return c.json({ error: err.message }, 502);
       }
     },
   )
@@ -793,23 +907,29 @@ const dashboard = new OpenAPIHono<AuthEnv>()
       }
 
       try {
-        const result = await editWordPressArticle(
-          org.website_url,
-          org.wordpress_token,
-          article.wordpress_post_id,
+        const published = await updateWordPressArticle({
           article,
-        );
-        if (result.status === 200) {
-          await recordWordPressPublication(article, article.wordpress_post_id);
-          return c.json(result.body, 200);
+          websiteUrl: org.website_url,
+          token: org.wordpress_token,
+          postId: article.wordpress_post_id,
+        });
+        await recordWordPressPublication(article, {
+          post_id: published.post_id,
+          slug: published.slug,
+          remote_url: published.remote_url || null,
+          published_at: published.published_at,
+        });
+        return c.json(published.response, 200);
+      } catch (err) {
+        if (!(err instanceof PublishingFailure)) {
+          return c.json({ error: 'WordPress request failed' }, 502);
         }
-        if (result.status === 400) return c.json(result.body, 400);
-        if (result.status === 403) return c.json(result.body, 403);
-        if (result.status === 404) return c.json(result.body, 404);
-        if (result.status === 409) return c.json(result.body, 409);
-        return c.json(result.body, 500);
-      } catch {
-        return c.json({ error: 'WordPress request failed' }, 502);
+        if (err.httpStatus === 400) return c.json({ error: err.message }, 400);
+        if (err.httpStatus === 403) return c.json({ error: err.message }, 403);
+        if (err.httpStatus === 404) return c.json({ error: err.message }, 404);
+        if (err.httpStatus === 409) return c.json({ error: err.message }, 409);
+        if (err.httpStatus === 500) return c.json({ error: err.message }, 500);
+        return c.json({ error: err.message }, 502);
       }
     },
   )
@@ -867,89 +987,21 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ error: 'Article images are not complete', code: 'images_incomplete' }, 409);
       }
 
-      const { content_path } = integration;
-      const live = (await ArticleRepo.listPublishedTo(org.id, 'static-site'))
-        .filter((a) => a.id !== article.id)
-        .map(toPublishedArticle)
-        .filter((e) => e !== null);
-
-      // Every file is addressed by slug and there is no unique index on
-      // `articles.slug`, so without this the second article to claim a slug
-      // silently overwrites the first one's file
-      // (design/static-site-integration.md § Publish semantics).
-      if (live.some((e) => e.slug === article.slug)) {
-        return c.json(
-          {
-            error: `Another article is already published at "${article.slug}"`,
-            code: 'slug_conflict',
-          },
-          409,
-        );
-      }
-
-      // One timestamp for the commit and for the publish state it records, so
-      // rebuilding this manifest from the database reproduces it byte for byte.
-      const now = new Date();
-      const previous = article.publications.find((p) => p.provider === 'static-site');
-      const entry: PublishedArticle = {
-        article,
-        slug: article.slug,
-        published_at: previous?.published_at ?? now,
-        updated_at: previous ? now : null,
-      };
-
-      const files: CommitFile[] = [
-        { path: articlePath(content_path, article.slug), content: renderArticle(entry) },
-        {
-          path: manifestPath(content_path),
-          content: renderManifest([...live, entry], content_path, now),
-        },
-      ];
-      // A slug renamed since the last publish would otherwise leave the old file
-      // behind as a live duplicate-content page. Deleting it rides in this same
-      // commit, so the repo is never briefly serving both.
-      if (previous && previous.slug !== article.slug) {
-        files.push({ path: articlePath(content_path, previous.slug), content: null });
-      }
-
-      let commitSha: string;
+      let published: Awaited<ReturnType<typeof publishStaticSiteArticle>>;
       try {
-        commitSha = await commitFiles({
-          installationId: integration.installation_id,
-          repo: integration.repo,
-          branch: integration.branch,
-          message: `seopotion: ${previous ? 'update' : 'publish'} "${article.title}"`,
-          files,
-        });
+        published = await publishStaticSiteArticle({ article, integration });
       } catch (err) {
-        const fail = publishFailure(err);
-        if (fail.status === 409) return c.json(fail.body, 409);
-        if (fail.status === 422) {
-          // A 422 is GitHub refusing us for a reason that is still true on the
-          // next attempt — uninstalled, suspended, repo dropped, branch
-          // protected. Stick it on the connection so the settings panel can say
-          // "connected but broken" instead of leaving a dead install looking
-          // healthy until someone tries to publish again. A lost push race
-          // (409) and an unreachable GitHub (502) are transient and must not.
-          // Best-effort: a write failure here must not mask the publish error.
-          await IntegrationRepo.setError(org.id, 'static-site', fail.body.code).catch(() => {});
-          return c.json(fail.body, 422);
+        if (!(err instanceof PublishingFailure)) {
+          return c.json({ error: 'GitHub request failed', code: 'github_request_failed' }, 502);
         }
-        return c.json(fail.body, 502);
-      }
-
-      const persisted = await ArticleRepo.recordPublication(
-        article.id,
-        { provider: 'static-site', ref: commitSha, slug: article.slug },
-        now,
-      );
-      if (!persisted) {
-        // The commit landed. Not recording it drops the article out of the next
-        // manifest rebuild, so say so rather than reporting success.
-        return c.json(
-          { error: 'Committed, but the publish state could not be saved', code: 'record_failed' },
-          500,
-        );
+        const body = { error: err.message, code: err.error.code };
+        if (err.httpStatus === 409) return c.json(body, 409);
+        if (err.httpStatus === 422) {
+          await IntegrationRepo.setError(org.id, 'static-site', err.error.code).catch(() => {});
+          return c.json(body, 422);
+        }
+        if (err.httpStatus === 500) return c.json(body, 500);
+        return c.json(body, 502);
       }
 
       // The commit proves the connection works again. Guarded so the common
@@ -960,9 +1012,9 @@ const dashboard = new OpenAPIHono<AuthEnv>()
 
       return c.json(
         {
-          commit_sha: commitSha,
-          commit_url: `https://github.com/${integration.repo}/commit/${commitSha}`,
-          path: articlePath(content_path, article.slug),
+          commit_sha: published.ref,
+          commit_url: published.remote_url,
+          path: published.path,
         },
         200,
       );

@@ -79,10 +79,11 @@ function inlineImages(article: Article): InlineImage[] {
 }
 
 /** One manifest entry, in the order the contract documents. */
-function manifestEntry(entry: PublishedArticle, contentPath: string) {
+export function manifestEntry(entry: PublishedArticle, contentPath: string) {
   const { article } = entry;
   const cover = coverOf(article);
   return {
+    source_article_id: article.id,
     slug: entry.slug,
     title: article.title,
     meta_title: article.meta_title,
@@ -115,6 +116,7 @@ export function renderArticle(entry: PublishedArticle): string {
 
   const lines = [
     '---',
+    `source_article_id: ${yamlString(article.id)}`,
     `slug: ${yamlString(entry.slug)}`,
     `title: ${yamlString(article.title)}`,
     `meta_title: ${yamlString(article.meta_title)}`,
@@ -166,17 +168,73 @@ export function renderManifest(
   contentPath: string,
   generatedAt: Date,
 ): string {
+  return renderManifestEntries(
+    entries.map((entry) => manifestEntry(entry, contentPath)),
+    generatedAt,
+  );
+}
+
+export type StaticSiteManifestArticle = ReturnType<typeof manifestEntry>;
+
+export function renderManifestEntries(
+  entries: StaticSiteManifestArticle[],
+  generatedAt: Date | string,
+): string {
   const articles = [...entries]
     .sort(
-      (a, b) => b.published_at.getTime() - a.published_at.getTime() || a.slug.localeCompare(b.slug),
+      (a, b) =>
+        Date.parse(b.published_at) - Date.parse(a.published_at) || a.slug.localeCompare(b.slug),
     )
-    .map((entry) => manifestEntry(entry, contentPath));
+    .map((entry) => ({ ...entry }));
 
   const manifest = {
     version: MANIFEST_VERSION,
-    generated_at: generatedAt.toISOString(),
+    generated_at: typeof generatedAt === 'string' ? generatedAt : generatedAt.toISOString(),
     articles,
   };
   // Trailing newline: this file lands in someone else's `git diff`.
   return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+export function parseManifest(content: string): {
+  generated_at: string;
+  articles: StaticSiteManifestArticle[];
+} {
+  const parsed: unknown = JSON.parse(content);
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !('version' in parsed) ||
+    parsed.version !== MANIFEST_VERSION ||
+    !('generated_at' in parsed) ||
+    typeof parsed.generated_at !== 'string' ||
+    !Number.isFinite(Date.parse(parsed.generated_at)) ||
+    !('articles' in parsed) ||
+    !Array.isArray(parsed.articles)
+  ) {
+    throw new SyntaxError('Invalid static-site manifest response');
+  }
+  const articles = parsed.articles.map((entry) => {
+    if (
+      typeof entry !== 'object' ||
+      entry === null ||
+      !('slug' in entry) ||
+      typeof entry.slug !== 'string' ||
+      !('published_at' in entry) ||
+      typeof entry.published_at !== 'string' ||
+      !Number.isFinite(Date.parse(entry.published_at)) ||
+      !('path' in entry) ||
+      typeof entry.path !== 'string' ||
+      ('source_article_id' in entry &&
+        entry.source_article_id !== null &&
+        typeof entry.source_article_id !== 'string')
+    ) {
+      throw new SyntaxError('Invalid static-site manifest article response');
+    }
+    return {
+      source_article_id: 'source_article_id' in entry ? entry.source_article_id : null,
+      ...entry,
+    } as StaticSiteManifestArticle;
+  });
+  return { generated_at: parsed.generated_at, articles };
 }

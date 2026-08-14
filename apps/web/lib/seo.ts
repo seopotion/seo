@@ -1,15 +1,15 @@
 export const SITE_NAME = 'Seopotion';
 export const SITE_URL = normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
-export const DEFAULT_TITLE = 'Seopotion | AI SEO Content for Google and ChatGPT';
+export const DEFAULT_TITLE = 'Seopotion — SEO Content Planning, Writing & Publishing Software';
 export const DEFAULT_DESCRIPTION =
-  'Seopotion helps teams rank on Google and get mentioned by AI search with keyword research, on-brand SEO content, CMS publishing, and continuous tuning.';
+  'Analyze your website, discover content opportunities, generate SEO-oriented articles, review and edit them, and publish directly to WordPress with Seopotion.';
 
 export const SOCIAL_IMAGE = {
-  url: '/hero-image-2.png',
-  width: 1754,
-  height: 1255,
-  alt: 'Seopotion SEO growth dashboard preview',
+  url: '/android-chrome-192x192.png',
+  width: 192,
+  height: 192,
+  alt: 'Seopotion logo',
 };
 
 export function absoluteUrl(path = '/') {

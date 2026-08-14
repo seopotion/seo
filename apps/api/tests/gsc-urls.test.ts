@@ -11,6 +11,7 @@ function article(id: string, ...slugs: string[]) {
       slug,
       published_at: new Date('2026-07-01T00:00:00Z'),
       updated_at: null,
+      remote_url: null,
     })),
   };
 }

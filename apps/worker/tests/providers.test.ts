@@ -17,12 +17,7 @@ vi.mock('@shared/providers', async (importOriginal) => ({
   createFalClient,
 }));
 
-import {
-  getGenerationClients,
-  getImageClients,
-  getScanClients,
-  getStrategyClients,
-} from '../src/providers';
+import { getGenerationClients, getImageClients, getScanClients } from '../src/providers';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -47,23 +42,6 @@ describe('worker provider factories', () => {
     });
     expect(createOpenRouterClient).toHaveBeenCalledWith({ apiKey: 'sk-local' });
     expect(getParameter).not.toHaveBeenCalled();
-  });
-
-  test('getStrategyClients resolves credentials from SSM when _PARAM is set', async () => {
-    process.env.DATAFORSEO_LOGIN_PARAM = '/seo/prod/dataforseo-login';
-    process.env.DATAFORSEO_PASSWORD_PARAM = '/seo/prod/dataforseo-password';
-    process.env.OPENROUTER_API_KEY_PARAM = '/seo/prod/openrouter-api-key';
-    getParameter.mockImplementation(async (name: string) => `value-for:${name}`);
-
-    await getStrategyClients();
-
-    expect(createDataForSeoClient).toHaveBeenCalledWith({
-      login: 'value-for:/seo/prod/dataforseo-login',
-      password: 'value-for:/seo/prod/dataforseo-password',
-    });
-    expect(createOpenRouterClient).toHaveBeenCalledWith({
-      apiKey: 'value-for:/seo/prod/openrouter-api-key',
-    });
   });
 
   test('getGenerationClients resolves the YouTube key from SSM', async () => {

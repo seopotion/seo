@@ -171,14 +171,10 @@ export const dbCommand = defineCommand({
           type: 'string',
           description: 'Model for the relevance stage only (default: the client default)',
         },
-        'model-serp-judge': {
+        'model-plan': {
           type: 'string',
           description:
-            'Model for the SERP intent/locality judge only (default: the client default)',
-        },
-        'model-classify': {
-          type: 'string',
-          description: 'Model for the article_type classifier only (default: the client default)',
+            'Model for the plan call (judgment + targets) only (default: the client default)',
         },
         snapshot: {
           type: 'string',
@@ -224,8 +220,7 @@ export const dbCommand = defineCommand({
               [
                 ['seeds', 'model-seeds'],
                 ['relevance', 'model-relevance'],
-                ['serpJudge', 'model-serp-judge'],
-                ['classify', 'model-classify'],
+                ['plan', 'model-plan'],
               ] as const
             )
               .map(([stage, flag]) => [stage, args[flag] as string | undefined])
@@ -269,6 +264,39 @@ export const dbCommand = defineCommand({
           } else {
             emitter.result(result);
           }
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'strategy-run': defineCommand({
+      meta: {
+        name: 'strategy-run',
+        description:
+          'Create and execute a REAL strategy run for one org, in-process (#56): persists candidates, ' +
+          'schedules planner entries, writes a strategy_runs doc. The recovery path for a failed org. ' +
+          'Needs Mongo + provider credentials in the environment.',
+      },
+      args: {
+        org: { type: 'positional', description: 'Org id', required: true },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { strategyRun } = await import('../lib/db');
+
+          emitter.warn(
+            'Writes to whatever MONGODB_URI targets and spends real provider credits — not a dry run.',
+          );
+          emitter.step('db:strategy-run', 'start');
+
+          const result = await strategyRun({ orgId: args.org as string });
+          emitter.step('db:strategy-run', result.ok ? 'done' : 'fail');
+          emitter.result(result);
 
           process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
         } catch (e) {

@@ -60,8 +60,15 @@ export interface DbInitData {
 export interface SetPlanData {
   org_id: string;
   plan: string;
-  /** True when escalating to paid kicked off the 30-day strategy pipeline. */
+  /**
+   * True when escalating to paid kicked off the 30-day strategy pipeline.
+   * Name predates the SQS→SFN switch (#56); kept for output-contract stability.
+   */
   strategy_enqueued: boolean;
+}
+
+export interface StrategyRunData {
+  run_id: string;
 }
 
 export interface ResetUserData {

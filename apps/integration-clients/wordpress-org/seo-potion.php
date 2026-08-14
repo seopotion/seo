@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 /*
  * Plugin Name: SEO Potion
  * Description: Publish SEO Potion articles to your WordPress site as posts or drafts.
- * Version: 1.0.0
+ * Version: 1.2.0
  * Author: SEO Potion
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html

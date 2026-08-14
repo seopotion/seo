@@ -13,19 +13,6 @@ import {
  * factories being async rather than reading `process.env` inline.
  */
 
-/** Build the DataForSEO + LLM clients the strategy pipeline needs. */
-export async function getStrategyClients() {
-  const [login, password, apiKey] = await Promise.all([
-    resolveProviderSecret('DATAFORSEO_LOGIN'),
-    resolveProviderSecret('DATAFORSEO_PASSWORD'),
-    resolveProviderSecret('OPENROUTER_API_KEY'),
-  ]);
-  return {
-    dataForSeo: createDataForSeoClient({ login, password }),
-    llm: createOpenRouterClient({ apiKey }),
-  };
-}
-
 /** Build the LLM + YouTube clients the generation worker needs (#55/#85). */
 export async function getGenerationClients() {
   const [apiKey, youtubeKey] = await Promise.all([

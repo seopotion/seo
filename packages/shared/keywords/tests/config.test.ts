@@ -40,7 +40,7 @@ describe('resolveConfig', () => {
     // should come from the SERP-validated top-N, with buffer for rejections.
     expect(DEFAULT_CONFIG.serpTopN).toBeGreaterThanOrEqual(40);
     expect(DEFAULT_CONFIG.serpTopN).toBe(150);
-    expect(DEFAULT_CONFIG.models.topicClusters).toBe('anthropic/claude-haiku-4.5');
+    expect(DEFAULT_CONFIG.models.plan).toBe('anthropic/claude-haiku-4.5');
     expect('clusterJaccard' in DEFAULT_CONFIG).toBe(false);
     expect('duplicateSerpOverlap' in DEFAULT_CONFIG).toBe(false);
   });

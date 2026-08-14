@@ -163,42 +163,29 @@ vi.mock('@shared/providers', async (importOriginal) => ({
       else if (sys.includes('Score each keyword'))
         text =
           '{"scores":[{"keyword":"cheap dog food","relevance":0.9},{"keyword":"dog food delivery","relevance":0.8}]}';
-      else if (sys.includes('could rank')) {
-        // Batched (#211): one entry per numbered keyword in the prompt.
-        const n = [...(messages.at(-1)?.content ?? '').matchAll(/^Keyword \d+: /gm)].length;
-        text = JSON.stringify({
-          judgments: Array.from({ length: n }, (_, index) => ({
-            index,
-            intentSuitable: true,
-            localitySuitable: true,
-            reason: null,
-          })),
-        });
-      } else if (sys.includes('Classify each keyword')) {
-        const n = [...(messages.at(-1)?.content ?? '').matchAll(/^\d+\. /gm)].length;
-        text = JSON.stringify({
-          types: Array.from({ length: n }, (_, index) => ({ index, article_type: 'listicle' })),
-        });
-      } else if (sys.includes('Assign the candidates to broad topic clusters')) {
+      else if (sys.includes('building a content plan')) {
+        // The single plan call (#56): judges intent/locality/article-type and
+        // groups accepted candidates into targets in one response. One verdict
+        // per finalist index, all grouped into a single cluster with the first
+        // index as the pillar — mirrors the old SERP-judge + classify +
+        // topic-cluster mocks this replaces.
         const indices = (messages.at(-1)?.content ?? '')
           .split('\n')
           .filter((line) => line.startsWith('{"index":'))
           .map((line) => (JSON.parse(line) as { index: number }).index);
         text = JSON.stringify({
-          clusters:
-            indices.length === 0
-              ? []
-              : [
-                  {
-                    label: 'Dog food',
-                    pillar_index: indices[0],
-                    targets: indices.map((index) => ({
-                      primary_index: index,
-                      member_indices: [index],
-                      content_focus: `Dog food target ${index}`,
-                    })),
-                  },
-                ],
+          verdicts: indices.map((index) => ({
+            index,
+            intent_ok: true,
+            locality_ok: true,
+            article_type: 'listicle',
+          })),
+          targets: indices.map((index, i) => ({
+            cluster: 'Dog food',
+            member_indices: [index],
+            content_focus: `Dog food target ${index}`,
+            is_pillar: i === 0,
+          })),
         });
       }
       return {
@@ -356,41 +343,31 @@ describe('strategyDryRun', () => {
   // Uniform `other` was indistinguishable from a real judgement until these
   // counters existed — the clewas run's classify call returned an empty body and
   // silently typed all 78 accepts `other` (#211).
-  test('reports SERP-judge and classify coverage plus article_type diagnostics', async () => {
+  test('reports plan coverage (verdicts, targets, clusters) and article_type diagnostics', async () => {
     const report = unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1 }));
 
-    expect(report.stats.judgment).toMatchObject({
-      sent: 1,
-      returned: 1,
-      unparseable: 0,
-      batches: 1,
-      failedBatches: 0,
-    });
-    expect(report.stats.classification).toMatchObject({
-      sent: 1,
-      returned: 1,
-      matched: 1,
-      typed: 1,
-      assigned: 1,
-      failedBatches: 0,
+    expect(report.stats.plan).toMatchObject({
+      finalists: 1,
+      verdicts: 1,
+      unjudged: 0,
+      accepted: 1,
+      targets: 1,
+      clusters: 1,
+      singletons: 0,
+      duplicates: 0,
+      pillars: 1,
+      supports: 0,
+      repairRetried: false,
     });
     expect(report.stats).toMatchObject({
       serpChecked: 1,
       serpValidated: 1,
       accepted: 1,
-      topicClustering: {
-        candidates: 1,
-        clusters: 1,
-        targets: 1,
-        duplicates: 0,
-        pillars: 1,
-        supports: 0,
-      },
     });
     expect(report.article_types).toEqual([{ article_type: 'listicle', count: 1 }]);
     // Full coverage, so neither degradation note fires.
-    expect(report.notes.join(' ')).not.toContain('FAILED OPEN');
-    expect(report.notes.join(' ')).not.toContain('kept the');
+    expect(report.notes.join(' ')).not.toContain('never got a verdict');
+    expect(report.notes.join(' ')).not.toContain('repaired');
   });
 
   test('replay fails loudly when the snapshot is missing a call', async () => {
@@ -473,29 +450,23 @@ describe('strategyDryRun', () => {
     const path = join(dir, 'snap.json');
     unwrap(await strategyDryRun({ org: 'org_1', serpTopN: 1, snapshotPath: path }));
     const baseline = JSON.parse(await readFile(path, 'utf8'));
-    const baselineClassify = baseline.llm.find((c: { messages: { content: string }[] }) =>
-      c.messages[0]!.content.includes('Classify each keyword'),
+    const baselinePlan = baseline.llm.find((c: { messages: { content: string }[] }) =>
+      c.messages[0]!.content.includes('building a content plan'),
     );
-    const baselineTopic = baseline.llm.find((c: { messages: { content: string }[] }) =>
-      c.messages[0]!.content.includes('Assign the candidates to broad topic clusters'),
-    );
-    expect(baselineClassify.model).toBe('anthropic/claude-haiku-4.5');
-    expect(baselineTopic.model).toBe('anthropic/claude-haiku-4.5');
+    expect(baselinePlan.model).toBe('anthropic/claude-haiku-4.5');
     expect(
       baseline.llm
-        .filter(
-          (c: { messages: { content: string }[] }) => c !== baselineClassify && c !== baselineTopic,
-        )
+        .filter((c: { messages: { content: string }[] }) => c !== baselinePlan)
         .every((c: { model?: string }) => c.model === undefined),
     ).toBe(true);
 
-    // Same org, same prompts, different classify model — the classify call must
-    // MISS rather than replay Haiku's body.
+    // Same org, same prompts, different plan model — the plan call must MISS
+    // rather than replay Haiku's body.
     const result = await strategyDryRun({
       org: 'org_1',
       serpTopN: 1,
       replayPath: path,
-      models: { classify: 'z-ai/glm-5.2' },
+      models: { plan: 'z-ai/glm-5.2' },
     });
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -508,13 +479,13 @@ describe('strategyDryRun', () => {
         org: 'org_1',
         serpTopN: 1,
         snapshotPath: abPath,
-        models: { classify: 'z-ai/glm-5.2' },
+        models: { plan: 'z-ai/glm-5.2' },
       }),
     );
     const ab = JSON.parse(await readFile(abPath, 'utf8'));
-    const classify = ab.llm.filter((c: { model?: string }) => c.model === 'z-ai/glm-5.2');
-    expect(classify).toHaveLength(1);
-    expect(classify[0].key).not.toBe(baselineClassify.key);
+    const plan = ab.llm.filter((c: { model?: string }) => c.model === 'z-ai/glm-5.2');
+    expect(plan).toHaveLength(1);
+    expect(plan[0].key).not.toBe(baselinePlan.key);
   });
 
   test('rejects --snapshot together with --replay', async () => {
