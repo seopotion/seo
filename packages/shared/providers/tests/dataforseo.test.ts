@@ -190,7 +190,8 @@ describe('keywordsForSite', () => {
     await expect(client().keywordsForSite({ target: 'x' })).rejects.toMatchObject({
       name: 'DataForSeoError',
       category: 'payment_required',
-      message: expect.stringContaining('Payment Required.'),
+      status: 402,
+      message: expect.stringMatching(/HTTP 402.*Payment Required\./),
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -202,6 +203,18 @@ describe('keywordsForSite', () => {
       category: 'payment_required',
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('non-JSON HTTP failure carries the status and a body snippet', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('Bandwidth limit exceeded', { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(client().keywordsForSite({ target: 'x' })).rejects.toMatchObject({
+      category: 'invalid_request',
+      status: 400,
+      message: expect.stringMatching(/HTTP 400.*Bandwidth limit exceeded/),
+    });
   });
 });
 

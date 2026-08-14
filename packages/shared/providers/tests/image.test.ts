@@ -65,6 +65,18 @@ describe('generate', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  test('HTTP failure carries the status and a body snippet', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('{"detail":"Exhausted balance"}', { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(client().generate({ prompt: 'x' })).rejects.toMatchObject({
+      category: 'auth',
+      status: 403,
+      message: expect.stringMatching(/HTTP 403.*Exhausted balance/),
+    });
+  });
+
   test('retries on 500 then succeeds', async () => {
     const fetchMock = vi
       .fn()

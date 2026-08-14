@@ -15,13 +15,20 @@ existing DataForSEO client and follow the same factory + normalized-error patter
 | Concern | Choice |
 | --- | --- |
 | LLM provider | **OpenRouter** (`https://openrouter.ai/api/v1/chat/completions`) |
-| LLM default model | **`z-ai/glm-5.2`** — outline, full-article, and humanization passes |
+| LLM default model | **`anthropic/claude-haiku-4.5`** — outline, full-article, and humanization passes |
 | Image provider | **fal.ai** (`https://fal.run/{model}`) |
 | Image default model | **`fal-ai/flux-2`** (FLUX.2 [dev]) — cover/OG + inline images |
 | Staging vs prod | One provider account for both; **separate API keys per stage** via per-stage SSM |
 
 Model is a per-call parameter (defaulted from client config), so the models above are
 **documented defaults, not hardcoded** — swapping a model is a config change.
+
+The LLM default was originally `z-ai/glm-5.2` and moved to Haiku 4.5. GLM-5.2 is a
+reasoning model, and twice spent its entire output budget on reasoning tokens while
+returning an empty body ([#211](https://github.com/seopotion/seo/issues/211)); Haiku 4.5
+does not reason by default. The keyword pipeline's `plan` stage was already pinned to
+Haiku, so this makes one model the default everywhere. Transport, secret, and the
+`LlmClient` interface are unchanged — it is a base-model-string change only.
 
 ### Why OpenRouter
 
@@ -84,7 +91,7 @@ interface LlmClient {
 
 type LlmConfig = {
   apiKey: string;
-  defaultModel?: string;   // default 'z-ai/glm-5.2'
+  defaultModel?: string;   // default 'anthropic/claude-haiku-4.5'
   baseUrl?: string;        // default 'https://openrouter.ai/api/v1'
   timeoutMs?: number;
   maxRetries?: number;
@@ -183,11 +190,14 @@ replace these with measured spend once the pipeline runs.
 
 | Step | Model | Rough tokens / count | Est. cost |
 | --- | --- | --- | --- |
-| Outline | GLM 5.2 | ~1k in / ~1.5k out | $0.01–0.03 |
-| Full article | GLM 5.2 | ~2k in / ~5k out | $0.03–0.08 |
-| Humanization pass | GLM 5.2 | ~5k in / ~5k out | $0.02–0.05 |
+| Outline | Haiku 4.5 | ~1k in / ~1.5k out | ~$0.01 |
+| Full article | Haiku 4.5 | ~2k in / ~5k out | ~$0.03 |
+| Humanization pass | Haiku 4.5 | ~5k in / ~5k out | ~$0.03 |
 | Images | FLUX.2 [dev] | ~3 images (1 cover + ~2 inline) @ $0.012/MP | $0.04–0.06 |
-| **Total** | | | **~$0.10–0.22** |
+| **Total** | | | **~$0.11–0.13** |
+
+LLM figures are at Haiku 4.5's $1 / $5 per MTok (in / out); OpenRouter bills close to
+that, and the response's `usage.cost` is what actually gets recorded.
 
 Operational limits carried by the clients: per-request timeout (default ~30s for LLM,
 longer for image), bounded retries with backoff on retryable categories, and normalized

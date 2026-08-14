@@ -1,4 +1,4 @@
-import { categorizeProviderHttpStatus, isRetryableProviderError, ProviderError } from '../errors';
+import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
 import type { YouTubeClient, YouTubeConfig, YouTubeSearchOpts, YouTubeVideo } from './types';
 
 const DEFAULT_BASE_URL = 'https://www.googleapis.com/youtube/v3';
@@ -34,10 +34,7 @@ export function createYouTubeClient(config: YouTubeConfig): YouTubeClient {
       clearTimeout(timer);
     }
 
-    if (!res.ok) {
-      const category = categorizeProviderHttpStatus(res.status);
-      throw new ProviderError(category, `YouTube request failed (${category})`);
-    }
+    if (!res.ok) throw await providerHttpError('YouTube', res);
 
     const json = (await res.json()) as {
       items?: Array<{

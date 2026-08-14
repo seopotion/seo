@@ -4,7 +4,7 @@ import { createOpenRouterClient } from '../src';
 function chatResponse(content: string) {
   return new Response(
     JSON.stringify({
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       choices: [{ message: { role: 'assistant', content } }],
       usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14, cost: 0.00014 },
     }),
@@ -32,14 +32,14 @@ describe('complete', () => {
 
     expect(out).toEqual({
       text: 'Hello there!',
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       usage: { promptTokens: 10, completionTokens: 4, totalTokens: 14, costUsd: 0.00014 },
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test');
     expect(JSON.parse(init.body as string)).toEqual({
-      model: 'z-ai/glm-5.2',
+      model: 'anthropic/claude-haiku-4.5',
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 100,
       temperature: 0.7,
@@ -115,6 +115,28 @@ describe('complete', () => {
     );
     const out = await client().complete({ messages: [{ role: 'user', content: 'x' }] });
     expect(out.usage.costUsd).toBeNull();
+  });
+
+  // Regression for the 2026-08-14 staging outage: a 402 "insufficient credits"
+  // surfaced as a bare invalid_request with no status or body to diagnose it.
+  test('HTTP failure carries the status and a body snippet', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { message: 'This request requires more credits', code: 402 } }),
+          { status: 402 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      client().complete({ messages: [{ role: 'user', content: 'x' }] }),
+    ).rejects.toMatchObject({
+      name: 'ProviderError',
+      category: 'invalid_request',
+      status: 402,
+      message: expect.stringMatching(/HTTP 402.*requires more credits/),
+    });
   });
 
   test('maps 401 to auth and does NOT retry', async () => {
