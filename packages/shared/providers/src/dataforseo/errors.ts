@@ -48,11 +48,14 @@ export function categorizeApiStatus(code: number): DataForSeoErrorCategory {
 export class DataForSeoError extends Error {
   readonly category: DataForSeoErrorCategory;
   readonly retryable: boolean;
+  /** HTTP response status, when the failure came from a non-ok HTTP response. */
+  readonly status: number | null;
 
-  constructor(category: DataForSeoErrorCategory, message: string) {
+  constructor(category: DataForSeoErrorCategory, message: string, opts?: { status?: number }) {
     super(message);
     this.name = 'DataForSeoError';
     this.category = category;
     this.retryable = isRetryable(category);
+    this.status = opts?.status ?? null;
   }
 }

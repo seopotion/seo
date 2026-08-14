@@ -1,4 +1,4 @@
-import { categorizeProviderHttpStatus, isRetryableProviderError, ProviderError } from '../errors';
+import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
 import type { ImageClient, ImageConfig, ImageGenerateParams, ImageResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://fal.run';
@@ -46,10 +46,7 @@ export function createFalClient(config: ImageConfig): ImageClient {
       clearTimeout(timer);
     }
 
-    if (!res.ok) {
-      const category = categorizeProviderHttpStatus(res.status);
-      throw new ProviderError(category, `fal.ai request failed (${category})`);
-    }
+    if (!res.ok) throw await providerHttpError('fal.ai', res);
 
     const json = (await res.json()) as {
       images?: Array<{ url?: string; width?: number; height?: number }>;

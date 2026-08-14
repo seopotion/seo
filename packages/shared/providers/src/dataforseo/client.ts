@@ -1,5 +1,6 @@
 import type { SearchIntent } from '@shared/schemas';
 import { SEARCH_INTENTS } from '@shared/schemas';
+import { bodySnippet } from '../errors';
 import { categorizeApiStatus, categorizeHttpStatus, DataForSeoError, isRetryable } from './errors';
 import type {
   BacklinksSummary,
@@ -158,20 +159,30 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     if (!res.ok) {
       // DataForSEO mirrors body/task errors in the HTTP status (e.g. 402 for a
       // 40200 "Payment Required." task) — read the body when it's JSON so the
-      // error keeps the provider's precise category and status_message.
-      const errBody = (await res.json().catch(() => null)) as {
+      // error keeps the provider's precise category and status_message; a
+      // non-envelope body still surfaces as a snippet.
+      const raw = await res.text().catch(() => '');
+      let errBody: {
         status_code?: number;
         status_message?: string;
         tasks?: Array<{ status_code?: number; status_message?: string }>;
-      } | null;
+      } | null = null;
+      try {
+        errBody = JSON.parse(raw);
+      } catch {}
       const src = [errBody?.tasks?.[0], errBody].find(
         (s) => typeof s?.status_code === 'number' && s.status_code >= 30000,
       );
       const category = src?.status_code
         ? categorizeApiStatus(src.status_code)
         : categorizeHttpStatus(res.status);
-      const suffix = src?.status_message ? `: ${src.status_message}` : '';
-      throw new DataForSeoError(category, `DataForSEO request failed (${category})${suffix}`);
+      const excerpt = src?.status_message ?? bodySnippet(raw);
+      const suffix = excerpt ? ` — ${excerpt}` : '';
+      throw new DataForSeoError(
+        category,
+        `DataForSEO request failed (${category}): HTTP ${res.status}${suffix}`,
+        { status: res.status },
+      );
     }
 
     const body = (await res.json()) as {
