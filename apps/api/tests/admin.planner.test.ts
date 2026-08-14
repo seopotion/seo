@@ -18,7 +18,7 @@ const repos = vi.hoisted(() => ({
 vi.mock('@shared/db', () => repos);
 
 const { enqueueGenerateTask } = vi.hoisted(() => ({ enqueueGenerateTask: vi.fn() }));
-vi.mock('../src/clients/sqs', () => ({ enqueueGenerateTask, enqueueStrategyTask: vi.fn() }));
+vi.mock('../src/clients/sqs', () => ({ enqueueGenerateTask }));
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';

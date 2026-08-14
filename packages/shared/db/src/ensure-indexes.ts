@@ -84,4 +84,6 @@ export async function ensureIndexes(): Promise<void> {
   // Admin audit log (epic #150): per-org history (newest first) + global feed.
   await db.collection('admin_actions').createIndex({ org_id: 1, at: -1 });
   await db.collection('admin_actions').createIndex({ at: -1 });
+  // Strategy runs are looked up per org, newest first (#56).
+  await db.collection('strategy_runs').createIndex({ org_id: 1, created_at: -1 });
 }

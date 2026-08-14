@@ -1,5 +1,5 @@
 import type { PipelineInput } from '@shared/keywords';
-import { runKeywordPipeline } from '@shared/keywords';
+import { PlanCoverageError, PlanParseError, runKeywordPipeline } from '@shared/keywords';
 import type {
   DataForSeoClient,
   KeywordMetric,
@@ -25,42 +25,23 @@ const metric = (keyword: string, over: Partial<KeywordMetric> = {}): KeywordMetr
 const serp = (domains: string[]): SerpResult[] =>
   domains.map((d, i) => ({ rank: i + 1, url: `https://${d}/p${i}`, domain: d, title: `t${i}` }));
 
-/** One suitable verdict per `Keyword <i>:` block the judge prompt carries. */
-function judgeAll(userContent: string): string {
-  const count = (userContent.match(/^Keyword \d+:/gm) ?? []).length;
-  return JSON.stringify({
-    judgments: Array.from({ length: count }, (_, index) => ({
-      index,
-      intentSuitable: true,
-      localitySuitable: true,
-      reason: null,
-    })),
-  });
-}
-
+/** The "N. text" lines a numbered prompt section carries, in order. Shared by
+ * the relevance prompt's keyword list and the plan prompt's candidate list. */
 const numberedKeywords = (userContent: string): string[] =>
   [...userContent.matchAll(/^\d+\. (.+)$/gm)].map((match) => match[1] as string);
 
-function topicResponse(userContent: string): string {
-  const indices = userContent
-    .split('\n')
-    .filter((line) => line.startsWith('{"index":'))
-    .map((line) => (JSON.parse(line) as { index: number }).index);
+/** One accepted verdict per candidate, alternating article_type; no targets — every
+ * accepted candidate becomes its own singleton pillar unless a test overrides this. */
+function defaultPlanResponse(userContent: string): string {
+  const keywords = numberedKeywords(userContent);
   return JSON.stringify({
-    clusters:
-      indices.length === 0
-        ? []
-        : [
-            {
-              label: 'Dog food',
-              pillar_index: indices[0],
-              targets: indices.map((index) => ({
-                primary_index: index,
-                member_indices: [index],
-                content_focus: `Article target ${index}`,
-              })),
-            },
-          ],
+    verdicts: keywords.map((_keyword, index) => ({
+      index,
+      intent_ok: true,
+      locality_ok: true,
+      article_type: index % 2 === 0 ? 'listicle' : 'product_guide',
+    })),
+    targets: [],
   });
 }
 
@@ -78,16 +59,8 @@ function fakeLlm(): LlmClient {
             relevance: Math.max(0.1, 0.9 - index * 0.1),
           })),
         });
-      } else if (sys.includes('could rank')) text = judgeAll(messages[1]!.content);
-      else if (sys.includes('Classify each keyword')) {
-        text = JSON.stringify({
-          types: numberedKeywords(messages[1]!.content).map((_keyword, index) => ({
-            index,
-            article_type: index === 0 ? 'listicle' : 'product_guide',
-          })),
-        });
-      } else if (sys.includes('Assign the candidates to broad topic clusters'))
-        text = topicResponse(messages[1]!.content);
+      } else if (sys.includes('building a content plan'))
+        text = defaultPlanResponse(messages[1]!.content);
       return {
         text,
         model: 'm',
@@ -143,7 +116,7 @@ const input = (): PipelineInput => ({
 });
 
 describe('runKeywordPipeline', () => {
-  it('produces accepted, classified candidates and records rejections with reasons', async () => {
+  it('produces accepted candidates and records rejections with reasons', async () => {
     const { candidates, stats } = await runKeywordPipeline(input());
 
     const brand = candidates.find((c) => c.keyword === 'acme login');
@@ -201,11 +174,11 @@ describe('runKeywordPipeline', () => {
       expect.objectContaining({ keyword: 'dog food' }),
     );
     expect(serpGoogleOrganic).toHaveBeenCalledTimes(2);
-    const topicCalls = complete.mock.calls.filter(([params]) =>
-      params.messages[0]!.content.includes('Assign the candidates to broad topic clusters'),
+    const planCalls = complete.mock.calls.filter(([params]) =>
+      params.messages[0]!.content.includes('building a content plan'),
     );
-    expect(topicCalls).toHaveLength(1);
-    expect(topicCalls[0]![0].messages.map((message) => message.content).join('\n')).not.toMatch(
+    expect(planCalls).toHaveLength(1);
+    expect(planCalls[0]![0].messages.map((message) => message.content).join('\n')).not.toMatch(
       /comp\.com|competitor/i,
     );
     expect(stats.accepted).toBe(2);
@@ -225,7 +198,7 @@ describe('runKeywordPipeline', () => {
     ]);
   });
 
-  it('replaces lexical and SERP duplicate gates with one post-classification topic assignment', async () => {
+  it('groups candidates into content targets via the plan call, rejecting duplicates within a cluster', async () => {
     const lexicalVariants = [
       metric('guide to membrane fouling', {
         difficulty: null,
@@ -268,31 +241,36 @@ describe('runKeywordPipeline', () => {
     const complete = vi.fn(async (params: Parameters<LlmClient['complete']>[0]) => {
       const system = params.messages[0]!.content;
       stageOrder.push(system);
-      if (!system.includes('Assign the candidates to broad topic clusters')) {
+      if (!system.includes('building a content plan')) {
         return baseLlm.complete(params);
       }
+      // Indices follow the ranked order the pool reaches the plan call in: the
+      // two lexical variants of "membrane fouling" are highest-ranked (0, 1),
+      // "prevent membrane fouling" is index 2.
       return {
         text: JSON.stringify({
-          clusters: [
+          verdicts: [0, 1, 2].map((index) => ({
+            index,
+            intent_ok: true,
+            locality_ok: true,
+            article_type: 'other',
+          })),
+          targets: [
             {
-              label: 'Membrane fouling',
-              pillar_index: 0,
-              targets: [
-                {
-                  primary_index: 0,
-                  member_indices: [0, 1],
-                  content_focus: 'What membrane fouling is and why it occurs',
-                },
-                {
-                  primary_index: 2,
-                  member_indices: [2],
-                  content_focus: 'How operators can prevent membrane fouling',
-                },
-              ],
+              cluster: 'Membrane fouling',
+              member_indices: [0, 1],
+              content_focus: 'What membrane fouling is and why it occurs',
+              is_pillar: true,
+            },
+            {
+              cluster: 'Membrane fouling',
+              member_indices: [2],
+              content_focus: 'How operators can prevent membrane fouling',
+              is_pillar: false,
             },
           ],
         }),
-        model: 'topic-model',
+        model: 'plan-model',
         usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null },
       };
     });
@@ -306,7 +284,7 @@ describe('runKeywordPipeline', () => {
         audience: { ...base.presets.audience, competitors: [] },
       },
       clients: { dataForSeo, llm: { complete } },
-      config: { models: { topicClusters: 'custom-topic-model' } },
+      config: { models: { plan: 'custom-plan-model' } },
     });
 
     expect(rankedKeywords).not.toHaveBeenCalled();
@@ -327,25 +305,23 @@ describe('runKeywordPipeline', () => {
     expect(relevancePrompt).toContain('guide to membrane fouling');
     expect(relevancePrompt).toContain('membrane fouling guide');
 
-    const topicCalls = complete.mock.calls.filter(([params]) =>
-      params.messages[0]!.content.includes('Assign the candidates to broad topic clusters'),
+    const planCalls = complete.mock.calls.filter(([params]) =>
+      params.messages[0]!.content.includes('building a content plan'),
     );
-    expect(topicCalls).toHaveLength(1);
-    expect(topicCalls[0]![0]).toMatchObject({
-      model: 'custom-topic-model',
+    expect(planCalls).toHaveLength(1);
+    expect(planCalls[0]![0]).toMatchObject({
+      model: 'custom-plan-model',
       temperature: 0,
       responseFormat: 'json',
     });
-    const topicPrompt = topicCalls[0]![0].messages.map((message) => message.content).join('\n');
-    expect(topicPrompt).toContain('guide to membrane fouling');
-    expect(topicPrompt).toContain('membrane fouling guide');
-    expect(topicPrompt).toContain('"serp_url_overlap":1');
-    expect(topicPrompt).not.toMatch(/shared-a\.com|competitor/i);
-    expect(stageOrder.findIndex((stage) => stage.includes('Classify each keyword'))).toBeLessThan(
-      stageOrder.findIndex((stage) =>
-        stage.includes('Assign the candidates to broad topic clusters'),
-      ),
-    );
+    const planPrompt = planCalls[0]![0].messages.map((message) => message.content).join('\n');
+    expect(planPrompt).toContain('guide to membrane fouling');
+    expect(planPrompt).toContain('membrane fouling guide');
+    expect(planPrompt).toContain('"serp_url_overlap":1');
+    expect(planPrompt).not.toMatch(/competitor/i);
+    expect(
+      stageOrder.findIndex((stage) => stage.includes('building a content plan')),
+    ).toBeGreaterThan(stageOrder.findIndex((stage) => stage.includes('Score each keyword')));
 
     expect(candidates.map((candidate) => candidate.keyword)).toEqual([
       'guide to membrane fouling',
@@ -383,12 +359,15 @@ describe('runKeywordPipeline', () => {
     });
     expect(stats).toMatchObject({
       serpChecked: 3,
-      serpValidated: 3,
+      serpFetched: 3,
+      authorityRejected: 0,
+      serpValidated: 2,
       accepted: 2,
-      topicClustering: {
-        candidates: 3,
-        clusters: 1,
+      plan: {
+        finalists: 3,
+        verdicts: 3,
         targets: 2,
+        clusters: 1,
         duplicates: 1,
         pillars: 1,
         supports: 1,
@@ -415,7 +394,7 @@ describe('runKeywordPipeline', () => {
     expect(pinned.stats.seeds).toEqual(['pinned seed']);
   });
 
-  it('uses Haiku by default for classification and topic clustering', async () => {
+  it('uses Haiku by default for the plan call, and no default for seeds/relevance', async () => {
     const base = fakeLlm();
     const complete = vi.fn(base.complete);
 
@@ -430,11 +409,7 @@ describe('runKeywordPipeline', () => {
 
     expect(modelFor('seed keywords')).toBeUndefined();
     expect(modelFor('Score each keyword')).toBeUndefined();
-    expect(modelFor('could rank')).toBeUndefined();
-    expect(modelFor('Classify each keyword')).toBe('anthropic/claude-haiku-4.5');
-    expect(modelFor('Assign the candidates to broad topic clusters')).toBe(
-      'anthropic/claude-haiku-4.5',
-    );
+    expect(modelFor('building a content plan')).toBe('anthropic/claude-haiku-4.5');
   });
 
   it('is deterministic for fixed provider responses', async () => {
@@ -477,7 +452,7 @@ describe('runKeywordPipeline', () => {
         clients: { dataForSeo, llm: { complete } },
         config: { serpTopN: 151 },
       }),
-    ).rejects.toThrow(/serpTopN 151 exceeds the topic-clustering maximum of 150/);
+    ).rejects.toThrow(/serpTopN 151 exceeds the plan-call maximum of 150/);
 
     expect(complete).not.toHaveBeenCalled();
     expect(dataForSeo.keywordsForSite).not.toHaveBeenCalled();
@@ -511,10 +486,10 @@ describe('runKeywordPipeline', () => {
   it('accepts the configured 150-candidate semantic bound', async () => {
     const { stats } = await runKeywordPipeline({ ...input(), config: { serpTopN: 150 } });
     expect(stats.serpChecked).toBe(2);
-    expect(stats.topicClustering.candidates).toBe(2);
+    expect(stats.plan.finalists).toBe(2);
   });
 
-  it('distinguishes SERP checked from validated before topic-clustering counts', async () => {
+  it('distinguishes SERP checked from validated before the plan call', async () => {
     const base = input();
     const dataForSeo = {
       ...fakeDataForSeo(),
@@ -539,16 +514,11 @@ describe('runKeywordPipeline', () => {
 
     expect(stats).toMatchObject({
       serpChecked: 2,
+      serpFetched: 2,
+      authorityRejected: 1,
       serpValidated: 1,
       accepted: 1,
-      topicClustering: {
-        candidates: 1,
-        clusters: 1,
-        targets: 1,
-        duplicates: 0,
-        pillars: 1,
-        supports: 0,
-      },
+      plan: { finalists: 1, targets: 1, clusters: 1, duplicates: 0, pillars: 1, supports: 0 },
     });
     expect(
       candidates.find((candidate) => candidate.keyword === 'authority research'),
@@ -559,12 +529,11 @@ describe('runKeywordPipeline', () => {
     });
   });
 
-  it('stamps serp_validated only on candidates that passed SERP validation', async () => {
+  it('stamps serp_validated only on candidates the plan call accepted', async () => {
     const { candidates } = await runKeywordPipeline({ ...input(), config: { serpTopN: 1 } });
     const validated = candidates.filter((c) => c.serp_validated);
     expect(validated.map((c) => c.keyword)).toEqual(['cheap dog food']);
-    // The below-N survivor is unrejected but unvalidated — the tier that used to
-    // backfill the plan (#211).
+    // The below-N survivor never reaches SERP fetch or the plan call.
     const belowN = candidates.find((c) => c.keyword === 'dog food delivery');
     expect(belowN).toMatchObject({
       rejection_reason: null,
@@ -718,61 +687,64 @@ describe('runKeywordPipeline', () => {
       expect(unscored).toMatchObject({ relevance_score: null, rejection_reason: null });
     });
 
-    it('FAILS the run when the SERP judge answers nothing, rather than accepting every keyword fail-open', async () => {
-      await expect(runWith(llmWith('could rank', ''))).rejects.toThrow(
-        /SERP judge LLM answered only 0 of 2 keywords/,
-      );
+    it('FAILS the run when the plan call answers nothing on both attempts', async () => {
+      await expect(runWith(llmWith('building a content plan', ''))).rejects.toThrow(PlanParseError);
     });
 
-    // Coverage is fine, every stage answered — but nothing survived. A plan with
-    // no entries is still a failed run, not a successful empty one.
-    it('FAILS the run when every candidate is rejected and the plan would be empty', async () => {
-      const rejectAll = llmWith(
-        'could rank',
+    it('FAILS the run when the plan call under-judges the pool on both attempts', async () => {
+      // 3 finalists so a single verdict (33%) is below minLlmCoverage without
+      // hitting the zero-verdicts ParseError path.
+      const dataForSeo = {
+        ...fakeDataForSeo(),
+        keywordsForSite: async () => [metric('kw one'), metric('kw two'), metric('kw three')],
+        rankedKeywords: async () => [],
+        keywordSuggestions: async () => [],
+      };
+      const llm = llmWith(
+        'building a content plan',
         JSON.stringify({
-          judgments: [0, 1].map((index) => ({
+          verdicts: [{ index: 0, intent_ok: true, locality_ok: true, article_type: 'other' }],
+          targets: [],
+        }),
+      );
+      const base = input();
+      await expect(
+        runKeywordPipeline({
+          ...base,
+          competitors: [],
+          presets: { ...base.presets, audience: { ...base.presets.audience, competitors: [] } },
+          clients: { dataForSeo, llm },
+        }),
+      ).rejects.toThrow(PlanCoverageError);
+    });
+
+    // The intentional behaviour change from the old classify+cluster pipeline:
+    // a FULLY judged pool that the model explicitly rejected end to end is a
+    // legitimate empty plan, not a failure — unlike an under-answered stage,
+    // nothing here was left unjudged.
+    // #211's stance: "gathered keywords but accepted none" is a failed stage
+    // wearing an empty plan, and it must never reach the persist stage
+    // silently — even when every candidate was fully judged and explicitly
+    // rejected, not merely under-answered.
+    it('FAILS the run when the model explicitly rejects every candidate, leaving nothing accepted', async () => {
+      const rejectAll = llmWith(
+        'building a content plan',
+        JSON.stringify({
+          verdicts: [0, 1].map((index) => ({
             index,
-            intentSuitable: false,
-            localitySuitable: true,
-            reason: 'product pages',
+            intent_ok: false,
+            locality_ok: true,
+            article_type: 'other',
           })),
+          targets: [],
         }),
       );
       await expect(runWith(rejectAll)).rejects.toThrow(
-        /gathered \d+ keywords but accepted 0, so the plan would be empty/,
+        /strategy aborted: 2 finalists reached the plan call but 0 were accepted/,
       );
     });
 
-    it('fails the pipeline on invalid or incomplete topic-cluster output', async () => {
-      await expect(
-        runWith(llmWith('Assign the candidates to broad topic clusters', '{"clusters":[]}')),
-      ).rejects.toThrow(/no clusters; covered 0\/2 candidate indexes/i);
-
-      await expect(
-        runWith(
-          llmWith(
-            'Assign the candidates to broad topic clusters',
-            JSON.stringify({
-              clusters: [
-                {
-                  label: 'Dog food',
-                  pillar_index: 0,
-                  targets: [
-                    {
-                      primary_index: 0,
-                      member_indices: [0],
-                      content_focus: 'Dog food overview',
-                    },
-                  ],
-                },
-              ],
-            }),
-          ),
-        ),
-      ).rejects.toThrow(/Missing candidate indexes \[1\]; covered 1\/2/i);
-    });
-
-    it('does not fire the empty-plan guard when nothing was gathered at all', async () => {
+    it('does not fire the empty-pool guard when nothing was gathered at all, and skips the plan call', async () => {
       const empty = {
         keywordsForSite: async () => [],
         rankedKeywords: async () => [],
@@ -787,17 +759,10 @@ describe('runKeywordPipeline', () => {
         clients: { dataForSeo: empty, llm: { complete } },
       });
       expect(stats).toMatchObject({ gathered: 0, accepted: 0 });
-      expect(stats.topicClustering).toEqual({
-        candidates: 0,
-        clusters: 0,
-        targets: 0,
-        duplicates: 0,
-        pillars: 0,
-        supports: 0,
-      });
+      expect(stats.plan).toMatchObject({ finalists: 0, accepted: 0, targets: 0, clusters: 0 });
       expect(
         complete.mock.calls.some(([params]) =>
-          params.messages[0]!.content.includes('Assign the candidates to broad topic clusters'),
+          params.messages[0]!.content.includes('building a content plan'),
         ),
       ).toBe(false);
     });

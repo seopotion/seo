@@ -147,3 +147,36 @@ export const CreateCandidateInput = CandidateSchema.omit({
 // are optional in the type, matching the runtime contract: callers pass only
 // org_id/keyword/source and the schema fills in the rest on `.parse()`.
 export type CreateCandidateInput = z.input<typeof CreateCandidateInput>;
+
+/**
+ * A candidate as it flows through the strategy pipeline stages (#56 rearchitect).
+ * Zod (not a bare interface) because stage state is checkpointed into the
+ * `strategy_runs` collection and parsed back at the boundary on resume.
+ */
+export const WorkingCandidateSchema = z.object({
+  keyword: z.string(),
+  normalized: z.string(),
+  source: z.enum(CANDIDATE_SOURCES),
+  source_context: z.string().nullable().default(null),
+  core_keyword: z.string().nullable().default(null),
+  category_ids: z.array(z.number().int()).default([]),
+  topic_cluster_id: z.string().nullable().default(null),
+  topic_cluster_label: z.string().nullable().default(null),
+  topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
+  topic_content_focus: z.string().nullable().default(null),
+  topic_primary_keyword: z.string().nullable().default(null),
+  search_volume: z.number().int().nullable().default(null),
+  difficulty: z.number().int().nullable().default(null),
+  cpc: z.number().nullable().default(null),
+  competition: z.number().nullable().default(null),
+  trend: z.number().nullable().default(null),
+  intent: z.enum(SEARCH_INTENTS).nullable().default(null),
+  relevance_score: z.number().nullable().default(null),
+  opportunity_score: z.number().nullable().default(null),
+  article_type: z.enum(ARTICLE_TYPES).nullable().default(null),
+  rejection_reason: z.enum(REJECTION_REASONS).nullable().default(null),
+  status: z.enum(CANDIDATE_STATUSES).default('candidate'),
+  serp_competitors: SerpCompetitorsField,
+  serp_validated: z.boolean().default(false),
+});
+export type WorkingCandidate = z.infer<typeof WorkingCandidateSchema>;

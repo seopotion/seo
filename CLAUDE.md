@@ -134,6 +134,8 @@ The HS256 signing secret is resolved by `getJwtSecret()` (`auth/secret.ts`): dep
 
 `POST /setup/start_scan` creates the org (`setup_scan_in_progress`) and enqueues a scan task to SQS via `apps/api/src/clients/sqs.ts`; the scanner worker (`apps/worker`) consumes it and advances the org to `setup_scan_completed`. The queue message is the shared `ScanTask` Zod schema (`@shared/schemas`) — the API builds it, the worker validates it on read with `ScanTask.parse`. The frontend learns completion by polling `GET /setup/status`, not from the `start_scan` response.
 
+The strategy job (30-day content plan) has a different shape: it's a Step Functions state machine over Mongo-checkpointed `strategy_runs` docs, launched by `@shared/strategy`'s `launchStrategy` — no SQS queue.
+
 ### Data layer (Zod + official mongodb driver, no Mongoose)
 
 - `@shared/schemas` (Zod) is the single source of truth for entity shapes; API request/response schemas in `apps/api/src/schemas/` derive from / reuse them.

@@ -1,4 +1,3 @@
-import type { SetupPresets } from '@shared/schemas';
 import { expect, test, vi } from 'vitest';
 import { validateSerp } from '../src/serp';
 import type { ResolvedConfig, WorkingCandidate } from '../src/types';
@@ -49,29 +48,8 @@ test('accepted candidates carry the top-K SERP entries', async () => {
       { rank: 4, url: 'https://d.com/1', domain: 'd.com', title: 'D' },
     ]),
   };
-  const llm = {
-    complete: vi.fn(async () => ({ text: '{"intentSuitable":true,"localitySuitable":true}' })),
-  };
-  const presets = {
-    business: { name: 'X', language: 'English', country: 'United States', description: 'd' },
-    audience: { target: ['t'], competitors: [] },
-    blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
-    article_preferences: {
-      content_seo: {
-        article_style: '',
-        internal_links_count: 0,
-        table_of_contents: true,
-        llm_instructions: '',
-      },
-      engagement: { image_style: '', youtube_videos: true },
-      publishing: { auto_publish: false },
-    },
-  } satisfies SetupPresets;
-
   const { accepted } = await validateSerp([candidate('best crm')], {
     dataForSeo: dataForSeo as never,
-    llm: llm as never,
-    presets,
     config,
   });
   expect(accepted[0]!.serp_competitors).toEqual([

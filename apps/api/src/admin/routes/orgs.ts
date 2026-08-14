@@ -9,7 +9,8 @@ import {
   UserRepo,
 } from '@shared/db';
 import { isPaid } from '@shared/schemas';
-import { enqueueScanTask, enqueueStrategyTask } from '../../clients/sqs';
+import { launchStrategy } from '@shared/strategy';
+import { enqueueScanTask } from '../../clients/sqs';
 import { testWordPressIntegration } from '../../clients/wordpress';
 import { mergePresets } from '../../lib/merge-presets';
 import { audit } from '../audit';
@@ -159,7 +160,7 @@ const orgs = new OpenAPIHono<AdminEnv>()
         (await OrgRepo.claimStrategy(org.id))
       ) {
         try {
-          await enqueueStrategyTask({ org_id: org.id });
+          await launchStrategy(org.id);
           strategy_kicked = true;
         } catch (err) {
           await OrgRepo.setStrategyStatus(org.id, 'failed');
@@ -296,7 +297,7 @@ const orgs = new OpenAPIHono<AdminEnv>()
         return c.json({ error: 'strategy_not_claimable' }, 409);
       }
       try {
-        await enqueueStrategyTask({ org_id: org.id });
+        await launchStrategy(org.id);
       } catch (err) {
         // Revert the claim so a retry can reclaim (same as the plan route).
         await OrgRepo.setStrategyStatus(org.id, 'failed');

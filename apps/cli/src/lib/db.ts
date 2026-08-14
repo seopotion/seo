@@ -28,6 +28,7 @@ import {
   createOpenRouterClient,
   resolveProviderSecret,
 } from '@shared/providers';
+import { createStrategyRun, launchStrategy, runLocalStrategy } from '@shared/strategy';
 import { ENTITLEMENT_PLANS, type EntitlementPlan } from '@shared/types';
 import {
   type DbInitData,
@@ -39,6 +40,7 @@ import {
   type SetPlanData,
   type StrategyAuditData,
   type StrategyDryRunData,
+  type StrategyRunData,
 } from '../types';
 import { buildStrategyAudit } from './strategy-audit';
 import { buildDryRunReport, LAMBDA_BUDGET_MS } from './strategy-dryrun';
@@ -144,19 +146,24 @@ export async function setOrgPlan(input: {
     if (!matched) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
 
     // Flipping the plan alone doesn't start anything: the keyword/article
-    // pipeline is only ever bootstrapped by the strategy worker, which
-    // POST /setup/finalize enqueues for orgs paid *at finalize time*. Escalating
+    // pipeline is only ever bootstrapped by the strategy launcher, which
+    // POST /setup/finalize triggers for orgs paid *at finalize time*. Escalating
     // to paid afterwards would otherwise leave the org permanently dormant, so
     // kick off the strategy here the same way finalize does — claimStrategy keeps
     // it to exactly one job across retries / a later re-finalize.
+    // Field/code names predate the SQS→SFN switch (#56) — kept as-is (surgical
+    // changes: nothing here forces a rename) even though "enqueued" no longer
+    // literally describes launchStrategy's in-process/SFN dispatch.
     let strategyEnqueued = false;
     if (plan === 'paid' || plan === 'expert') {
       const org = await OrgRepo.findById(orgId);
       const finalized = org?.setup_status === 'setup_complete' && !!org.presets;
       if (finalized && (await OrgRepo.claimStrategy(orgId))) {
         try {
-          const { enqueueStrategyTask } = await import('./sqs');
-          await enqueueStrategyTask({ org_id: orgId });
+          // wait: true — the CLI process exits (and closeDb() runs) right after
+          // this returns, which would otherwise race a fire-and-forget local run
+          // (final-review finding 3).
+          await launchStrategy(orgId, { wait: true });
           strategyEnqueued = true;
         } catch (e) {
           // The claim already flipped strategy_status to `pending`; revert it so
@@ -165,8 +172,8 @@ export async function setOrgPlan(input: {
           await OrgRepo.setStrategyStatus(orgId, 'failed');
           return fail(
             'STRATEGY_ENQUEUE_FAILED',
-            `Plan set to paid, but enqueueing the strategy task failed: ${(e as Error).message}`,
-            'Is STRATEGY_QUEUE_URL set (and SQS reachable)? Re-run set-plan to retry.',
+            `Plan set to paid, but launching the strategy run failed: ${(e as Error).message}`,
+            'Re-run set-plan to retry.',
           );
         }
       }
@@ -414,6 +421,32 @@ export async function strategyDryRun(input: {
         },
       }),
     );
+  } finally {
+    await closeDb();
+  }
+}
+
+/**
+ * Create and execute a REAL strategy run for one org, in-process (#56): persists
+ * candidates, schedules planner entries, writes a strategy_runs doc. The recovery
+ * path for a failed org — unlike setOrgPlan's kickoff, NOT gated by claimStrategy,
+ * so it can re-run an org regardless of strategy_status. Needs Mongo + provider
+ * credentials in the environment.
+ */
+export async function strategyRun(input: { orgId: string }): Promise<Result<StrategyRunData>> {
+  try {
+    const org = await OrgRepo.findById(input.orgId);
+    if (!org) return fail('ORG_NOT_FOUND', `No org with id "${input.orgId}".`);
+    if (!org.presets) {
+      return fail(
+        'ORG_NOT_FINALIZED',
+        `Org "${org.id}" has no presets, so the strategy job would skip it entirely.`,
+      );
+    }
+
+    const run = await createStrategyRun(org.id);
+    await runLocalStrategy(run.id);
+    return ok({ run_id: run.id });
   } finally {
     await closeDb();
   }

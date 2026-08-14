@@ -18,11 +18,11 @@ const repos = vi.hoisted(() => ({
 }));
 vi.mock('@shared/db', () => repos);
 
-const { enqueueStrategyTask, enqueueScanTask } = vi.hoisted(() => ({
-  enqueueStrategyTask: vi.fn(),
-  enqueueScanTask: vi.fn(),
-}));
-vi.mock('../src/clients/sqs', () => ({ enqueueStrategyTask, enqueueScanTask }));
+const { enqueueScanTask } = vi.hoisted(() => ({ enqueueScanTask: vi.fn() }));
+vi.mock('../src/clients/sqs', () => ({ enqueueScanTask }));
+
+const { launchStrategy } = vi.hoisted(() => ({ launchStrategy: vi.fn() }));
+vi.mock('@shared/strategy', () => ({ launchStrategy }));
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
@@ -53,7 +53,7 @@ beforeEach(() => {
   repos.OrgRepo.setPlan.mockResolvedValue(true);
   repos.OrgRepo.claimStrategy.mockResolvedValue(true);
   repos.AdminActionRepo.insert.mockResolvedValue({});
-  enqueueStrategyTask.mockResolvedValue(undefined);
+  launchStrategy.mockResolvedValue({ run_id: 'run_1' });
 });
 
 describe('POST /admin/v0/orgs/{org_id}/plan', () => {
@@ -66,7 +66,7 @@ describe('POST /admin/v0/orgs/{org_id}/plan', () => {
 
     expect(repos.OrgRepo.setPlan).toHaveBeenCalledWith(baseOrg.id, 'expert');
     expect(repos.OrgRepo.claimStrategy).toHaveBeenCalledWith(baseOrg.id);
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    expect(launchStrategy).toHaveBeenCalledWith(baseOrg.id);
   });
 
   test('writes one audit row with actor, action and a before snapshot', async () => {
@@ -100,7 +100,7 @@ describe('POST /admin/v0/orgs/{org_id}/plan', () => {
     const res = await setPlan(org.id, plan);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ plan, strategy_kicked: false });
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 
   test('no strategy kick when the claim loses', async () => {
@@ -110,12 +110,12 @@ describe('POST /admin/v0/orgs/{org_id}/plan', () => {
     const res = await setPlan(baseOrg.id, 'paid');
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ plan: 'paid', strategy_kicked: false });
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
   });
 
   test('reverts the claim and rethrows on enqueue failure (and audits nothing)', async () => {
     repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
-    enqueueStrategyTask.mockRejectedValueOnce(new Error('sqs down'));
+    launchStrategy.mockRejectedValueOnce(new Error('strategy launch failed'));
 
     const res = await setPlan(baseOrg.id, 'expert');
     expect(res.status).toBe(500);
@@ -155,7 +155,7 @@ describe('POST /admin/v0/orgs/{org_id}/strategy', () => {
     const res = await runStrategy(baseOrg.id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ strategy_status: 'pending' });
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    expect(launchStrategy).toHaveBeenCalledWith(baseOrg.id);
     // Non-force never touches the status ahead of the claim.
     expect(repos.OrgRepo.setStrategyStatus).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
@@ -170,13 +170,13 @@ describe('POST /admin/v0/orgs/{org_id}/strategy', () => {
     const res = await runStrategy(baseOrg.id);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'strategy_not_claimable' });
-    expect(enqueueStrategyTask).not.toHaveBeenCalled();
+    expect(launchStrategy).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 
   test('enqueue failure reverts the claim and 500s', async () => {
     repos.OrgRepo.findById.mockResolvedValueOnce(baseOrg);
-    enqueueStrategyTask.mockRejectedValueOnce(new Error('sqs down'));
+    launchStrategy.mockRejectedValueOnce(new Error('strategy launch failed'));
 
     const res = await runStrategy(baseOrg.id);
     expect(res.status).toBe(500);
@@ -197,7 +197,7 @@ describe('POST /admin/v0/orgs/{org_id}/strategy', () => {
     const claimOrder = repos.OrgRepo.claimStrategy.mock.invocationCallOrder[0] ?? 0;
     expect(repos.OrgRepo.setStrategyStatus).toHaveBeenCalledWith(baseOrg.id, 'failed');
     expect(resetOrder).toBeLessThan(claimOrder);
-    expect(enqueueStrategyTask).toHaveBeenCalledWith({ org_id: baseOrg.id });
+    expect(launchStrategy).toHaveBeenCalledWith(baseOrg.id);
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'org.strategy_force_rerun', payload: { force: true } }),
     );

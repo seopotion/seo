@@ -24,7 +24,6 @@ vi.mock('../src/clients/sqs', () => ({
   enqueueImageTask,
   enqueueGenerateTask: vi.fn(),
   enqueueScanTask: vi.fn(),
-  enqueueStrategyTask: vi.fn(),
 }));
 
 import { testClient } from 'hono/testing';

@@ -12,6 +12,7 @@
     "@shared/keywords": "*",
     "@shared/providers": "*",
     "@shared/schemas": "*",
+    "@shared/strategy": "*",
     "citty": "^0.1.6"
   }
 }

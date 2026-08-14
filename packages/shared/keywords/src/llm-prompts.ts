@@ -1,4 +1,4 @@
-import type { LlmMessage, SerpResult } from '@shared/providers';
+import type { LlmMessage } from '@shared/providers';
 import {
   ARTICLE_TYPES,
   type ArticleType,
@@ -6,7 +6,6 @@ import {
   type SetupPresets,
 } from '@shared/schemas';
 import { parseJsonResponse } from './json-response';
-import type { ClassificationCoverage } from './types';
 
 const ARTICLE_TYPE_SET = new Set<string>(ARTICLE_TYPES);
 
@@ -127,102 +126,7 @@ export function parseRelevance(
   return { scores: out, parsed: out.size > 0 };
 }
 
-// ---- SERP judgment ----
-export interface SerpJudgment {
-  intentSuitable: boolean;
-  localitySuitable: boolean;
-  reason: string | null;
-}
-
-/** What an unanswered keyword gets: the long-standing fail-OPEN policy (#211). */
-export const FAIL_OPEN_JUDGMENT: SerpJudgment = {
-  intentSuitable: true,
-  localitySuitable: true,
-  reason: null,
-};
-
-export interface SerpJudgmentItem {
-  keyword: string;
-  serp: SerpResult[];
-}
-
-/**
- * Judge N keywords in one call. The per-keyword round trip was ~30s regardless
- * of how little it had to say, which made the judge ~10m30s of an 11m33s run —
- * the cost is the trip, not the tokens, so the fix is fewer trips (#211).
- *
- * The CRITERIA below are carried over verbatim from the per-keyword prompt: this
- * changes how many keywords one call covers, never what the judge decides. Rows
- * are addressed by index so nothing depends on the model echoing keyword text.
- */
-export function buildSerpJudgmentPrompt(
-  items: SerpJudgmentItem[],
-  presets: SetupPresets,
-): LlmMessage[] {
-  const blocks = items.map((item, i) => {
-    const results = item.serp.map((r) => `${r.rank}. ${r.title} — ${r.domain}`).join('\n');
-    return `Keyword ${i}: ${item.keyword}\nResults:\n${results}`;
-  });
-  return [
-    {
-      role: 'system',
-      content:
-        'Given keywords and their Google results, decide for each if a blog article we write ' +
-        'could rank. ' +
-        'intentSuitable=false if results are product/navigational pages, not informational articles. ' +
-        'localitySuitable=false if results are dominated by local businesses/directories for a ' +
-        'location that does not match the business country. ' +
-        'Judge each keyword independently, on its own results only. ' +
-        'Each keyword is numbered; answer by that index and return one entry for every index. ' +
-        'Respond ONLY with JSON: {"judgments":[{"index":number,"intentSuitable":boolean,' +
-        '"localitySuitable":boolean,"reason":string}]}.',
-    },
-    { role: 'user', content: `${businessContext(presets)}\n\n${blocks.join('\n\n')}` },
-  ];
-}
-
-/**
- * One verdict per input, in input order. A row the model omitted or mangled
- * degrades to the fail-open default for THAT keyword only — a single malformed
- * body must not decide the whole batch. `unparseable` counts them, and
- * `parsed === false` marks a body that yielded nothing at all.
- */
-export function parseSerpJudgments(
-  text: string,
-  count: number,
-): { judgments: SerpJudgment[]; unparseable: number; parsed: boolean } {
-  const out = new Array<SerpJudgment>(count).fill(FAIL_OPEN_JUDGMENT);
-  const seen = new Set<number>();
-  const parsed = parseJsonResponse(text) as {
-    judgments?: Array<{
-      index?: unknown;
-      intentSuitable?: unknown;
-      localitySuitable?: unknown;
-      reason?: unknown;
-    }>;
-  } | null;
-  for (const row of parsed?.judgments ?? []) {
-    if (
-      typeof row.index !== 'number' ||
-      !Number.isInteger(row.index) ||
-      row.index < 0 ||
-      row.index >= count ||
-      typeof row.intentSuitable !== 'boolean' ||
-      typeof row.localitySuitable !== 'boolean'
-    ) {
-      continue;
-    }
-    out[row.index] = {
-      intentSuitable: row.intentSuitable,
-      localitySuitable: row.localitySuitable,
-      reason: typeof row.reason === 'string' ? row.reason : null,
-    };
-    seen.add(row.index);
-  }
-  return { judgments: out, unparseable: count - seen.size, parsed: seen.size > 0 };
-}
-
-// ---- classification ----
+// ---- article type ----
 /**
  * Resolve a model-written type to an enum member. Models routinely return
  * "How-To Guide" or "how to guide" for `how_to_guide`, and the old exact-match
@@ -234,83 +138,4 @@ export function toArticleType(raw: string): ArticleType | null {
     .toLowerCase()
     .replace(/[\s-]+/g, '_');
   return ARTICLE_TYPE_SET.has(normalized) ? (normalized as ArticleType) : null;
-}
-
-/**
- * Classify a batch of keywords. Answers are addressed by INDEX rather than by
- * echoing the keyword back: the echo was pure output cost, and on the clewas run
- * asking for 78 of them contributed to the model exhausting its 65k-token output
- * budget mid-reasoning and returning an empty body. The allowed values are
- * spelled as exact literals because the response is matched against them (#211).
- */
-export function buildClassifyPrompt(keywords: string[], presets: SetupPresets): LlmMessage[] {
-  const list = keywords.map((k, i) => `${i}. ${k}`).join('\n');
-  return [
-    {
-      role: 'system',
-      content:
-        'Classify each keyword into exactly one article_type. The allowed values are exactly: ' +
-        `${ARTICLE_TYPES.map((t) => `"${t}"`).join(', ')}. Copy one of those strings verbatim — ` +
-        'do not reword, capitalize or hyphenate it. Use "other" only if none of the others fit. ' +
-        'Each keyword is numbered; answer by that index and do not repeat the keyword text. ' +
-        'Return one entry for every index. Respond ONLY with JSON: ' +
-        '{"types":[{"index":number,"article_type":string}]}.',
-    },
-    { role: 'user', content: `${businessContext(presets)}\n\nKeywords:\n${list}` },
-  ];
-}
-
-/**
- * Type every keyword, seeding `other` for the ones the model did not answer.
- * Rows are read by `index`; a row that echoes a `keyword` instead is still
- * honoured via normalizeKeyword, so a model that ignores the index contract
- * degrades to the old behaviour rather than to silence. The coverage counts are
- * the point: `assigned` well below `sent` is the signal that used to be
- * invisible.
- */
-export function parseClassification(
-  text: string,
-  keywords: string[],
-): { types: Map<string, ArticleType>; coverage: Omit<ClassificationCoverage, 'batches'> } {
-  const out = new Map<string, ArticleType>(keywords.map((k) => [k, 'other']));
-  const byNormalized = new Map(keywords.map((k) => [normalizeKeyword(k), k]));
-  const assigned = new Set<string>();
-  let returned = 0;
-  let matched = 0;
-  let typed = 0;
-
-  const parsed = parseJsonResponse(text) as {
-    types?: Array<{ index?: unknown; keyword?: unknown; article_type?: unknown }>;
-  } | null;
-
-  for (const row of parsed?.types ?? []) {
-    returned++;
-    const keyword =
-      typeof row.index === 'number' && Number.isInteger(row.index)
-        ? keywords[row.index]
-        : typeof row.keyword === 'string'
-          ? byNormalized.get(normalizeKeyword(row.keyword))
-          : undefined;
-    if (keyword !== undefined) matched++;
-
-    const articleType =
-      typeof row.article_type === 'string' ? toArticleType(row.article_type) : null;
-    if (articleType !== null) typed++;
-
-    if (keyword === undefined || articleType === null) continue;
-    out.set(keyword, articleType);
-    assigned.add(keyword);
-  }
-
-  return {
-    types: out,
-    coverage: {
-      sent: keywords.length,
-      returned,
-      matched,
-      typed,
-      assigned: assigned.size,
-      failedBatches: returned === 0 ? 1 : 0,
-    },
-  };
 }

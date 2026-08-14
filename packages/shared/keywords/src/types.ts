@@ -9,35 +9,15 @@ import type {
   SetupPresets,
   TopicRole,
 } from '@shared/schemas';
+import type { PlanCoverage } from './materializer';
 
-/** A candidate as it flows through the pipeline. `normalized` is the dedup key. */
-export interface WorkingCandidate {
-  keyword: string;
-  normalized: string;
-  source: CandidateSource;
-  source_context: string | null;
-  core_keyword: string | null;
-  category_ids: number[];
-  topic_cluster_id: string | null;
-  topic_cluster_label: string | null;
-  topic_role: TopicRole | null;
-  topic_content_focus: string | null;
-  topic_primary_keyword: string | null;
-  search_volume: number | null;
-  difficulty: number | null;
-  cpc: number | null;
-  competition: number | null;
-  trend: number | null;
-  intent: SearchIntent | null;
-  relevance_score: number | null;
-  opportunity_score: number | null;
-  article_type: ArticleType | null;
-  rejection_reason: RejectionReason | null;
-  status: CandidateStatus;
-  serp_competitors: SerpCompetitor[] | null;
-  /** Set by validateSerp on accept; the only candidates strategy may schedule. */
-  serp_validated: boolean;
-}
+/**
+ * A candidate as it flows through the pipeline. `normalized` is the dedup key.
+ * The canonical definition is `@shared/schemas` (Zod, since stage state is
+ * checkpointed into the `strategy_runs` collection); re-exported here so
+ * every module in this package can keep importing it from `./types`.
+ */
+export type { WorkingCandidate } from '@shared/schemas';
 
 /** Pipeline output — assignable to `CreateCandidateInput` (repo derives normalized_keyword). */
 export interface EnrichedCandidate {
@@ -78,16 +58,14 @@ export interface ScoreWeights {
 /**
  * Per-stage model override. Every one of these calls is structured extraction,
  * not reasoning, and it was a reasoning model burning its whole output budget on
- * reasoning tokens that returned the empty classify body (#211) — so the stage a
- * model is used for is worth choosing per stage. Unset means the LlmClient's own
- * default, which keeps behaviour identical to before this existed.
+ * reasoning tokens that returned an empty body (#211) — so the stage a model is
+ * used for is worth choosing per stage. Unset means the LlmClient's own default,
+ * which keeps behaviour identical to before this existed.
  */
 export interface StageModels {
   seeds?: string;
   relevance?: string;
-  serpJudge?: string;
-  classify?: string;
-  topicClusters?: string;
+  plan?: string;
 }
 
 export interface PipelineConfig {
@@ -173,47 +151,6 @@ export interface RelevanceCoverage {
   failedBatches: number;
 }
 
-/**
- * How much of the classify batch the LLM actually answered. Uniform `other` is
- * indistinguishable from a real judgement without these: on the clewas run the
- * single classify call returned an EMPTY body after burning its whole 65k-token
- * output budget on reasoning, and all 78 keywords silently kept
- * parseClassification's `other` seed. `assigned` is the bottom line; the rest
- * say which link in the chain broke (#211).
- */
-export interface ClassificationCoverage {
-  sent: number;
-  /** Rows the model returned across every batch. */
-  returned: number;
-  /** Rows that resolved to one of the sent keywords, by index or by keyword. */
-  matched: number;
-  /** Rows whose article_type normalized to a member of ARTICLE_TYPES. */
-  typed: number;
-  /** Keywords that ended up with a model-assigned type rather than the seed. */
-  assigned: number;
-  batches: number;
-  /** Batches whose body did not parse at all — every keyword in them kept the seed. */
-  failedBatches: number;
-}
-
-/**
- * How much of the SERP intent/locality judgment the LLM actually answered.
- * parseSerpJudgment fails OPEN, so an unanswered keyword is accepted as if it
- * had been judged suitable — `unparseable` is the only way to see it, and
- * batching makes it matter more since one bad body covers N keywords (#211).
- */
-export interface JudgmentCoverage {
-  /** Keywords sent to the judge; authority rejects are gated out before it. */
-  sent: number;
-  /** Keywords the judge returned a parseable verdict for. */
-  returned: number;
-  /** Keywords that fell back to the fail-open default without being judged. */
-  unparseable: number;
-  batches: number;
-  /** Batches whose body did not parse at all — every keyword in them failed open. */
-  failedBatches: number;
-}
-
 export interface PipelineStats {
   gathered: number;
   /**
@@ -232,21 +169,16 @@ export interface PipelineStats {
   afterRelevanceFloor: number;
   /** Candidates sent through SERP validation. */
   serpChecked: number;
+  /** Candidates whose SERP was fetched (authority-gated survivors and rejects alike). */
+  serpFetched: number;
+  /** Candidates rejected by the authority filter before ever reaching the plan call. */
+  authorityRejected: number;
   /** Candidates that passed authority, intent, and locality checks. */
   serpValidated: number;
-  topicClustering: {
-    candidates: number;
-    clusters: number;
-    targets: number;
-    duplicates: number;
-    pillars: number;
-    supports: number;
-  };
   accepted: number;
   rejectedByReason: Record<RejectionReason, number>;
   relevance: RelevanceCoverage;
-  judgment: JudgmentCoverage;
-  classification: ClassificationCoverage;
+  plan: PlanCoverage;
 }
 
 export interface PipelineResult {

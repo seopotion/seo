@@ -1,7 +1,8 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { OrgRepo } from '@shared/db';
 import { isPaid } from '@shared/schemas';
-import { enqueueScanTask, enqueueStrategyTask } from '../clients/sqs';
+import { launchStrategy } from '@shared/strategy';
+import { enqueueScanTask } from '../clients/sqs';
 import { loadOwnedOrg } from '../lib/load-owned-org';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
@@ -206,7 +207,7 @@ const setup = new OpenAPIHono<AuthEnv>()
       // Paid orgs get an automatic 30-day strategy. claimStrategy guarantees
       // exactly one job across finalize retries / re-finalize (#47).
       if (isPaid(org) && (await OrgRepo.claimStrategy(org_id))) {
-        await enqueueStrategyTask({ org_id });
+        await launchStrategy(org_id);
       }
       return c.json({ setup_status: 'setup_complete' as const, presets: merged }, 200);
     },
