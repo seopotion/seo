@@ -13,9 +13,26 @@ import { GITHUB_RETURN_LOCALE_KEY, type GithubRepoSummary } from '@/lib/integrat
 import { cn } from '@/lib/utils';
 
 type RedeemErrorKey = 'cancelled' | 'expired' | 'installationGone' | 'redeemFailed';
-type ConnectErrorKey = 'claimed' | 'connectFailed' | 'noAccess' | 'noWriteAccess';
+type ConnectErrorKey =
+  | 'claimed'
+  | 'connectFailed'
+  | 'invalidPostBase'
+  | 'noAccess'
+  | 'noWriteAccess';
 
 const SETTINGS_HREF = '/settings?tab=integrations';
+
+/** Mirrors the API rule: a slug must be appendable, so no query or fragment. */
+function isValidPostUrlBase(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  const httpish = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  return httpish && !parsed.search && !parsed.hash;
+}
 
 /**
  * GitHub App install callback (#7, design/github-app.md § The install flow).
@@ -38,6 +55,7 @@ function CallbackInner() {
   const [repo, setRepo] = useState<string | null>(null);
   const [branch, setBranch] = useState('');
   const [contentPath, setContentPath] = useState(DEFAULT_CONTENT_PATH);
+  const [postUrlBase, setPostUrlBase] = useState('');
   const [redeemErrorKey, setRedeemErrorKey] = useState<RedeemErrorKey | null>(null);
   const [connectErrorKey, setConnectErrorKey] = useState<ConnectErrorKey | null>(null);
   const [saving, setSaving] = useState(false);
@@ -110,12 +128,23 @@ function CallbackInner() {
   }
 
   async function confirm() {
-    if (!grant || !repo || !branch.trim() || !contentPath.trim() || saving) return;
+    if (!grant || !repo || !branch.trim() || !contentPath.trim() || !postUrlBase.trim() || saving)
+      return;
+    if (!isValidPostUrlBase(postUrlBase.trim())) {
+      setConnectErrorKey('invalidPostBase');
+      return;
+    }
     setSaving(true);
     setConnectErrorKey(null);
 
     const res = await api.api.v0.dashboard.integrations['static-site'].$post({
-      json: { grant, repo, branch: branch.trim(), content_path: contentPath.trim() },
+      json: {
+        grant,
+        repo,
+        branch: branch.trim(),
+        content_path: contentPath.trim(),
+        post_url_base: postUrlBase.trim(),
+      },
     });
     if ((res.status as number) === 401) {
       clearToken();
@@ -252,12 +281,31 @@ function CallbackInner() {
               <p className="text-slate-500 text-xs">{t('contentPathHint')}</p>
             </div>
 
+            <div className="grid gap-2">
+              <Label htmlFor="github-post-url-base">{t('postUrlBase')}</Label>
+              <Input
+                autoComplete="off"
+                disabled={!repo || saving}
+                id="github-post-url-base"
+                onChange={(event) => {
+                  setPostUrlBase(event.target.value);
+                  setConnectErrorKey((key) => (key === 'invalidPostBase' ? null : key));
+                }}
+                placeholder="https://example.com/blog"
+                spellCheck={false}
+                value={postUrlBase}
+              />
+              <p className="text-slate-500 text-xs">{t('postUrlBaseHint')}</p>
+            </div>
+
             {connectErrorKey ? <ErrorPanel>{t(`errors.${connectErrorKey}`)}</ErrorPanel> : null}
 
             <Button
               type="button"
               className="w-fit"
-              disabled={!repo || !branch.trim() || !contentPath.trim() || saving}
+              disabled={
+                !repo || !branch.trim() || !contentPath.trim() || !postUrlBase.trim() || saving
+              }
               onClick={confirm}
             >
               {saving ? t('saving') : t('confirm')}

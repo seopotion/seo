@@ -6,14 +6,15 @@
  * Dry run by default. Published articles that changed are listed in the result
  * so an operator can republish them — this command never publishes anything.
  */
-import { ArticleRepo, closeDb, OrgRepo } from '@shared/db';
+import { ArticleRepo, closeDb, IntegrationRepo, OrgRepo } from '@shared/db';
 import {
   deriveCandidates,
   extractLinks,
   sanitizeLinks,
+  staticSitePostUrl,
   verifyCandidates,
 } from '@shared/generation';
-import { type CleanLinksData, fail, ok, type Result } from '../types';
+import { type CleanLinksData, fail, ok, type Result, type SetPostBaseData } from '../types';
 
 const MAX_ARTICLES = 500;
 
@@ -28,17 +29,21 @@ export async function cleanLinks(opts: {
     const org = await OrgRepo.findById(opts.org);
     if (!org) return fail('ORG_NOT_FOUND', `No org with id ${opts.org}.`);
 
-    const mainBlogUrl = org.presets?.blog.main_blog_url ?? '';
     const max = org.presets?.article_preferences.content_seo.internal_links_count ?? 0;
+
+    let staticSitePostBase: string | null = null;
+    for (const integration of await IntegrationRepo.listByOrgId(org.id)) {
+      if (integration.provider === 'static-site') staticSitePostBase = integration.post_url_base;
+    }
 
     const { articles: publishedArticles } = await ArticleRepo.listByOrg(org.id, {
       status: 'published',
       limit: MAX_ARTICLES,
       offset: 0,
     });
-    const allowed = mainBlogUrl.trim()
-      ? await verifyCandidates(deriveCandidates(mainBlogUrl, publishedArticles))
-      : [];
+    const allowed = await verifyCandidates(
+      deriveCandidates({ staticSitePostBase }, publishedArticles),
+    );
     const allowedUrls = allowed.map((c) => c.url);
 
     const { articles } = await ArticleRepo.listByOrg(org.id, { limit: MAX_ARTICLES, offset: 0 });
@@ -61,6 +66,7 @@ export async function cleanLinks(opts: {
       org: org.id,
       apply: opts.apply,
       allowedUrls: allowedUrls.length,
+      published: publishedArticles.length,
       scanned: articles.length,
       changed,
       linksRemoved,
@@ -68,6 +74,39 @@ export async function cleanLinks(opts: {
     });
   } catch (e) {
     return fail('CLEAN_LINKS_FAILED', (e as Error).message);
+  } finally {
+    await closeDb();
+  }
+}
+
+/**
+ * Backfill `post_url_base` on an org's static-site connection (#228) — how
+ * connections that predate the connect-form field get one without redoing the
+ * GitHub App flow.
+ */
+export async function setPostBase(opts: {
+  org?: string;
+  base?: string;
+}): Promise<Result<SetPostBaseData>> {
+  if (!opts.org) {
+    return fail('ORG_REQUIRED', 'Pass --org <id>.', 'Find it with `npm run cli -- db set-plan`.');
+  }
+  const base = opts.base?.trim().replace(/\/+$/, '') ?? '';
+  // Valid exactly when a post URL can be built from it — the one job it has.
+  if (!staticSitePostUrl(base, 'probe')) {
+    return fail(
+      'INVALID_BASE',
+      'Pass --base <url>: an http(s) URL without query or fragment.',
+      'Example: --base https://www.clewas.com — a post then lives at <base>/<slug>.',
+    );
+  }
+  try {
+    if (!(await IntegrationRepo.setStaticSitePostBase(opts.org, base))) {
+      return fail('NO_STATIC_SITE', `Org ${opts.org} has no static-site connection.`);
+    }
+    return ok({ org: opts.org, postUrlBase: base });
+  } catch (e) {
+    return fail('SET_POST_BASE_FAILED', (e as Error).message);
   } finally {
     await closeDb();
   }

@@ -66,6 +66,21 @@ export const StaticSiteConnectBody = z
       .openapi({ example: 'unmarble/unmarble-website' }),
     branch: z.string().min(1).openapi({ example: 'main' }),
     content_path: z.string().min(1).default(DEFAULT_CONTENT_PATH),
+    // A published post lives at <base>/<slug> (#228), so the base must be an
+    // http(s) URL a path segment can be appended to — no query, no fragment.
+    post_url_base: z
+      .string()
+      .refine((value) => {
+        let parsed: URL;
+        try {
+          parsed = new URL(value.trim());
+        } catch {
+          return false;
+        }
+        const httpish = parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        return httpish && !parsed.search && !parsed.hash;
+      }, 'Expected an http(s) URL without query or fragment')
+      .openapi({ example: 'https://example.com/blog' }),
   })
   .openapi('StaticSiteConnectBody');
 

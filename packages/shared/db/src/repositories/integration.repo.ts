@@ -4,6 +4,9 @@ import { getDb } from '../client';
 
 const collection = async () => (await getDb()).collection('integrations');
 
+/** Stored trimmed and slash-free so `base + '/' + slug` always joins cleanly. */
+const normalizePostUrlBase = (base: string) => base.trim().replace(/\/+$/, '');
+
 /** Map a Mongo document to a validated entity (`_id` -> string `id`). */
 function toEntity(doc: WithId<Document>): Integration {
   const { _id, ...rest } = doc;
@@ -55,7 +58,13 @@ export const IntegrationRepo = {
    */
   async connectStaticSite(
     orgId: string,
-    input: { installationId: number; repo: string; branch: string; contentPath: string },
+    input: {
+      installationId: number;
+      repo: string;
+      branch: string;
+      contentPath: string;
+      postUrlBase: string;
+    },
   ): Promise<boolean> {
     try {
       await (await collection()).updateOne(
@@ -67,6 +76,7 @@ export const IntegrationRepo = {
             repo: input.repo,
             branch: input.branch,
             content_path: input.contentPath,
+            post_url_base: normalizePostUrlBase(input.postUrlBase),
             connected_at: new Date(),
             last_error: null,
           },
@@ -78,6 +88,19 @@ export const IntegrationRepo = {
       if ((err as { code?: number }).code === 11000) return false;
       throw err;
     }
+  },
+
+  /**
+   * Backfill or correct the post URL base on an existing static-site
+   * connection (#228, `db set-post-base`). Returns false when the org has no
+   * static-site connection to annotate.
+   */
+  async setStaticSitePostBase(orgId: string, base: string): Promise<boolean> {
+    const res = await (await collection()).updateOne(
+      { org_id: orgId, provider: 'static-site' },
+      { $set: { post_url_base: normalizePostUrlBase(base) } },
+    );
+    return res.matchedCount === 1;
   },
 
   /**

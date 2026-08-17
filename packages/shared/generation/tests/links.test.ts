@@ -7,8 +7,8 @@ import {
   extractLinks,
   normalizeUrl,
   prioritizeLinkCandidates,
-  publishedArticleUrl,
   sanitizeLinks,
+  staticSitePostUrl,
 } from '../src/links';
 
 describe('normalizeUrl', () => {
@@ -18,42 +18,58 @@ describe('normalizeUrl', () => {
   });
 });
 
-describe('publishedArticleUrl', () => {
+describe('staticSitePostUrl', () => {
   test('joins base and slug with exactly one slash', () => {
-    expect(publishedArticleUrl('https://a.com/blog/', 'my-post')).toBe(
-      'https://a.com/blog/my-post',
-    );
-    expect(publishedArticleUrl('https://a.com/blog', '/my-post/')).toBe(
-      'https://a.com/blog/my-post',
+    expect(staticSitePostUrl('https://a.com/', 'my-post')).toBe('https://a.com/my-post');
+    expect(staticSitePostUrl('https://a.com/posts', '/my-post/')).toBe(
+      'https://a.com/posts/my-post',
     );
   });
 
   test('returns null for an empty base, empty slug, or non-http base', () => {
-    expect(publishedArticleUrl('', 'my-post')).toBeNull();
-    expect(publishedArticleUrl('https://a.com/blog', '')).toBeNull();
-    expect(publishedArticleUrl('not a url', 'my-post')).toBeNull();
-    expect(publishedArticleUrl('ftp://a.com', 'my-post')).toBeNull();
+    expect(staticSitePostUrl('', 'my-post')).toBeNull();
+    expect(staticSitePostUrl('https://a.com', '')).toBeNull();
+    expect(staticSitePostUrl('not a url', 'my-post')).toBeNull();
+    expect(staticSitePostUrl('ftp://a.com', 'my-post')).toBeNull();
   });
 
   test('returns null when the base carries a query or fragment', () => {
     // Appending a slug to these yields `…?page=2/my-post` — not a page URL.
-    expect(publishedArticleUrl('https://a.com/blog?page=2', 'my-post')).toBeNull();
-    expect(publishedArticleUrl('https://a.com/blog#latest', 'my-post')).toBeNull();
+    expect(staticSitePostUrl('https://a.com?page=2', 'my-post')).toBeNull();
+    expect(staticSitePostUrl('https://a.com#latest', 'my-post')).toBeNull();
   });
 });
 
 describe('deriveCandidates', () => {
-  const pub = (slug: string, published_at: Date) => ({ slug, published_at });
+  const sources = { staticSitePostBase: 'https://a.com' };
+  const article = (
+    title: string,
+    publications: {
+      provider: 'wordpress' | 'static-site';
+      slug: string;
+      published_at: Date;
+      remote_url: string | null;
+    }[],
+  ) => ({ title, publications, topic_cluster_id: null, topic_role: null });
+  const staticPub = (slug: string, published_at = new Date('2026-01-01')) => ({
+    provider: 'static-site' as const,
+    slug,
+    published_at,
+    // What static-site actually stores here — a commit URL, never a post URL.
+    remote_url: 'https://github.com/o/r/commit/abc',
+  });
+  const wpPub = (remote_url: string | null, published_at = new Date('2026-01-01')) => ({
+    provider: 'wordpress' as const,
+    slug: 'wp-slug',
+    published_at,
+    remote_url,
+  });
 
-  test('uses the most recent publication slug, not article.slug', () => {
-    const got = deriveCandidates('https://a.com/blog', [
+  test('static-site: joins the configured post base with the published slug', () => {
+    const got = deriveCandidates(sources, [
       {
         title: 'Post One',
-        slug: 'edited-after-publish',
-        publications: [
-          pub('published-slug-old', new Date('2026-01-01')),
-          pub('published-slug-new', new Date('2026-02-01')),
-        ],
+        publications: [staticPub('old-slug'), staticPub('new-slug', new Date('2026-02-01'))],
         topic_cluster_id: 'topic:widgets',
         topic_role: 'pillar',
       },
@@ -61,53 +77,51 @@ describe('deriveCandidates', () => {
     expect(got).toEqual([
       {
         title: 'Post One',
-        url: 'https://a.com/blog/published-slug-new',
+        url: 'https://a.com/new-slug',
         topic_cluster_id: 'topic:widgets',
         topic_role: 'pillar',
       },
     ]);
   });
 
-  test('falls back to article.slug when there is no publication entry', () => {
-    const got = deriveCandidates('https://a.com/blog', [
-      {
-        title: 'Post',
-        slug: 'fallback',
-        publications: [],
-        topic_cluster_id: null,
-        topic_role: null,
-      },
-    ]);
-    expect(got[0]!.url).toBe('https://a.com/blog/fallback');
-  });
-
-  test('drops undecidable URLs and de-duplicates', () => {
-    const got = deriveCandidates('', [
-      {
-        title: 'P',
-        slug: 's',
-        publications: [],
-        topic_cluster_id: null,
-        topic_role: null,
-      },
+  test('static-site: dropped when no post base is configured', () => {
+    const got = deriveCandidates({ staticSitePostBase: null }, [
+      article('P', [staticPub('my-post')]),
     ]);
     expect(got).toEqual([]);
+  });
 
-    const dupes = deriveCandidates('https://a.com/blog', [
-      {
-        title: 'A',
-        slug: 'same',
-        publications: [],
-        topic_cluster_id: null,
-        topic_role: null,
-      },
-      {
-        title: 'B',
-        slug: 'same',
-        publications: [],
-        topic_cluster_id: null,
-        topic_role: null,
-      },
+  test('wordpress: uses the stored permalink, never a joined base', () => {
+    const got = deriveCandidates({ staticSitePostBase: null }, [
+      article('WP', [wpPub('https://site.com/archives/my-post')]),
+    ]);
+    expect(got[0]!.url).toBe('https://site.com/archives/my-post');
+  });
+
+  test('wordpress: dropped when the permalink is missing or not http(s)', () => {
+    expect(deriveCandidates(sources, [article('A', [wpPub(null)])])).toEqual([]);
+    expect(deriveCandidates(sources, [article('B', [wpPub('not a url')])])).toEqual([]);
+    expect(deriveCandidates(sources, [article('C', [wpPub('ftp://site.com/x')])])).toEqual([]);
+  });
+
+  test('the most recent publication decides the provider', () => {
+    const got = deriveCandidates(sources, [
+      article('Both', [
+        staticPub('static-slug', new Date('2026-01-01')),
+        wpPub('https://site.com/wp-post', new Date('2026-02-01')),
+      ]),
+    ]);
+    expect(got[0]!.url).toBe('https://site.com/wp-post');
+  });
+
+  test('an article with no publication entry is dropped, not guessed', () => {
+    expect(deriveCandidates(sources, [article('P', [])])).toEqual([]);
+  });
+
+  test('de-duplicates articles resolving to the same URL', () => {
+    const dupes = deriveCandidates(sources, [
+      article('A', [staticPub('same')]),
+      article('B', [staticPub('same')]),
     ]);
     expect(dupes).toHaveLength(1);
   });

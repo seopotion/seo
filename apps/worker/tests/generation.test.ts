@@ -10,6 +10,7 @@ const {
   createArticle,
   listByOrg,
   listPublishedByTopicCluster,
+  listIntegrations,
 } = vi.hoisted(() => ({
   claimGeneration: vi.fn(async () => true),
   findKeywordById: vi.fn(),
@@ -19,11 +20,17 @@ const {
   createArticle: vi.fn(async (_doc: unknown) => ({ id: 'art1' })),
   listByOrg: vi.fn(async () => ({ articles: [] as unknown[], total: 0 })),
   listPublishedByTopicCluster: vi.fn(async () => [] as unknown[]),
+  // Default: a static-site connection whose declared post base carries the
+  // /blog prefix the older fixtures' expected URLs assume.
+  listIntegrations: vi.fn(async () => [
+    { provider: 'static-site', post_url_base: 'https://acme.com/blog' as string | null },
+  ]),
 }));
 vi.mock('@shared/db', () => ({
   KeywordRepo: { claimGeneration, findById: findKeywordById, failGeneration, linkArticle },
   OrgRepo: { findById: findOrgById },
   ArticleRepo: { create: createArticle, listByOrg, listPublishedByTopicCluster },
+  IntegrationRepo: { listByOrgId: listIntegrations },
 }));
 
 const { generateArticle, verifyCandidates } = vi.hoisted(() => ({
@@ -49,6 +56,7 @@ vi.mock('../src/queue', () => ({ enqueueImageTask }));
 
 import { MAX_LINK_CANDIDATES } from '@shared/generation';
 import { handler } from '../src/generation';
+import { logger } from '../src/logger';
 
 function event(body: unknown): SQSEvent {
   return {
@@ -312,11 +320,13 @@ describe('generation worker', () => {
     );
   });
 
+  // main_blog_url deliberately stays empty: it is the blog INDEX, and after
+  // #228 it plays no part in candidate URLs — the static-site integration's
+  // post_url_base does.
   const linkingOrg = {
     ...org,
     presets: {
       ...org.presets,
-      blog: { sitemap_url: '', main_blog_url: 'https://acme.com/blog', best_articles: [] },
       article_preferences: {
         ...org.presets.article_preferences,
         content_seo: { ...org.presets.article_preferences.content_seo, internal_links_count: 2 },
@@ -324,13 +334,20 @@ describe('generation worker', () => {
     },
   };
 
+  const staticPublication = (slug: string, published_at = new Date('2026-01-01')) => ({
+    provider: 'static-site',
+    slug,
+    published_at,
+    remote_url: 'https://github.com/acme/site/commit/abc',
+  });
+
   const published = {
     id: 'article-published',
     org_id: 'o1',
     title: 'Widget Guide',
     slug: 'edited-later',
     status: 'published',
-    publications: [{ slug: 'widget-guide', published_at: new Date('2026-01-01') }],
+    publications: [staticPublication('widget-guide')],
     topic_cluster_id: null,
     topic_role: null,
   };
@@ -359,7 +376,7 @@ describe('generation worker', () => {
     id: `article-${slug}`,
     title,
     slug,
-    publications: [{ slug, published_at: new Date('2026-01-01') }],
+    publications: [staticPublication(slug)],
     topic_cluster_id: topicClusterId,
     topic_role: topicRole,
     ...overrides,
@@ -511,7 +528,7 @@ describe('generation worker', () => {
       'pillar',
     );
     const duplicate = publishedArticle('Duplicate', 'same-url', 'topic:other', 'support', {
-      publications: [{ slug: '/same-url/', published_at: new Date('2026-02-01') }],
+      publications: [staticPublication('/same-url/', new Date('2026-02-01'))],
     });
     findOrgById.mockResolvedValue(linkingOrg);
     findKeywordById.mockResolvedValue(semanticKeyword('support'));
@@ -594,21 +611,80 @@ describe('generation worker', () => {
     expect(passed.ctx.linkCandidates).toEqual([]);
   });
 
-  test('an org with no main_blog_url gets no candidates (#186)', async () => {
-    findOrgById.mockResolvedValue({
-      ...linkingOrg,
-      presets: {
-        ...linkingOrg.presets,
-        blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
-      },
-    });
+  test('a wordpress publication contributes its stored permalink (#228)', async () => {
+    findOrgById.mockResolvedValue(linkingOrg);
     findKeywordById.mockResolvedValue(keyword);
     generateArticle.mockResolvedValue(okArticle);
+    listIntegrations.mockResolvedValueOnce([]);
+    listByOrg.mockResolvedValueOnce({
+      articles: [
+        {
+          ...published,
+          publications: [
+            {
+              provider: 'wordpress',
+              slug: 'widget-guide',
+              published_at: new Date('2026-01-01'),
+              remote_url: 'https://acme.com/archives/widget-guide',
+            },
+          ],
+        },
+      ],
+      total: 1,
+    });
 
     await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
 
-    expect(listByOrg).not.toHaveBeenCalled();
-    expect(listPublishedByTopicCluster).not.toHaveBeenCalled();
-    expect(verifyCandidates).not.toHaveBeenCalled();
+    expect(verifyCandidates).toHaveBeenCalledWith([
+      expect.objectContaining({ url: 'https://acme.com/archives/widget-guide' }),
+    ]);
+  });
+
+  test('a static-site connection without a post base derives nothing and warns (#228)', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listIntegrations.mockResolvedValueOnce([{ provider: 'static-site', post_url_base: null }]);
+    listByOrg.mockResolvedValueOnce({ articles: [published], total: 1 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const passed = generateArticle.mock.calls[0]![0] as { ctx: { linkCandidates: unknown[] } };
+    expect(passed.ctx.linkCandidates).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('no usable'),
+      expect.objectContaining({ published: 1, derived: 0, verified: 0 }),
+    );
+  });
+
+  test('published articles that all fail verification warn instead of staying silent (#228)', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({ articles: [published], total: 1 });
+    verifyCandidates.mockResolvedValueOnce([]);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('no usable'),
+      expect.objectContaining({ published: 1, derived: 1, verified: 0 }),
+    );
+  });
+
+  test('an org that published nothing gets zero links without a warning (#228)', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    findOrgById.mockResolvedValue(linkingOrg);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    listByOrg.mockResolvedValueOnce({ articles: [], total: 0 });
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    const passed = generateArticle.mock.calls[0]![0] as { ctx: { linkCandidates: unknown[] } };
+    expect(passed.ctx.linkCandidates).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

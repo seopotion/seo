@@ -215,7 +215,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
       },
     }),
     async (c) => {
-      const { grant, repo, branch, content_path } = c.req.valid('json');
+      const { grant, repo, branch, content_path, post_url_base } = c.req.valid('json');
       const { userId } = c.get('auth');
 
       // org_id and installation_id both come out of the grant: a client cannot
@@ -247,6 +247,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         repo,
         branch,
         contentPath: content_path,
+        postUrlBase: post_url_base,
       });
       if (!stored) {
         return c.json(
