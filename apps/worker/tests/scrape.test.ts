@@ -71,6 +71,24 @@ describe('discoverBlog', () => {
     expect(blog.best_articles).toEqual(['https://clewas.com/blog/post-1']);
   });
 
+  test('pagination pages are not best articles (#228)', async () => {
+    // Clewas-shaped sitemap: /blog is the index, /blog/2 is pagination, and the
+    // posts live at the root. Suggesting /blog/2 as a "best article" is worse
+    // than suggesting nothing.
+    stubFetch({
+      'https://clewas.com/robots.txt': 'User-agent: *\nSitemap: https://clewas.com/sitemap.xml',
+      'https://clewas.com/sitemap.xml':
+        '<urlset><url><loc>https://clewas.com/blog</loc></url>' +
+        '<url><loc>https://clewas.com/blog/2</loc></url>' +
+        '<url><loc>https://clewas.com/blog/actual-post</loc></url>' +
+        '<url><loc>https://clewas.com/what-is-osmosis</loc></url></urlset>',
+    });
+
+    const blog = await discoverBlog('https://clewas.com');
+
+    expect(blog.best_articles).toEqual(['https://clewas.com/blog/actual-post']);
+  });
+
   test('falls back to defaults when robots and sitemap are absent', async () => {
     stubFetch({});
 

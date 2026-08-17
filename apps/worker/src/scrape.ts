@@ -84,7 +84,8 @@ export async function discoverBlog(url: string): Promise<BlogInfo> {
   }
   locs = locs.slice(0, MAX_SITEMAP_URLS);
 
-  const blogArticles = locs.filter((l) => /\/blog\/.+/i.test(l));
+  // `/blog/<digits>` is pagination, not an article — the Clewas trap (#228).
+  const blogArticles = locs.filter((l) => /\/blog\/.+/i.test(l) && !/\/blog\/\d+\/?$/i.test(l));
   return {
     sitemap_url: sitemapUrl,
     main_blog_url: `${origin}/blog`,

@@ -7,7 +7,7 @@
  * unwrapped to plain text rather than guessed at.
  */
 
-import type { TopicRole } from '@shared/schemas';
+import type { IntegrationProvider, TopicRole } from '@shared/schemas';
 import type { CompleteTopicBrief } from './topic';
 
 /** A link target we are willing to hand to the model. */
@@ -27,10 +27,24 @@ export interface MarkdownLink {
  * that keeps this pure module independent of repositories. */
 export interface PublishedArticleInput {
   title: string;
-  slug: string;
-  publications: { slug: string; published_at: Date }[];
+  publications: {
+    provider: IntegrationProvider;
+    slug: string;
+    published_at: Date;
+    remote_url: string | null;
+  }[];
   topic_cluster_id: string | null;
   topic_role: TopicRole | null;
+}
+
+/**
+ * Provider-specific facts `deriveCandidates` cannot know on its own (#228).
+ * `staticSitePostBase` is `integration.post_url_base` — the customer-declared
+ * base that a published slug is appended to; null means the org never set one,
+ * so static-site publications yield no candidates (fail closed).
+ */
+export interface PostUrlSources {
+  staticSitePostBase: string | null;
 }
 
 const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})(.*)$/;
@@ -98,9 +112,9 @@ export function normalizeUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');
 }
 
-/** The live URL of a published article, or null when we cannot decide it. */
-export function publishedArticleUrl(mainBlogUrl: string, slug: string): string | null {
-  const base = mainBlogUrl.trim();
+/** `base + slug` for a static-site post, or null when we cannot decide it. */
+export function staticSitePostUrl(postUrlBase: string, slug: string): string | null {
+  const base = postUrlBase.trim();
   const path = slug.trim().replace(/^\/+|\/+$/g, '');
   if (!base || !path) return null;
   let parsed: URL;
@@ -115,13 +129,30 @@ export function publishedArticleUrl(mainBlogUrl: string, slug: string): string |
   return `${base.replace(/\/+$/, '')}/${path}`;
 }
 
+/** A stored permalink is only usable if it is an absolute http(s) URL. */
+function permalinkOrNull(remoteUrl: string | null): string | null {
+  if (!remoteUrl) return null;
+  const url = remoteUrl.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : null;
+}
+
 /**
- * Candidate targets for an org's published articles. The slug comes from the
- * most recent `publications` entry — the slug the article ACTUALLY went live
- * under, which the editor can change on `article.slug` afterwards.
+ * Candidate targets for an org's published articles, derived from the most
+ * recent `publications` entry — the publish that ACTUALLY happened, whose slug
+ * the editor cannot retroactively change. The live URL is provider-shaped
+ * (#228): WordPress recorded its own permalink in `remote_url`; static-site
+ * routing is whatever the customer declared as `staticSitePostBase` plus the
+ * published slug. Anything unresolvable is dropped, never guessed —
+ * `main_blog_url` (the blog INDEX, not a post prefix) plays no part here.
  */
 export function deriveCandidates(
-  mainBlogUrl: string,
+  sources: PostUrlSources,
   articles: readonly PublishedArticleInput[],
 ): LinkCandidate[] {
   const seen = new Set<string>();
@@ -130,7 +161,13 @@ export function deriveCandidates(
     const latest = [...article.publications].sort(
       (a, b) => b.published_at.getTime() - a.published_at.getTime(),
     )[0];
-    const url = publishedArticleUrl(mainBlogUrl, latest?.slug ?? article.slug);
+    if (!latest) continue;
+    const url =
+      latest.provider === 'wordpress'
+        ? permalinkOrNull(latest.remote_url)
+        : sources.staticSitePostBase
+          ? staticSitePostUrl(sources.staticSitePostBase, latest.slug)
+          : null;
     if (!url) continue;
     const key = normalizeUrl(url);
     if (seen.has(key)) continue;

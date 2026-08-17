@@ -18,6 +18,15 @@ function toEntity(doc: WithId<Document>): Org {
   return OrgSchema.parse({ id: _id.toString(), ...rest });
 }
 
+/** An org as `listAllSummaries` reports it; nullable where a legacy doc may lack the field. */
+export interface OrgSummary {
+  id: string;
+  website_url: string;
+  user_id: string | null;
+  plan: string | null;
+  setup_status: string | null;
+}
+
 export const OrgRepo = {
   async findById(id: string): Promise<Org | null> {
     if (!ObjectId.isValid(id)) return null;
@@ -77,6 +86,24 @@ export const OrgRepo = {
   async findByUserId(userId: string): Promise<Org[]> {
     const docs = await (await collection()).find({ user_id: userId }).toArray();
     return docs.map(toEntity);
+  },
+
+  /**
+   * Every org, reduced to the fields the `db delete-org` sweep reports.
+   * Projected and deliberately NOT Zod-parsed: a sweep whose whole job is to
+   * remove stale orgs must not abort because one of them is legacy-shaped.
+   */
+  async listAllSummaries(): Promise<OrgSummary[]> {
+    const docs = await (await collection())
+      .find({}, { projection: { website_url: 1, user_id: 1, plan: 1, setup_status: 1 } })
+      .toArray();
+    return docs.map((doc) => ({
+      id: doc._id.toString(),
+      website_url: typeof doc.website_url === 'string' ? doc.website_url : '',
+      user_id: typeof doc.user_id === 'string' ? doc.user_id : null,
+      plan: typeof doc.plan === 'string' ? doc.plan : null,
+      setup_status: typeof doc.setup_status === 'string' ? doc.setup_status : null,
+    }));
   },
 
   /**

@@ -75,7 +75,7 @@ export const dbCommand = defineCommand({
         try {
           const { setOrgPlan } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:set-plan', 'start');
 
           const result = await setOrgPlan({
@@ -290,7 +290,7 @@ export const dbCommand = defineCommand({
           const { strategyRun } = await import('../lib/db');
 
           emitter.warn(
-            'Writes to whatever MONGODB_URI targets and spends real provider credits — not a dry run.',
+            'Writes to whatever MONGO_URI targets and spends real provider credits — not a dry run.',
           );
           emitter.step('db:strategy-run', 'start');
 
@@ -326,8 +326,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? "Writes to whatever MONGODB_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
+              ? "Writes to whatever MONGO_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
           );
           emitter.step('db:clean-links', 'start');
 
@@ -339,6 +339,105 @@ export const dbCommand = defineCommand({
           if (result.ok && result.data.publishedChanged.length) {
             emitter.warn(
               `${result.data.publishedChanged.length} PUBLISHED article(s) changed — republish them so the customer's site picks up the fix.`,
+            );
+          }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'set-post-base': defineCommand({
+      meta: {
+        name: 'set-post-base',
+        description:
+          "Set a static-site connection's post URL base (#228): a published post lives at <base>/<slug>",
+      },
+      args: {
+        org: { type: 'string', description: 'Org id' },
+        base: { type: 'string', description: 'http(s) URL posts are served under' },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { setPostBase } = await import('../lib/links');
+
+          emitter.warn('Writes to whatever MONGO_URI targets — safe and intended for prod.');
+          emitter.step('db:set-post-base', 'start');
+
+          const result = await setPostBase({
+            org: args.org as string | undefined,
+            base: args.base as string | undefined,
+          });
+          emitter.step('db:set-post-base', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'delete-org': defineCommand({
+      meta: {
+        name: 'delete-org',
+        description:
+          'Delete whole orgs and every org-scoped document (keywords, candidates, articles, ' +
+          'GSC connections + cache, subscriptions, integrations, strategy runs), cancelling ' +
+          'active LemonSqueezy subs first. Users are NOT touched, and the append-only ' +
+          'admin_actions audit log is left intact. Dry run by default.',
+      },
+      args: {
+        org: {
+          type: 'string',
+          description: 'Org id to delete. Repeatable or comma-separated.',
+        },
+        keep: {
+          type: 'string',
+          description:
+            'Invert: delete EVERY org except these ids. Repeatable or comma-separated. ' +
+            'An unknown id here aborts the whole sweep.',
+        },
+        apply: {
+          type: 'boolean',
+          description: 'Write the changes (default: dry run)',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { deleteOrgs } = await import('../lib/db');
+
+          // citty collects a repeated flag into an array; also accept "a,b".
+          const list = (raw: string | string[] | undefined) =>
+            (Array.isArray(raw) ? raw : raw ? [raw] : [])
+              .flatMap((v) => v.split(','))
+              .map((v) => v.trim())
+              .filter(Boolean);
+
+          emitter.warn(
+            args.apply
+              ? 'IRREVERSIBLE — deletes from whatever MONGO_URI targets. Never run this against prod.'
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Pass --apply to delete.',
+          );
+          emitter.step('db:delete-org', 'start');
+
+          const result = await deleteOrgs({
+            orgs: list(args.org as string | string[] | undefined),
+            keep: list(args.keep as string | string[] | undefined),
+            apply: args.apply as boolean,
+          });
+          emitter.step('db:delete-org', result.ok ? 'done' : 'fail');
+          if (result.ok && !result.data.apply) {
+            emitter.warn(
+              `${result.data.orgs.length} org(s) would be deleted, along with ${result.data.active_subscriptions} active subscription(s). Re-run with --apply.`,
             );
           }
           emitter.result(result);
@@ -365,7 +464,7 @@ export const dbCommand = defineCommand({
         try {
           const { deleteUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:delete-user', 'start');
 
           const result = await deleteUser({ user: args.user as string | undefined });
@@ -394,7 +493,7 @@ export const dbCommand = defineCommand({
         try {
           const { resetUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:reset-user', 'start');
 
           const result = await resetUser({ user: args.user as string | undefined });

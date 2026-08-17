@@ -19,15 +19,20 @@ export {
 } from './images';
 export { parseJsonObject } from './json';
 export { verifyCandidates } from './link-verify';
-export type { LinkCandidate, MarkdownLink, PublishedArticleInput } from './links';
+export type {
+  LinkCandidate,
+  MarkdownLink,
+  PostUrlSources,
+  PublishedArticleInput,
+} from './links';
 export {
   deduplicateLinkCandidates,
   deriveCandidates,
   extractLinks,
   normalizeUrl,
   prioritizeLinkCandidates,
-  publishedArticleUrl,
   sanitizeLinks,
+  staticSitePostUrl,
 } from './links';
 export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';

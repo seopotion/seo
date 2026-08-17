@@ -100,6 +100,7 @@ describe('IntegrationRepo (integration)', () => {
         repo: 'unmarble/unmarble-website',
         branch: 'main',
         contentPath: 'seopotion/',
+        postUrlBase: 'https://unmarble.com/blog/ ',
       }),
     ).toBe(true);
 
@@ -110,8 +111,47 @@ describe('IntegrationRepo (integration)', () => {
     expect(found.installation_id).toBe(111222);
     expect(found.repo).toBe('unmarble/unmarble-website');
     expect(found.content_path).toBe('seopotion/');
+    // Normalized at write: base + slug joins with exactly one slash later.
+    expect(found.post_url_base).toBe('https://unmarble.com/blog');
     // No secret at rest: only the installation id, which mints ~1h tokens.
     expect(Object.keys(found)).not.toContain('token_enc');
+  });
+
+  test('a connection that predates post_url_base reads back as null', async () => {
+    const col = (await getDb()).collection('integrations');
+    await col.insertOne({
+      org_id: 'org_ss_old',
+      provider: 'static-site',
+      host: 'github',
+      installation_id: 777888,
+      repo: 'acme/site',
+      branch: 'main',
+      content_path: 'seopotion/',
+      connected_at: new Date(),
+      last_error: null,
+    });
+
+    const found = await IntegrationRepo.findByOrgAndProvider('org_ss_old', 'static-site');
+    expect(found?.provider === 'static-site' && found.post_url_base).toBeNull();
+  });
+
+  test('setStaticSitePostBase backfills an existing connection, normalized', async () => {
+    await IntegrationRepo.connectStaticSite('org_ss_base', {
+      installationId: 999111,
+      repo: 'acme/site',
+      branch: 'main',
+      contentPath: 'seopotion/',
+      postUrlBase: 'https://old.example.com',
+    });
+
+    expect(
+      await IntegrationRepo.setStaticSitePostBase('org_ss_base', 'https://www.clewas.com/ '),
+    ).toBe(true);
+    const found = await IntegrationRepo.findByOrgAndProvider('org_ss_base', 'static-site');
+    expect(found?.provider === 'static-site' && found.post_url_base).toBe('https://www.clewas.com');
+
+    // No static-site connection, nothing to backfill.
+    expect(await IntegrationRepo.setStaticSitePostBase('org_absent', 'https://x.com')).toBe(false);
   });
 
   test('reconnecting the same org repoints the row instead of adding one', async () => {
@@ -120,12 +160,14 @@ describe('IntegrationRepo (integration)', () => {
       repo: 'acme/site',
       branch: 'main',
       contentPath: 'seopotion/',
+      postUrlBase: 'https://acme.com',
     });
     await IntegrationRepo.connectStaticSite('org_ss_re', {
       installationId: 333444,
       repo: 'acme/site',
       branch: 'release',
       contentPath: 'content/',
+      postUrlBase: 'https://acme.com',
     });
 
     const rows = await IntegrationRepo.listByOrgId('org_ss_re');
@@ -139,6 +181,7 @@ describe('IntegrationRepo (integration)', () => {
       repo: 'acme/site',
       branch: 'main',
       contentPath: 'seopotion/',
+      postUrlBase: 'https://acme.com',
     });
     const now = new Date('2026-08-12T10:00:00.000Z');
 
@@ -183,6 +226,7 @@ describe('IntegrationRepo (integration)', () => {
       repo: 'acme/site',
       branch: 'main',
       contentPath: 'seopotion/',
+      postUrlBase: 'https://acme.com',
     });
 
     // The partial unique index is what says no, so two simultaneous claimants
@@ -193,6 +237,7 @@ describe('IntegrationRepo (integration)', () => {
         repo: 'acme/site',
         branch: 'main',
         contentPath: 'seopotion/',
+        postUrlBase: 'https://acme.com',
       }),
     ).toBe(false);
     expect(await IntegrationRepo.listByOrgId('org_claim_2')).toEqual([]);

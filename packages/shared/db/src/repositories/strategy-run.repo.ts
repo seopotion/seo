@@ -89,4 +89,11 @@ export const StrategyRunRepo = {
       .collection<StrategyRunDoc>(COLLECTION)
       .updateOne({ _id: new ObjectId(id) }, { $set: { status, updated_at: new Date() } });
   },
+
+  /** Every run for the org (used by the `db delete-org` CLI). */
+  async deleteByOrgId(orgId: string): Promise<number> {
+    const db = await getDb();
+    const res = await db.collection<StrategyRunDoc>(COLLECTION).deleteMany({ org_id: orgId });
+    return res.deletedCount;
+  },
 };

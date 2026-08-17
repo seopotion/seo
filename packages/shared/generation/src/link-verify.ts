@@ -1,8 +1,8 @@
 /**
- * Proving a link target is live (#186). This is deliberately the ONLY thing we
- * trust: we never ask a publishing plugin what URL it created, so WordPress,
- * the Vue static-site adapter, and every future adapter are all held to the
- * same test — does this URL answer 2xx right now?
+ * Proving a link target is live (#186). Providers may CLAIM a URL — WordPress
+ * records its permalink, static-site derives from a customer-declared base
+ * (#228) — but a claim never makes a link. Every candidate, whatever its
+ * origin, is held to the same test: does this URL answer 2xx right now?
  */
 import type { LinkCandidate } from './links';
 

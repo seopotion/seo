@@ -8,7 +8,7 @@ export { GscAnalyticsCacheRepo } from './repositories/gsc-analytics-cache.repo';
 export { GscConnectionRepo } from './repositories/gsc-connection.repo';
 export { IntegrationRepo } from './repositories/integration.repo';
 export { KeywordRepo } from './repositories/keyword.repo';
-export { OrgRepo } from './repositories/org.repo';
+export { OrgRepo, type OrgSummary } from './repositories/org.repo';
 export {
   StrategyRunRepo,
   type StrategyWorkStatePatch,

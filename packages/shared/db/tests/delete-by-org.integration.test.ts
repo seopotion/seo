@@ -3,8 +3,11 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '../src/client';
 import { ArticleRepo } from '../src/repositories/article.repo';
 import { CandidateRepo } from '../src/repositories/candidate.repo';
+import { GscAnalyticsCacheRepo } from '../src/repositories/gsc-analytics-cache.repo';
+import { IntegrationRepo } from '../src/repositories/integration.repo';
 import { KeywordRepo } from '../src/repositories/keyword.repo';
 import { OrgRepo } from '../src/repositories/org.repo';
+import { StrategyRunRepo } from '../src/repositories/strategy-run.repo';
 
 /**
  * Real-MongoDB round-trip for the `db reset-user` delete methods. Run with
@@ -63,8 +66,82 @@ describe('delete-by-org (integration)', () => {
     expect(await col.countDocuments({ org_id: orgB })).toBe(1);
   });
 
+  test("IntegrationRepo.deleteByOrgId removes only that org's providers", async () => {
+    const col = (await getDb()).collection('integrations');
+    const orgA = `reset_int_a_${timestamp}`;
+    const orgB = `reset_int_b_${timestamp}`;
+    await col.insertMany([
+      { org_id: orgA, provider: 'wordpress' },
+      { org_id: orgA, provider: 'static-site' },
+      { org_id: orgB, provider: 'wordpress' },
+    ]);
+
+    expect(await IntegrationRepo.deleteByOrgId(orgA)).toBe(2);
+    expect(await col.countDocuments({ org_id: orgA })).toBe(0);
+    expect(await col.countDocuments({ org_id: orgB })).toBe(1);
+  });
+
+  test("StrategyRunRepo.deleteByOrgId removes only that org's runs", async () => {
+    const col = (await getDb()).collection('strategy_runs');
+    const orgA = `reset_run_a_${timestamp}`;
+    const orgB = `reset_run_b_${timestamp}`;
+    await col.insertMany([
+      { org_id: orgA, status: 'failed' },
+      { org_id: orgA, status: 'completed' },
+      { org_id: orgB, status: 'completed' },
+    ]);
+
+    expect(await StrategyRunRepo.deleteByOrgId(orgA)).toBe(2);
+    expect(await col.countDocuments({ org_id: orgA })).toBe(0);
+    expect(await col.countDocuments({ org_id: orgB })).toBe(1);
+  });
+
+  test("GscAnalyticsCacheRepo.deleteByOrgId removes only that org's cached rows", async () => {
+    const col = (await getDb()).collection('gsc_analytics_cache');
+    const orgA = `reset_cache_a_${timestamp}`;
+    const orgB = `reset_cache_b_${timestamp}`;
+    await col.insertMany([
+      { org_id: orgA, key: `${orgA}:1`, rows: [] },
+      { org_id: orgB, key: `${orgB}:1`, rows: [] },
+    ]);
+
+    expect(await GscAnalyticsCacheRepo.deleteByOrgId(orgA)).toBe(1);
+    expect(await col.countDocuments({ org_id: orgA })).toBe(0);
+    expect(await col.countDocuments({ org_id: orgB })).toBe(1);
+  });
+
   test('deleteByOrgId returns 0 when nothing matches', async () => {
     expect(await KeywordRepo.deleteByOrgId(`reset_no_such_org_${timestamp}`)).toBe(0);
+  });
+
+  test('listAllSummaries reports every org, tolerating a legacy-shaped doc', async () => {
+    const org = await OrgRepo.create({
+      user_id: `list_user_${timestamp}`,
+      website_url: `https://list.example.com/${timestamp}`,
+      setup_status: 'setup_scan_in_progress',
+    });
+    // A doc OrgSchema would reject — listAllSummaries must not parse, or a
+    // cleanup sweep could never remove exactly the junk it exists to remove.
+    const { insertedId } = await (await getDb())
+      .collection('orgs')
+      .insertOne({ website_url: 42, note: `legacy_${timestamp}` });
+
+    const summaries = await OrgRepo.listAllSummaries();
+    const created = summaries.find((s) => s.id === org.id);
+    expect(created?.website_url).toBe(`https://list.example.com/${timestamp}`);
+    expect(created?.user_id).toBe(`list_user_${timestamp}`);
+
+    const legacy = summaries.find((s) => s.id === insertedId.toString());
+    expect(legacy).toEqual({
+      id: insertedId.toString(),
+      website_url: '',
+      user_id: null,
+      plan: null,
+      setup_status: null,
+    });
+
+    await OrgRepo.deleteById(org.id);
+    await OrgRepo.deleteById(insertedId.toString());
   });
 
   test('OrgRepo.deleteById deletes the org and reports the match', async () => {
