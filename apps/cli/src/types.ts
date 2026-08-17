@@ -121,6 +121,21 @@ export interface DeleteOrgData {
   };
 }
 
+/**
+ * `db reset-images` report. `reset` is populated in both modes, so a dry run
+ * shows exactly what `--apply` would blank; `enqueued` is 0 without `--enqueue`,
+ * and those articles still need an image replay before they can be republished.
+ */
+export interface ResetImagesData {
+  apply: boolean;
+  /** The dead CDN host that was matched against, lowercased. */
+  host: string;
+  scanned: number;
+  slotsReset: number;
+  enqueued: number;
+  reset: { id: string; title: string; status: string; slots: number }[];
+}
+
 export type Stage = 'staging' | 'prod';
 
 export interface PrereqCheck {

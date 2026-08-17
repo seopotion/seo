@@ -998,6 +998,7 @@
     "useCasesTitle": "Kimler için geliştirildi?"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
     "features": "Özellikler",
     "legalNavigationLabel": "Yasal",
@@ -1030,7 +1031,8 @@
     "links": {
       "features": "Özellikler",
       "pricing": "Fiyatlandırma",
-      "docs": "Dokümanlar"
+      "docs": "Dokümanlar",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"

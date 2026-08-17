@@ -22,6 +22,9 @@ export function Footer() {
             <Link href="/pricing" className={linkClassName}>
               {t('pricing')}
             </Link>
+            <Link href="/blog" className={linkClassName}>
+              {t('blog')}
+            </Link>
           </nav>
           <p className="text-gray-500 text-sm">{t('copyright')}</p>
         </div>

@@ -998,6 +998,7 @@
     "useCasesTitle": "Built for"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. All rights reserved.",
     "features": "Features",
     "legalNavigationLabel": "Legal",
@@ -1030,7 +1031,8 @@
     "links": {
       "features": "Features",
       "pricing": "Pricing",
-      "docs": "Docs"
+      "docs": "Docs",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logo",
     "primaryNavigation": "Primary navigation"
