@@ -1,4 +1,4 @@
-import { ArticleRepo, KeywordRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import {
   buildContext,
   buildVideoEmbed,
@@ -12,6 +12,7 @@ import {
   type LinkCandidate,
   languageCodeFromName,
   MAX_LINK_CANDIDATES,
+  type PostUrlSources,
   parseVideoPick,
   prioritizeLinkCandidates,
   verifyCandidates,
@@ -33,18 +34,29 @@ import { enqueueImageTask } from './queue';
 
 /**
  * Internal-link targets for this org: its own published articles, each derived
- * to a URL and then proven live (#186). Anything unproven is dropped — an org
- * with nothing published, or no blog URL to build one from, gets no links at
- * all, whatever `internal_links_count` says.
+ * to a provider-shaped URL (#228) and then proven live (#186). Anything
+ * unproven is dropped — an org with nothing published, or no way to name a
+ * post URL, gets no links at all, whatever `internal_links_count` says.
  */
 async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCandidate[]> {
   const max = org.presets?.article_preferences.content_seo.internal_links_count ?? 0;
-  const mainBlogUrl = org.presets?.blog.main_blog_url ?? '';
-  if (max <= 0 || !mainBlogUrl.trim()) return [];
+  if (max <= 0) return [];
+
+  let staticSitePostBase: string | null = null;
+  for (const integration of await IntegrationRepo.listByOrgId(org.id)) {
+    if (integration.provider === 'static-site') staticSitePostBase = integration.post_url_base;
+  }
+  const sources: PostUrlSources = { staticSitePostBase };
 
   const topic = completeTopicBrief(keyword);
-  const eligible = (articles: Article[]) =>
-    articles.filter((article) => article.org_id === org.id && article.status === 'published');
+  const publishedSeen = new Set<string>();
+  const eligible = (articles: Article[]) => {
+    const rows = articles.filter(
+      (article) => article.org_id === org.id && article.status === 'published',
+    );
+    for (const row of rows) publishedSeen.add(row.id);
+    return rows;
+  };
   let derived: LinkCandidate[];
 
   if (topic) {
@@ -55,7 +67,7 @@ async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCa
         role: { value: complementaryRole, mode: 'include' },
       }),
     );
-    let sameClusterCandidates = deriveCandidates(mainBlogUrl, complementary);
+    let sameClusterCandidates = deriveCandidates(sources, complementary);
     if (sameClusterCandidates.length < MAX_LINK_CANDIDATES) {
       const remainingSameCluster = eligible(
         await ArticleRepo.listPublishedByTopicCluster(org.id, topic.topic_cluster_id, {
@@ -65,7 +77,7 @@ async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCa
       );
       sameClusterCandidates = deduplicateLinkCandidates([
         ...sameClusterCandidates,
-        ...deriveCandidates(mainBlogUrl, remainingSameCluster),
+        ...deriveCandidates(sources, remainingSameCluster),
       ]);
     }
     let gathered = sameClusterCandidates;
@@ -75,7 +87,7 @@ async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCa
         limit: MAX_LINK_CANDIDATES,
         offset: 0,
       });
-      gathered = [...sameClusterCandidates, ...deriveCandidates(mainBlogUrl, eligible(articles))];
+      gathered = [...sameClusterCandidates, ...deriveCandidates(sources, eligible(articles))];
     }
     derived = deduplicateLinkCandidates(prioritizeLinkCandidates(topic, gathered)).slice(
       0,
@@ -87,10 +99,19 @@ async function resolveLinkCandidates(org: Org, keyword: Keyword): Promise<LinkCa
       limit: MAX_LINK_CANDIDATES,
       offset: 0,
     });
-    derived = deriveCandidates(mainBlogUrl, eligible(articles)).slice(0, MAX_LINK_CANDIDATES);
+    derived = deriveCandidates(sources, eligible(articles)).slice(0, MAX_LINK_CANDIDATES);
   }
 
   const candidates = (await verifyCandidates(derived)).slice(0, MAX_LINK_CANDIDATES);
+  if (publishedSeen.size > 0 && candidates.length === 0) {
+    // The one signal that separates "this org published nothing" from "we
+    // failed to place a single link for an org that DID publish" (#228).
+    logger.warn('internal links: published articles yielded no usable candidates', {
+      published: publishedSeen.size,
+      derived: derived.length,
+      verified: 0,
+    });
+  }
   logger.info('internal link candidates resolved', {
     derived: derived.length,
     verified: candidates.length,

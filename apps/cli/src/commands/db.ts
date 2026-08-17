@@ -349,6 +349,39 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'set-post-base': defineCommand({
+      meta: {
+        name: 'set-post-base',
+        description:
+          "Set a static-site connection's post URL base (#228): a published post lives at <base>/<slug>",
+      },
+      args: {
+        org: { type: 'string', description: 'Org id' },
+        base: { type: 'string', description: 'http(s) URL posts are served under' },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { setPostBase } = await import('../lib/links');
+
+          emitter.warn('Writes to whatever MONGO_URI targets — safe and intended for prod.');
+          emitter.step('db:set-post-base', 'start');
+
+          const result = await setPostBase({
+            org: args.org as string | undefined,
+            base: args.base as string | undefined,
+          });
+          emitter.step('db:set-post-base', result.ok ? 'done' : 'fail');
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'delete-org': defineCommand({
       meta: {
         name: 'delete-org',

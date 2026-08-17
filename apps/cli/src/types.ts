@@ -323,8 +323,16 @@ export interface CleanLinksData {
    * reachable published page, so EVERY link is stripped — expected, but it
    * explains an otherwise alarming `changed` count. */
   allowedUrls: number;
+  /** Published articles considered. `published > 0` with `allowedUrls: 0`
+   * means we could not verify a single page the org DID publish (#228). */
+  published: number;
   scanned: number;
   changed: number;
   linksRemoved: number;
   publishedChanged: { id: string; title: string }[];
+}
+
+export interface SetPostBaseData {
+  org: string;
+  postUrlBase: string;
 }

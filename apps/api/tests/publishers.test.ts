@@ -79,6 +79,7 @@ const staticSite: Extract<Integration, { provider: 'static-site' }> = {
   repo: 'acme/site',
   branch: 'main',
   content_path: 'seopotion/',
+  post_url_base: 'https://acme.com',
   connected_at: new Date(),
   last_error: null,
 };
