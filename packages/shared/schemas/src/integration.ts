@@ -54,6 +54,12 @@ export const IntegrationSchema = z.discriminatedUnion('provider', [
     // The one contract path (design/static-site-integration.md § The contract).
     // Images are not committed — they stay on our CDN, referenced absolutely.
     content_path: z.string(),
+    // Where the customer's site serves a published post: base + slug = live URL
+    // (#228). Declared by the customer at connect (or set via the CLI) — post
+    // routing is their build's decision, not something we can observe. Null on
+    // connections that predate the field: no base means no internal-link
+    // candidates from this provider, never a guessed URL.
+    post_url_base: z.string().nullable().default(null),
   }),
 ]);
 export type Integration = z.infer<typeof IntegrationSchema>;

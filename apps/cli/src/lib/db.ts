@@ -124,7 +124,7 @@ async function resolveOrgId(org?: string, user?: string): Promise<Result<string>
 /**
  * Override an org's entitlement plan. Targets the org directly (`org`) or the
  * single org owned by a user (`user` email). Operates against whatever
- * `MONGODB_URI` is configured — the caller is responsible for pointing it at
+ * `MONGO_URI` is configured — the caller is responsible for pointing it at
  * the intended environment.
  */
 export async function setOrgPlan(input: {
@@ -546,7 +546,7 @@ async function wipeUser(user: string | undefined, alsoDeleteUser: boolean) {
  * the next login re-runs onboarding. The user document stays — login recreates
  * session state and the onboarding gate is org-presence. Idempotent: a user
  * with no orgs is a success with zero counts. Operates against whatever
- * `MONGODB_URI` is configured.
+ * `MONGO_URI` is configured.
  */
 export async function resetUser(input: { user?: string }): Promise<Result<ResetUserData>> {
   try {

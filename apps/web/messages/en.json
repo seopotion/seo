@@ -178,6 +178,7 @@
       "connectFailed": "We couldn't save this connection. Please try again.",
       "expired": "This setup link has expired. Start again from Settings.",
       "installationGone": "We can no longer reach that GitHub installation. Install the app again from Settings.",
+      "invalidPostBase": "Enter an http(s) URL without query or fragment — for example https://example.com/blog.",
       "noAccess": "We can't reach that repository or branch. Check the branch name, and that the repository is still selected in the GitHub app.",
       "noWriteAccess": "The GitHub app has no write access to that repository. Install it again and allow write access to repository contents.",
       "redeemFailed": "We couldn't finish the GitHub installation. Please try again from Settings."
@@ -186,6 +187,8 @@
     "pendingApproval": "Your organization's owner has to approve the installation. GitHub will bring you back here once they do.",
     "pickBody": "We commit Markdown files and a manifest; your existing build and deploy do the rest.",
     "pickTitle": "Choose the repository to publish into",
+    "postUrlBase": "Post URL base",
+    "postUrlBaseHint": "Where your site serves a published post: this base plus the article's slug. If https://example.com/my-post is a post on your site, enter https://example.com.",
     "private": "Private",
     "redeeming": "Finishing the GitHub installation...",
     "saving": "Connecting...",

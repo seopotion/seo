@@ -75,7 +75,7 @@ export const dbCommand = defineCommand({
         try {
           const { setOrgPlan } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:set-plan', 'start');
 
           const result = await setOrgPlan({
@@ -290,7 +290,7 @@ export const dbCommand = defineCommand({
           const { strategyRun } = await import('../lib/db');
 
           emitter.warn(
-            'Writes to whatever MONGODB_URI targets and spends real provider credits — not a dry run.',
+            'Writes to whatever MONGO_URI targets and spends real provider credits — not a dry run.',
           );
           emitter.step('db:strategy-run', 'start');
 
@@ -326,8 +326,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? "Writes to whatever MONGODB_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
+              ? "Writes to whatever MONGO_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
           );
           emitter.step('db:clean-links', 'start');
 
@@ -380,8 +380,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? 'Writes to whatever MONGODB_URI targets. Regeneration bills the image provider and produces DIFFERENT images; republish every published article it touches.'
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Pass --apply to write.',
+              ? 'Writes to whatever MONGO_URI targets. Regeneration bills the image provider and produces DIFFERENT images; republish every published article it touches.'
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Pass --apply to write.',
           );
           emitter.step('db:reset-images', 'start');
 
@@ -398,6 +398,39 @@ export const dbCommand = defineCommand({
               `${result.data.reset.length} article(s) blanked but NOT requeued — replay each with POST /admin/articles/{id}/images, or rerun with --enqueue.`,
             );
           }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'set-post-base': defineCommand({
+      meta: {
+        name: 'set-post-base',
+        description:
+          "Set a static-site connection's post URL base (#228): a published post lives at <base>/<slug>",
+      },
+      args: {
+        org: { type: 'string', description: 'Org id' },
+        base: { type: 'string', description: 'http(s) URL posts are served under' },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { setPostBase } = await import('../lib/links');
+
+          emitter.warn('Writes to whatever MONGO_URI targets — safe and intended for prod.');
+          emitter.step('db:set-post-base', 'start');
+
+          const result = await setPostBase({
+            org: args.org as string | undefined,
+            base: args.base as string | undefined,
+          });
+          emitter.step('db:set-post-base', result.ok ? 'done' : 'fail');
           emitter.result(result);
 
           process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
@@ -448,8 +481,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? 'IRREVERSIBLE — deletes from whatever MONGODB_URI targets. Never run this against prod.'
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Pass --apply to delete.',
+              ? 'IRREVERSIBLE — deletes from whatever MONGO_URI targets. Never run this against prod.'
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Pass --apply to delete.',
           );
           emitter.step('db:delete-org', 'start');
 
@@ -488,7 +521,7 @@ export const dbCommand = defineCommand({
         try {
           const { deleteUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:delete-user', 'start');
 
           const result = await deleteUser({ user: args.user as string | undefined });
@@ -517,7 +550,7 @@ export const dbCommand = defineCommand({
         try {
           const { resetUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:reset-user', 'start');
 
           const result = await resetUser({ user: args.user as string | undefined });

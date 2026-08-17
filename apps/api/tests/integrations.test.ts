@@ -198,7 +198,12 @@ describe('POST /github/installation', () => {
 describe('POST /static-site', () => {
   test('verifies the repo before storing, and defaults the content path', async () => {
     const res = await client['static-site'].$post({
-      json: { grant: await grantFor(), repo: 'acme/site', branch: 'main' },
+      json: {
+        grant: await grantFor(),
+        repo: 'acme/site',
+        branch: 'main',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(res.status).toBe(200);
 
@@ -208,6 +213,7 @@ describe('POST /static-site', () => {
       repo: 'acme/site',
       branch: 'main',
       contentPath: 'seopotion/',
+      postUrlBase: 'https://acme.com',
     });
     // Verification runs first: a connection that cannot publish is never stored.
     expect(verifyRepoAccess.mock.invocationCallOrder[0]).toBeLessThan(
@@ -222,6 +228,7 @@ describe('POST /static-site', () => {
         repo: 'acme/site',
         branch: 'main',
         content_path: 'content/blog/',
+        post_url_base: 'https://acme.com',
       },
     });
     expect(connectStaticSite).toHaveBeenCalledWith(
@@ -230,11 +237,27 @@ describe('POST /static-site', () => {
     );
   });
 
+  test('rejects a post base a post URL cannot be built from, before any GitHub call', async () => {
+    for (const post_url_base of ['', 'not a url', 'ftp://a.com', 'https://a.com?page=2']) {
+      const res = await client['static-site'].$post({
+        json: { grant: await grantFor(), repo: 'acme/site', branch: 'main', post_url_base },
+      });
+      expect(res.status).toBe(400);
+    }
+    expect(verifyRepoAccess).not.toHaveBeenCalled();
+    expect(connectStaticSite).not.toHaveBeenCalled();
+  });
+
   test('the org and installation come from the grant, never from the body', async () => {
     // There is no org_id or installation_id field to send — the only way to name
     // either is a token we signed.
     const res = await client['static-site'].$post({
-      json: { grant: 'not-a-jwt', repo: 'acme/site', branch: 'main' },
+      json: {
+        grant: 'not-a-jwt',
+        repo: 'acme/site',
+        branch: 'main',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(res.status).toBe(400);
     if (res.status === 400) expect((await res.json()).code).toBe('invalid_grant');
@@ -245,7 +268,12 @@ describe('POST /static-site', () => {
       installation_id: 4242,
     });
     const stolen = await client['static-site'].$post({
-      json: { grant: someoneElse, repo: 'acme/site', branch: 'main' },
+      json: {
+        grant: someoneElse,
+        repo: 'acme/site',
+        branch: 'main',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(stolen.status).toBe(400);
     expect(connectStaticSite).not.toHaveBeenCalled();
@@ -258,14 +286,19 @@ describe('POST /static-site', () => {
       installation_id: 4242,
     });
     const res = await client['static-site'].$post({
-      json: { grant, repo: 'acme/site', branch: 'main' },
+      json: { grant, repo: 'acme/site', branch: 'main', post_url_base: 'https://acme.com' },
     });
     expect(res.status).toBe(404);
   });
 
   test('rejects a malformed repo before any GitHub call', async () => {
     const res = await client['static-site'].$post({
-      json: { grant: await grantFor(), repo: 'site', branch: 'main' },
+      json: {
+        grant: await grantFor(),
+        repo: 'site',
+        branch: 'main',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(res.status).toBe(400);
     expect(verifyRepoAccess).not.toHaveBeenCalled();
@@ -274,7 +307,12 @@ describe('POST /static-site', () => {
   test('422 when GitHub cannot reach the repo, and nothing is stored', async () => {
     verifyRepoAccess.mockRejectedValueOnce(new GithubError('repo_not_found', 'no such branch'));
     const res = await client['static-site'].$post({
-      json: { grant: await grantFor(), repo: 'acme/site', branch: 'nope' },
+      json: {
+        grant: await grantFor(),
+        repo: 'acme/site',
+        branch: 'nope',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(res.status).toBe(422);
     if (res.status === 422) expect((await res.json()).code).toBe('repo_not_found');
@@ -286,7 +324,12 @@ describe('POST /static-site', () => {
     // race-proof answer rather than a check-then-write.
     connectStaticSite.mockResolvedValueOnce(false);
     const res = await client['static-site'].$post({
-      json: { grant: await grantFor(), repo: 'acme/site', branch: 'main' },
+      json: {
+        grant: await grantFor(),
+        repo: 'acme/site',
+        branch: 'main',
+        post_url_base: 'https://acme.com',
+      },
     });
     expect(res.status).toBe(409);
     if (res.status === 409) expect((await res.json()).code).toBe('installation_claimed');

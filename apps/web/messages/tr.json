@@ -178,6 +178,7 @@
       "connectFailed": "Bu bağlantı kaydedilemedi. Lütfen tekrar deneyin.",
       "expired": "Bu kurulum bağlantısının süresi doldu. Ayarlar'dan yeniden başlayın.",
       "installationGone": "Bu GitHub kurulumuna artık erişemiyoruz. Uygulamayı Ayarlar'dan yeniden kurun.",
+      "invalidPostBase": "Sorgu veya fragment içermeyen bir http(s) URL'si girin — örneğin https://example.com/blog.",
       "noAccess": "Bu depoya veya dala erişemiyoruz. Dal adını ve deponun GitHub uygulamasında hâlâ seçili olduğunu kontrol edin.",
       "noWriteAccess": "GitHub uygulamasının bu depoda yazma izni yok. Uygulamayı yeniden kurup depo içeriği için yazma izni verin.",
       "redeemFailed": "GitHub kurulumu tamamlanamadı. Lütfen Ayarlar'dan tekrar deneyin."
@@ -186,6 +187,8 @@
     "pendingApproval": "Kurulumun kuruluş sahibiniz tarafından onaylanması gerekiyor. Onayladığında GitHub sizi buraya geri getirecek.",
     "pickBody": "Markdown dosyalarını ve bir manifest dosyasını commit ederiz; gerisini mevcut derleme ve dağıtım akışınız yapar.",
     "pickTitle": "Yayınlanacak depoyu seçin",
+    "postUrlBase": "Yazı URL tabanı",
+    "postUrlBaseHint": "Sitenizin yayınlanan bir yazıyı sunduğu adres: bu taban artı makalenin slug'ı. https://example.com/my-post sitenizde bir yazıysa https://example.com girin.",
     "private": "Özel",
     "redeeming": "GitHub kurulumu tamamlanıyor...",
     "saving": "Bağlanıyor...",
