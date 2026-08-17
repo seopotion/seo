@@ -51,7 +51,7 @@ against the code; the map is accurate, with these sharpenings/corrections:
 6. Confirmed as stated: `CandidateRepo.setStatus` is dead code (`candidate.repo.ts:139`);
    `hasExpert` is called nowhere outside its test; `wordpress_token` is stored
    plaintext (vs. the AES-256-GCM GSC token); no entity anywhere has provenance
-   (who/what wrote this); the CLI's only identity is "whoever has `MONGODB_URI`".
+   (who/what wrote this); the CLI's only identity is "whoever has `MONGO_URI`".
 
 ---
 
@@ -240,7 +240,7 @@ WordPress sites. Assets, adversaries, mitigations:
 | Confused-deputy bug (new admin route forgets auth) | Router-global middleware (fail closed) |
 | Secret/token exfiltration through admin *reads* | Response DTO mappers only (the `toArticleDetail` pattern) — never return raw entities. `wordpress_token` → `{ connected, connected_at }`; `refresh_token_enc` never returned; the admin Lambda is **not granted** `GSC_TOKEN_KEY_PARAM`, the customer JWT secret, or the Google client secret at all (least privilege — it can't decrypt what it can't read) |
 | Insider misuse | Append-only audit log (§8): insert+list repo only, no update/delete methods; both operators can read it |
-| Wrong-environment mistakes (the CLI's "applies to whatever `MONGODB_URI` targets" footgun) | The admin *URL* determines the environment — no ambient config. UI shows a persistent stage banner (staging/prod) derived from the URL it's pointed at |
+| Wrong-environment mistakes (the CLI's "applies to whatever `MONGO_URI` targets" footgun) | The admin *URL* determines the environment — no ambient config. UI shows a persistent stage banner (staging/prod) derived from the URL it's pointed at |
 | Network exposure | v0: auth only (the unhosted local UI is convenience, not security). API Gateway IP allowlisting / WAF is a phase-3 hardening, listed in §11 |
 
 ---
