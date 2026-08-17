@@ -75,7 +75,7 @@ export const dbCommand = defineCommand({
         try {
           const { setOrgPlan } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:set-plan', 'start');
 
           const result = await setOrgPlan({
@@ -290,7 +290,7 @@ export const dbCommand = defineCommand({
           const { strategyRun } = await import('../lib/db');
 
           emitter.warn(
-            'Writes to whatever MONGODB_URI targets and spends real provider credits — not a dry run.',
+            'Writes to whatever MONGO_URI targets and spends real provider credits — not a dry run.',
           );
           emitter.step('db:strategy-run', 'start');
 
@@ -326,8 +326,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? "Writes to whatever MONGODB_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
+              ? "Writes to whatever MONGO_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the dead links."
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
           );
           emitter.step('db:clean-links', 'start');
 
@@ -391,8 +391,8 @@ export const dbCommand = defineCommand({
 
           emitter.warn(
             args.apply
-              ? 'IRREVERSIBLE — deletes from whatever MONGODB_URI targets. Never run this against prod.'
-              : 'Dry run against whatever MONGODB_URI targets — nothing is written. Pass --apply to delete.',
+              ? 'IRREVERSIBLE — deletes from whatever MONGO_URI targets. Never run this against prod.'
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Pass --apply to delete.',
           );
           emitter.step('db:delete-org', 'start');
 
@@ -431,7 +431,7 @@ export const dbCommand = defineCommand({
         try {
           const { deleteUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:delete-user', 'start');
 
           const result = await deleteUser({ user: args.user as string | undefined });
@@ -460,7 +460,7 @@ export const dbCommand = defineCommand({
         try {
           const { resetUser } = await import('../lib/db');
 
-          emitter.warn('Applies to whatever MONGODB_URI targets — never run this against prod.');
+          emitter.warn('Applies to whatever MONGO_URI targets — never run this against prod.');
           emitter.step('db:reset-user', 'start');
 
           const result = await resetUser({ user: args.user as string | undefined });
