@@ -143,6 +143,7 @@
     "notConfigured": "Google sign-in is not configured",
     "retry": "Retry",
     "signInError": "Google sign-in failed. Try again.",
+    "signUp": "Sign Up",
     "signingIn": "Signing in...",
     "workspaceError": "Could not check your workspace."
   },
@@ -1000,6 +1001,7 @@
     "useCasesTitle": "Built for"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. All rights reserved.",
     "features": "Features",
     "legalNavigationLabel": "Legal",
@@ -1032,7 +1034,8 @@
     "links": {
       "features": "Features",
       "pricing": "Pricing",
-      "docs": "Docs"
+      "docs": "Docs",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logo",
     "primaryNavigation": "Primary navigation"

@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: '/#features', key: 'features' },
   { href: '/pricing', key: 'pricing' },
   { href: '/docs', key: 'docs' },
+  { href: '/blog', key: 'blog' },
 ] as const;
 
 const linkClassName =

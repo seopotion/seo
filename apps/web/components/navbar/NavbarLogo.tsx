@@ -12,7 +12,7 @@ export function NavbarLogo() {
       aria-label={t('homeLabel')}
     >
       <Image src="/android-chrome-192x192.png" alt={t('logoAlt')} width={32} height={32} />
-      <span className="text-2xl font-bold text-gray-900">Seopotion</span>
+      <span className="text-lg font-bold text-gray-900 sm:text-2xl">Seopotion</span>
     </Link>
   );
 }

@@ -143,6 +143,7 @@
     "notConfigured": "Google ile oturum açma yapılandırılmamış",
     "retry": "Tekrar dene",
     "signInError": "Google ile oturum açılamadı. Tekrar deneyin.",
+    "signUp": "Kaydol",
     "signingIn": "Oturum açılıyor...",
     "workspaceError": "Çalışma alanınız kontrol edilemedi."
   },
@@ -1000,6 +1001,7 @@
     "useCasesTitle": "Kimler için geliştirildi?"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
     "features": "Özellikler",
     "legalNavigationLabel": "Yasal",
@@ -1032,7 +1034,8 @@
     "links": {
       "features": "Özellikler",
       "pricing": "Fiyatlandırma",
-      "docs": "Dokümanlar"
+      "docs": "Dokümanlar",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"
