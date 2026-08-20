@@ -370,7 +370,7 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', youtube_videos: true },
+            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
             publishing: { auto_publish: false },
           },
         },
@@ -405,7 +405,7 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', youtube_videos: true },
+            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
             publishing: { auto_publish: false },
           },
         },
@@ -2245,6 +2245,47 @@ describe('dashboard settings persistence', () => {
       expect(body.article_preferences.content_seo.internal_links_count).toBe(2);
       expect(body.article_preferences.content_seo.table_of_contents).toBe(false);
       expect(body.article_preferences.publishing.auto_publish).toBe(true);
+    }
+  });
+
+  test('PATCH /settings/articles persists a disabled CTA preference', async () => {
+    const opts = await auth();
+    const res = await client.api.v0.dashboard.settings.articles.$patch(
+      { json: { org_id: 'org_1', engagement: { include_cta: false } } },
+      opts,
+    );
+    expect(res.status).toBe(200);
+    if (res.status === 200) {
+      const preferences = (await res.json()).article_preferences;
+      expect(preferences.engagement.include_cta).toBe(false);
+      expect(preferences.engagement.image_style).toBeTruthy();
+      expect(preferences.content_seo.article_style).toBeTruthy();
+    }
+  });
+
+  test('PATCH /settings/articles preserves disabled engagement siblings on a partial update', async () => {
+    const opts = await auth();
+    const disabled = await client.api.v0.dashboard.settings.articles.$patch(
+      {
+        json: {
+          org_id: 'org_1',
+          engagement: { include_cta: false, youtube_videos: false },
+        },
+      },
+      opts,
+    );
+    expect(disabled.status).toBe(200);
+
+    const updated = await client.api.v0.dashboard.settings.articles.$patch(
+      { json: { org_id: 'org_1', engagement: { image_style: 'Photography' } } },
+      opts,
+    );
+    expect(updated.status).toBe(200);
+    if (updated.status === 200) {
+      const engagement = (await updated.json()).article_preferences.engagement;
+      expect(engagement.image_style).toBe('Photography');
+      expect(engagement.include_cta).toBe(false);
+      expect(engagement.youtube_videos).toBe(false);
     }
   });
 });

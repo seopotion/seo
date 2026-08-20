@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { SetupPresetsSchema } from '../src/presets';
+import { EngagementPrefsPatchSchema, SetupPresetsSchema } from '../src/presets';
 
 const base = {
   business: { name: 'n', language: 'English', country: 'United States', description: 'd' },
@@ -48,8 +48,30 @@ describe('SetupPresetsSchema article_preferences defaults + validation', () => {
     });
     expect(p.article_preferences.content_seo.internal_links_count).toBe(1);
     expect(p.article_preferences.content_seo.table_of_contents).toBe(true);
+    expect(p.article_preferences.engagement.include_cta).toBe(true);
     expect(p.article_preferences.engagement.youtube_videos).toBe(true);
     expect(p.article_preferences.publishing.auto_publish).toBe(false);
+  });
+
+  test('preserves an explicitly disabled CTA preference', () => {
+    const p = SetupPresetsSchema.parse({
+      ...base,
+      audience: { target: [], competitors: [] },
+      article_preferences: {
+        ...base.article_preferences,
+        engagement: { image_style: 'i', include_cta: false },
+      },
+    });
+    expect(p.article_preferences.engagement.include_cta).toBe(false);
+  });
+
+  test('engagement patches do not inject defaults for omitted fields', () => {
+    expect(EngagementPrefsPatchSchema.parse({ image_style: 'Photo' })).toEqual({
+      image_style: 'Photo',
+    });
+    expect(EngagementPrefsPatchSchema.parse({ youtube_videos: false })).toEqual({
+      youtube_videos: false,
+    });
   });
 
   test('rejects an out-of-range internal_links_count', () => {

@@ -152,7 +152,7 @@ const org = {
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: 'flat illustration', youtube_videos: true },
+      engagement: { image_style: 'flat illustration', include_cta: true, youtube_videos: true },
       publishing: { auto_publish: false },
     },
   },

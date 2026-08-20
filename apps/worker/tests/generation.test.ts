@@ -93,7 +93,7 @@ const org = {
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: '', youtube_videos: true },
+      engagement: { image_style: '', include_cta: true, youtube_videos: true },
       publishing: { auto_publish: false },
     },
   },
@@ -314,7 +314,7 @@ describe('generation worker', () => {
         ...org.presets,
         article_preferences: {
           ...org.presets.article_preferences,
-          engagement: { image_style: '', youtube_videos: false },
+          engagement: { image_style: '', include_cta: true, youtube_videos: false },
         },
       },
     });

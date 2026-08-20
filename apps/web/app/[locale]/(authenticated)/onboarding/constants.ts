@@ -61,6 +61,7 @@ export const initialForm: OnboardingForm = {
   blogPageUrl: '',
   blogPosts: ['', '', ''],
   articleStyle: '',
+  includeCta: true,
   internalLinksCount: '1',
   tableOfContents: true,
   youtubeVideos: true,

@@ -757,6 +757,10 @@
           "noDestinationEnabled": "Otomatik yayınlama açık kalır ancak bir yayınlama hedefi bağlanana kadar gelecekteki otomatik denemeler çalışmayabilir."
         }
       },
+      "includeCta": {
+        "description": "Oluşturulan makalelerin sonuna yakın ilgili bir harekete geçirici mesaj ekleyin.",
+        "label": "Harekete geçirici mesaj"
+      },
       "internalLinks": {
         "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
         "label": "İç bağlantılar"
@@ -1052,6 +1056,7 @@
     },
     "articleSettings": {
       "articleStyle": "Makale stili",
+      "includeCta": "Harekete geçirici mesaj",
       "internalLinksCount": "İç bağlantı sayısı",
       "selectStyle": "Stil seç",
       "tableOfContents": "İçindekiler",

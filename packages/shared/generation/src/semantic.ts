@@ -18,6 +18,9 @@ export function buildSemanticCheckPrompt(ctx: GenerationContext, markdown: strin
     '- the article makes unsupported or unverifiable claims about the business;',
     '- it promotes, recommends, or links to a competitor;',
     '- the target keyword is stuffed unnaturally or is entirely absent;',
+    ctx.includeCta
+      ? '- it lacks one concise, relevant call to action near the end;'
+      : '- it contains a call to action, including an invitation to contact, subscribe, buy, book, download, sign up, or take another next step;',
     topic
       ? '- the article materially ignores its assigned content focus or violates its pillar/support scope;'
       : '',

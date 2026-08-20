@@ -10,6 +10,7 @@ export interface GenerationContext extends TopicBriefFields {
   audience: string;
   competitors: string[];
   articleStyle: string;
+  includeCta: boolean;
   // Ceiling on internal links, never a quota (#186). The pre-#186 `internalLinks`
   // boolean collapsed the 0-3 preset to yes/no, which is why a preset of 1 shipped
   // 3-6 links.

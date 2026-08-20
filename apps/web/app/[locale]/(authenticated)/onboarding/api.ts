@@ -46,6 +46,7 @@ type OnboardingFormPatch = Partial<
     | 'businessName'
     | 'competitors'
     | 'country'
+    | 'includeCta'
     | 'internalLinksCount'
     | 'language'
     | 'sitemapUrl'
@@ -101,7 +102,7 @@ function toBlogPosts(values: string[]): [string, string, string] {
   return [blogPosts[0] ?? '', blogPosts[1] ?? '', blogPosts[2] ?? ''];
 }
 
-function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
+export function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
   return {
     articleStyle: presets.article_preferences.content_seo.article_style,
     blogPageUrl: presets.blog.main_blog_url,
@@ -113,6 +114,7 @@ function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
       'competitor',
     ),
     country: presets.business.country,
+    includeCta: presets.article_preferences.engagement.include_cta,
     internalLinksCount: String(presets.article_preferences.content_seo.internal_links_count),
     language: presets.business.language,
     sitemapUrl: presets.blog.sitemap_url,
@@ -120,7 +122,7 @@ function mapPresetsToFormPatch(presets: SetupPresets): OnboardingFormPatch {
   };
 }
 
-function buildPresetsPatch(form: OnboardingForm): SetupPresetsPatch {
+export function buildPresetsPatch(form: OnboardingForm): SetupPresetsPatch {
   return {
     business: {
       name: form.businessName.trim(),
@@ -141,6 +143,9 @@ function buildPresetsPatch(form: OnboardingForm): SetupPresetsPatch {
       content_seo: {
         article_style: form.articleStyle,
         internal_links_count: Number.parseInt(form.internalLinksCount, 10),
+      },
+      engagement: {
+        include_cta: form.includeCta,
       },
     },
   };
