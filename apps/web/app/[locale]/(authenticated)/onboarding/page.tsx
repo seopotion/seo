@@ -1,11 +1,12 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher';
 import { Button, Card, CardContent } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { clearToken, getToken } from '@/lib/auth';
+import { useConnectedIntegrations } from '@/lib/integrations';
 import {
   clearWorkspaceStatusCache,
   getWorkspaceStatus,
@@ -17,6 +18,7 @@ import { ErrorMessage } from './components/ErrorMessage';
 import { ProgressSteps } from './components/ProgressSteps';
 import { StepNavigation } from './components/StepNavigation';
 import { initialForm, MAX_TARGET_AUDIENCES, steps } from './constants';
+import { clearOnboardingIntegrations, toOnboardingIntegrationIds } from './integrations';
 import { ArticleSettingsStep } from './steps/ArticleSettingsStep';
 import { AudienceCompetitorsStep } from './steps/AudienceCompetitorsStep';
 import { BlogInfoStep } from './steps/BlogInfoStep';
@@ -45,6 +47,23 @@ export default function OnboardingPage() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [workspaceGate, setWorkspaceGate] = useState<'checking' | 'error' | 'ready'>('checking');
   const scanRunIdRef = useRef(0);
+
+  const handleUnauthorized = useCallback(() => {
+    clearToken();
+    clearWorkspaceStatusCache();
+    router.replace('/');
+  }, [router]);
+
+  const connectedIntegrationsQuery = useConnectedIntegrations(orgId, {
+    onUnauthorized: handleUnauthorized,
+  });
+  const connectedIntegrationIds = useMemo(
+    () =>
+      connectedIntegrationsQuery.data
+        ? toOnboardingIntegrationIds(connectedIntegrationsQuery.data.integrations)
+        : [],
+    [connectedIntegrationsQuery.data],
+  );
 
   const checkWorkspaceGate = useCallback(
     async (isCancelled: () => boolean = () => false) => {
@@ -97,6 +116,27 @@ export default function OnboardingPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!connectedIntegrationsQuery.isSuccess || connectedIntegrationsQuery.isFetching) return;
+
+    setForm((currentForm) => {
+      if (
+        currentForm.integrations.length === connectedIntegrationIds.length &&
+        currentForm.integrations.every((integration) =>
+          connectedIntegrationIds.includes(integration),
+        )
+      ) {
+        return currentForm;
+      }
+
+      return { ...currentForm, integrations: connectedIntegrationIds };
+    });
+  }, [
+    connectedIntegrationIds,
+    connectedIntegrationsQuery.isFetching,
+    connectedIntegrationsQuery.isSuccess,
+  ]);
+
   function clearErrors(...keys: string[]) {
     setErrors((currentErrors) => {
       const nextErrors = { ...currentErrors };
@@ -124,7 +164,11 @@ export default function OnboardingPage() {
 
   function updateWebsiteUrl(value: string) {
     scanRunIdRef.current += 1;
-    updateField('websiteUrl', value, ['websiteUrl', 'scan']);
+    setForm((currentForm) => ({
+      ...clearOnboardingIntegrations(currentForm),
+      websiteUrl: value,
+    }));
+    clearErrors('websiteUrl', 'scan');
     setOrgId(null);
     setScanState('idle');
   }
@@ -216,6 +260,7 @@ export default function OnboardingPage() {
     });
     setScanState('scanning');
     setOrgId(null);
+    setForm(clearOnboardingIntegrations);
 
     const scanRunId = scanRunIdRef.current + 1;
     scanRunIdRef.current = scanRunId;
@@ -292,7 +337,13 @@ export default function OnboardingPage() {
     setErrors({});
 
     try {
-      await completeOnboarding(orgId, form);
+      const integrationsResult = await connectedIntegrationsQuery.refetch();
+      if (integrationsResult.isError || !integrationsResult.data) {
+        throw new OnboardingApiError('request_failed');
+      }
+
+      const verifiedIntegrations = toOnboardingIntegrationIds(integrationsResult.data.integrations);
+      await completeOnboarding(orgId, form, verifiedIntegrations);
       const workspaceStatus = await getWorkspaceStatus({ useCache: false });
 
       if (!workspaceStatus.ok && workspaceStatus.reason === 'unauthorized') {
@@ -389,17 +440,6 @@ export default function OnboardingPage() {
     clearErrors('competitors');
   }
 
-  function toggleIntegration(integrationId: string) {
-    setForm((currentForm) => {
-      const selected = currentForm.integrations.includes(integrationId);
-
-      return {
-        ...currentForm,
-        integrations: selected ? [] : [integrationId],
-      };
-    });
-  }
-
   function renderCurrentStep() {
     if (currentStep === 0) {
       return (
@@ -451,8 +491,13 @@ export default function OnboardingPage() {
 
     return (
       <IntegrationsStep
+        connectedIntegrationIds={connectedIntegrationIds}
         form={form}
-        toggleIntegration={toggleIntegration}
+        integrationsError={connectedIntegrationsQuery.isError}
+        integrationsLoading={connectedIntegrationsQuery.isFetching}
+        onUnauthorized={handleUnauthorized}
+        onRetryIntegrations={() => void connectedIntegrationsQuery.refetch()}
+        organizationId={orgId}
         updateField={updateField}
       />
     );
@@ -501,7 +546,7 @@ export default function OnboardingPage() {
               currentStep={currentStep}
               finishLabel={isFinishing ? t('actions.finalizing') : t('actions.getStarted')}
               isFinalStep={currentStep === steps.length - 1}
-              isFinishDisabled={isFinishing}
+              isFinishDisabled={isFinishing || connectedIntegrationsQuery.isFetching}
               isNextDisabled={scanState === 'scanning' || isFinishing}
               onBack={handleBack}
               onFinish={() => void handleFinish()}

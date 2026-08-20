@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
+import { StatusPanel } from '@/components/integrations/StatusPanel';
 import { Button, Modal } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
@@ -14,7 +15,6 @@ import {
   PUBLISH_ERROR_KEYS,
 } from '@/lib/integrations';
 import type { ProductOrganization } from '@/lib/organizations';
-import { StatusPanel } from './StatusPanel';
 
 type InstallErrorKey = 'installFailed' | 'notConfigured';
 

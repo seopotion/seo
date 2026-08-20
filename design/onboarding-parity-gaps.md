@@ -21,18 +21,19 @@ Our baseline mirrors Outrank's spine 1:1:
 | Finish → dashboard | `POST /setup/finalize` → `setup_complete` | same terminal state |
 
 Outrank's review wizard steps (**Business → Audience & Competitors → Blog → Articles →
-Integration**) map onto our four `SetupPresetsSchema` top-level keys — except
-**Integration**, which we don't model (see G1).
+Integration**) map onto our wizard. The preset steps use the four `SetupPresetsSchema`
+top-level keys; Integration reads and writes the separate generalized integration entity.
 
 ## Gap backlog (deferred, prioritized)
 
-### G1 — No integrations / publishing model *(already tracked in PROGRESS.md)*
+### G1 — Integrations / publishing model *(completed for self-hosted WordPress)*
 Outrank's Integration step connects a CMS to auto-publish articles (WordPress, Notion,
 Webflow, Shopify, Wix, WordPress.com, API Webhook, Framer, Ghost, Next.js Blog, Feather).
-We capture *where the blog is* (`blog.sitemap_url` / `blog.main_blog_url`) but have **no
-connected-CMS entity and no OAuth/token storage**. `⬜ GET/POST /setup/integrations` is
-the placeholder. Largest missing subsystem; deferred because auth/token handling per
-platform is expensive.
+Our generalized `integrations` entity stores verified WordPress and static-site connections.
+The optional onboarding step reuses `GET /dashboard/integrations/connected` and
+`POST /dashboard/integrations/wordpress`, so it does not duplicate those operations under
+`/setup`. Static-site/GitHub onboarding remains deferred because its external redirect needs
+the unfinished wizard state and callback destination to be restored.
 
 ### G2 — `article_preferences` is a thin subset (~4 of ~20 controls)
 Baseline: `content_seo.{article_style, internal_links, llm_instructions}` +

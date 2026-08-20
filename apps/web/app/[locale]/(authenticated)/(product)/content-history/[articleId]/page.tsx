@@ -242,7 +242,7 @@ export default function ArticleDetailPage() {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [dirty]);
 
-  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization?.id ?? null, {
     enabled: !redirecting && !organizationLoading,
     onUnauthorized: handleUnauthorized,
   });

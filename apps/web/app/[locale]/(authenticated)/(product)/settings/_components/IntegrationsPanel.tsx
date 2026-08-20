@@ -5,14 +5,14 @@ import { GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { StatusPanel } from '@/components/integrations/StatusPanel';
+import { WordPressDialog } from '@/components/integrations/WordPressDialog';
 import { Badge, Button } from '@/components/ui';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { PUBLISH_ERROR_KEYS, RECONNECT_CODES, useConnectedIntegrations } from '@/lib/integrations';
 import type { ProductOrganization } from '@/lib/organizations';
 import { cn } from '@/lib/utils';
 import { StaticSiteDialog } from './StaticSiteDialog';
-import { StatusPanel } from './StatusPanel';
-import { WordPressDialog } from './WordPressDialog';
 
 type DialogProvider = 'wordpress' | 'static-site';
 
@@ -40,7 +40,7 @@ export function IntegrationsPanel({
     [locale],
   );
 
-  const connectedQuery = useConnectedIntegrations(organization, { onUnauthorized });
+  const connectedQuery = useConnectedIntegrations(organization?.id ?? null, { onUnauthorized });
   const wordpressIntegration = connectedQuery.data?.integrations.find(
     (integration) => integration.provider === 'wordpress',
   );
@@ -226,7 +226,8 @@ export function IntegrationsPanel({
         }}
         onUnauthorized={onUnauthorized}
         open={openDialog === 'wordpress'}
-        organization={organization}
+        organizationId={organization?.id ?? null}
+        siteUrl={organization?.website_url ?? ''}
       />
       <StaticSiteDialog
         dateFormatter={dateFormatter}

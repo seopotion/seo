@@ -7,7 +7,6 @@ import { useId, useState } from 'react';
 import { Button, Input, Label, Modal } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
-import type { ProductOrganization } from '@/lib/organizations';
 import { cn } from '@/lib/utils';
 import { StatusPanel } from './StatusPanel';
 
@@ -41,14 +40,16 @@ export function WordPressDialog({
   onConnected,
   onUnauthorized,
   open,
-  organization,
+  organizationId,
+  siteUrl,
 }: {
   isConnected: boolean;
   onClose: () => void;
   onConnected: () => void;
   onUnauthorized: () => void;
   open: boolean;
-  organization: ProductOrganization | null;
+  organizationId: string | null;
+  siteUrl: string;
 }) {
   const t = useTranslations('SettingsPage.wordpress');
   const actionsT = useTranslations('SettingsPage.actions');
@@ -57,14 +58,14 @@ export function WordPressDialog({
   const [token, setToken] = useState('');
   const [connectError, setConnectError] = useState<ConnectError | null>(null);
 
-  const siteUrl = (organization?.website_url ?? '').replace(/\/+$/, '');
+  const normalizedSiteUrl = siteUrl.replace(/\/+$/, '');
 
   const connectMutation = useMutation({
     mutationFn: async () => {
-      if (!organization) throw new Error('organization_required');
+      if (!organizationId) throw new Error('organization_required');
 
       const response = await api.api.v0.dashboard.integrations.wordpress.$post({
-        json: { org_id: organization.id, token: token.trim() },
+        json: { org_id: organizationId, token: token.trim() },
       });
 
       if ((response.status as number) === 401) {
@@ -89,17 +90,8 @@ export function WordPressDialog({
         return;
       }
 
-      if (organization) {
-        const connectedIntegrationsKey = dashboardQueryKeys.connectedIntegrations(organization.id);
-        queryClient.setQueryData(connectedIntegrationsKey, {
-          integrations: [
-            {
-              id: 'wordpress',
-              provider: 'wordpress' as const,
-              connected_at: new Date().toISOString(),
-            },
-          ],
-        });
+      if (organizationId) {
+        const connectedIntegrationsKey = dashboardQueryKeys.connectedIntegrations(organizationId);
         void queryClient.invalidateQueries({ queryKey: connectedIntegrationsKey });
       }
 
@@ -121,7 +113,7 @@ export function WordPressDialog({
   });
 
   function handleConnect() {
-    if (!organization || !token.trim() || connectMutation.isPending) return;
+    if (!organizationId || !token.trim() || connectMutation.isPending) return;
 
     setConnectError(null);
     connectMutation.mutate();
@@ -187,7 +179,7 @@ export function WordPressDialog({
                   directory-search page and the self-hosted zip becomes a fallback. */}
               <Button asChild size="sm" variant="outline">
                 <a
-                  href={`${siteUrl}/wp-admin/plugin-install.php?tab=upload`}
+                  href={`${normalizedSiteUrl}/wp-admin/plugin-install.php?tab=upload`}
                   rel="noopener noreferrer"
                   target="_blank"
                 >
@@ -198,7 +190,7 @@ export function WordPressDialog({
             </div>
           </li>
           <SetupStep
-            actionHref={`${siteUrl}/wp-admin/admin.php?page=seo-potion-manage`}
+            actionHref={`${normalizedSiteUrl}/wp-admin/admin.php?page=seo-potion-manage`}
             actionLabel={t('step2Action')}
             body={t('step2Body')}
             failed={connectError?.step === 2}
@@ -236,7 +228,7 @@ export function WordPressDialog({
 
       <footer className="flex shrink-0 flex-wrap items-center gap-2 border-slate-200 border-t px-4 py-4 sm:px-6">
         <Button
-          disabled={!organization || !token.trim() || connectMutation.isPending}
+          disabled={!organizationId || !token.trim() || connectMutation.isPending}
           onClick={handleConnect}
           type="button"
         >

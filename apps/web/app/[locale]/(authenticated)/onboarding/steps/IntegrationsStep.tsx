@@ -1,5 +1,8 @@
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+import { StatusPanel } from '@/components/integrations/StatusPanel';
+import { WordPressDialog } from '@/components/integrations/WordPressDialog';
 import {
   Badge,
   Button,
@@ -36,37 +39,59 @@ export const integrationOptions = [
 ] as const;
 
 export function IntegrationsStep({
+  connectedIntegrationIds,
   form,
-  toggleIntegration,
+  integrationsError,
+  integrationsLoading,
+  onUnauthorized,
+  onRetryIntegrations,
+  organizationId,
   updateField,
 }: {
+  connectedIntegrationIds: OnboardingForm['integrations'];
   form: OnboardingForm;
-  toggleIntegration: (integrationId: string) => void;
+  integrationsError: boolean;
+  integrationsLoading: boolean;
+  onUnauthorized: () => void;
+  onRetryIntegrations: () => void;
+  organizationId: string | null;
   updateField: UpdateOnboardingField;
 }) {
   const t = useTranslations('Onboarding.integrations');
   const optionsT = useTranslations('Onboarding.options');
+  const [wordpressDialogOpen, setWordpressDialogOpen] = useState(false);
+  const [justConnected, setJustConnected] = useState(false);
+  const wordpressConnected = connectedIntegrationIds.includes('wordpress');
 
   return (
     <div>
       <h2 className="font-bold text-2xl text-gray-900">{t('title')}</h2>
-      <p className="mt-2 text-gray-600 text-sm">{t('settingsNotice')}</p>
+      <p className="mt-2 text-gray-600 text-sm">{t('optionalNotice')}</p>
 
       <div className="mt-6">
         <p className="font-medium text-sm leading-none">{t('availableIntegrations')}</p>
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {integrationOptions.map((integration) => {
-            const selected = form.integrations.includes(integration.id);
+            const isWordPress = integration.id === 'wordpress';
+            const isConnected = isWordPress && wordpressConnected;
+            const isLoading = isWordPress && integrationsLoading;
 
             return (
               <Button
                 key={integration.id}
                 variant="outline"
-                onClick={() => toggleIntegration(integration.id)}
-                aria-pressed={selected}
+                type="button"
+                disabled={
+                  integration.comingSoon ||
+                  !organizationId ||
+                  (isWordPress && (integrationsLoading || integrationsError))
+                }
+                onClick={() => {
+                  if (isWordPress) setWordpressDialogOpen(true);
+                }}
                 className={cn(
-                  'h-auto justify-start gap-3 px-3 py-3 text-left',
-                  selected
+                  'h-auto min-h-16 justify-start gap-3 px-3 py-3 text-left',
+                  isConnected
                     ? 'border-primary bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary'
                     : 'text-foreground',
                 )}
@@ -76,13 +101,32 @@ export function IntegrationsStep({
                 </span>
                 <span className="font-semibold">{integration.name}</span>
                 {integration.comingSoon ? (
-                  <Badge variant="secondary">{t('comingSoon')}</Badge>
-                ) : null}
+                  <Badge className="ml-auto" variant="secondary">
+                    {t('comingSoon')}
+                  </Badge>
+                ) : isLoading ? (
+                  <span className="ml-auto text-muted-foreground text-xs">{t('loading')}</span>
+                ) : (
+                  <span className="ml-auto text-xs">{t(isConnected ? 'replace' : 'connect')}</span>
+                )}
               </Button>
             );
           })}
         </div>
-        <p className="mt-2 text-gray-500 text-sm">{t('connectWordPressLater')}</p>
+        {integrationsError ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <p className="text-red-600 text-sm">{t('loadError')}</p>
+            <Button onClick={onRetryIntegrations} size="sm" variant="outline">
+              {t('retry')}
+            </Button>
+          </div>
+        ) : null}
+        {justConnected ? (
+          <div className="mt-3">
+            <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel>
+          </div>
+        ) : null}
+        <p className="mt-2 text-gray-500 text-sm">{t('settingsNotice')}</p>
       </div>
 
       <div className="mt-6">
@@ -103,6 +147,19 @@ export function IntegrationsStep({
           </SelectContent>
         </Select>
       </div>
+
+      <WordPressDialog
+        isConnected={wordpressConnected}
+        onClose={() => setWordpressDialogOpen(false)}
+        onConnected={() => {
+          setJustConnected(true);
+          setWordpressDialogOpen(false);
+        }}
+        onUnauthorized={onUnauthorized}
+        open={wordpressDialogOpen}
+        organizationId={organizationId}
+        siteUrl={form.websiteUrl}
+      />
     </div>
   );
 }
