@@ -7,6 +7,8 @@ import {
   deduplicateLinkCandidates,
   deriveCandidates,
   extractH2s,
+  FLESCH_KINCAID_TARGET,
+  fleschKincaidGrade,
   generateArticle,
   injectBlockAfterHeading,
   type LinkCandidate,
@@ -162,6 +164,20 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         logger.warn('generation validation failed', { failures: result.failures });
         await KeywordRepo.failGeneration(keywordId, `validation: ${codes}`);
         continue;
+      }
+
+      if (ctx.language === 'English') {
+        const fkGrade = fleschKincaidGrade(result.article.content);
+        const readability = {
+          readability_metric: 'flesch_kincaid_grade',
+          fk_grade: fkGrade,
+          fk_target: FLESCH_KINCAID_TARGET,
+          fk_target_met: fkGrade !== null && fkGrade <= FLESCH_KINCAID_TARGET,
+        };
+        logger.info('article readability measured', readability);
+        if (fkGrade !== null && fkGrade > FLESCH_KINCAID_TARGET) {
+          logger.warn('article readability above target', readability);
+        }
       }
 
       // YouTube embed (#85): best-effort — any failure logs and the article

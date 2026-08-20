@@ -33,12 +33,14 @@ vi.mock('@shared/db', () => ({
   IntegrationRepo: { listByOrgId: listIntegrations },
 }));
 
-const { generateArticle, verifyCandidates } = vi.hoisted(() => ({
+const { fleschKincaidGrade, generateArticle, verifyCandidates } = vi.hoisted(() => ({
+  fleschKincaidGrade: vi.fn(() => 7.5 as number | null),
   generateArticle: vi.fn(),
   verifyCandidates: vi.fn(async (c: unknown[]) => c),
 }));
 vi.mock('@shared/generation', async (orig) => ({
   ...(await orig<typeof import('@shared/generation')>()),
+  fleschKincaidGrade,
   generateArticle,
   verifyCandidates,
 }));
@@ -139,6 +141,68 @@ const pickJson = (text: string) => ({
 describe('generation worker', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  test('measures and logs readability for an exact-English article', async () => {
+    const info = vi.spyOn(logger, 'info');
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(fleschKincaidGrade).toHaveBeenCalledWith(okArticle.article.content);
+    expect(info).toHaveBeenCalledWith('article readability measured', {
+      readability_metric: 'flesch_kincaid_grade',
+      fk_grade: 7.5,
+      fk_target: 8,
+      fk_target_met: true,
+    });
+  });
+
+  test('warns above target without failing, blocking creation, or blocking linking', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    findOrgById.mockResolvedValue(org);
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+    fleschKincaidGrade.mockReturnValueOnce(10.2);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(warn).toHaveBeenCalledWith('article readability above target', {
+      readability_metric: 'flesch_kincaid_grade',
+      fk_grade: 10.2,
+      fk_target: 8,
+      fk_target_met: false,
+    });
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(linkArticle).toHaveBeenCalledWith('k1', 'art1');
+    expect(failGeneration).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    'Turkish',
+    'english',
+  ])('does not measure or add FK log fields for language %s', async (language) => {
+    const info = vi.spyOn(logger, 'info');
+    const warn = vi.spyOn(logger, 'warn');
+    findOrgById.mockResolvedValue({
+      ...org,
+      presets: {
+        ...org.presets,
+        business: { ...org.presets.business, language },
+      },
+    });
+    findKeywordById.mockResolvedValue(keyword);
+    generateArticle.mockResolvedValue(okArticle);
+
+    await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
+
+    expect(fleschKincaidGrade).not.toHaveBeenCalled();
+    const loggedFields = [...info.mock.calls, ...warn.mock.calls].map((call) => call[1]);
+    expect(loggedFields).not.toContainEqual(
+      expect.objectContaining({ readability_metric: 'flesch_kincaid_grade' }),
+    );
+  });
+
   test('claims, generates, persists article, links keyword', async () => {
     findOrgById.mockResolvedValue(org);
     findKeywordById.mockResolvedValue(keyword);
@@ -195,6 +259,7 @@ describe('generation worker', () => {
     await handler(event({ org_id: 'o1', keyword_id: 'k1' }), {} as never, () => {});
 
     expect(createArticle).not.toHaveBeenCalled();
+    expect(fleschKincaidGrade).not.toHaveBeenCalled();
     expect(failGeneration).toHaveBeenCalledWith('k1', expect.stringContaining('validation'));
   });
 
@@ -234,6 +299,7 @@ describe('generation worker', () => {
       video: { video_id: string; section_heading: string };
     };
     expect(created.content).toContain('youtube-nocookie.com/embed/v1');
+    expect(fleschKincaidGrade).toHaveBeenCalledWith(okArticleWithSection.article.content);
     expect(created.video).toEqual({
       video_id: 'v1',
       title: 'Widget basics',

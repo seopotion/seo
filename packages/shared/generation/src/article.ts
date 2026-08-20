@@ -28,6 +28,9 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
       ? 'Topic scope: go deep on the assigned content focus. Do not broaden it into a second cluster overview, and keep it distinct from the pillar and other article targets.'
       : '',
     `Write the entire article in ${ctx.language}.`,
+    ctx.language === 'English'
+      ? 'Aim for Flesch-Kincaid grade level 8 or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.'
+      : '',
     linkLines.length
       ? 'Link to the internal pages listed below, at most once each, using descriptive anchor text. Use those exact URLs verbatim — never invent, shorten, or alter one — and include no other links of any kind.'
       : 'Do not include any hyperlinks.',

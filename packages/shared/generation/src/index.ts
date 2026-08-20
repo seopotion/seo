@@ -1,5 +1,6 @@
 export { buildArticlePrompt } from './article';
 export {
+  FLESCH_KINCAID_TARGET,
   HUMANIZE,
   INLINE_IMAGE_COUNT,
   MAX_GENERATION_ATTEMPTS,
@@ -35,6 +36,7 @@ export {
   staticSitePostUrl,
 } from './links';
 export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
+export { fleschKincaidGrade } from './readability';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
 export type { CompleteTopicBrief, TopicBriefFields } from './topic';
 export { completeTopicBrief } from './topic';
