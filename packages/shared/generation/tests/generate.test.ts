@@ -11,6 +11,7 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: [],
   articleStyle: 'practical',
+  includeCta: true,
   maxInternalLinks: 0,
   linkCandidates: [],
   llmInstructions: '',
@@ -34,6 +35,7 @@ const outlineJson = JSON.stringify({
     { heading: 'One', intent: 'i' },
     { heading: 'Two', intent: 'i' },
   ],
+  cta: 'Compare the best option for your needs.',
 });
 
 // Fixture must clear WORD_COUNT_FLOOR (800): 80 intro + 2 x 400 section words = ~886.
@@ -75,6 +77,27 @@ describe('generateArticle', () => {
     const result = await generateArticle({ ctx, llm });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.failures.map((f) => f.code)).toContain('semantic');
+  });
+
+  test('does not return an article when final content violates a disabled CTA preference', async () => {
+    const disabled = { ...ctx, includeCta: false };
+    const articleWithCta = `${articleMd}\nContact us today to get started.\n`;
+    const llm = mockLlm([
+      outlineJson,
+      articleWithCta,
+      articleWithCta,
+      '{"pass":false,"reasons":["The article contains a call to action."]}',
+    ]);
+
+    const result = await generateArticle({ ctx: disabled, llm });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.failures).toContainEqual({
+        code: 'semantic',
+        message: 'The article contains a call to action.',
+      });
+    }
   });
 
   test('deterministic failure (short article) returns ok:false', async () => {

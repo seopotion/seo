@@ -7,6 +7,7 @@ const ctx = {
   competitors: ['rival.com'],
   keyword: 'best widgets',
   language: 'English',
+  includeCta: true,
   topic_cluster_id: null,
   topic_cluster_label: null,
   topic_role: null,
@@ -33,6 +34,22 @@ describe('semantic check', () => {
       pass: false,
       reasons: ['promotes rival'],
     });
+  });
+
+  test('makes the final CTA preference a pass/fail requirement', () => {
+    const enabled = buildSemanticCheckPrompt(ctx, '# Article\n\nBody')
+      .map((message) => message.content)
+      .join('\n');
+    const disabled = buildSemanticCheckPrompt(
+      { ...ctx, includeCta: false },
+      '# Article\n\nContact us today.',
+    )
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(enabled).toContain('lacks one concise, relevant call to action near the end');
+    expect(disabled).toContain('contains a call to action');
+    expect(disabled).toContain('contact, subscribe, buy, book, download, sign up');
   });
 
   test.each([

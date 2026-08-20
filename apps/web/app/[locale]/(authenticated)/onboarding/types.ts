@@ -19,6 +19,7 @@ export type OnboardingForm = {
   blogPageUrl: string;
   blogPosts: string[];
   articleStyle: string;
+  includeCta: boolean;
   internalLinksCount: string;
   tableOfContents: boolean;
   youtubeVideos: boolean;

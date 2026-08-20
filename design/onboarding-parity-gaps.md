@@ -35,23 +35,23 @@ The optional onboarding step reuses `GET /dashboard/integrations/connected` and
 `/setup`. Static-site/GitHub onboarding remains deferred because its external redirect needs
 the unfinished wizard state and callback destination to be restored.
 
-### G2 — `article_preferences` is a thin subset (~4 of ~20 controls)
-Baseline: `content_seo.{article_style, internal_links, llm_instructions}` +
-`engagement.{image_style}`.
+### G2 — `article_preferences` is a thin subset (8 of ~24 controls)
+Current: `content_seo.{article_style, internal_links_count, table_of_contents,
+llm_instructions}` + `engagement.{image_style, youtube_videos, include_cta}` +
+`publishing.auto_publish`. The CTA preference is enforced across outline, article,
+humanization, and final semantic validation; disabling it also clears any CTA returned in the
+outline.
 Outrank additionally exposes, on the Articles step:
-- **Content/SEO:** auto-publish toggle; internal-links as a **count** (see G5).
+- **Content/SEO:** external-link count, outline controls, and excluded words.
 - **Engagement toggles:** brand color; Title-Based Featured Image (+ its own style);
-  Table of Contents; YouTube video; Call-to-Action; Infographics; Emojis; Mention
-  Similar Products & Tools; First-Person Writing; custom AI image-style presets.
-- **Improvement Schedule** (whole subsystem): auto-improve existing articles, auto-push
-  to integration, weekday picker (max 2 days/week).
-- **Product Catalog** (whole subsystem): feature real products/images in articles.
+  Infographics; Emojis; Mention Similar Products & Tools; First-Person Writing; custom AI
+  image-style presets.
+- **Improvement Schedule** and **Product Catalog** are no longer planned.
 
-Two entire subsystems (article **Improvements** and **Product Catalog**) are absent from
-our schema. Deferred: baseline only needs enough prefs to generate one article.
+The remaining gap is optional article-generation polish, not a baseline blocker.
 
 **Confirmed 2026-07-01:** the live `output_settings_presets` row has ~24 controls (full field
-list in [`product-flow.md`](product-flow.md) §2.3); ours implements ~4 of them.
+list in [`product-flow.md`](product-flow.md) §2.3); ours implements 8 of them.
 
 ### G3 — `audience.target` should be a list
 Baseline `audience.target: z.string()` (single). Outrank collects **up to 7 target-audience

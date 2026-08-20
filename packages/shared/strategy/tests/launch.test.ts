@@ -48,7 +48,7 @@ const presets = {
       table_of_contents: true,
       llm_instructions: '',
     },
-    engagement: { image_style: 'photo', youtube_videos: true },
+    engagement: { image_style: 'photo', include_cta: true, youtube_videos: true },
     publishing: { auto_publish: false },
   },
 };

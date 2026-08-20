@@ -429,7 +429,7 @@ const org = {
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: '', youtube_videos: true },
+      engagement: { image_style: '', include_cta: false, youtube_videos: true },
       publishing: { auto_publish: false },
     },
   },
@@ -455,6 +455,7 @@ describe('buildContext link fields', () => {
       },
     ]);
     expect(ctx.maxInternalLinks).toBe(2);
+    expect(ctx.includeCta).toBe(false);
     expect(ctx.linkCandidates).toEqual([
       {
         title: 'One',

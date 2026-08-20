@@ -757,6 +757,10 @@
           "noDestinationEnabled": "Auto-publish is still on, but future automatic attempts may not run until a publishing destination is connected."
         }
       },
+      "includeCta": {
+        "description": "Include a relevant call to action near the end of generated articles.",
+        "label": "Call to action"
+      },
       "internalLinks": {
         "description": "Choose how many internal links generated articles should include (0–3).",
         "label": "Internal links"
@@ -1052,6 +1056,7 @@
     },
     "articleSettings": {
       "articleStyle": "Article style",
+      "includeCta": "Call to action",
       "internalLinksCount": "Internal links count",
       "selectStyle": "Select style",
       "tableOfContents": "Table of contents",

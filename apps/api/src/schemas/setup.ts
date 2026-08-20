@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import {
+  EngagementPrefsPatchSchema,
   ONBOARDING_INTEGRATIONS,
   PublishingPrefsSchema,
   SetupPresetsSchema,
@@ -62,9 +63,7 @@ export const SetupPresetsPatchSchema = z
         content_seo: SetupPresetsSchema.shape.article_preferences.shape.content_seo
           .partial()
           .optional(),
-        engagement: SetupPresetsSchema.shape.article_preferences.shape.engagement
-          .partial()
-          .optional(),
+        engagement: EngagementPrefsPatchSchema.optional(),
         publishing: PublishingPrefsSchema.partial().optional(),
       })
       .optional(),

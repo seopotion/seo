@@ -11,6 +11,7 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: ['rival.com'],
   articleStyle: 'practical',
+  includeCta: true,
   maxInternalLinks: 0,
   linkCandidates: [],
   llmInstructions: '',
@@ -111,6 +112,33 @@ describe('article + humanize prompts', () => {
       .map((m) => m.content)
       .join('\n');
     expect(joined).toContain('Do not include any hyperlinks');
+  });
+
+  test('omits CTA content and forbids adding one when the preference is disabled', () => {
+    const withoutCta = { ...ctx, includeCta: false };
+    const article = buildArticlePrompt(withoutCta, outline)
+      .map((message) => message.content)
+      .join('\n');
+    const humanize = buildHumanizePrompt(withoutCta, '# Title\n\nBody')
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(article).toContain('Do not include a call to action');
+    expect(article).not.toContain('Call to action: Compra ya');
+    expect(humanize).toContain('Remove any call to action');
+  });
+
+  test('places and preserves one CTA near the end when enabled', () => {
+    const article = buildArticlePrompt(ctx, outline)
+      .map((message) => message.content)
+      .join('\n');
+    const humanize = buildHumanizePrompt(ctx, '# Title\n\nBody\n\nCompra ya')
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(article).toContain('Include the supplied call to action once, near the end');
+    expect(article).toContain('Call to action: Compra ya');
+    expect(humanize).toContain('Preserve the call to action near the end');
   });
 
   test('a complete support brief repeats its exact narrow scope in the writing prompt', () => {

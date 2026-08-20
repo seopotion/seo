@@ -1,5 +1,10 @@
+import { SetupPresetsSchema } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
-import { buildFinalizeBody } from '../app/[locale]/(authenticated)/onboarding/api';
+import {
+  buildFinalizeBody,
+  buildPresetsPatch,
+  mapPresetsToFormPatch,
+} from '../app/[locale]/(authenticated)/onboarding/api';
 import {
   competitorErrorKey,
   MAX_COMPETITORS,
@@ -130,6 +135,36 @@ describe('onboarding integrations', () => {
         },
       ]),
     ).toEqual(['wordpress', 'static-site']);
+  });
+});
+
+describe('onboarding CTA preference', () => {
+  test('defaults to enabled and persists an explicit disabled choice', () => {
+    expect(initialForm.includeCta).toBe(true);
+
+    const patch = buildPresetsPatch({ ...initialForm, includeCta: false });
+    expect(patch.article_preferences?.engagement?.include_cta).toBe(false);
+  });
+
+  test('hydrates the CTA choice from generated presets', () => {
+    const presets = SetupPresetsSchema.parse({
+      business: { name: 'Acme', language: 'English', country: 'US', description: 'Widgets' },
+      audience: { target: ['Makers'], competitors: [] },
+      blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
+      article_preferences: {
+        content_seo: { article_style: 'Practical', llm_instructions: '' },
+        engagement: { image_style: 'Sketch', include_cta: false },
+      },
+    });
+
+    expect(mapPresetsToFormPatch(presets).includeCta).toBe(false);
+  });
+
+  test('provides CTA labels in English and Turkish settings surfaces', () => {
+    expect(enMessages.Onboarding.articleSettings.includeCta).toBe('Call to action');
+    expect(enMessages.ArticleSettingsPage.fields.includeCta.label).toBe('Call to action');
+    expect(trMessages.Onboarding.articleSettings.includeCta).toBe('Harekete geçirici mesaj');
+    expect(trMessages.ArticleSettingsPage.fields.includeCta.label).toBe('Harekete geçirici mesaj');
   });
 });
 
