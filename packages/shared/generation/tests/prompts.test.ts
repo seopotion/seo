@@ -54,6 +54,34 @@ describe('article + humanize prompts', () => {
     expect(msgs[0]!.content).toContain('Spanish');
   });
 
+  test('adds grade 8 readability guidance to both English prompts only', () => {
+    const english = { ...ctx, language: 'English' };
+    const readabilityInstruction = 'Flesch-Kincaid grade level 8 or lower';
+
+    const englishArticle = buildArticlePrompt(english, outline)
+      .map((message) => message.content)
+      .join('\n');
+    const englishHumanize = buildHumanizePrompt(english, '# Title\n\nbody')
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(englishArticle).toContain(readabilityInstruction);
+    expect(englishHumanize).toContain(readabilityInstruction);
+
+    for (const language of ['Spanish', 'Turkish', 'english']) {
+      const nonEnglish = { ...ctx, language };
+      const article = buildArticlePrompt(nonEnglish, outline)
+        .map((message) => message.content)
+        .join('\n');
+      const humanize = buildHumanizePrompt(nonEnglish, '# Title\n\nbody')
+        .map((message) => message.content)
+        .join('\n');
+
+      expect(article).not.toContain(readabilityInstruction);
+      expect(humanize).not.toContain(readabilityInstruction);
+    }
+  });
+
   test('passes the selected URL and its title, and forbids other links (#186)', () => {
     const linked = {
       ...ctx,
