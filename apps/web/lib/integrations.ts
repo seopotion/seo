@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 import { dashboardQueryKeys } from './dashboard-query-keys';
-import type { ProductOrganization } from './organizations';
 
 export type ConnectedIntegration = {
   id: string;
@@ -74,20 +73,20 @@ export const GITHUB_RETURN_LOCALE_KEY = 'seo_github_return_locale';
  * settings integrations panel and the article detail page.
  */
 export function useConnectedIntegrations(
-  organization: ProductOrganization | null,
+  organizationId: string | null,
   options?: { enabled?: boolean; onUnauthorized?: () => void },
 ) {
   const { enabled = true, onUnauthorized } = options ?? {};
 
   return useQuery({
-    queryKey: dashboardQueryKeys.connectedIntegrations(organization?.id ?? ''),
+    queryKey: dashboardQueryKeys.connectedIntegrations(organizationId ?? ''),
     queryFn: async (): Promise<ConnectedIntegrationsResult> => {
-      if (!organization) {
+      if (!organizationId) {
         throw new Error('organization_required');
       }
 
       const response = await api.api.v0.dashboard.integrations.connected.$get({
-        query: { org_id: organization.id },
+        query: { org_id: organizationId },
       });
 
       if ((response.status as number) === 401) {
@@ -101,7 +100,7 @@ export function useConnectedIntegrations(
 
       return response.json();
     },
-    enabled: Boolean(organization) && enabled,
+    enabled: Boolean(organizationId) && enabled,
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
   });

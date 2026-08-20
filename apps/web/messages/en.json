@@ -1108,14 +1108,20 @@
     "integrations": {
       "availableIntegrations": "Available integrations",
       "comingSoon": "Coming soon",
-      "connectWordPressLater": "You can connect WordPress later from Settings.",
+      "connect": "Connect",
+      "connectedSuccess": "WordPress is connected. You can finish onboarding or replace the connection.",
+      "loadError": "We couldn't load your connected integrations.",
+      "loading": "Checking…",
+      "optionalNotice": "Connect a publishing platform now, or skip this optional step and finish onboarding.",
       "providers": {
         "framer": "Framer",
         "wordpress": "Self-hosted WordPress"
       },
       "referralSource": "How did you hear about us?",
+      "replace": "Replace",
+      "retry": "Retry",
       "selectOption": "Select an option",
-      "settingsNotice": "Once onboarding is complete, you can connect and manage integrations from Settings in your dashboard.",
+      "settingsNotice": "You can connect, replace, or disconnect integrations later from Settings.",
       "title": "Integrations And Referral Source"
     },
     "options": {

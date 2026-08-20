@@ -1,3 +1,5 @@
+import type { ONBOARDING_INTEGRATIONS } from '@shared/schemas';
+
 export type ScanState = 'idle' | 'scanning' | 'complete';
 
 export type TextEntry = {
@@ -20,7 +22,7 @@ export type OnboardingForm = {
   internalLinksCount: string;
   tableOfContents: boolean;
   youtubeVideos: boolean;
-  integrations: string[];
+  integrations: (typeof ONBOARDING_INTEGRATIONS)[number][];
   referralSource: string;
 };
 

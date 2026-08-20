@@ -149,7 +149,7 @@ export default function ArticleSettingsPage() {
     staleTime: 60 * 60 * 1000,
   });
 
-  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization?.id ?? null, {
     enabled: !redirecting && !organizationLoading,
     onUnauthorized: handleUnauthorized,
   });

@@ -209,11 +209,29 @@ export async function scanWebsiteForOnboarding(websiteUrl: string): Promise<Onbo
   };
 }
 
-export async function completeOnboarding(orgId: string, form: OnboardingForm): Promise<void> {
+export function buildFinalizeBody(
+  orgId: string,
+  form: OnboardingForm,
+  verifiedIntegrations: OnboardingForm['integrations'],
+) {
+  const referralSource = form.referralSource.trim();
+
+  return {
+    org_id: orgId,
+    ...(referralSource ? { referral_source: referralSource } : {}),
+    integrations: [...verifiedIntegrations],
+  };
+}
+
+export async function completeOnboarding(
+  orgId: string,
+  form: OnboardingForm,
+  verifiedIntegrations: OnboardingForm['integrations'],
+): Promise<void> {
   await saveOnboardingPresets(orgId, form);
 
   const response = await api.api.v0.setup.finalize.$post({
-    json: { org_id: orgId },
+    json: buildFinalizeBody(orgId, form, verifiedIntegrations),
   });
 
   await ensureOk(response);

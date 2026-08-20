@@ -196,7 +196,7 @@ real document id; it is opaque to the frontend, so nothing else changes.
 | `GET /dashboard/integrations/connected` | Unchanged path; response widened to the provider enum |
 | `POST /dashboard/integrations/static-site` | Connect: `{ grant, repo, branch, content_path? }` |
 | `DELETE /dashboard/integrations/{provider}` | Disconnect — one route replacing per-provider variants |
-| `GET`/`POST /setup/integrations` (#7) | Onboarding-time view of the same entity |
+| Onboarding integration step (#7) | Reuses the connected-list and WordPress connect routes above |
 
 The static-site connect body carries a signed `grant` rather than an `org_id` +
 `installation_id` pair, because an installation id is a guessable integer and not a secret —
@@ -233,9 +233,10 @@ unique index. Doing it that way — instead of a `findOne` first — means two s
 claimants cannot both pass a check-then-write, and keeps the driver's error code from
 leaking into a route handler.
 
-**Re-scoping #7.** The issue is written as two endpoints; the connected-CMS entity it
-names as missing is this document. #7 should build against this model rather than invent a
-parallel one — that was the issue's own instruction ("build the entity once").
+**Re-scoping #7.** The issue was written as two endpoints before this model existed. The
+onboarding implementation now reads the same connected list and opens the same verified
+WordPress connector as Settings instead of introducing a parallel `/setup` API. Static-site
+onboarding remains separate because its GitHub redirect needs wizard-state recovery.
 
 ## Secrets
 

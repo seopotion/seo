@@ -418,6 +418,16 @@ vi.mock('@shared/db', () => {
       { id: 'org_3', user_id: 'user_2', website_url: 'https://other.com', created_at: now },
     ],
     [
+      'org_onboarding',
+      {
+        id: 'org_onboarding',
+        user_id: 'user_1',
+        website_url: 'https://onboarding.example.com',
+        setup_status: 'setup_scan_completed',
+        created_at: now,
+      },
+    ],
+    [
       'org_stale',
       {
         id: 'org_stale',
@@ -790,6 +800,30 @@ describe('dashboard WordPress integration', () => {
     expect(testWordPressIntegration.mock.invocationCallOrder[0]).toBeLessThan(
       saveWordPressConnection.mock.invocationCallOrder[0] ?? 0,
     );
+  });
+
+  test('connects and lists WordPress before onboarding is finalized', async () => {
+    const opts = await auth();
+    const connectResponse = await client.api.v0.dashboard.integrations.wordpress.$post(
+      { json: { org_id: 'org_onboarding', token: 'onboarding-token' } },
+      opts,
+    );
+
+    expect(connectResponse.status).toBe(200);
+
+    const connectedResponse = await client.api.v0.dashboard.integrations.connected.$get(
+      { query: { org_id: 'org_onboarding' } },
+      opts,
+    );
+
+    expect(connectedResponse.status).toBe(200);
+    if (connectedResponse.status !== 200) return;
+    expect((await connectedResponse.json()).integrations).toEqual([
+      expect.objectContaining({
+        provider: 'wordpress',
+        target: 'https://onboarding.example.com',
+      }),
+    ]);
   });
 
   test.each([
