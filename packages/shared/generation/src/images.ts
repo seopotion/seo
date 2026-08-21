@@ -26,6 +26,15 @@ export const ImagePlanSchema = z.object({
 });
 export type ImagePlan = z.infer<typeof ImagePlanSchema>;
 
+const TolerantImagePlanSchema = z.object({
+  cover: ImagePlanSchema.shape.cover,
+  inline: z.array(
+    ImagePlanSchema.shape.inline.element.extend({
+      section_heading: z.string().min(1).optional(),
+    }),
+  ),
+});
+
 /** H2 heading texts, in order, from markdown content. */
 export function extractH2s(content: string): string[] {
   return content
@@ -64,7 +73,18 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
 
 /** Parse + validate a plan; throws on wrong count, unknown or duplicate headings. */
 export function parseImagePlan(text: string, headings: string[]): ImagePlan {
-  const plan = ImagePlanSchema.parse(parseJsonObject(text));
+  const parsed = TolerantImagePlanSchema.parse(parseJsonObject(text));
+  const specified = parsed.inline.flatMap((img) =>
+    img.section_heading === undefined ? [] : [img.section_heading],
+  );
+  const available = headings.filter((heading) => !specified.includes(heading));
+  const plan = ImagePlanSchema.parse({
+    ...parsed,
+    inline: parsed.inline.map((img) => ({
+      ...img,
+      section_heading: img.section_heading ?? available.shift(),
+    })),
+  });
   if (plan.inline.length !== INLINE_IMAGE_COUNT)
     throw new Error(`image plan needs exactly ${INLINE_IMAGE_COUNT} inline images`);
   const seen = new Set<string>();
