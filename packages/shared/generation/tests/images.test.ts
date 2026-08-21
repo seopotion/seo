@@ -57,6 +57,18 @@ describe('parseImagePlan', () => {
     expect(() => parseImagePlan(JSON.stringify(bad), headings)).toThrow(/exactly/);
   });
 
+  test('fills omitted section headings from unused article headings in order', () => {
+    const omitted = {
+      ...validPlan,
+      inline: [
+        { prompt: 'p1', alt: 'alt one' },
+        { prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' },
+      ],
+    };
+
+    expect(parseImagePlan(JSON.stringify(omitted), headings)).toEqual(validPlan);
+  });
+
   test('rejects unknown and duplicate headings, and empty alt', () => {
     const unknown = {
       ...validPlan,

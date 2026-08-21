@@ -35,6 +35,16 @@ describe('resolveConfig', () => {
     expect(c.locationName).toBe('United States');
   });
 
+  it("maps Turkey to DataForSEO's Turkiye location name", () => {
+    const turkey = {
+      ...presets,
+      business: { ...presets.business, country: 'Turkey', language: 'Turkish' },
+    };
+    const c = resolveConfig(turkey);
+    expect(c.locationName).toBe('Turkiye');
+    expect(c.languageName).toBe('Turkish');
+  });
+
   it('SERP-validates more than a full 30-day plan by default', () => {
     // The strategy worker schedules 30 entries (PLAN_DAYS); every one of them
     // should come from the SERP-validated top-N, with buffer for rejections.
