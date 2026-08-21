@@ -238,9 +238,11 @@ describe('outline', () => {
     expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide']);
   });
 
-  test('parseOutline canonicalizes a trailing-slash variant to our URL (#186)', () => {
-    const out = parseOutline(outlineJson(['https://a.com/blog/widget-guide/']), withCandidates(2));
-    expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide']);
+  test('parseOutline re-emits a canonical trailing-slash URL after the model omits it', () => {
+    const canonical = withCandidates(2);
+    canonical.linkCandidates[0]!.url = 'https://a.com/blog/widget-guide/';
+    const out = parseOutline(outlineJson(['https://a.com/blog/widget-guide']), canonical);
+    expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide/']);
   });
 
   test('parseOutline yields no links when there are no candidates (#186)', () => {

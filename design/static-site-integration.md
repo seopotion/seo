@@ -38,6 +38,8 @@ the client's git repo** and letting their build run.
 | Images | **Not committed.** Served from our CloudFront and referenced by absolute URL, exactly as `article.content` already holds them |
 | Atomicity | **One commit per publish** (blobs → tree → commit → ref), carrying the Markdown and the updated manifest together |
 | Addressing | **Deterministic paths keyed by slug**, so republishing overwrites instead of accumulating |
+| Public article URL | **Directory-style and trailing-slash canonical:** `<post_url_base>/<slug>/` |
+| Build output | **Nested directory output:** `<route>/index.html`; the host must resolve directory URLs and must not send unknown blog routes to an SPA fallback |
 | Auth | **GitHub App** installation token scoped to `contents: write`, per-repo, client-revocable ([`github-app.md`](github-app.md)) |
 
 ## Why this shape
@@ -103,6 +105,29 @@ touching their static assets or their build config. Nothing lands in `public/`, 
 directory the framework serves from is untouched — which also means the earlier
 per-framework variance (`public/` for Astro, `static/` for Nuxt and Hugo) stops mattering.
 Images live on our CDN at the S3 keys `article-images.md` already defines.
+
+### Public URL and output contract
+
+Static-site articles use one exact public URL shape. If `post_url_base` is
+`https://example.com/blog` and the slug is `article-slug`, the supported URL is:
+
+```
+https://example.com/blog/article-slug/
+```
+
+The final slash is part of the contract. The adapter must use that exact URL in:
+
+- blog indexes, navigation and every other article link;
+- the canonical tag and `og:url`;
+- every `BlogPosting` URL that identifies the article and the article item in
+  `BreadcrumbList` structured data;
+- sitemap entries; and
+- internal links between published articles.
+
+The static build must emit `<route>/index.html`, for example
+`dist/blog/article-slug/index.html`. Vue sites using `vite-ssg` must set
+`ssgOptions.dirStyle: 'nested'` and include `/blog/<slug>/` in `includedRoutes`.
+Other frameworks must be configured for the equivalent nested directory output.
 
 ### `manifest.json`
 
@@ -228,9 +253,43 @@ its own date type.
 ### What the client site owns
 
 We supply data; the site renders it. An adapter is expected to emit, per article:
-a canonical URL, `og:*` tags from `meta_title` / `meta_description` / `cover`,
-`BlogPosting` + `BreadcrumbList` JSON-LD, and sitemap entries. Those are page concerns
-that depend on the site's own routing, so the contract does not attempt to own them.
+a canonical URL and `og:url` in the exact trailing-slash form above, other `og:*` tags
+from `meta_title` / `meta_description` / `cover`, `BlogPosting` + `BreadcrumbList`
+JSON-LD with the same article URL, and sitemap entries with that URL. Those are page
+concerns that depend on the site's own routing, so the contract specifies their URL
+shape but does not render them.
+
+### Hosting contract
+
+The host must resolve a directory URL such as `/blog/article-slug/` to
+`/blog/article-slug/index.html`. A successful Git commit proves only that the source files
+landed, and a successful static build proves only that the output files were generated.
+Neither proves that the production host routes the public URL to those bytes. That routing
+is deployment configuration and must be checked on the deployed host; it is not a reason
+to add live-site polling or request-time fetching to the publishing flow.
+
+A request for an existing article without the slash, such as `/blog/article-slug`, may
+redirect to `/blog/article-slug/`; it must never fall through to the homepage. Only the
+trailing-slash form is linked, canonicalized or indexed.
+
+A site-wide SPA fallback such as `try_files ... /index.html` is dangerous for article
+routes: a missing `/blog/article-slug/` or an unknown `/blog/anything/` can return the
+homepage with HTTP 200. Search engines then see a soft 404 and the integration can appear
+healthy while serving the wrong document. Unknown blog paths must return a genuine HTTP
+404 or 410.
+
+For nginx, scope the blog before any broader SPA fallback and enable directory indexes:
+
+```nginx
+index index.html;
+
+location ^~ /blog/ {
+  try_files $uri $uri/ =404;
+}
+```
+
+Equivalent hosts must preserve the same behavior: resolve existing directories to their
+`index.html`, and do not rewrite missing blog routes to the homepage.
 
 ## Publish semantics
 
@@ -318,7 +377,7 @@ The deliverable per framework is a documented snippet, not a package — roughly
 
 | Framework | Route enumeration hook |
 | --- | --- |
-| **Vue + `vite-ssg`** | `ssgOptions.includedRoutes` reads `manifest.json` → `/blog/<slug>` per article. **Written 2026-07-31** — see below |
+| **Vue + `vite-ssg`** | `ssgOptions.dirStyle: 'nested'`; `includedRoutes` reads `manifest.json` → `/blog/<slug>/` per article. **Written 2026-07-31** — see below |
 | Next.js (static export) | `generateStaticParams()` |
 | Astro | `getStaticPaths()`, or point a content collection at `content_path` |
 | Nuxt | `nitro.prerender.routes` |
@@ -428,12 +487,14 @@ blog: their site stays up, their articles go dark until the adapter is updated.
    dependency and no hand-rolled escaper. Quoting *everything* also dodges YAML 1.1's
    `no` → `false`, which a slug can genuinely be.
 
-**Client side (per site).** Blog index + detail routes, the adapter snippet, and blog
-entries in the sitemap. Deploying on push is a prerequisite we *assume* rather than build —
-Vercel, Netlify, Cloudflare Pages and Coolify all do it out of the box, and a client
-without it needs a one-off workflow that is not part of this contract. *Built for the
-first site 2026-07-31 (unmarble, branch `alper/seo-improvements`); the sitemap entries
-cost nothing there because its generator already walks the build output.*
+**Client side (per site).** Blog index + detail routes, the adapter snippet, blog entries
+in the sitemap, and host routing that serves nested directory indexes without applying the
+homepage fallback to unknown blog paths. Deploying on push is a prerequisite we *assume*
+rather than build — Vercel, Netlify, Cloudflare Pages and Coolify all do it out of the box,
+and a client without it needs a one-off workflow that is not part of this contract. A green
+build still does not prove the host routing contract. *Built for the first site 2026-07-31
+(unmarble, branch `alper/seo-improvements`); the sitemap entries cost nothing there because
+its generator already walks the build output.*
 
 ## Deliberately out of scope
 

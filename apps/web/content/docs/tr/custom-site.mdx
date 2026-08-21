@@ -1,7 +1,7 @@
 ---
 title: Özel sitede yayınlama
 description: Bir GitHub deposu bağlayın, Seopotion'ın depoya işlediği Markdown ve manifest dosyalarını tanıyın, bunları Next.js, Astro, Nuxt veya Vue ile ekrana getirin.
-updated: 2026-08-08
+updated: 2026-08-21
 ---
 
 Siteniz bir JavaScript çatısıyla kuruluysa — Next.js, Astro, Nuxt, Vue, Hugo, Eleventy — içine yazı
@@ -9,9 +9,10 @@ gönderebileceğiniz bir sunucu yoktur. Site bir dosyalar klasörüdür ve içer
 oradaysa vardır.
 
 Bu yüzden bu entegrasyon, yayınlamayı **içeriği Git deponuza işleyerek (commit)** yapar. Seopotion
-her makale için bir Markdown dosyası ve bir `manifest.json` dizini yazar, mevcut dağıtım hattınız
-bu push'u görüp siteyi yeniden derler ve makale yayına girer. Her yayınlama, okuyabileceğiniz,
-inceleyebileceğiniz ve geri alabileceğiniz sıradan bir commit'tir.
+her makale için bir Markdown dosyası ve bir `manifest.json` dizini yazar; mevcut dağıtım hattınız
+bu push'u görüp siteyi yeniden derler. Her yayınlama, okuyabileceğiniz, inceleyebileceğiniz ve geri
+alabileceğiniz sıradan bir commit'tir. Sunucunuzun da aşağıda açıklanan dizin rotalarını sunacak
+şekilde yapılandırılması gerekir.
 
 Kurulumun iki yarısı var. İlki Bağlan'a tıklamak; bir dakika sürer. İkincisi sitenize bu dosyaları
 nasıl işleyeceğini öğretmek — bir kez yazılan yaklaşık 60–100 satır kod.
@@ -39,6 +40,9 @@ nasıl işleyeceğini öğretmek — bir kez yazılan yaklaşık 60–100 satır
    - **Depo** — az önce izin verdiğiniz depo.
    - **Dal (branch)** — canlı sitenizin derlendiği dal, genellikle `main`.
    - **İçerik klasörü** — dosyaların gideceği yer. Varsayılan `seopotion/`.
+   - **Yazı URL tabanı** — makalenin slug'ından önce gelen genel yol. `https://example.com/blog`
+     tabanı `https://example.com/blog/article-slug/` adresini üretir. Sondaki eğik çizgi
+     zorunludur.
 
 Siz onaylayana kadar deponuza hiçbir şey yazılmaz; ilk makalenizi yayınlayana kadar da hiçbir şey
 yazılmaz.
@@ -158,8 +162,8 @@ bir şey yapmak isterseniz diye oradadır.
 
 ## Her render'ın uyması gereken kurallar
 
-Sözleşmenin tamamı bu dört kuraldır. Doğru yaparsanız her çatı çalışır; yanlış yaparsanız ortaya
-çıkan belirtiler kafa karıştırıcıdır. Aşağıdaki tüm örnekler için geçerlidir.
+Bu dört render kuralı aşağıdaki tüm örnekler için geçerlidir. Doğru yaparsanız her çatı çalışır;
+yanlış yaparsanız ortaya çıkan belirtiler kafa karıştırıcıdır.
 
 1. **Markdown render'ınızda ham HTML'i açın.** YouTube videoları gövdeye `<iframe>` olarak
    gömülüdür. HTML'i kaçışlayan bir render — güvenlik gerekçesiyle birçoğu varsayılan olarak bunu
@@ -181,6 +185,26 @@ Sözleşmenin tamamı bu dört kuraldır. Doğru yaparsanız her çatı çalış
    `![alt](url)` söz dizimi ölçü taşıyamaz; bu yüzden düz bir render'da görseller yüklendikçe sayfa
    oynar. Her görseli `src` değerine göre `images` dizisiyle eşleştirip öznitelikleri yazın. Ölçüsü
    `null` olanları atlayın.
+
+## Herkese açık makale URL'si sözleşmesi
+
+Makaleler dizin tarzı genel URL'ler kullanır. `https://example.com/blog` altında
+`ai-outfit-generator` slug'ı için desteklenen tek URL şudur:
+
+```
+https://example.com/blog/ai-outfit-generator/
+```
+
+Sondaki eğik çizgi URL sözleşmesinin parçasıdır. Her yerde tam olarak bu biçimi kullanın:
+
+- dizin sayfalarında, navigasyonda ve makaleler arası iç bağlantılarda;
+- canonical etiketinde ve `og:url` içinde;
+- makaleyi tanımlayan tüm `BlogPosting` URL'lerinde ve `BreadcrumbList` JSON-LD içindeki makale
+  öğesinde; ve
+- makaleye ait her site haritası `<loc>` kaydında.
+
+Derleme `dist/blog/ai-outfit-generator/index.html` gibi iç içe bir dosya üretmelidir. Sunucunuz
+`/blog/ai-outfit-generator/` adresini bu `index.html` dosyasına çözümlemelidir.
 
 ## Blog sayfalarınızı oluşturun
 
@@ -270,7 +294,7 @@ export default async function BlogIndex() {
       <h1>Blog</h1>
       {articles.map((article) => (
         <article key={article.slug}>
-          <Link href={`/blog/${article.slug}`}>
+          <Link href={`/blog/${article.slug}/`}>
             <img
               src={article.cover}
               alt={article.cover_alt}
@@ -313,12 +337,16 @@ export async function generateMetadata({
   const article = await getArticle(slug);
   if (!article) return {};
 
+  const articleUrl = `https://example.com/blog/${article.slug}/`;
+
   return {
     title: article.meta_title,
     description: article.meta_description,
+    alternates: { canonical: articleUrl },
     openGraph: {
       title: article.meta_title,
       description: article.meta_description,
+      url: articleUrl,
       images: [article.cover],
       type: 'article',
       publishedTime: article.published_at,
@@ -375,10 +403,16 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 }
 ```
 
-Next.js'e özgü iki not:
+Next.js'e özgü üç not:
 
 - Next.js 15 ve sonrasında **`params` bir Promise'tir**; örneklerde `await` edilmesinin sebebi
   budur. Next.js 14'te doğrudan `params.slug` kullanın.
+- **Statik dışa aktarımda iç içe dizin çıktısını açın.** Böylece genel URL ile üretilen dosya
+  `next.config.ts` içinde aynı biçimi kullanır:
+
+  ```ts
+  export default { output: 'export', trailingSlash: true };
+  ```
 - Düz `<img>` yerine **`next/image` kullanmak isterseniz** önce CDN'imizi `next.config.js`
   dosyanıza ekleyin; yoksa her görsel derleme sırasında hata verir:
 
@@ -641,9 +675,10 @@ import manifest from './seopotion/manifest.json';
 
 export default defineConfig({
   ssgOptions: {
+    dirStyle: 'nested',
     includedRoutes: (paths) => [
       ...paths,
-      ...manifest.articles.map((article) => `/blog/${article.slug}`),
+      ...manifest.articles.map((article) => `/blog/${article.slug}/`),
     ],
   },
 });
@@ -675,8 +710,8 @@ kural birebir aynıdır.
 
 ## Adım 3 — Biz yayınlayınca siteyi yeniden derlemek
 
-Yapılandırılacak bir şey yok. Yayınlama, seçtiğiniz dala bir commit push eder ve mevcut dağıtım
-hattınız bunu diğer push'lardan ayırt etmez.
+Yayınlama, seçtiğiniz dala bir commit push eder ve mevcut dağıtım hattınız bunu diğer push'lardan
+ayırt etmez.
 
 | Barındırma | Ne olur |
 | --- | --- |
@@ -685,7 +720,36 @@ hattınız bunu diğer push'lardan ayırt etmez.
 | Kendi sunucunuz | Zaten ne kullanıyorsanız o — webhook, cron ile `git pull` veya bir CI işi. |
 
 Dikkat edilmesi gereken ilk yayınlamadır. Tek bir makale yayınlayın, commit'in deponuzda
-göründüğünü doğrulayın, ardından dağıtımın çalıştığını ve sayfanın açıldığını doğrulayın.
+göründüğünü doğrulayın, ardından dağıtımın çalıştığını ve sonunda eğik çizgi olan sayfanın
+açıldığını doğrulayın.
+
+## Sunucunuzu yapılandırın
+
+Başarılı bir Git commit'i içeriğin deponuza ulaştığını kanıtlar. Başarılı bir derleme çatınızın
+dosyaları ürettiğini kanıtlar. Hiçbiri canlı sunucunun makale URL'sini doğru dosyaya gönderdiğini
+kanıtlamaz. Bu bir sunucu yapılandırmasıdır; Seopotion'dan istek anında veri çekme işlemi değildir.
+
+Sunucunuz bir dizin URL'sini o dizinin `index.html` dosyasına çözümlemelidir. Site genelindeki bir
+SPA fallback'inin bilinmeyen `/blog/` yollarını kök `/index.html` dosyasına yönlendirmesine izin
+vermeyin: bu, eksik bir makale için ana sayfayı HTTP 200 ile döndürür ve soft 404 oluşturur.
+Bilinmeyen blog yolları gerçek bir HTTP 404 veya 410 döndürmelidir.
+
+Sondaki eğik çizgi olmadan istenen mevcut bir makale, sonunda eğik çizgi olan URL'sine
+yönlendirilebilir; ancak asla ana sayfaya düşmemelidir. Yalnızca sonunda eğik çizgi olan biçime
+bağlantı verilmeli ve yalnızca bu biçim dizine eklenmelidir.
+
+nginx kullanıyorsanız genel SPA fallback'inden önce yalnızca blog'u kapsayan bir location ekleyin:
+
+```nginx
+index index.html;
+
+location ^~ /blog/ {
+  try_files $uri $uri/ =404;
+}
+```
+
+Diğer sunucular da aynı davranışı sağlamalıdır: var olan makale dizininin `index.html` dosyasını
+sunmalı ve eksik bir makale rotasında ana sayfayı fallback olarak kullanmamalıdır.
 
 ## Yeniden yayınlama, ad değiştirme ve silme
 
@@ -743,6 +807,14 @@ aynı olmalıdır.
 Dağıtımınız çalışmadı ya da başka bir dalda çalıştı. Entegrasyon kartındaki dalın, canlı sitenizin
 derlendiği dal olduğunu doğrulayın.
 
+### Makale URL'si ana sayfayı gösteriyor
+
+Önce derleme çıktısında `<route>/index.html` dosyasını arayın. `vite-ssg` kullanıyorsanız
+`ssgOptions.dirStyle` değerinin `'nested'` olduğunu ve `includedRoutes` içinde sonunda eğik çizgi
+olan rotanın bulunduğunu doğrulayın. Dosya varsa sunucunuzun SPA fallback'i makale URL'sini
+yakalıyor demektir. `/blog/` için dizin-index çözümlemesini yapılandırın ve bilinmeyen blog
+yollarının `/index.html` yerine 404 veya 410 döndürmesini sağlayın.
+
 ### Yayınlama izin veya depo hatasıyla başarısız oluyor
 
 Kart, sebebini gösterir. Sık görülenler:
@@ -759,5 +831,6 @@ Kart, sebebini gösterir. Sık görülenler:
 
 Size içeriği ve ona dair verileri veriyoruz. Sitenizin kendi yönlendirmesine bağlı olan her şey
 sizde kalır: canonical adresler, `og:` ve Twitter etiketleri, `BlogPosting` ve `BreadcrumbList`
-JSON-LD, site haritanız ve RSS akışınız. Manifest hepsini kolaylaştıracak şekilde tasarlandı —
+JSON-LD, site haritanız ve RSS akışınız. Bu çıktıların içindeki her makale referansı, sonunda eğik
+çizgi olan aynı URL'yi kullanmalıdır. Manifest hepsini kolaylaştıracak şekilde tasarlandı —
 ihtiyacınız olan her alan içinde ve en yeniden eskiye sıralı geliyor.

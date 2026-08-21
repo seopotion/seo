@@ -1,7 +1,7 @@
 ---
 title: Publish to a custom site
 description: Connect a GitHub repository, understand the Markdown and manifest files Seopotion commits into it, and render them in Next.js, Astro, Nuxt or Vue.
-updated: 2026-08-08
+updated: 2026-08-21
 ---
 
 If your site is built with a JavaScript framework — Next.js, Astro, Nuxt, Vue, Hugo, Eleventy —
@@ -9,9 +9,9 @@ there is no server to push a post into. The site is a folder of files, and conte
 it was there when the site was built.
 
 So this integration publishes by **committing content into your Git repository**. Seopotion writes
-one Markdown file per article plus a `manifest.json` index, your existing deploy pipeline sees the
-push and rebuilds, and the article is live. Every publish is an ordinary commit you can read,
-review and revert.
+one Markdown file per article plus a `manifest.json` index, and your existing deploy pipeline sees
+the push and rebuilds. Every publish is an ordinary commit you can read, review and revert. The
+host must also be configured to serve the generated directory routes described below.
 
 There are two halves to setting this up. The first is clicking Connect, and takes a minute. The
 second is teaching your site to render the files — roughly 60–100 lines of code, written once.
@@ -40,6 +40,9 @@ second is teaching your site to render the files — roughly 60–100 lines of c
    - **Repository** — the one you just granted.
    - **Branch** — the branch your production site builds from, usually `main`.
    - **Content folder** — where the files go. `seopotion/` by default.
+   - **Post URL base** — the public path before an article's slug. A base of
+     `https://example.com/blog` produces `https://example.com/blog/article-slug/`. The final slash
+     is required.
 
 Nothing is written to your repository until you confirm, and nothing is written at all until you
 publish your first article.
@@ -158,8 +161,8 @@ in the manifest. You rarely need it, because the video is already embedded in th
 
 ## Rules every renderer must follow
 
-These four rules are the whole contract. Get them right and any framework works; get them wrong
-and the symptoms are confusing. They apply equally to every example below.
+These four rendering rules apply equally to every example below. Get them right and any framework
+works; get them wrong and the symptoms are confusing.
 
 1. **Enable raw HTML in your Markdown renderer.** YouTube videos are embedded in the body as an
    `<iframe>`. A renderer that escapes HTML — which many do by default, for safety — will print
@@ -180,6 +183,26 @@ and the symptoms are confusing. They apply equally to every example below.
 4. **Add `width` and `height` to inline images yourself.** Markdown's `![alt](url)` syntax cannot
    carry dimensions, so a plain render shifts the page around as images load. Match each image on
    its `src` against the `images` array and set the attributes. Skip any whose size is `null`.
+
+## Public article URL contract
+
+Articles use directory-style public URLs. For the slug `ai-outfit-generator` under
+`https://example.com/blog`, the one supported URL is:
+
+```
+https://example.com/blog/ai-outfit-generator/
+```
+
+The trailing slash is part of the URL contract. Use that exact form everywhere:
+
+- index pages, navigation and internal article links;
+- the canonical tag and `og:url`;
+- every `BlogPosting` URL that identifies the article, and the article item in
+  `BreadcrumbList` JSON-LD; and
+- every sitemap `<loc>` entry for an article.
+
+The build must emit a nested file such as `dist/blog/ai-outfit-generator/index.html`. Your host
+must resolve `/blog/ai-outfit-generator/` to that `index.html` file.
 
 ## Build your blog pages
 
@@ -268,7 +291,7 @@ export default async function BlogIndex() {
       <h1>Blog</h1>
       {articles.map((article) => (
         <article key={article.slug}>
-          <Link href={`/blog/${article.slug}`}>
+          <Link href={`/blog/${article.slug}/`}>
             <img
               src={article.cover}
               alt={article.cover_alt}
@@ -311,12 +334,16 @@ export async function generateMetadata({
   const article = await getArticle(slug);
   if (!article) return {};
 
+  const articleUrl = `https://example.com/blog/${article.slug}/`;
+
   return {
     title: article.meta_title,
     description: article.meta_description,
+    alternates: { canonical: articleUrl },
     openGraph: {
       title: article.meta_title,
       description: article.meta_description,
+      url: articleUrl,
       images: [article.cover],
       type: 'article',
       publishedTime: article.published_at,
@@ -373,10 +400,16 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 }
 ```
 
-Two Next.js-specific notes:
+Three Next.js-specific notes:
 
 - **`params` is a Promise** in Next.js 15 and newer, which is why the examples `await` it. On
   Next.js 14, use `params.slug` directly.
+- **For a static export, enable nested directory output** in `next.config.ts` so the public URL and
+  emitted file agree:
+
+  ```ts
+  export default { output: 'export', trailingSlash: true };
+  ```
 - **If you prefer `next/image`** over a plain `<img>`, add our CDN to `next.config.js` first —
   otherwise every image throws at build time:
 
@@ -638,9 +671,10 @@ import manifest from './seopotion/manifest.json';
 
 export default defineConfig({
   ssgOptions: {
+    dirStyle: 'nested',
     includedRoutes: (paths) => [
       ...paths,
-      ...manifest.articles.map((article) => `/blog/${article.slug}`),
+      ...manifest.articles.map((article) => `/blog/${article.slug}/`),
     ],
   },
 });
@@ -672,8 +706,8 @@ are identical.
 
 ## Step 3 — Rebuilding when we publish
 
-There is nothing to configure. Publishing pushes a commit to the branch you chose, and your
-existing deploy pipeline treats it like any other push.
+Publishing pushes a commit to the branch you chose, and your existing deploy pipeline treats it
+like any other push.
 
 | Your host | What happens |
 | --- | --- |
@@ -682,7 +716,35 @@ existing deploy pipeline treats it like any other push.
 | Your own server | Whatever you already use — a webhook, a cron `git pull`, a CI job. |
 
 The first publish is the one to watch. Publish a single article, confirm the commit appears in
-your repository, then confirm your deploy ran and the page renders.
+your repository, then confirm your deploy ran and the trailing-slash page renders.
+
+## Configure your host
+
+A successful Git commit proves that the content reached your repository. A successful build proves
+that your framework generated files. Neither proves that the production host sends an article URL
+to the matching file. This is host configuration, not a request-time fetch from Seopotion.
+
+Your host must resolve a directory URL to its `index.html`. Do not let a site-wide SPA fallback
+rewrite unknown `/blog/` paths to the root `/index.html`: that returns the homepage with HTTP 200
+for a missing article, which is a soft 404. Unknown blog paths must return a genuine HTTP 404 or
+410.
+
+An existing article requested without the final slash may redirect to its trailing-slash URL, but
+it must never fall through to the homepage. Only the trailing-slash form should be linked or
+indexed.
+
+On nginx, put a scoped blog location before any broader SPA fallback:
+
+```nginx
+index index.html;
+
+location ^~ /blog/ {
+  try_files $uri $uri/ =404;
+}
+```
+
+Other hosts need the same behavior: serve an existing article directory's `index.html`, and do
+not use the homepage as the fallback for a missing article route.
 
 ## Republishing, renaming and deleting
 
@@ -739,6 +801,13 @@ must match the path in your code.
 Your deploy did not run, or ran on a different branch. Check that the branch on the integration
 card is the branch your production site builds from.
 
+### The article URL shows the homepage
+
+First check the build output for `<route>/index.html`. With `vite-ssg`, confirm that
+`ssgOptions.dirStyle` is `'nested'` and `includedRoutes` contains the trailing-slash route. If the
+file exists, your host's SPA fallback is catching the article URL. Configure directory-index
+resolution for `/blog/` and make unknown blog paths return 404 or 410 instead of `/index.html`.
+
 ### Publishing fails with a permission or repository error
 
 The card shows the reason. The common ones:
@@ -755,5 +824,6 @@ The card shows the reason. The common ones:
 
 We give you the content and the data about it. Everything that depends on your site's own routing
 stays yours to render: canonical URLs, `og:` and Twitter tags, `BlogPosting` and `BreadcrumbList`
-JSON-LD, your sitemap and your RSS feed. The manifest is designed to make all of them
-straightforward — every field you need is in it, and it is sorted newest-first.
+JSON-LD, your sitemap and your RSS feed. Every article reference in those outputs must use the
+same trailing-slash URL. The manifest is designed to make all of them straightforward — every
+field you need is in it, and it is sorted newest-first.

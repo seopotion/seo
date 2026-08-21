@@ -112,7 +112,7 @@ export function normalizeUrl(url: string): string {
   return url.trim().replace(/\/+$/, '');
 }
 
-/** `base + slug` for a static-site post, or null when we cannot decide it. */
+/** `<base>/<slug>/` for a static-site post, or null when we cannot decide it. */
 export function staticSitePostUrl(postUrlBase: string, slug: string): string | null {
   const base = postUrlBase.trim();
   const path = slug.trim().replace(/^\/+|\/+$/g, '');
@@ -126,7 +126,7 @@ export function staticSitePostUrl(postUrlBase: string, slug: string): string | n
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
   // A query or fragment can't have a slug appended (`…?page=2/my-post`).
   if (parsed.search || parsed.hash) return null;
-  return `${base.replace(/\/+$/, '')}/${path}`;
+  return `${base.replace(/\/+$/, '')}/${path}/`;
 }
 
 /** A stored permalink is only usable if it is an absolute http(s) URL. */
