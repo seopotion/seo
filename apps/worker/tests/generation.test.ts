@@ -460,7 +460,7 @@ describe('generation worker', () => {
     expect(verifyCandidates).toHaveBeenCalledWith([
       {
         title: 'Widget Guide',
-        url: 'https://acme.com/blog/widget-guide',
+        url: 'https://acme.com/blog/widget-guide/',
         topic_cluster_id: null,
         topic_role: null,
       },
@@ -472,7 +472,7 @@ describe('generation worker', () => {
     expect(passed.ctx.linkCandidates).toEqual([
       {
         title: 'Widget Guide',
-        url: 'https://acme.com/blog/widget-guide',
+        url: 'https://acme.com/blog/widget-guide/',
         topic_cluster_id: null,
         topic_role: null,
       },

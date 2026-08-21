@@ -114,7 +114,7 @@ describe('cleanLinks', () => {
     expect(replaceContent).toHaveBeenCalledTimes(1);
     const [id, content] = replaceContent.mock.calls[0] as unknown as [string, string];
     expect(id).toBe('a2');
-    expect(content).toBe('See features and this and [guide](https://acme.com/blog/widget-guide).');
+    expect(content).toBe('See features and this and [guide](https://acme.com/blog/widget-guide/).');
   });
 
   test('lists published articles that changed, so they can be republished', async () => {
