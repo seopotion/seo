@@ -66,16 +66,17 @@ to be polled.
 Pulls the org's next scheduled article(s) into the pipeline now:
 
 1. Find the org's next planner keyword(s): `article_id: null`,
-   `generation_status` not `generated`, attempts under
+   `generation_status` in `pending`/`failed`, attempts under
    `MAX_GENERATION_ATTEMPTS`, smallest `scheduled_date` first. `--count`
    defaults to 1.
-2. For each, bump `scheduled_date` to today (`KeywordRepo.reschedulePending`)
-   so the pick is consistent with scheduler semantics and visible in the
-   planner.
-3. Enqueue a `GenerateTask` (`@shared/schemas`) to `GENERATION_QUEUE_URL`,
+2. Enqueue a `GenerateTask` (`@shared/schemas`) to `GENERATION_QUEUE_URL`,
    using the CLI's own `SQSClient` honoring `SQS_ENDPOINT` (same as
-   `lib/images.ts`) — no dependency on `apps/api`.
-4. Output: keyword id(s), title, old→new scheduled_date, queue message id.
+   `lib/images.ts`) — no dependency on `apps/api`. **No `scheduled_date`
+   bump:** `(org_id, scheduled_date)` is a unique index and today's slot is
+   usually taken, so rewriting the date would collide; the generation worker
+   never checks the date (only the scheduler filters by it), so enqueueing
+   directly is sufficient and leaves the planner untouched.
+3. Output: keyword id(s), keyword text, scheduled_date, generation status.
 
 No due keyword ⇒ `NO_KEYWORDS_DUE` error (hint: check the planner /
 strategy commands).
@@ -174,7 +175,9 @@ skill, so cold-start agent sessions discover the workflow. Contents:
 - `apps/cli/src/types.ts` — new result data shapes + error codes.
 - Reuses: `@shared/db` repos, `@shared/schemas` (`GenerateTask`,
   `PublishTask`, `isPaid` from `org.ts`), `resolveOrgId`, emitter.
-- No changes to worker, API, or infra. No new npm dependencies.
+- No changes to worker, API, or infra. No new external npm dependencies;
+  adds the internal `"@shared/generation": "*"` workspace dep to `apps/cli`
+  for `MAX_GENERATION_ATTEMPTS`.
 
 ## Testing
 
