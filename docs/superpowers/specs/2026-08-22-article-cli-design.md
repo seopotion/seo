@@ -136,6 +136,15 @@ never claim success. On terminal failure: surface `last_error` /
   the enqueueing commands, AWS credentials (ambient) unless `SQS_ENDPOINT`
   (local ElasticMQ) is set. Commands that write emit the existing
   "which env does MONGO_URI target" warning.
+- **AWS auth preflight:** `generate-next` and `publish` probe the target
+  queue with `GetQueueAttributes` (the same call `infra check` uses) **before
+  any Mongo write** — so an expired SSO session can't leave a keyword
+  rescheduled with nothing enqueued. Credential failures (missing/expired
+  creds, access denied) map to `AWS_NOT_AUTHENTICATED` with hint
+  "log in with the AWS CLI (e.g. `aws sso login`) or check `AWS_PROFILE`";
+  other probe failures (bad queue URL, SQS down) exit `INFRA_DOWN`. The probe
+  runs against ElasticMQ too when `SQS_ENDPOINT` is set, so the same path
+  covers local dev. No new dependency (reuses `@aws-sdk/client-sqs`).
 
 ## Project skill
 
@@ -144,7 +153,9 @@ skill, so cold-start agent sessions discover the workflow. Contents:
 
 - **When to use:** verifying article generation/publishing changes on staging
   (or locally against ElasticMQ) without waiting for the nightly cron.
-- **Setup:** required env vars and where they come from; the
+- **Setup:** required env vars and where they come from; **check AWS login
+  first** (`aws sts get-caller-identity`, or just run the command — the CLI's
+  preflight reports `AWS_NOT_AUTHENTICATED` with the login hint); the
   `npm run --silent cli -- … --output json` invocation form (npm banner
   corrupts stdout JSON otherwise).
 - **Workflow:** `articles generate-next --user <email> --wait` →
