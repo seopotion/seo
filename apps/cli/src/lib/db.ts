@@ -59,6 +59,7 @@ import {
   type StrategySnapshot,
   writeSnapshot,
 } from './strategy-snapshot';
+import { resolveOrgId } from './target';
 
 export async function initDb(): Promise<Result<DbInitData>> {
   try {
@@ -93,32 +94,6 @@ export async function migrateDb(): Promise<Result<MigrationReport>> {
 
 function isEntitlementPlan(plan: string): plan is EntitlementPlan {
   return (ENTITLEMENT_PLANS as readonly string[]).includes(plan);
-}
-
-/**
- * Resolve the target org from exactly one of `org` (id, taken as-is) or `user`
- * (email -> their single org). Shared by every org-scoped db subcommand so they
- * accept the same flags and fail with the same codes.
- */
-async function resolveOrgId(org?: string, user?: string): Promise<Result<string>> {
-  if ((org && user) || (!org && !user)) {
-    return fail('BAD_TARGET', 'Provide exactly one of --org or --user.');
-  }
-  if (!user) return ok(org as string);
-
-  const found = await UserRepo.findByEmail(user);
-  if (!found) return fail('USER_NOT_FOUND', `No user with email "${user}".`);
-  const orgs = await OrgRepo.findByUserId(found.id);
-  if (orgs.length > 1) {
-    return fail(
-      'AMBIGUOUS_ORG',
-      `User "${user}" owns ${orgs.length} orgs: ${orgs.map((o) => o.id).join(', ')}.`,
-      'Re-run with --org <id>.',
-    );
-  }
-  const [only] = orgs;
-  if (!only) return fail('ORG_NOT_FOUND', `User "${user}" owns no org.`);
-  return ok(only.id);
 }
 
 /**
