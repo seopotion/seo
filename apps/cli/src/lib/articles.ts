@@ -316,6 +316,25 @@ export async function generateNext(opts: {
     if (!resolved.ok) return resolved;
     const orgId = resolved.data;
 
+    // The generation worker fails these permanently (no retry) — check them up
+    // front so `--wait` doesn't burn its whole timeout on a doomed org.
+    const org = await OrgRepo.findById(orgId);
+    if (!org) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
+    if (!org.presets) {
+      return fail(
+        'ORG_NOT_FINALIZED',
+        `Org "${orgId}" has no presets — the generation worker would fail it permanently.`,
+        'Finish onboarding for this org first.',
+      );
+    }
+    if (!isPaid(org)) {
+      return fail(
+        'ORG_NOT_PAID',
+        `Org "${orgId}" is on plan "${org.plan}" — the generation worker refuses unpaid orgs.`,
+        `npm run cli -- db set-plan --org ${orgId} --plan paid`,
+      );
+    }
+
     // Same eligibility as the scheduler's listDueForGeneration, minus the date
     // cap (the worker never checks scheduled_date — only the scheduler does) and
     // scoped to one org. listByOrg sorts by scheduled_date asc, so "next" is
@@ -402,13 +421,16 @@ export async function publishArticle(opts: {
     const org = await OrgRepo.findById(article.org_id);
     if (!org) return fail('ORG_NOT_FOUND', `No org with id "${article.org_id}".`);
 
-    // The publish worker checks all of these and silently drops the task when
-    // they fail — surface them as errors BEFORE enqueueing instead.
+    // The publish worker checks these same gates and, when one fails, consumes
+    // the task and records a typed failure on the attempt (visible via
+    // `articles show` as `last_error`) rather than retrying — surface them as
+    // errors BEFORE enqueueing instead, so we avoid burning that attempt and
+    // give an immediate, actionable error here.
     if (article.images_status !== 'complete') {
       return fail(
         'IMAGES_INCOMPLETE',
         `images_status is "${article.images_status}" — the publish worker refuses articles without complete images.`,
-        'Check `articles show`; a failed image run can be replayed with `db reset-images --enqueue`.',
+        'Check `articles show`; a failed image run can be replayed with POST /admin/articles/{id}/images.',
       );
     }
     if (!org.presets?.article_preferences.publishing.auto_publish) {

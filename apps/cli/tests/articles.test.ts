@@ -195,6 +195,10 @@ describe('generateNext', () => {
   const pending = (id: string, date: string, over: Record<string, unknown> = {}) =>
     keyword({ id, scheduled_date: date, ...over });
 
+  beforeEach(() => {
+    repos.orgFindById.mockResolvedValue(paidOrg());
+  });
+
   test('enqueues the next N eligible keywords, oldest scheduled_date first', async () => {
     repos.keywordListByOrg.mockResolvedValueOnce([
       pending('k1', '2026-08-23', { article_id: 'a0', generation_status: 'generated' }),
@@ -260,6 +264,23 @@ describe('generateNext', () => {
     );
     const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
     expect(result).toMatchObject({ ok: false, error: { code: 'SQS_UNAVAILABLE' } });
+  });
+
+  test('fails ORG_NOT_PAID before listing keywords, so --wait never burns its timeout', async () => {
+    repos.orgFindById.mockResolvedValue(paidOrg({ plan: 'free' }));
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'ORG_NOT_PAID' } });
+    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
+    // Only the preflight probe — no generation task was enqueued.
+    expect(sqs.send).toHaveBeenCalledTimes(1);
+  });
+
+  test('fails ORG_NOT_FINALIZED when the org has no presets', async () => {
+    repos.orgFindById.mockResolvedValue(paidOrg({ presets: null }));
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'ORG_NOT_FINALIZED' } });
+    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
+    expect(sqs.send).toHaveBeenCalledTimes(1);
   });
 });
 

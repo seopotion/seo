@@ -193,6 +193,7 @@ npm run cli -- --help                 # list commands
 npm run cli -- infra check            # health-check mongo + sqs + api
 npm run cli -- infra check --services mongo,api
 npm run cli -- db init                # create MongoDB indexes
+npm run cli -- articles list --user someone@example.com   # article pipeline: inspect, trigger generation, republish
 ```
 
 Add `--output json` to any command for machine-readable output + meaningful exit

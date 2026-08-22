@@ -45,7 +45,7 @@ const waitArgs = (defaultTimeout: string) => ({
 });
 
 function parsePositiveInt(raw: string): number | null {
-  const value = Number.parseInt(raw, 10);
+  const value = Number(raw);
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 

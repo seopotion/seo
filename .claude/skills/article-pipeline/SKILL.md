@@ -45,8 +45,9 @@ for detail → `publish <id>` if you changed something and want to republish.
 
 `--wait` polls Mongo every 5s and exits 3 (`OP_FAILED`) on timeout or a
 terminal failure — the payload always carries the last observed state.
-Exit codes: 0 ok, 1 user error (incl. unmet gates), 2 infra/auth down,
-3 pipeline failed or timed out, 4 internal.
+Exit codes: 0 ok, 1 user error (incl. unmet gates), 2 AWS/SQS preflight
+failed, 3 pipeline failed or timed out, 4 internal (incl. Mongo connection
+failures).
 
 ## Error codes and remediation
 
@@ -56,15 +57,17 @@ Exit codes: 0 ok, 1 user error (incl. unmet gates), 2 infra/auth down,
 | `SQS_UNAVAILABLE` | Bad queue URL or network — check the URL / VPN |
 | `QUEUE_URL_MISSING` | Set `GENERATION_QUEUE_URL` / `PUBLISH_QUEUE_URL` |
 | `NO_KEYWORDS_DUE` | Planner has nothing ungenerated — `db strategy-audit` / `db strategy-run` |
-| `IMAGES_INCOMPLETE` | Images not done — `articles show`, maybe `db reset-images --enqueue` |
+| `IMAGES_INCOMPLETE` | Images not done — check `articles show`; a failed image run can be replayed with `POST /admin/articles/{id}/images` |
 | `AUTO_PUBLISH_DISABLED` | Org preset off — enable auto-publish in dashboard settings |
 | `ORG_NOT_PAID` | `npm run cli -- db set-plan --org <id> --plan paid` |
+| `ORG_NOT_FINALIZED` | Org has no presets — finish onboarding for it first (`generate-next` only) |
 | `NOT_CONNECTED` | No integration row for the provider — connect it in the dashboard |
 
-The publish worker re-checks all of these gates and **silently drops**
-tasks that fail them — which is why the CLI checks first. If an enqueued
-task seems to vanish, check `articles show` for the attempt state and
-`last_error`.
+The publish worker re-checks all of these gates. When one fails, it
+consumes the task and records a typed failure on the attempt rather than
+retrying — visible via `articles show` as `last_error`. The CLI checks
+these gates first to avoid burning an attempt and to give an immediate,
+actionable error instead of waiting on the worker.
 
 ## Caveats
 
