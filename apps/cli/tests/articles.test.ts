@@ -48,7 +48,7 @@ vi.mock('@aws-sdk/client-sqs', () => ({
 // The real index pulls the whole generation pipeline into the graph.
 vi.mock('@shared/generation', () => ({ MAX_GENERATION_ATTEMPTS: 3 }));
 
-import { listArticles, showArticle } from '../src/lib/articles';
+import { generateNext, listArticles, showArticle } from '../src/lib/articles';
 
 const attempt = (over: Record<string, unknown> = {}) => ({
   provider: 'wordpress',
@@ -178,5 +178,77 @@ describe('showArticle', () => {
     repos.articleFindById.mockResolvedValueOnce(null);
     const result = await showArticle('nope');
     expect(result).toMatchObject({ ok: false, error: { code: 'ARTICLE_NOT_FOUND' } });
+  });
+});
+
+describe('generateNext', () => {
+  const pending = (id: string, date: string, over: Record<string, unknown> = {}) =>
+    keyword({ id, scheduled_date: date, ...over });
+
+  test('enqueues the next N eligible keywords, oldest scheduled_date first', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([
+      pending('k1', '2026-08-23', { article_id: 'a0', generation_status: 'generated' }),
+      pending('k2', '2026-08-24'),
+      pending('k3', '2026-08-25', { generation_status: 'failed', generation_attempts: 3 }),
+      pending('k4', '2026-08-26'),
+    ]);
+    const result = await generateNext({ org: 'o1', count: 2, wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // k1 is generated, k3 is out of attempts — k2 and k4 are the next two.
+    expect(result.data.enqueued.map((e) => e.keyword_id)).toEqual(['k2', 'k4']);
+    // 1 preflight probe + 2 sends.
+    expect(sqs.send).toHaveBeenCalledTimes(3);
+    const bodies = sqs.send.mock.calls
+      .slice(1)
+      .map((call) => JSON.parse((call[0] as { input: { MessageBody: string } }).input.MessageBody));
+    expect(bodies).toEqual([
+      { org_id: 'o1', keyword_id: 'k2' },
+      { org_id: 'o1', keyword_id: 'k4' },
+    ]);
+  });
+
+  test('retries a failed keyword with attempts left', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([
+      pending('k1', '2026-08-20', { generation_status: 'failed', generation_attempts: 1 }),
+    ]);
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.enqueued.map((e) => e.keyword_id)).toEqual(['k1']);
+  });
+
+  test('fails NO_KEYWORDS_DUE when nothing is eligible', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([
+      pending('k1', '2026-08-20', { article_id: 'a1', generation_status: 'generated' }),
+    ]);
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'NO_KEYWORDS_DUE' } });
+  });
+
+  test('fails QUEUE_URL_MISSING without GENERATION_QUEUE_URL, before touching Mongo', async () => {
+    delete process.env.GENERATION_QUEUE_URL;
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'QUEUE_URL_MISSING' } });
+    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
+  });
+
+  test('maps expired credentials to AWS_NOT_AUTHENTICATED, before touching Mongo', async () => {
+    sqs.send.mockRejectedValueOnce(
+      Object.assign(new Error('The security token included in the request is expired'), {
+        name: 'ExpiredTokenException',
+      }),
+    );
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'AWS_NOT_AUTHENTICATED' } });
+    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
+  });
+
+  test('maps other probe failures to SQS_UNAVAILABLE', async () => {
+    sqs.send.mockRejectedValueOnce(
+      Object.assign(new Error('queue does not exist'), { name: 'QueueDoesNotExist' }),
+    );
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code: 'SQS_UNAVAILABLE' } });
   });
 });
