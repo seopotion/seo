@@ -281,6 +281,12 @@ export const dbCommand = defineCommand({
       },
       args: {
         org: { type: 'positional', description: 'Org id', required: true },
+        force: {
+          type: 'boolean',
+          description:
+            'Re-run an org whose strategy is already completed (or stuck pending): resets strategy_status to failed first. Tops up the plan; safe to repeat.',
+          default: false,
+        },
         ...outputOption,
         ...verboseOption,
       },
@@ -294,7 +300,10 @@ export const dbCommand = defineCommand({
           );
           emitter.step('db:strategy-run', 'start');
 
-          const result = await strategyRun({ orgId: args.org as string });
+          const result = await strategyRun({
+            orgId: args.org as string,
+            force: args.force as boolean,
+          });
           emitter.step('db:strategy-run', result.ok ? 'done' : 'fail');
           emitter.result(result);
 
