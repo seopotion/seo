@@ -5,16 +5,17 @@
  * generates or publishes in-process, so a run exercises the deployed pipeline.
  */
 import { GetQueueAttributesCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
-import { ArticleRepo, closeDb, KeywordRepo } from '@shared/db';
+import { ArticleRepo, closeDb, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { MAX_GENERATION_ATTEMPTS } from '@shared/generation';
-import type { Article, PublishingError } from '@shared/schemas';
-import { GenerateTask } from '@shared/schemas';
+import type { Article, IntegrationProvider, PublishingError } from '@shared/schemas';
+import { GenerateTask, INTEGRATION_PROVIDERS, isPaid, PublishTask } from '@shared/schemas';
 import {
   type ArticleShowData,
   type ArticlesListData,
   fail,
   type GenerateNextData,
   ok,
+  type PublishArticleData,
   type PublishingErrorView,
   type Result,
 } from '../types';
@@ -235,6 +236,118 @@ export async function generateNext(opts: {
       })),
       wait: null,
     });
+  } finally {
+    client.destroy();
+    await closeDb();
+  }
+}
+
+export async function publishArticle(opts: {
+  articleId: string;
+  provider?: string;
+  wait: boolean;
+  timeoutMs: number;
+}): Promise<Result<PublishArticleData>> {
+  if (opts.provider && !(INTEGRATION_PROVIDERS as readonly string[]).includes(opts.provider)) {
+    return fail(
+      'BAD_ARGS',
+      `Unknown provider "${opts.provider}".`,
+      `Use one of: ${INTEGRATION_PROVIDERS.join(', ')}.`,
+    );
+  }
+  const queueUrl = process.env.PUBLISH_QUEUE_URL;
+  if (!queueUrl) {
+    return fail(
+      'QUEUE_URL_MISSING',
+      'PUBLISH_QUEUE_URL is not set.',
+      'Point it at the staging publish queue (aws sqs list-queues), or at ElasticMQ with SQS_ENDPOINT for local dev.',
+    );
+  }
+  const probe = await preflightQueue(queueUrl);
+  if (!probe.ok) return probe;
+  const client = probe.data;
+
+  try {
+    const article = await ArticleRepo.findById(opts.articleId);
+    if (!article) return fail('ARTICLE_NOT_FOUND', `No article with id "${opts.articleId}".`);
+    const org = await OrgRepo.findById(article.org_id);
+    if (!org) return fail('ORG_NOT_FOUND', `No org with id "${article.org_id}".`);
+
+    // The publish worker checks all of these and silently drops the task when
+    // they fail — surface them as errors BEFORE enqueueing instead.
+    if (article.images_status !== 'complete') {
+      return fail(
+        'IMAGES_INCOMPLETE',
+        `images_status is "${article.images_status}" — the publish worker refuses articles without complete images.`,
+        'Check `articles show`; a failed image run can be replayed with `db reset-images --enqueue`.',
+      );
+    }
+    if (!org.presets?.article_preferences.publishing.auto_publish) {
+      return fail(
+        'AUTO_PUBLISH_DISABLED',
+        'The org preset article_preferences.publishing.auto_publish is off.',
+        'Enable automatic publishing in the dashboard settings for this org.',
+      );
+    }
+    if (!isPaid(org)) {
+      return fail(
+        'ORG_NOT_PAID',
+        `Org "${org.id}" is on plan "${org.plan}" — publishing requires a paid plan.`,
+        `npm run cli -- db set-plan --org ${org.id} --plan paid`,
+      );
+    }
+
+    // Presence of an Integration row = connected (same as the retry route). The
+    // route's lazy org→Integration WordPress migration is NOT replicated here:
+    // it needs apps/api's crypto. Legacy-mirror orgs read as NOT_CONNECTED; any
+    // dashboard publish migrates them.
+    const integrations = await IntegrationRepo.listByOrgId(org.id);
+    const connected = integrations.map((i) => i.provider);
+    if (opts.provider && !connected.includes(opts.provider as IntegrationProvider)) {
+      return fail(
+        'NOT_CONNECTED',
+        `No "${opts.provider}" integration is connected for org "${org.id}".`,
+        `Connected: ${connected.length ? connected.join(', ') : '(none)'}.`,
+      );
+    }
+    const requested = opts.provider
+      ? [opts.provider as IntegrationProvider]
+      : [...new Set(connected)];
+    if (requested.length === 0) {
+      return fail(
+        'NOT_CONNECTED',
+        `Org "${org.id}" has no publishing integration connected.`,
+        'Connect WordPress or a static site in the dashboard first.',
+      );
+    }
+
+    await ArticleRepo.clearAutoPublishPreflightError(article.id);
+    const requestedAt = new Date();
+    const publishedTo = new Set(article.publications.map((p) => p.provider));
+    const providers: PublishArticleData['providers'] = [];
+    for (const provider of requested) {
+      const attempt = article.auto_publish.attempts.find((entry) => entry.provider === provider);
+      if (publishedTo.has(provider) || attempt?.status === 'published') {
+        providers.push({ provider, action: 'skipped_published' });
+        continue;
+      }
+      if (attempt?.status === 'failed' || attempt?.status === 'cancelled') {
+        await ArticleRepo.resetAutoPublishAttempt(article.id, provider, requestedAt);
+      } else if (!attempt) {
+        await ArticleRepo.initializeAutoPublishAttempt(article.id, provider, requestedAt);
+      }
+      await client.send(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: JSON.stringify(
+            PublishTask.parse({ org_id: org.id, article_id: article.id, provider }),
+          ),
+        }),
+      );
+      providers.push({ provider, action: 'enqueued' });
+    }
+
+    return ok({ article_id: article.id, org_id: org.id, providers, wait: null });
   } finally {
     client.destroy();
     await closeDb();

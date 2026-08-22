@@ -48,7 +48,7 @@ vi.mock('@aws-sdk/client-sqs', () => ({
 // The real index pulls the whole generation pipeline into the graph.
 vi.mock('@shared/generation', () => ({ MAX_GENERATION_ATTEMPTS: 3 }));
 
-import { generateNext, listArticles, showArticle } from '../src/lib/articles';
+import { generateNext, listArticles, publishArticle, showArticle } from '../src/lib/articles';
 
 const attempt = (over: Record<string, unknown> = {}) => ({
   provider: 'wordpress',
@@ -94,6 +94,16 @@ const keyword = (over: Record<string, unknown> = {}) => ({
   generation_error: null,
   ...over,
 });
+
+const paidOrg = (over: Record<string, unknown> = {}) => ({
+  id: 'o1',
+  plan: 'paid',
+  website_url: 'https://example.com',
+  presets: { article_preferences: { publishing: { auto_publish: true } } },
+  ...over,
+});
+
+const integration = (provider: string) => ({ org_id: 'o1', provider });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -250,5 +260,122 @@ describe('generateNext', () => {
     );
     const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
     expect(result).toMatchObject({ ok: false, error: { code: 'SQS_UNAVAILABLE' } });
+  });
+});
+
+describe('publishArticle', () => {
+  beforeEach(() => {
+    repos.articleFindById.mockResolvedValue(article());
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([
+      integration('wordpress'),
+      integration('static-site'),
+    ]);
+  });
+
+  test('resets/initializes attempts and enqueues one task per connected provider', async () => {
+    repos.articleFindById.mockResolvedValue(
+      article({
+        auto_publish: { preflight_error: null, attempts: [attempt({ status: 'failed' })] },
+      }),
+    );
+    const result = await publishArticle({ articleId: 'a1', wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.providers).toEqual([
+      { provider: 'wordpress', action: 'enqueued' },
+      { provider: 'static-site', action: 'enqueued' },
+    ]);
+    // failed wordpress attempt is reset; static-site has none and is initialized.
+    expect(repos.resetAttempt).toHaveBeenCalledWith('a1', 'wordpress', expect.any(Date));
+    expect(repos.initAttempt).toHaveBeenCalledWith('a1', 'static-site', expect.any(Date));
+    expect(repos.clearPreflight).toHaveBeenCalledWith('a1');
+    const bodies = sqs.send.mock.calls
+      .slice(1)
+      .map((call) => JSON.parse((call[0] as { input: { MessageBody: string } }).input.MessageBody));
+    expect(bodies).toEqual([
+      { org_id: 'o1', article_id: 'a1', provider: 'wordpress' },
+      { org_id: 'o1', article_id: 'a1', provider: 'static-site' },
+    ]);
+  });
+
+  test('skips providers already published', async () => {
+    repos.articleFindById.mockResolvedValue(
+      article({
+        publications: [
+          {
+            provider: 'wordpress',
+            ref: '12',
+            slug: 'widget-guide',
+            published_at: new Date('2026-08-20T08:00:00Z'),
+            updated_at: null,
+            remote_url: null,
+          },
+        ],
+      }),
+    );
+    const result = await publishArticle({ articleId: 'a1', wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.providers).toEqual([
+      { provider: 'wordpress', action: 'skipped_published' },
+      { provider: 'static-site', action: 'enqueued' },
+    ]);
+  });
+
+  test('--provider restricts to one connected provider', async () => {
+    const result = await publishArticle({
+      articleId: 'a1',
+      provider: 'static-site',
+      wait: false,
+      timeoutMs: 0,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.providers).toEqual([{ provider: 'static-site', action: 'enqueued' }]);
+  });
+
+  test('fails BAD_ARGS on an unknown provider', async () => {
+    const result = await publishArticle({
+      articleId: 'a1',
+      provider: 'medium',
+      wait: false,
+      timeoutMs: 0,
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: 'BAD_ARGS' } });
+  });
+
+  test.each([
+    [
+      'IMAGES_INCOMPLETE',
+      () => repos.articleFindById.mockResolvedValue(article({ images_status: 'pending' })),
+    ],
+    [
+      'AUTO_PUBLISH_DISABLED',
+      () =>
+        repos.orgFindById.mockResolvedValue(
+          paidOrg({ presets: { article_preferences: { publishing: { auto_publish: false } } } }),
+        ),
+    ],
+    ['ORG_NOT_PAID', () => repos.orgFindById.mockResolvedValue(paidOrg({ plan: 'free' }))],
+    ['NOT_CONNECTED', () => repos.integrationsList.mockResolvedValue([])],
+  ] as const)('fails fast with %s', async (code, arrange) => {
+    arrange();
+    const result = await publishArticle({ articleId: 'a1', wait: false, timeoutMs: 0 });
+    expect(result).toMatchObject({ ok: false, error: { code } });
+    expect(repos.initAttempt).not.toHaveBeenCalled();
+    // Only the preflight probe — no publish task was enqueued.
+    expect(sqs.send).toHaveBeenCalledTimes(1);
+  });
+
+  test('fails NOT_CONNECTED when --provider names an unconnected one', async () => {
+    repos.integrationsList.mockResolvedValue([integration('static-site')]);
+    const result = await publishArticle({
+      articleId: 'a1',
+      provider: 'wordpress',
+      wait: false,
+      timeoutMs: 0,
+    });
+    expect(result).toMatchObject({ ok: false, error: { code: 'NOT_CONNECTED' } });
   });
 });
