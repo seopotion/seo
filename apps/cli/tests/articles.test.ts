@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const repos = vi.hoisted(() => ({
   articleListByOrg: vi.fn(async () => ({ articles: [] as unknown[], total: 0 })),
@@ -377,5 +377,142 @@ describe('publishArticle', () => {
       timeoutMs: 0,
     });
     expect(result).toMatchObject({ ok: false, error: { code: 'NOT_CONNECTED' } });
+  });
+});
+
+describe('--wait', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test('generate-next --wait polls until the article is published', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([keyword()]);
+    // Wait-start expectation lookup: org is paid + auto_publish on + wordpress connected.
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([integration('wordpress')]);
+    // Poll 1: still generating. Poll 2: article linked and published.
+    repos.keywordFindById
+      .mockResolvedValueOnce(keyword({ generation_status: 'generating' }))
+      .mockResolvedValue(keyword({ article_id: 'a1', generation_status: 'generated' }));
+    repos.articleFindById.mockResolvedValue(
+      article({
+        status: 'published',
+        auto_publish: {
+          preflight_error: null,
+          attempts: [attempt({ status: 'published', last_error: null })],
+        },
+      }),
+    );
+
+    const promise = generateNext({ org: 'o1', count: 1, wait: true, timeoutMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await promise;
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.wait).toMatchObject({
+      timed_out: false,
+      outcomes: [{ keyword_id: 'k1', article_id: 'a1', done: true, ok: true }],
+    });
+  });
+
+  test('generate-next --wait reports failure when generation exhausts attempts', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([keyword()]);
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([]);
+    repos.keywordFindById.mockResolvedValue(
+      keyword({ generation_status: 'failed', generation_attempts: 3, generation_error: 'boom' }),
+    );
+
+    const result = await generateNext({ org: 'o1', count: 1, wait: true, timeoutMs: 60_000 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.wait).toMatchObject({
+      timed_out: false,
+      outcomes: [{ done: true, ok: false, generation_status: 'failed' }],
+    });
+  });
+
+  test('generate-next --wait times out with the last observed state', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([keyword()]);
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([]);
+    repos.keywordFindById.mockResolvedValue(keyword({ generation_status: 'generating' }));
+
+    const promise = generateNext({ org: 'o1', count: 1, wait: true, timeoutMs: 12_000 });
+    await vi.advanceTimersByTimeAsync(15_000);
+    const result = await promise;
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.wait).toMatchObject({
+      timed_out: true,
+      outcomes: [{ done: false, generation_status: 'generating' }],
+    });
+  });
+
+  test('publish --wait resolves when the enqueued provider publishes', async () => {
+    repos.articleFindById
+      .mockResolvedValueOnce(article()) // initial load
+      .mockResolvedValueOnce(
+        article({
+          auto_publish: {
+            preflight_error: null,
+            attempts: [attempt({ status: 'publishing', last_error: null })],
+          },
+        }),
+      ) // poll 1
+      .mockResolvedValue(
+        article({
+          status: 'published',
+          publications: [
+            {
+              provider: 'wordpress',
+              ref: '12',
+              slug: 'widget-guide',
+              published_at: new Date('2026-08-22T09:00:00Z'),
+              updated_at: null,
+              remote_url: 'https://example.com/widget-guide',
+            },
+          ],
+        }),
+      );
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([integration('wordpress')]);
+
+    const promise = publishArticle({ articleId: 'a1', wait: true, timeoutMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    const result = await promise;
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.wait).toMatchObject({
+      timed_out: false,
+      outcomes: [{ article_id: 'a1', done: true, ok: true }],
+    });
+  });
+
+  test('publish --wait reports a failed attempt with its error code', async () => {
+    repos.articleFindById.mockResolvedValueOnce(article()).mockResolvedValue(
+      article({
+        auto_publish: { preflight_error: null, attempts: [attempt({ status: 'failed' })] },
+      }),
+    );
+    repos.orgFindById.mockResolvedValue(paidOrg());
+    repos.integrationsList.mockResolvedValue([integration('wordpress')]);
+
+    const result = await publishArticle({ articleId: 'a1', wait: true, timeoutMs: 60_000 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.wait).toMatchObject({
+      timed_out: false,
+      outcomes: [
+        {
+          done: true,
+          ok: false,
+          attempts: [{ provider: 'wordpress', status: 'failed', error: 'plugin_upgrade_required' }],
+        },
+      ],
+    });
   });
 });

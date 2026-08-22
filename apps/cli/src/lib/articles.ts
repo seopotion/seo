@@ -18,6 +18,8 @@ import {
   type PublishArticleData,
   type PublishingErrorView,
   type Result,
+  type WaitOutcome,
+  type WaitReport,
 } from '../types';
 import { resolveOrgId } from './target';
 
@@ -172,6 +174,124 @@ export async function showArticle(articleId: string): Promise<Result<ArticleShow
   }
 }
 
+export const POLL_MS = 5_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function pollUntil(
+  observe: () => Promise<WaitOutcome[]>,
+  timeoutMs: number,
+): Promise<WaitReport> {
+  const startedAt = Date.now();
+  for (;;) {
+    const outcomes = await observe();
+    if (outcomes.every((o) => o.done)) {
+      return { timed_out: false, elapsed_ms: Date.now() - startedAt, outcomes };
+    }
+    if (Date.now() - startedAt + POLL_MS > timeoutMs) {
+      return { timed_out: true, elapsed_ms: Date.now() - startedAt, outcomes };
+    }
+    await sleep(POLL_MS);
+  }
+}
+
+/**
+ * The providers auto-publish will actually run for, computed ONCE at wait
+ * start: with the preset off, an unpaid org, or nothing connected, the images
+ * worker never hands off to publishing, and success is images completing.
+ */
+async function expectedProviders(orgId: string): Promise<IntegrationProvider[]> {
+  const org = await OrgRepo.findById(orgId);
+  if (!org?.presets?.article_preferences.publishing.auto_publish || !isPaid(org)) return [];
+  return [...new Set((await IntegrationRepo.listByOrgId(orgId)).map((i) => i.provider))];
+}
+
+function attemptViews(article: Article): WaitOutcome['attempts'] {
+  return article.auto_publish.attempts.map((entry) => ({
+    provider: entry.provider,
+    status: entry.status,
+    error: entry.last_error?.code ?? null,
+  }));
+}
+
+/** Terminal check for one provider: published (either record) / failed / cancelled. */
+function providerState(article: Article, provider: IntegrationProvider) {
+  const published =
+    article.publications.some((p) => p.provider === provider) ||
+    article.auto_publish.attempts.some(
+      (entry) => entry.provider === provider && entry.status === 'published',
+    );
+  const attempt = article.auto_publish.attempts.find((entry) => entry.provider === provider);
+  const terminal = published || attempt?.status === 'failed' || attempt?.status === 'cancelled';
+  return { published, terminal };
+}
+
+async function generationOutcome(
+  keywordId: string,
+  providers: IntegrationProvider[],
+): Promise<WaitOutcome> {
+  const current = await KeywordRepo.findById(keywordId);
+  const articleId = current?.article_id ?? null;
+  const article = articleId ? await ArticleRepo.findById(articleId) : null;
+  const base: WaitOutcome = {
+    keyword_id: keywordId,
+    article_id: articleId,
+    generation_status: current?.generation_status ?? null,
+    images_status: article?.images_status ?? null,
+    preflight_error: article?.auto_publish.preflight_error?.code ?? null,
+    attempts: article ? attemptViews(article) : [],
+    done: false,
+    ok: false,
+  };
+
+  const exhausted =
+    current?.generation_status === 'failed' &&
+    current.generation_attempts >= MAX_GENERATION_ATTEMPTS;
+  if (exhausted || (!current && !article)) return { ...base, done: true, ok: false };
+  if (!article) return base;
+
+  if (article.images_status === 'failed' || base.preflight_error) {
+    return { ...base, done: true, ok: false };
+  }
+  if (article.images_status !== 'complete') return base;
+  if (providers.length === 0) return { ...base, done: true, ok: true };
+
+  const states = providers.map((provider) => providerState(article, provider));
+  if (!states.every((s) => s.terminal)) return base;
+  return { ...base, done: true, ok: states.every((s) => s.published) };
+}
+
+async function publishOutcome(
+  articleId: string,
+  providers: IntegrationProvider[],
+): Promise<WaitOutcome> {
+  const article = await ArticleRepo.findById(articleId);
+  if (!article) {
+    return {
+      keyword_id: null,
+      article_id: articleId,
+      generation_status: null,
+      images_status: null,
+      preflight_error: null,
+      attempts: [],
+      done: true,
+      ok: false,
+    };
+  }
+  const states = providers.map((provider) => providerState(article, provider));
+  const done = states.every((s) => s.terminal);
+  return {
+    keyword_id: null,
+    article_id: articleId,
+    generation_status: null,
+    images_status: article.images_status,
+    preflight_error: article.auto_publish.preflight_error?.code ?? null,
+    attempts: attemptViews(article),
+    done,
+    ok: done && states.every((s) => s.published),
+  };
+}
+
 export async function generateNext(opts: {
   org?: string;
   user?: string;
@@ -225,6 +345,15 @@ export async function generateNext(opts: {
       );
     }
 
+    let wait: WaitReport | null = null;
+    if (opts.wait) {
+      const providers = await expectedProviders(orgId);
+      wait = await pollUntil(
+        () => Promise.all(targets.map((t) => generationOutcome(t.id, providers))),
+        opts.timeoutMs,
+      );
+    }
+
     return ok({
       org_id: orgId,
       enqueued: targets.map((k) => ({
@@ -234,7 +363,7 @@ export async function generateNext(opts: {
         generation_status: k.generation_status,
         generation_attempts: k.generation_attempts,
       })),
-      wait: null,
+      wait,
     });
   } finally {
     client.destroy();
@@ -347,7 +476,17 @@ export async function publishArticle(opts: {
       providers.push({ provider, action: 'enqueued' });
     }
 
-    return ok({ article_id: article.id, org_id: org.id, providers, wait: null });
+    const enqueuedProviders = providers
+      .filter((p) => p.action === 'enqueued')
+      .map((p) => p.provider as IntegrationProvider);
+    let wait: WaitReport | null = null;
+    if (opts.wait && enqueuedProviders.length > 0) {
+      wait = await pollUntil(
+        () => publishOutcome(article.id, enqueuedProviders).then((o) => [o]),
+        opts.timeoutMs,
+      );
+    }
+    return ok({ article_id: article.id, org_id: org.id, providers, wait });
   } finally {
     client.destroy();
     await closeDb();
