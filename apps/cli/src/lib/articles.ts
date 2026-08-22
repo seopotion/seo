@@ -350,7 +350,7 @@ export async function generateNext(opts: {
       return fail(
         'NO_KEYWORDS_DUE',
         `Org "${orgId}" has no ungenerated planner keywords with attempts left.`,
-        'Inspect the planner with `db strategy-audit`, or build one with `db strategy-run`.',
+        'Inspect the planner with `db strategy-audit`, or build one with `db strategy-run` (add --force if the strategy already completed).',
       );
     }
 

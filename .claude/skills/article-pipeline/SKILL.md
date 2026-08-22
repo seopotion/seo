@@ -65,7 +65,7 @@ failures).
 | `AWS_NOT_AUTHENTICATED` | AWS creds missing/expired — `aws sso login` |
 | `SQS_UNAVAILABLE` | Bad queue URL or network — check the URL / VPN |
 | `QUEUE_URL_MISSING` | Set `GENERATION_QUEUE_URL` / `PUBLISH_QUEUE_URL` |
-| `NO_KEYWORDS_DUE` | Planner has nothing ungenerated — see the **strategy-pipeline** skill (`db strategy-audit` first; `db strategy-run` schedules nothing on a `completed` org) |
+| `NO_KEYWORDS_DUE` | Planner has nothing ungenerated — see the **strategy-pipeline** skill (`db strategy-audit` first; `db strategy-run [--force]` to build one) |
 | `IMAGES_INCOMPLETE` | Images not done — check `articles show`; a failed image run can be replayed from the admin panel (`POST /admin/v0/articles/{id}/images`, operator JWT) |
 | `AUTO_PUBLISH_DISABLED` | Org preset off — enable auto-publish in dashboard settings |
 | `ORG_NOT_PAID` | `npm run cli -- db set-plan --org <id> --plan paid` |

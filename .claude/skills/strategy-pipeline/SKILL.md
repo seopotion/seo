@@ -41,19 +41,15 @@ not exactly what a top-up rerun would schedule.
 
 ## Gotchas (verified in code)
 
-- **`strategy-run` on a `completed` org schedules nothing.** The persist
-  stage short-circuits when `org.strategy_status === 'completed'`
-  (`packages/shared/strategy/src/persist.ts`) and the CLI has no `--force` or
-  status reset — you burn the full pipeline's credits for nothing (and leave
-  a stray `strategy_runs` doc that muddies later audits). Check
-  `strategy_status` in the audit first. For a completed org use the admin
-  force-rerun (admin panel "strategy force-rerun", or
-  `POST /admin/orgs/{id}/strategy {"force":true}`), which resets the status to
-  `failed`, reclaims, and runs it on the **deployed** Step Functions. Use
-  `strategy-run` for `failed`/`none` orgs, or when you need the run to use
-  *local* (unmerged) pipeline code.
-- `strategy-run` is not guarded by `claimStrategy` — it will happily start a
-  second run next to a `pending` one. Don't.
+- **`strategy-run` refuses a `completed`/`pending` org (`STRATEGY_NOT_CLAIMABLE`)**
+  because the persist stage short-circuits on `completed`
+  (`packages/shared/strategy/src/persist.ts`) — an un-gated run would spend
+  the full pipeline's credits and schedule nothing. `--force` resets the
+  status to `failed` and re-runs (tops up, safe to repeat) — same as the admin
+  panel's "strategy force-rerun" / `POST /admin/orgs/{id}/strategy
+  {"force":true}`, which instead runs it on the **deployed** Step Functions
+  (use that when you don't want local/unmerged pipeline code). Only `--force` a
+  `pending` org if you know that run died.
 - No CLI lever removes thin/junk planner entries before a rerun; a rerun tops
   up, it doesn't replace. Unschedule via the admin panel, or (nuclear)
   `db delete-org` (staging-accounts skill).
