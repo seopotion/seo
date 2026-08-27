@@ -91,6 +91,14 @@ export interface PipelineConfig {
    * plan built on nothing, which is worse than no plan at all (#211).
    */
   minLlmCoverage: number;
+  /**
+   * Fraction of SERP fetches allowed to fail before the stage gives up. DataForSEO
+   * fails individual live SERP calls for reasons that have nothing to do with the
+   * keyword (40101 "Internal SE Server Error"), so one casualty must not fail a
+   * run four stages deep; a broadly broken provider still must. 0 demands a
+   * perfect stage; 1 tolerates anything.
+   */
+  maxSerpFailureRate: number;
   /** Per-stage model override; unset stages use the LlmClient default. */
   models: StageModels;
   /**
@@ -173,6 +181,8 @@ export interface PipelineStats {
   serpFetched: number;
   /** Candidates rejected by the authority filter before ever reaching the plan call. */
   authorityRejected: number;
+  /** Candidates whose SERP fetch failed, so they were never judged either way. */
+  serpUnvalidated: number;
   /** Candidates that passed authority, intent, and locality checks. */
   serpValidated: number;
   accepted: number;

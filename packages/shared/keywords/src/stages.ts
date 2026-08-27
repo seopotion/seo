@@ -254,7 +254,7 @@ export async function stageSerpFetch(
 ): Promise<StrategyWorkState> {
   ctx.log?.('serp_fetch', { candidates: state.candidates.length });
   const serpFetched = state.candidates.length;
-  const { accepted, rejected } = await validateSerp(state.candidates, {
+  const { accepted, rejected, unvalidated } = await validateSerp(state.candidates, {
     dataForSeo: ctx.clients.dataForSeo,
     config: ctx.config,
   });
@@ -265,16 +265,26 @@ export async function stageSerpFetch(
   // case, since it early-returns before ever calling the LLM (#211).
   if (serpFetched > 0 && accepted.length === 0) {
     throw new Error(
-      `strategy aborted: ${serpFetched} candidates reached SERP fetch but 0 survived the ` +
-        'authority filter, so the plan would be empty. Check rejectedByReason.serp_authority.',
+      `strategy aborted: ${serpFetched} candidates reached SERP fetch but 0 survived ` +
+        `(${rejected.length} authority-rejected, ${unvalidated.length} unfetchable), so the ` +
+        'plan would be empty. Check rejectedByReason.serp_authority.',
     );
   }
 
+  // Candidates whose SERP never came back join the below-N tier rather than the
+  // pool: unjudged, unschedulable (`serp_validated: false`), and still counted,
+  // so accepted + belowN + rejected reconciles against what entered the stage.
   return {
     ...state,
     candidates: accepted,
+    belowN: [...state.belowN, ...unvalidated],
     rejected: [...state.rejected, ...rejected],
-    stats: { ...state.stats, serpFetched, authorityRejected: rejected.length },
+    stats: {
+      ...state.stats,
+      serpFetched,
+      authorityRejected: rejected.length,
+      serpUnvalidated: unvalidated.length,
+    },
   };
 }
 
