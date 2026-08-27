@@ -17,6 +17,7 @@
     "@shared/providers": "*",
     "@shared/schemas": "*",
     "@shared/strategy": "*",
-    "@shared/types": "*"
+    "@shared/types": "*",
+    "zod": "^4.4.3"
   }
 }

@@ -64,15 +64,42 @@ describe('scanWebsite', () => {
     expect(presets.blog).toEqual(BLOG);
   });
 
-  test('coerces a string audience target from the LLM into a single-element array', async () => {
+  test('constrains the response to the presets schema', async () => {
     fetchSite.mockResolvedValue({ text: 'x', links: [] });
-    const stringTarget = JSON.parse(LLM_JSON);
-    stringTarget.audience = { target: 'SEO founders, and marketers' };
-    const llm = llmReturning(JSON.stringify(stringTarget));
+    const llm = llmReturning(LLM_JSON);
 
-    const presets = await scanWebsite('https://clewas.com', { llm });
+    await scanWebsite('https://clewas.com', { llm });
 
-    expect(presets.audience.target).toEqual(['SEO founders, and marketers']);
+    const { responseSchema } = llm.complete.mock.calls[0]![0];
+    expect(responseSchema?.name).toBe('setup_presets');
+    // The field whose absence dead-lettered a production scan.
+    const audience = (responseSchema?.schema.properties as Record<string, { required?: string[] }>)
+      .audience;
+    expect(audience?.required).toEqual(['target']);
+  });
+
+  test('trims an over-long audience target rather than failing the scan', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    // The 7-segment cap is a presets rule strict mode cannot express, so an
+    // over-eager model must not be able to fail the whole scan on it.
+    const tooMany = JSON.parse(LLM_JSON);
+    tooMany.audience = { target: Array.from({ length: 12 }, (_, i) => `segment ${i}`) };
+
+    const presets = await scanWebsite('https://clewas.com', {
+      llm: llmReturning(JSON.stringify(tooMany)),
+    });
+
+    expect(presets.audience.target).toHaveLength(7);
+  });
+
+  test('rejects a response missing a schema-required field', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const missing = JSON.parse(LLM_JSON);
+    delete missing.audience;
+
+    await expect(
+      scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(missing)) }),
+    ).rejects.toThrow();
   });
 
   test('completes with a valid preset when the homepage cannot be fetched', async () => {

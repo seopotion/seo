@@ -312,7 +312,7 @@ describe('runKeywordPipeline', () => {
     expect(planCalls[0]![0]).toMatchObject({
       model: 'custom-plan-model',
       temperature: 0,
-      responseFormat: 'json',
+      responseSchema: { name: 'content_plan' },
     });
     const planPrompt = planCalls[0]![0].messages.map((message) => message.content).join('\n');
     expect(planPrompt).toContain('guide to membrane fouling');

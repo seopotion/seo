@@ -1,7 +1,7 @@
 import type { DataForSeoClient, LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
 import { mapWithConcurrency } from './concurrency';
-import { buildSeedPrompt, parseSeeds } from './llm-prompts';
+import { buildSeedPrompt, parseSeeds, SEED_RESPONSE_SCHEMA } from './llm-prompts';
 import { toWorking } from './normalize';
 import type { ResolvedConfig, WorkingCandidate } from './types';
 
@@ -85,7 +85,7 @@ export async function gatherCandidates(
               messages: buildSeedPrompt(input.presets, topWins),
               model: config.models.seeds,
               temperature: 0,
-              responseFormat: 'json',
+              responseSchema: SEED_RESPONSE_SCHEMA,
             })
           ).text,
         ).slice(0, SUGGESTION_SEEDS);

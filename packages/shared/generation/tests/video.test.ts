@@ -21,7 +21,7 @@ describe('buildVideoPickPrompt', () => {
       ],
     });
     expect(system!.role).toBe('system');
-    expect(system!.content).toContain('"video_index"');
+    expect(system!.content).toContain('video_index is the 0-based index');
     expect(user!.content).toContain('Best Widgets');
     expect(user!.content).toContain('Intro | Deep Dive');
     expect(user!.content).toContain('0. Widgets 101');

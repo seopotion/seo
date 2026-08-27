@@ -97,7 +97,22 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       };
       if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens;
       if (params.temperature !== undefined) body.temperature = params.temperature;
-      if (params.responseFormat === 'json') body.response_format = { type: 'json_object' };
+      if (params.responseSchema) {
+        body.response_format = {
+          type: 'json_schema',
+          json_schema: {
+            name: params.responseSchema.name,
+            strict: true,
+            schema: params.responseSchema.schema,
+          },
+        };
+        // OpenRouter silently DROPS parameters an endpoint does not support, and
+        // the same model is served by several. Without this the call would look
+        // identical and quietly fall back to unconstrained output — the failure
+        // we are removing. Fail the request instead of pretending it was
+        // constrained.
+        body.provider = { require_parameters: true };
+      }
 
       const result = await send(body);
       // An empty body is a 200 OK that says nothing: every caller parses JSON out

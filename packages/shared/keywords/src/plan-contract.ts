@@ -1,5 +1,11 @@
 import type { LlmMessage } from '@shared/providers';
-import { ARTICLE_TYPES, type SetupPresets, type WorkingCandidate } from '@shared/schemas';
+import {
+  ARTICLE_TYPES,
+  type SetupPresets,
+  toStrictJsonSchema,
+  type WorkingCandidate,
+} from '@shared/schemas';
+import { z } from 'zod';
 import { parseJsonResponse } from './json-response';
 import { compareTopicSignals } from './topic-signals';
 
@@ -27,6 +33,33 @@ export interface PlanResponse {
   /** Rows dropped for being structurally unusable — logged, never fatal. */
   droppedRows: number;
 }
+
+/**
+ * The wire contract for the plan call. `article_type` is an enum here so the
+ * model picks from the literal set rather than being asked to copy strings out
+ * of prose; `toArticleType` stays as the normalizer for everything else.
+ */
+export const PLAN_RESPONSE_SCHEMA = toStrictJsonSchema(
+  z.object({
+    verdicts: z.array(
+      z.object({
+        index: z.number().int(),
+        intent_ok: z.boolean(),
+        locality_ok: z.boolean(),
+        article_type: z.enum(ARTICLE_TYPES),
+      }),
+    ),
+    targets: z.array(
+      z.object({
+        cluster: z.string(),
+        member_indices: z.array(z.number().int()),
+        content_focus: z.string(),
+        is_pillar: z.boolean(),
+      }),
+    ),
+  }),
+  'content_plan',
+);
 
 /** The plan response yielded nothing usable — triggers the repair retry. */
 export class PlanParseError extends Error {
@@ -159,9 +192,7 @@ export function buildPlanPrompt(
         'Evidence rules: missing evidence is unknown, not disagreement; different provider ' +
         'core keywords do not prove different topics; zero measured SERP URL overlap does not ' +
         'by itself prove different topics; category evidence is supporting evidence only.\n' +
-        'Respond ONLY with JSON matching: {"verdicts":[{"index":number,"intent_ok":boolean,' +
-        '"locality_ok":boolean,"article_type":string}],"targets":[{"cluster":string,' +
-        '"member_indices":number[],"content_focus":string,"is_pillar":boolean}]}.',
+        'Return one verdict for EVERY candidate index.',
     },
     {
       role: 'user',

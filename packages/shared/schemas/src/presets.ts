@@ -19,6 +19,9 @@ const EngagementPrefsFields = {
 
 export const EngagementPrefsPatchSchema = z.object(EngagementPrefsFields).partial();
 
+/** Distinct audience segments a preset may hold (design note). */
+export const AUDIENCE_TARGET_MAX = 7;
+
 export const SetupPresetsSchema = z.object({
   business: z.object({
     name: z.string(),
@@ -33,7 +36,7 @@ export const SetupPresetsSchema = z.object({
     // strings may contain natural-language commas (#99).
     target: z.preprocess(
       (v) => (typeof v === 'string' ? (v === '' ? [] : [v]) : v),
-      z.array(z.string()).max(7),
+      z.array(z.string()).max(AUDIENCE_TARGET_MAX),
     ),
     competitors: z.array(z.string()),
   }),

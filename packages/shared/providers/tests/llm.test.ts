@@ -81,12 +81,39 @@ describe('complete', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  test('json responseFormat maps to response_format json_object', async () => {
+  test('responseSchema maps to a strict json_schema response_format', async () => {
     const fetchMock = vi.fn().mockResolvedValue(chatResponse('{}'));
     vi.stubGlobal('fetch', fetchMock);
-    await client().complete({ messages: [{ role: 'user', content: 'x' }], responseFormat: 'json' });
+    const schema = { type: 'object', properties: { a: { type: 'string' } } };
+    await client().complete({
+      messages: [{ role: 'user', content: 'x' }],
+      responseSchema: { name: 'thing', schema },
+    });
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
-    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.response_format).toEqual({
+      type: 'json_schema',
+      json_schema: { name: 'thing', strict: true, schema },
+    });
+  });
+
+  test('responseSchema pins routing so the schema cannot be silently dropped', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatResponse('{}'));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().complete({
+      messages: [{ role: 'user', content: 'x' }],
+      responseSchema: { name: 'thing', schema: { type: 'object' } },
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.provider).toEqual({ require_parameters: true });
+  });
+
+  test('omits response_format and provider pinning without a responseSchema', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().complete({ messages: [{ role: 'user', content: 'x' }] });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.response_format).toBeUndefined();
+    expect(body.provider).toBeUndefined();
   });
 
   test('honors an explicit model override', async () => {
