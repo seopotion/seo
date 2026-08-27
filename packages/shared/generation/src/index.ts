@@ -13,6 +13,7 @@ export type { ImagePlan, ImagePlanInput } from './images';
 export {
   buildImagePlanPrompt,
   extractH2s,
+  IMAGE_PLAN_RESPONSE_SCHEMA,
   ImagePlanSchema,
   injectBlockAfterHeading,
   injectImageAfterHeading,
@@ -48,5 +49,6 @@ export {
   buildVideoPickPrompt,
   languageCodeFromName,
   parseVideoPick,
+  VIDEO_PICK_RESPONSE_SCHEMA,
   VideoPickSchema,
 } from './video';

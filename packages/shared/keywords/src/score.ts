@@ -1,7 +1,7 @@
 import type { LlmClient } from '@shared/providers';
 import type { SetupPresets } from '@shared/schemas';
 import { chunk, mapWithConcurrency } from './concurrency';
-import { buildRelevancePrompt, parseRelevance } from './llm-prompts';
+import { buildRelevancePrompt, parseRelevance, RELEVANCE_RESPONSE_SCHEMA } from './llm-prompts';
 import type { RelevanceCoverage, ResolvedConfig, WorkingCandidate } from './types';
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
@@ -71,7 +71,7 @@ export async function applyRelevance(
       messages,
       model: deps.model,
       temperature: 0,
-      responseFormat: 'json',
+      responseSchema: RELEVANCE_RESPONSE_SCHEMA,
     });
     const parsed = parseRelevance(first.text, keywords);
     if (parsed.parsed) return parsed;
@@ -88,7 +88,7 @@ export async function applyRelevance(
       ],
       model: deps.model,
       temperature: 0,
-      responseFormat: 'json',
+      responseSchema: RELEVANCE_RESPONSE_SCHEMA,
     });
     return parseRelevance(retry.text, keywords);
   });

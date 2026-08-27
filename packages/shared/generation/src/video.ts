@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
+import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { parseJsonObject } from './json';
 
@@ -15,11 +16,11 @@ export const VideoPickSchema = z.object({
   section_heading: z.string().nullable(),
 });
 
+export const VIDEO_PICK_RESPONSE_SCHEMA = toStrictJsonSchema(VideoPickSchema, 'video_pick');
+
 export function buildVideoPickPrompt(input: VideoPickInput): LlmMessage[] {
   const system = [
     'You choose one YouTube video to embed in a blog article, or none.',
-    'Respond with ONLY a JSON object of this shape:',
-    '{ "video_index": number | null, "section_heading": string | null }',
     'Rules: video_index is the 0-based index of the most relevant candidate, or null',
     'when no candidate is genuinely relevant to the article — prefer null over a weak',
     'match. When video_index is set, section_heading MUST be copied EXACTLY from the',

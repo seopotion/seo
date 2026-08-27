@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
+import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { INLINE_IMAGE_COUNT } from './config';
 import { parseJsonObject } from './json';
@@ -35,6 +36,10 @@ const TolerantImagePlanSchema = z.object({
   ),
 });
 
+// The STRICT plan is the wire contract: section_heading is required, which is
+// exactly the field TolerantImagePlanSchema was written to survive without.
+export const IMAGE_PLAN_RESPONSE_SCHEMA = toStrictJsonSchema(ImagePlanSchema, 'image_plan');
+
 /** H2 heading texts, in order, from markdown content. */
 export function extractH2s(content: string): string[] {
   return content
@@ -46,9 +51,6 @@ export function extractH2s(content: string): string[] {
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
     'You are an art director planning images for one blog article.',
-    'Respond with ONLY a JSON object of this shape:',
-    '{ "cover": { "prompt": string, "alt": string },',
-    '  "inline": [{ "prompt": string, "alt": string, "section_heading": string }] }',
     `Rules: exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
     'EXACTLY from the provided section list, each from a DIFFERENT section. Prompts describe',
     'a single visual scene with no text or words in the image. alt is a meaningful',

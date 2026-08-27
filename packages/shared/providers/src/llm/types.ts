@@ -1,3 +1,5 @@
+import type { LlmResponseSchema } from '@shared/schemas';
+
 export type LlmRole = 'system' | 'user' | 'assistant';
 export interface LlmMessage {
   role: LlmRole;
@@ -10,8 +12,13 @@ export interface LlmCompleteParams {
   model?: string;
   maxTokens?: number;
   temperature?: number;
-  /** 'json' maps to OpenRouter response_format json_object. Default text. */
-  responseFormat?: 'text' | 'json';
+  /**
+   * Constrain the response to a JSON Schema (OpenRouter structured outputs).
+   * Omit for free-form text. There is deliberately no plain "JSON mode" option:
+   * it guarantees only that the bytes parse, never that a field is present, and
+   * a scan once dead-lettered on an `audience.target` the model simply left out.
+   */
+  responseSchema?: LlmResponseSchema;
 }
 
 export interface LlmUsage {

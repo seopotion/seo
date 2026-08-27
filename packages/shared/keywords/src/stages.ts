@@ -14,7 +14,12 @@ import {
   PlanCoverageError,
 } from './materializer';
 import { dedupe } from './normalize';
-import { buildPlanPrompt, PlanParseError, parsePlanResponse } from './plan-contract';
+import {
+  buildPlanPrompt,
+  PLAN_RESPONSE_SCHEMA,
+  PlanParseError,
+  parsePlanResponse,
+} from './plan-contract';
 import { applyRelevance, scoreCandidates } from './score';
 import { validateSerp } from './serp';
 import type { EnrichedCandidate, ResolvedConfig, WorkingCandidate } from './types';
@@ -325,7 +330,7 @@ export async function stagePlan(
       messages: msgs,
       model: ctx.config.models.plan,
       temperature: 0,
-      responseFormat: 'json',
+      responseSchema: PLAN_RESPONSE_SCHEMA,
     });
 
   const first = await callPlan(messages);

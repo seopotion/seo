@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@shared/providers": "*",
-    "@shared/schemas": "*"
+    "@shared/schemas": "*",
+    "zod": "^4.4.3"
   }
 }

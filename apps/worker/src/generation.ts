@@ -17,6 +17,7 @@ import {
   type PostUrlSources,
   parseVideoPick,
   prioritizeLinkCandidates,
+  VIDEO_PICK_RESPONSE_SCHEMA,
   verifyCandidates,
 } from '@shared/generation';
 import type { Article, ArticleVideo, Keyword, Org } from '@shared/schemas';
@@ -201,7 +202,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
                 headings,
                 candidates,
               }),
-              responseFormat: 'json',
+              responseSchema: VIDEO_PICK_RESPONSE_SCHEMA,
             });
             const pick = parseVideoPick(res.text, candidates.length, headings);
             if (pick) {

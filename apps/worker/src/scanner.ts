@@ -1,11 +1,34 @@
 import { parseJsonObject } from '@shared/generation';
 import type { LlmClient, LlmMessage } from '@shared/providers';
-import { type SetupPresets, SetupPresetsSchema } from '@shared/schemas';
+import {
+  AUDIENCE_TARGET_MAX,
+  type SetupPresets,
+  SetupPresetsSchema,
+  toStrictJsonSchema,
+} from '@shared/schemas';
+import { z } from 'zod';
 import { discoverBlog, fetchSite } from './scrape';
 
 export interface ScanClients {
   llm: LlmClient;
 }
+
+/**
+ * The LLM-owned slice of the presets — deliberately narrower than
+ * SetupPresetsSchema, which also covers fields the scanner fills in itself
+ * (competitors, blog URLs) or defaults. This is both the wire schema the model
+ * is constrained to and the parse target for its reply.
+ */
+const ScanOutputSchema = z.object({
+  business: SetupPresetsSchema.shape.business,
+  audience: z.object({ target: z.array(z.string()) }),
+  article_preferences: z.object({
+    content_seo: z.object({ article_style: z.string(), llm_instructions: z.string() }),
+    engagement: z.object({ image_style: z.string() }),
+  }),
+});
+
+const SCAN_RESPONSE_SCHEMA = toStrictJsonSchema(ScanOutputSchema, 'setup_presets');
 
 function domainOf(url: string): string {
   try {
@@ -20,16 +43,11 @@ function domainOf(url: string): string {
  * deterministically (manual entry / sitemap) and deliberately excluded here.
  */
 function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
+  // The response shape is enforced by SCAN_RESPONSE_SCHEMA, so this describes
+  // only what the schema cannot: what each field should MEAN.
   const system = [
     'You are an SEO onboarding assistant.',
     'From the scraped website content, produce onboarding presets as JSON.',
-    'Respond with ONLY a JSON object of this exact shape:',
-    '{ "business": { "name": string, "language": string, "country": string, "description": string },',
-    '  "audience": { "target": string[] },',
-    '  "article_preferences": {',
-    '    "content_seo": { "article_style": string, "llm_instructions": string },',
-    '    "engagement": { "image_style": string } } }',
-    'Do NOT include competitors or blog URLs — those are handled separately.',
     'language is the primary content language (e.g. "English"); country is the primary target',
     'market as a plain country name (e.g. "United States") — never a region or "Global".',
     'description is 2-4 sentences summarizing the business.',
@@ -59,20 +77,19 @@ export async function scanWebsite(url: string, { llm }: ScanClients): Promise<Se
 
   const res = await llm.complete({
     messages: buildScanPrompt(url, page?.text ?? null),
-    responseFormat: 'json',
+    responseSchema: SCAN_RESPONSE_SCHEMA,
   });
 
-  const fields = parseJsonObject(res.text) as {
-    business?: unknown;
-    audience?: { target?: unknown };
-    article_preferences?: unknown;
-  };
+  const fields = ScanOutputSchema.parse(parseJsonObject(res.text));
 
   // SetupPresetsSchema is the single validation gate — a malformed/incomplete
   // LLM object throws here and dead-letters rather than persisting junk.
   return SetupPresetsSchema.parse({
     business: fields.business,
-    audience: { target: fields.audience?.target, competitors: [] },
+    // The 7-segment cap is a presets rule, not a shape the wire schema can
+    // express (strict mode drops maxItems), so trim rather than let an
+    // over-eager list fail the whole scan.
+    audience: { target: fields.audience.target.slice(0, AUDIENCE_TARGET_MAX), competitors: [] },
     blog,
     article_preferences: fields.article_preferences,
   });

@@ -16,7 +16,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 
 ## Shared packages
 
-- ✅ `@shared/types`, `@shared/schemas` (Zod entity shapes), `@shared/db` (repos + `ensureIndexes`), `@shared/clients` (typed `getApiClient`), `@shared/providers` (DataForSEO + OpenRouter LLM + fal.ai image clients)
+- ✅ `@shared/types`, `@shared/schemas` (Zod entity shapes), `@shared/db` (repos + `ensureIndexes`), `@shared/clients` (typed `getApiClient`), `@shared/providers` (DataForSEO + OpenRouter LLM + fal.ai image clients). Every LLM call is schema-constrained — `toStrictJsonSchema` derives the OpenRouter structured-output schema from the same Zod schema that parses the reply, so a missing field fails at the provider rather than at a repository write
 
 ## Setup / onboarding
 
