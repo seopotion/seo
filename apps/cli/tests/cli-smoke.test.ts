@@ -17,10 +17,19 @@ function run(args: string[]) {
 }
 
 describe('cli smoke', () => {
-  test('--help exits 0 and lists both command groups', () => {
+  test('--help exits 0 and lists all command groups', () => {
     const { status, out } = run(['--help']);
     expect(status).toBe(0);
     expect(out).toContain('infra');
     expect(out).toContain('db');
+    expect(out).toContain('articles');
+  });
+
+  test('articles --help lists the four subcommands', () => {
+    const { status, out } = run(['articles', '--help']);
+    expect(status).toBe(0);
+    for (const sub of ['list', 'show', 'generate-next', 'publish']) {
+      expect(out).toContain(sub);
+    }
   });
 });

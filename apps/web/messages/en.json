@@ -143,6 +143,7 @@
     "notConfigured": "Google sign-in is not configured",
     "retry": "Retry",
     "signInError": "Google sign-in failed. Try again.",
+    "signUp": "Sign Up",
     "signingIn": "Signing in...",
     "workspaceError": "Could not check your workspace."
   },
@@ -184,10 +185,10 @@
     },
     "noRepos": "This installation has no repository we can write to. Add one from the GitHub app's settings, then start again.",
     "pendingApproval": "Your organization's owner has to approve the installation. GitHub will bring you back here once they do.",
-    "pickBody": "We commit Markdown files and a manifest; your existing build and deploy do the rest.",
+    "pickBody": "We commit Markdown files and a manifest; your existing build and correctly configured host do the rest.",
     "pickTitle": "Choose the repository to publish into",
     "postUrlBase": "Post URL base",
-    "postUrlBaseHint": "Where your site serves a published post: this base plus the article's slug. If https://example.com/my-post is a post on your site, enter https://example.com.",
+    "postUrlBaseHint": "Enter the part before the article slug. The result is base/slug/ — for example, https://example.com/blog produces https://example.com/blog/article-slug/.",
     "private": "Private",
     "redeeming": "Finishing the GitHub installation...",
     "saving": "Connecting...",
@@ -756,6 +757,10 @@
           "noDestinationEnabled": "Auto-publish is still on, but future automatic attempts may not run until a publishing destination is connected."
         }
       },
+      "includeCta": {
+        "description": "Include a relevant call to action near the end of generated articles.",
+        "label": "Call to action"
+      },
       "internalLinks": {
         "description": "Choose how many internal links generated articles should include (0–3).",
         "label": "Internal links"
@@ -1000,6 +1005,7 @@
     "useCasesTitle": "Built for"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. All rights reserved.",
     "features": "Features",
     "legalNavigationLabel": "Legal",
@@ -1032,7 +1038,8 @@
     "links": {
       "features": "Features",
       "pricing": "Pricing",
-      "docs": "Docs"
+      "docs": "Docs",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logo",
     "primaryNavigation": "Primary navigation"
@@ -1049,6 +1056,7 @@
     },
     "articleSettings": {
       "articleStyle": "Article style",
+      "includeCta": "Call to action",
       "internalLinksCount": "Internal links count",
       "selectStyle": "Select style",
       "tableOfContents": "Table of contents",
@@ -1105,14 +1113,20 @@
     "integrations": {
       "availableIntegrations": "Available integrations",
       "comingSoon": "Coming soon",
-      "connectWordPressLater": "You can connect WordPress later from Settings.",
+      "connect": "Connect",
+      "connectedSuccess": "WordPress is connected. You can finish onboarding or replace the connection.",
+      "loadError": "We couldn't load your connected integrations.",
+      "loading": "Checking…",
+      "optionalNotice": "Connect a publishing platform now, or skip this optional step and finish onboarding.",
       "providers": {
         "framer": "Framer",
         "wordpress": "Self-hosted WordPress"
       },
       "referralSource": "How did you hear about us?",
+      "replace": "Replace",
+      "retry": "Retry",
       "selectOption": "Select an option",
-      "settingsNotice": "Once onboarding is complete, you can connect and manage integrations from Settings in your dashboard.",
+      "settingsNotice": "You can connect, replace, or disconnect integrations later from Settings.",
       "title": "Integrations And Referral Source"
     },
     "options": {

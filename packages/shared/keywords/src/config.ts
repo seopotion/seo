@@ -39,6 +39,12 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
   // that actually happened — a whole stage returning nothing. Set it near 1.0 to
   // demand a perfect stage; 0 disables the guard (#211).
   minLlmCoverage: 0.5,
+  // A fifth. Live SERP failures are per-keyword and independent (unlike the LLM
+  // batches minLlmCoverage guards), so a handful of casualties out of serpTopN
+  // costs a few candidates from a pool that over-supplies the 30-day plan. Past
+  // a fifth it is no longer bad luck — the provider or our credentials are down,
+  // and finishing would ship a plan validated against almost nothing.
+  maxSerpFailureRate: 0.2,
   // Unset = the LlmClient's default model for that stage.
   models: {
     plan: 'anthropic/claude-haiku-4.5',
@@ -64,9 +70,13 @@ export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName
 // has no worldwide location — fall back to its largest dataset.
 const GLOBAL_COUNTRY = 'Global (English)';
 const DEFAULT_LOCATION = 'United States';
+const LOCATION_ALIASES: Record<string, string> = {
+  Turkey: 'Turkiye',
+};
 
 function toLocationName(country: string): string {
-  return country === GLOBAL_COUNTRY ? DEFAULT_LOCATION : country;
+  if (country === GLOBAL_COUNTRY) return DEFAULT_LOCATION;
+  return LOCATION_ALIASES[country] ?? country;
 }
 
 /** Merge defaults + caller overrides, deriving location/language from presets when absent. */

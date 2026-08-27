@@ -7,6 +7,8 @@ import {
   deduplicateLinkCandidates,
   deriveCandidates,
   extractH2s,
+  FLESCH_KINCAID_TARGET,
+  fleschKincaidGrade,
   generateArticle,
   injectBlockAfterHeading,
   type LinkCandidate,
@@ -15,6 +17,7 @@ import {
   type PostUrlSources,
   parseVideoPick,
   prioritizeLinkCandidates,
+  VIDEO_PICK_RESPONSE_SCHEMA,
   verifyCandidates,
 } from '@shared/generation';
 import type { Article, ArticleVideo, Keyword, Org } from '@shared/schemas';
@@ -164,6 +167,20 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
         continue;
       }
 
+      if (ctx.language === 'English') {
+        const fkGrade = fleschKincaidGrade(result.article.content);
+        const readability = {
+          readability_metric: 'flesch_kincaid_grade',
+          fk_grade: fkGrade,
+          fk_target: FLESCH_KINCAID_TARGET,
+          fk_target_met: fkGrade !== null && fkGrade <= FLESCH_KINCAID_TARGET,
+        };
+        logger.info('article readability measured', readability);
+        if (fkGrade !== null && fkGrade > FLESCH_KINCAID_TARGET) {
+          logger.warn('article readability above target', readability);
+        }
+      }
+
       // YouTube embed (#85): best-effort — any failure logs and the article
       // ships without a video; never fail or delay generation over this.
       let content = result.article.content;
@@ -185,7 +202,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
                 headings,
                 candidates,
               }),
-              responseFormat: 'json',
+              responseSchema: VIDEO_PICK_RESPONSE_SCHEMA,
             });
             const pick = parseVideoPick(res.text, candidates.length, headings);
             if (pick) {

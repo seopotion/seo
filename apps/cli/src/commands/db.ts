@@ -281,6 +281,12 @@ export const dbCommand = defineCommand({
       },
       args: {
         org: { type: 'positional', description: 'Org id', required: true },
+        force: {
+          type: 'boolean',
+          description:
+            'Re-run an org whose strategy is already completed (or stuck pending): resets strategy_status to failed first. Tops up the plan; safe to repeat.',
+          default: false,
+        },
         ...outputOption,
         ...verboseOption,
       },
@@ -294,7 +300,10 @@ export const dbCommand = defineCommand({
           );
           emitter.step('db:strategy-run', 'start');
 
-          const result = await strategyRun({ orgId: args.org as string });
+          const result = await strategyRun({
+            orgId: args.org as string,
+            force: args.force as boolean,
+          });
           emitter.step('db:strategy-run', result.ok ? 'done' : 'fail');
           emitter.result(result);
 
@@ -339,6 +348,63 @@ export const dbCommand = defineCommand({
           if (result.ok && result.data.publishedChanged.length) {
             emitter.warn(
               `${result.data.publishedChanged.length} PUBLISHED article(s) changed — republish them so the customer's site picks up the fix.`,
+            );
+          }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
+    'reset-images': defineCommand({
+      meta: {
+        name: 'reset-images',
+        description:
+          'Blank article images that point at a dead CDN host (e.g. the pre-migration ' +
+          'account) so the image worker regenerates them; dry run by default',
+      },
+      args: {
+        host: { type: 'string', description: 'Dead CDN host to match, e.g. dXXXX.cloudfront.net' },
+        org: { type: 'string', description: 'Org id to scan (or use --article)' },
+        article: { type: 'string', description: 'Single article id to reset' },
+        apply: {
+          type: 'boolean',
+          description: 'Write the changes (default: dry run)',
+          default: false,
+        },
+        enqueue: {
+          type: 'boolean',
+          description: 'With --apply, requeue the image task (needs IMAGES_QUEUE_URL)',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { resetImages } = await import('../lib/images');
+
+          emitter.warn(
+            args.apply
+              ? 'Writes to whatever MONGO_URI targets. Regeneration bills the image provider and produces DIFFERENT images; republish every published article it touches.'
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Pass --apply to write.',
+          );
+          emitter.step('db:reset-images', 'start');
+
+          const result = await resetImages({
+            host: args.host as string | undefined,
+            org: args.org as string | undefined,
+            article: args.article as string | undefined,
+            apply: args.apply as boolean,
+            enqueue: args.enqueue as boolean,
+          });
+          emitter.step('db:reset-images', result.ok ? 'done' : 'fail');
+          if (result.ok && result.data.apply && !result.data.enqueued && result.data.reset.length) {
+            emitter.warn(
+              `${result.data.reset.length} article(s) blanked but NOT requeued — replay each with POST /admin/articles/{id}/images, or rerun with --enqueue.`,
             );
           }
           emitter.result(result);

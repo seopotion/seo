@@ -2,6 +2,7 @@ import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
 import {
   buildImagePlanPrompt,
   extractH2s,
+  IMAGE_PLAN_RESPONSE_SCHEMA,
   injectImageAfterHeading,
   parseImagePlan,
 } from '@shared/generation';
@@ -174,7 +175,7 @@ export const handler: SQSHandler = async (event, context): Promise<void> => {
             metaDescription: article.meta_description,
             headings,
           }),
-          responseFormat: 'json',
+          responseSchema: IMAGE_PLAN_RESPONSE_SCHEMA,
         });
         let plan: ReturnType<typeof parseImagePlan>;
         try {

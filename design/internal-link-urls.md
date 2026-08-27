@@ -26,9 +26,13 @@ for or recorded, never inferred.** `deriveCandidates` resolves the most recent
   Nothing is asked, nothing is joined.
 - **Static-site** — only the customer knows their routing (it's their build).
   The connect form collects `post_url_base` (stored on the integration record
-  next to `content_path`); candidate URL = base + published slug. Connections
-  that predate the field have `null` — no base, no candidates from this
-  provider, and `db set-post-base --org <id> --base <url>` backfills it
+  next to `content_path`); candidate URL = `<base>/<published-slug>/`, including
+  the final slash. For example, base `https://example.com/blog` and slug
+  `article-slug` produce `https://example.com/blog/article-slug/`. This is the
+  same directory-style URL required for canonical, sitemap, structured-data and
+  navigation URLs by [`static-site-integration.md`](static-site-integration.md#public-url-and-output-contract).
+  Connections that predate the field have `null` — no base, no candidates from
+  this provider, and `db set-post-base --org <id> --base <url>` backfills it
   without redoing the GitHub App flow.
 
 `main_blog_url` keeps its onboarding/display role but is no longer

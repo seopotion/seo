@@ -121,6 +121,21 @@ export interface DeleteOrgData {
   };
 }
 
+/**
+ * `db reset-images` report. `reset` is populated in both modes, so a dry run
+ * shows exactly what `--apply` would blank; `enqueued` is 0 without `--enqueue`,
+ * and those articles still need an image replay before they can be republished.
+ */
+export interface ResetImagesData {
+  apply: boolean;
+  /** The dead CDN host that was matched against, lowercased. */
+  host: string;
+  scanned: number;
+  slotsReset: number;
+  enqueued: number;
+  reset: { id: string; title: string; status: string; slots: number }[];
+}
+
 export type Stage = 'staging' | 'prod';
 
 export interface PrereqCheck {
@@ -335,4 +350,119 @@ export interface CleanLinksData {
 export interface SetPostBaseData {
   org: string;
   postUrlBase: string;
+}
+
+/** Publishing error as `articles show` renders it (dates ISO-stringified). */
+export interface PublishingErrorView {
+  code: string;
+  kind: string;
+  message: string;
+  at: string;
+}
+
+export interface ArticleAttemptView {
+  provider: string;
+  status: string;
+  attempt_count: number;
+  requested_at: string;
+  last_attempt_at: string | null;
+  last_error: PublishingErrorView | null;
+}
+
+export interface ArticlePublicationView {
+  provider: string;
+  ref: string;
+  slug: string;
+  remote_url: string | null;
+  published_at: string;
+  updated_at: string | null;
+}
+
+/** One row of `articles list` — enough to spot where the pipeline is stuck. */
+export interface ArticleListRow {
+  id: string;
+  title: string;
+  status: string;
+  images_status: string;
+  created_at: string;
+  attempts: { provider: string; status: string }[];
+  published_to: string[];
+}
+
+export interface ArticlesListData {
+  org_id: string;
+  /** Total articles in the org; `articles` holds at most `--limit` of them. */
+  total: number;
+  articles: ArticleListRow[];
+}
+
+/** `articles show` — the full pipeline picture for one article. */
+export interface ArticleShowData {
+  id: string;
+  org_id: string;
+  title: string;
+  slug: string;
+  keyword: string;
+  status: string;
+  images_status: string;
+  created_at: string;
+  published_at: string | null;
+  updated_at: string | null;
+  preflight_error: PublishingErrorView | null;
+  attempts: ArticleAttemptView[];
+  publications: ArticlePublicationView[];
+  /** The linked planner keyword; null when it was deleted out from under the article. */
+  planner: {
+    keyword_id: string;
+    scheduled_date: string;
+    generation_status: string;
+    generation_attempts: number;
+    generation_error: string | null;
+  } | null;
+}
+
+/**
+ * `--wait` observation for one pipeline target. `done` = reached a terminal
+ * state before the timeout; `ok` = that terminal state is success (published,
+ * or images complete when no publishing is expected).
+ */
+export interface WaitOutcome {
+  /** The planner keyword being generated; null for `articles publish` targets. */
+  keyword_id: string | null;
+  /** Null until generation has created the article. */
+  article_id: string | null;
+  generation_status: string | null;
+  images_status: string | null;
+  /** Preflight error code, when the images worker's publish handoff refused. */
+  preflight_error: string | null;
+  attempts: { provider: string; status: string; error: string | null }[];
+  done: boolean;
+  ok: boolean;
+}
+
+export interface WaitReport {
+  timed_out: boolean;
+  elapsed_ms: number;
+  outcomes: WaitOutcome[];
+}
+
+export interface GenerateNextData {
+  org_id: string;
+  enqueued: {
+    keyword_id: string;
+    keyword: string;
+    scheduled_date: string;
+    generation_status: string;
+    generation_attempts: number;
+  }[];
+  /** Null unless --wait was passed. */
+  wait: WaitReport | null;
+}
+
+export interface PublishArticleData {
+  article_id: string;
+  org_id: string;
+  providers: { provider: string; action: 'enqueued' | 'skipped_published' }[];
+  /** Null unless --wait was passed (or nothing was enqueued). */
+  wait: WaitReport | null;
 }

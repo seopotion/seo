@@ -11,6 +11,17 @@ import { z } from 'zod';
  */
 export const PublishingPrefsSchema = z.object({ auto_publish: z.boolean().default(false) });
 
+const EngagementPrefsFields = {
+  image_style: z.string(),
+  include_cta: z.boolean(),
+  youtube_videos: z.boolean(),
+};
+
+export const EngagementPrefsPatchSchema = z.object(EngagementPrefsFields).partial();
+
+/** Distinct audience segments a preset may hold (design note). */
+export const AUDIENCE_TARGET_MAX = 7;
+
 export const SetupPresetsSchema = z.object({
   business: z.object({
     name: z.string(),
@@ -25,7 +36,7 @@ export const SetupPresetsSchema = z.object({
     // strings may contain natural-language commas (#99).
     target: z.preprocess(
       (v) => (typeof v === 'string' ? (v === '' ? [] : [v]) : v),
-      z.array(z.string()).max(7),
+      z.array(z.string()).max(AUDIENCE_TARGET_MAX),
     ),
     competitors: z.array(z.string()),
   }),
@@ -44,9 +55,10 @@ export const SetupPresetsSchema = z.object({
       llm_instructions: z.string(),
     }),
     engagement: z.object({
-      image_style: z.string(),
+      ...EngagementPrefsFields,
+      include_cta: EngagementPrefsFields.include_cta.default(true),
       // YouTube embed toggle (#85; renamed from include_youtube_video in #73).
-      youtube_videos: z.boolean().default(true),
+      youtube_videos: EngagementPrefsFields.youtube_videos.default(true),
     }),
     // Object-level default (with the field spelled out — Zod uses the default
     // value verbatim, it does NOT re-parse it) so scan output that omits

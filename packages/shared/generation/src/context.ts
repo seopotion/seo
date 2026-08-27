@@ -20,6 +20,7 @@ export function buildContext(
     audience: p.audience.target.join(', '),
     competitors: p.audience.competitors,
     articleStyle: p.article_preferences.content_seo.article_style,
+    includeCta: p.article_preferences.engagement.include_cta,
     maxInternalLinks: p.article_preferences.content_seo.internal_links_count,
     linkCandidates,
     llmInstructions: p.article_preferences.content_seo.llm_instructions,

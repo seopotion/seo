@@ -82,6 +82,11 @@ export function ArticleSettingsStep({
           checked={form.youtubeVideos}
           onChange={(checked) => updateField('youtubeVideos', checked)}
         />
+        <ToggleSwitch
+          label={t('includeCta')}
+          checked={form.includeCta}
+          onChange={(checked) => updateField('includeCta', checked)}
+        />
       </div>
     </div>
   );

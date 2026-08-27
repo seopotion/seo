@@ -23,78 +23,21 @@ import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { articleStyles, internalLinkCounts } from '../../onboarding/constants';
-
-type ArticleSettingsForm = {
-  autoPublish: boolean;
-  articleStyle: string;
-  internalLinksCount: string;
-  tableOfContents: boolean;
-  youtubeVideos: boolean;
-};
+import {
+  type ArticleSettingsForm,
+  type ArticleSettingsResponse,
+  buildArticleSettingsPatch,
+  initialArticleSettings,
+  mergeArticleSettings,
+} from './article-settings';
 
 type ArticleSettingsSaveState = 'error' | 'idle' | 'saved';
-
-type ArticleSettingsResponse = {
-  article_preferences: {
-    content_seo: {
-      article_style: string;
-      internal_links_count: number;
-      table_of_contents: boolean;
-      llm_instructions: string;
-    };
-    engagement: {
-      image_style: string;
-      youtube_videos: boolean;
-    };
-    publishing: {
-      auto_publish: boolean;
-    };
-  };
-};
 
 type ArticleSettingsMutationVariables = {
   organizationId: string;
   saveRevision: number;
   settings: ArticleSettingsForm;
 };
-
-const initialArticleSettings: ArticleSettingsForm = {
-  articleStyle: articleStyles[1].value,
-  autoPublish: false,
-  internalLinksCount: '1',
-  tableOfContents: true,
-  youtubeVideos: true,
-};
-
-function mergeArticleSettings(
-  data: ArticleSettingsResponse,
-  currentSettings: ArticleSettingsForm,
-): ArticleSettingsForm {
-  return {
-    ...currentSettings,
-    articleStyle: data.article_preferences.content_seo.article_style,
-    internalLinksCount: String(data.article_preferences.content_seo.internal_links_count),
-    tableOfContents: data.article_preferences.content_seo.table_of_contents,
-    youtubeVideos: data.article_preferences.engagement.youtube_videos,
-    autoPublish: data.article_preferences.publishing.auto_publish,
-  };
-}
-
-function buildArticleSettingsPatch(settings: ArticleSettingsForm) {
-  return {
-    content_seo: {
-      article_style: settings.articleStyle,
-      internal_links_count: Number.parseInt(settings.internalLinksCount, 10),
-      table_of_contents: settings.tableOfContents,
-    },
-    engagement: {
-      youtube_videos: settings.youtubeVideos,
-    },
-    publishing: {
-      auto_publish: settings.autoPublish,
-    },
-  };
-}
 
 export default function ArticleSettingsPage() {
   const t = useTranslations('ArticleSettingsPage');
@@ -149,7 +92,7 @@ export default function ArticleSettingsPage() {
     staleTime: 60 * 60 * 1000,
   });
 
-  const connectedIntegrationsQuery = useConnectedIntegrations(organization, {
+  const connectedIntegrationsQuery = useConnectedIntegrations(organization?.id ?? null, {
     enabled: !redirecting && !organizationLoading,
     onUnauthorized: handleUnauthorized,
   });
@@ -447,6 +390,14 @@ export default function ArticleSettingsPage() {
           id="youtube-videos"
           label={t('fields.youtubeVideos.label')}
           onCheckedChange={(checked) => updateSetting('youtubeVideos', checked)}
+        />
+
+        <SwitchSetting
+          checked={settings.includeCta}
+          description={t('fields.includeCta.description')}
+          id="include-cta"
+          label={t('fields.includeCta.label')}
+          onCheckedChange={(checked) => updateSetting('includeCta', checked)}
         />
       </div>
 

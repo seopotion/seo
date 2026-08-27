@@ -4,6 +4,7 @@ export * from './article';
 export * from './candidate';
 export * from './gsc';
 export * from './integration';
+export * from './json-schema';
 export * from './keyword';
 export * from './org';
 export * from './presets';

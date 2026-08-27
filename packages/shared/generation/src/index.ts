@@ -1,5 +1,6 @@
 export { buildArticlePrompt } from './article';
 export {
+  FLESCH_KINCAID_TARGET,
   HUMANIZE,
   INLINE_IMAGE_COUNT,
   MAX_GENERATION_ATTEMPTS,
@@ -12,6 +13,7 @@ export type { ImagePlan, ImagePlanInput } from './images';
 export {
   buildImagePlanPrompt,
   extractH2s,
+  IMAGE_PLAN_RESPONSE_SCHEMA,
   ImagePlanSchema,
   injectBlockAfterHeading,
   injectImageAfterHeading,
@@ -35,6 +37,7 @@ export {
   staticSitePostUrl,
 } from './links';
 export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
+export { fleschKincaidGrade } from './readability';
 export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
 export type { CompleteTopicBrief, TopicBriefFields } from './topic';
 export { completeTopicBrief } from './topic';
@@ -46,5 +49,6 @@ export {
   buildVideoPickPrompt,
   languageCodeFromName,
   parseVideoPick,
+  VIDEO_PICK_RESPONSE_SCHEMA,
   VideoPickSchema,
 } from './video';

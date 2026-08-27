@@ -38,7 +38,12 @@ const {
   setPlan: vi.fn(async () => true),
   // Default: a finalized org with presets, so paid escalation kicks off strategy.
   findById: vi.fn(
-    async (): Promise<{ id: string; setup_status: string; presets: unknown } | null> => ({
+    async (): Promise<{
+      id: string;
+      setup_status: string;
+      presets: unknown;
+      strategy_status?: string;
+    } | null> => ({
       id: 'org_1',
       setup_status: 'setup_complete',
       presets: { audience: {} },
@@ -292,15 +297,48 @@ describe('setOrgPlan', () => {
 });
 
 describe('strategyRun', () => {
-  test('creates and executes a strategy run for an existing, finalized org', async () => {
+  test('claims, then creates and executes a strategy run for an existing, finalized org', async () => {
     const res = await strategyRun({ orgId: 'org_1' });
     expect(findById).toHaveBeenCalledWith('org_1');
+    expect(claimStrategy).toHaveBeenCalledWith('org_1');
+    expect(setStrategyStatus).not.toHaveBeenCalled();
     expect(createStrategyRun).toHaveBeenCalledWith('org_1');
     expect(runLocalStrategy).toHaveBeenCalledWith('run_1');
     expect(closeDb).toHaveBeenCalledOnce();
     expect(res.ok).toBe(true);
     if (!res.ok) throw new Error('expected ok');
     expect(res.data).toEqual({ run_id: 'run_1' });
+  });
+
+  test('refuses an org whose strategy is completed or pending unless forced', async () => {
+    // claimStrategy only claims from none|failed — a completed org would run the
+    // whole paid pipeline and then have the persist stage skip it.
+    findById.mockResolvedValueOnce({
+      id: 'org_1',
+      setup_status: 'setup_complete',
+      presets: { audience: {} },
+      strategy_status: 'completed',
+    });
+    claimStrategy.mockResolvedValueOnce(false);
+    const res = await strategyRun({ orgId: 'org_1' });
+    expect(createStrategyRun).not.toHaveBeenCalled();
+    expect(runLocalStrategy).not.toHaveBeenCalled();
+    expect(closeDb).toHaveBeenCalledOnce();
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.error.code).toBe('STRATEGY_NOT_CLAIMABLE');
+    expect(res.error.message).toContain('completed');
+    expect(res.error.suggestion).toContain('--force');
+  });
+
+  test('--force resets the status to failed before claiming, then runs', async () => {
+    const res = await strategyRun({ orgId: 'org_1', force: true });
+    expect(setStrategyStatus).toHaveBeenCalledWith('org_1', 'failed');
+    const [resetOrder] = setStrategyStatus.mock.invocationCallOrder;
+    const [claimOrder] = claimStrategy.mock.invocationCallOrder;
+    expect(resetOrder).toBeLessThan(claimOrder ?? 0);
+    expect(runLocalStrategy).toHaveBeenCalledWith('run_1');
+    expect(res.ok).toBe(true);
   });
 
   test('fails when the org id matches nothing', async () => {
@@ -326,9 +364,10 @@ describe('strategyRun', () => {
     expect(res.error.code).toBe('ORG_NOT_FINALIZED');
   });
 
-  test('propagates an unexpected failure from the pipeline itself', async () => {
+  test('propagates an unexpected failure from the pipeline itself and reverts the claim', async () => {
     runLocalStrategy.mockRejectedValueOnce(new Error('stage blew up'));
     await expect(strategyRun({ orgId: 'org_1' })).rejects.toThrow('stage blew up');
+    expect(setStrategyStatus).toHaveBeenCalledWith('org_1', 'failed');
     expect(closeDb).toHaveBeenCalledOnce();
   });
 });

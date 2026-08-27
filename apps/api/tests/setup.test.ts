@@ -31,7 +31,7 @@ const presetsFixture = {
       table_of_contents: true,
       llm_instructions: '',
     },
-    engagement: { image_style: 'Minimal', youtube_videos: true },
+    engagement: { image_style: 'Minimal', include_cta: true, youtube_videos: true },
     publishing: { auto_publish: false },
   },
 };
@@ -312,6 +312,25 @@ describe('setup routes', () => {
         }),
       }),
     );
+  });
+
+  test('PATCH /presets persists a disabled CTA preference and preserves engagement siblings', async () => {
+    const res = await client.api.v0.setup.presets.$patch(
+      {
+        json: {
+          org_id: '6650f1a2b3c4d5e6f7a8b9c0',
+          presets: { article_preferences: { engagement: { include_cta: false } } },
+        },
+      },
+      { headers: await authHeader() },
+    );
+    expect(res.status).toBe(200);
+    if (res.status !== 200) throw new Error('expected 200');
+
+    const engagement = (await res.json()).presets.article_preferences.engagement;
+    expect(engagement.include_cta).toBe(false);
+    expect(engagement.image_style).toBe('Minimal');
+    expect(engagement.youtube_videos).toBe(true);
   });
 
   test('PATCH /presets returns 404 for an org owned by another user', async () => {

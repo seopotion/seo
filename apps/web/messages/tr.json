@@ -143,6 +143,7 @@
     "notConfigured": "Google ile oturum açma yapılandırılmamış",
     "retry": "Tekrar dene",
     "signInError": "Google ile oturum açılamadı. Tekrar deneyin.",
+    "signUp": "Kaydol",
     "signingIn": "Oturum açılıyor...",
     "workspaceError": "Çalışma alanınız kontrol edilemedi."
   },
@@ -184,10 +185,10 @@
     },
     "noRepos": "Bu kurulumda yazabileceğimiz bir depo yok. GitHub uygulamasının ayarlarından bir depo ekleyip yeniden başlayın.",
     "pendingApproval": "Kurulumun kuruluş sahibiniz tarafından onaylanması gerekiyor. Onayladığında GitHub sizi buraya geri getirecek.",
-    "pickBody": "Markdown dosyalarını ve bir manifest dosyasını commit ederiz; gerisini mevcut derleme ve dağıtım akışınız yapar.",
+    "pickBody": "Markdown dosyalarını ve bir manifest dosyasını commit ederiz; gerisini mevcut derlemeniz ve doğru yapılandırılmış sunucunuz yapar.",
     "pickTitle": "Yayınlanacak depoyu seçin",
     "postUrlBase": "Yazı URL tabanı",
-    "postUrlBaseHint": "Sitenizin yayınlanan bir yazıyı sunduğu adres: bu taban artı makalenin slug'ı. https://example.com/my-post sitenizde bir yazıysa https://example.com girin.",
+    "postUrlBaseHint": "Makale slug'ından önceki bölümü girin. Sonuç taban/slug/ olur; örneğin https://example.com/blog tabanı https://example.com/blog/article-slug/ üretir.",
     "private": "Özel",
     "redeeming": "GitHub kurulumu tamamlanıyor...",
     "saving": "Bağlanıyor...",
@@ -756,6 +757,10 @@
           "noDestinationEnabled": "Otomatik yayınlama açık kalır ancak bir yayınlama hedefi bağlanana kadar gelecekteki otomatik denemeler çalışmayabilir."
         }
       },
+      "includeCta": {
+        "description": "Oluşturulan makalelerin sonuna yakın ilgili bir harekete geçirici mesaj ekleyin.",
+        "label": "Harekete geçirici mesaj"
+      },
       "internalLinks": {
         "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
         "label": "İç bağlantılar"
@@ -1000,6 +1005,7 @@
     "useCasesTitle": "Kimler için geliştirildi?"
   },
   "Footer": {
+    "blog": "Blog",
     "copyright": "© 2026 Seopotion. Tüm hakları saklıdır.",
     "features": "Özellikler",
     "legalNavigationLabel": "Yasal",
@@ -1032,7 +1038,8 @@
     "links": {
       "features": "Özellikler",
       "pricing": "Fiyatlandırma",
-      "docs": "Dokümanlar"
+      "docs": "Dokümanlar",
+      "blog": "Blog"
     },
     "logoAlt": "Seopotion logosu",
     "primaryNavigation": "Ana gezinme"
@@ -1049,6 +1056,7 @@
     },
     "articleSettings": {
       "articleStyle": "Makale stili",
+      "includeCta": "Harekete geçirici mesaj",
       "internalLinksCount": "İç bağlantı sayısı",
       "selectStyle": "Stil seç",
       "tableOfContents": "İçindekiler",
@@ -1105,14 +1113,20 @@
     "integrations": {
       "availableIntegrations": "Mevcut entegrasyonlar",
       "comingSoon": "Yakında",
-      "connectWordPressLater": "WordPress'i daha sonra Ayarlar'dan bağlayabilirsiniz.",
+      "connect": "Bağla",
+      "connectedSuccess": "WordPress bağlandı. Onboarding'i tamamlayabilir veya bağlantıyı değiştirebilirsiniz.",
+      "loadError": "Bağlı entegrasyonlarınız yüklenemedi.",
+      "loading": "Kontrol ediliyor…",
+      "optionalNotice": "Şimdi bir yayın platformu bağlayın veya bu isteğe bağlı adımı atlayıp onboarding'i tamamlayın.",
       "providers": {
         "framer": "Framer",
         "wordpress": "Kendi sunucunuzdaki WordPress"
       },
       "referralSource": "Bizi nereden duydunuz?",
+      "replace": "Değiştir",
+      "retry": "Tekrar dene",
       "selectOption": "Bir seçenek seç",
-      "settingsNotice": "Onboarding tamamlandığında entegrasyonlarınızı kontrol panelinizdeki Ayarlar bölümünden bağlayabilir ve yönetebilirsiniz.",
+      "settingsNotice": "Entegrasyonları daha sonra Ayarlar'dan bağlayabilir, değiştirebilir veya bağlantısını kesebilirsiniz.",
       "title": "Entegrasyonlar ve Referans Kaynağı"
     },
     "options": {

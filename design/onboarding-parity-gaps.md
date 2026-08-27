@@ -21,36 +21,37 @@ Our baseline mirrors Outrank's spine 1:1:
 | Finish → dashboard | `POST /setup/finalize` → `setup_complete` | same terminal state |
 
 Outrank's review wizard steps (**Business → Audience & Competitors → Blog → Articles →
-Integration**) map onto our four `SetupPresetsSchema` top-level keys — except
-**Integration**, which we don't model (see G1).
+Integration**) map onto our wizard. The preset steps use the four `SetupPresetsSchema`
+top-level keys; Integration reads and writes the separate generalized integration entity.
 
 ## Gap backlog (deferred, prioritized)
 
-### G1 — No integrations / publishing model *(already tracked in PROGRESS.md)*
+### G1 — Integrations / publishing model *(completed for self-hosted WordPress)*
 Outrank's Integration step connects a CMS to auto-publish articles (WordPress, Notion,
 Webflow, Shopify, Wix, WordPress.com, API Webhook, Framer, Ghost, Next.js Blog, Feather).
-We capture *where the blog is* (`blog.sitemap_url` / `blog.main_blog_url`) but have **no
-connected-CMS entity and no OAuth/token storage**. `⬜ GET/POST /setup/integrations` is
-the placeholder. Largest missing subsystem; deferred because auth/token handling per
-platform is expensive.
+Our generalized `integrations` entity stores verified WordPress and static-site connections.
+The optional onboarding step reuses `GET /dashboard/integrations/connected` and
+`POST /dashboard/integrations/wordpress`, so it does not duplicate those operations under
+`/setup`. Static-site/GitHub onboarding remains deferred because its external redirect needs
+the unfinished wizard state and callback destination to be restored.
 
-### G2 — `article_preferences` is a thin subset (~4 of ~20 controls)
-Baseline: `content_seo.{article_style, internal_links, llm_instructions}` +
-`engagement.{image_style}`.
+### G2 — `article_preferences` is a thin subset (8 of ~24 controls)
+Current: `content_seo.{article_style, internal_links_count, table_of_contents,
+llm_instructions}` + `engagement.{image_style, youtube_videos, include_cta}` +
+`publishing.auto_publish`. The CTA preference is enforced across outline, article,
+humanization, and final semantic validation; disabling it also clears any CTA returned in the
+outline.
 Outrank additionally exposes, on the Articles step:
-- **Content/SEO:** auto-publish toggle; internal-links as a **count** (see G5).
+- **Content/SEO:** external-link count, outline controls, and excluded words.
 - **Engagement toggles:** brand color; Title-Based Featured Image (+ its own style);
-  Table of Contents; YouTube video; Call-to-Action; Infographics; Emojis; Mention
-  Similar Products & Tools; First-Person Writing; custom AI image-style presets.
-- **Improvement Schedule** (whole subsystem): auto-improve existing articles, auto-push
-  to integration, weekday picker (max 2 days/week).
-- **Product Catalog** (whole subsystem): feature real products/images in articles.
+  Infographics; Emojis; Mention Similar Products & Tools; First-Person Writing; custom AI
+  image-style presets.
+- **Improvement Schedule** and **Product Catalog** are no longer planned.
 
-Two entire subsystems (article **Improvements** and **Product Catalog**) are absent from
-our schema. Deferred: baseline only needs enough prefs to generate one article.
+The remaining gap is optional article-generation polish, not a baseline blocker.
 
 **Confirmed 2026-07-01:** the live `output_settings_presets` row has ~24 controls (full field
-list in [`product-flow.md`](product-flow.md) §2.3); ours implements ~4 of them.
+list in [`product-flow.md`](product-flow.md) §2.3); ours implements 8 of them.
 
 ### G3 — `audience.target` should be a list
 Baseline `audience.target: z.string()` (single). Outrank collects **up to 7 target-audience

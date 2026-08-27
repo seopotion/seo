@@ -3,8 +3,12 @@ import { buildArticlePrompt } from './article';
 import { HUMANIZE } from './config';
 import { buildHumanizePrompt } from './humanize';
 import { sanitizeLinks } from './links';
-import { buildOutlinePrompt, parseOutline } from './outline';
-import { buildSemanticCheckPrompt, parseSemanticResult } from './semantic';
+import { buildOutlinePrompt, OUTLINE_RESPONSE_SCHEMA, parseOutline } from './outline';
+import {
+  buildSemanticCheckPrompt,
+  parseSemanticResult,
+  SEMANTIC_RESPONSE_SCHEMA,
+} from './semantic';
 import type { GeneratedArticle, GenerationContext, ValidationFailure } from './types';
 import { validateArticle } from './validate';
 
@@ -31,7 +35,7 @@ export async function generateArticle(params: {
 
   const outlineRes = await llm.complete({
     messages: buildOutlinePrompt(ctx),
-    responseFormat: 'json',
+    responseSchema: OUTLINE_RESPONSE_SCHEMA,
   });
   track(outlineRes.usage);
   const outline = parseOutline(outlineRes.text, ctx);
@@ -65,7 +69,7 @@ export async function generateArticle(params: {
 
   const semRes = await llm.complete({
     messages: buildSemanticCheckPrompt(ctx, content),
-    responseFormat: 'json',
+    responseSchema: SEMANTIC_RESPONSE_SCHEMA,
   });
   track(semRes.usage);
   const semantic = parseSemanticResult(semRes.text);

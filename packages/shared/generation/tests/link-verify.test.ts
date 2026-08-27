@@ -34,6 +34,13 @@ describe('verifyCandidates', () => {
     expect(live).toEqual([candidate(1)]);
   });
 
+  test('requests and retains the canonical trailing-slash URL', async () => {
+    const canonical = { ...candidate(1), url: 'https://a.com/blog/p1/' };
+    const fetchMock = stubFetch({ [canonical.url]: 200 });
+    expect(await verifyCandidates([canonical])).toEqual([canonical]);
+    expect(fetchMock).toHaveBeenCalledWith(canonical.url, expect.any(Object));
+  });
+
   test('retries with GET when HEAD is not allowed', async () => {
     const methods: string[] = [];
     let head = true;

@@ -28,13 +28,32 @@ export function categorizeHttpStatus(status: number): DataForSeoErrorCategory {
   return 'invalid_request';
 }
 
+/** Credential problems: 40100 Not Authorized, 40104 Account Verification Required. */
+const AUTH_CODES: ReadonlySet<number> = new Set([40100, 40104]);
+
+/**
+ * The search engine failed us mid-task: 40101 "Internal SE Server Error",
+ * 40103 "Task Execution Failed". DataForSEO's own docs say to post the task
+ * again, so these are provider blips, not our problem.
+ */
+const TRANSIENT_TASK_CODES: ReadonlySet<number> = new Set([40101, 40103]);
+
+/** "No Search Results." — an empty SERP, not a failure. Handled in the client. */
+export const NO_SEARCH_RESULTS_CODE = 40102;
+
 /**
  * Map a DataForSEO body `status_code` (returned even on HTTP 200) to a category.
- * 401xx = auth, 40200 = out of funds, other 402xx = rate/quota limit,
- * 5xxxx = provider, else invalid request.
+ * 40200 = out of funds, other 402xx = rate/quota limit, 5xxxx = provider, else
+ * invalid request.
+ *
+ * 401xx is deliberately NOT treated as an auth block: despite looking like HTTP
+ * 401 it mixes credential errors with transient search-engine failures. Reading
+ * the whole range as auth made 40101 non-retryable, and one keyword's SERP blip
+ * fataled a whole production strategy run.
  */
 export function categorizeApiStatus(code: number): DataForSeoErrorCategory {
-  if (code >= 40100 && code < 40200) return 'auth';
+  if (AUTH_CODES.has(code)) return 'auth';
+  if (TRANSIENT_TASK_CODES.has(code)) return 'provider';
   if (code === 40200) return 'payment_required';
   if (code > 40200 && code < 40300) return 'rate_limit';
   if (code >= 50000) return 'provider';

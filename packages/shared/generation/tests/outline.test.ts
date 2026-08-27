@@ -10,6 +10,7 @@ const ctx: GenerationContext = {
   audience: 'makers',
   competitors: ['rival.com'],
   articleStyle: 'practical',
+  includeCta: true,
   maxInternalLinks: 0,
   linkCandidates: [],
   llmInstructions: 'be concise',
@@ -53,6 +54,7 @@ const outlineJson = (internal_links: string[]) =>
     slug: 'best-widgets',
     sections: [{ heading: 'H', intent: 'i' }],
     internal_links,
+    cta: 'Compare the available options.',
   });
 
 describe('outline', () => {
@@ -98,6 +100,46 @@ describe('outline', () => {
       .map((m) => m.content)
       .join('\n');
     expect(joined).toContain('no internal link candidates');
+  });
+
+  test('buildOutlinePrompt requires an empty CTA when CTA generation is disabled', () => {
+    const joined = buildOutlinePrompt({ ...ctx, includeCta: false })
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(joined).toContain('Set "cta" to an empty string');
+  });
+
+  test('parseOutline removes a model-produced CTA when CTA generation is disabled', () => {
+    const out = parseOutline(
+      JSON.stringify({
+        h1: 'Best Widgets Ranked',
+        meta_title: 't',
+        meta_description: 'd',
+        slug: 'best-widgets',
+        sections: [{ heading: 'H', intent: 'i' }],
+        cta: 'Buy now',
+      }),
+      { ...ctx, includeCta: false },
+    );
+
+    expect(out.cta).toBe('');
+  });
+
+  test('parseOutline rejects an empty CTA when CTA generation is enabled', () => {
+    expect(() =>
+      parseOutline(
+        JSON.stringify({
+          h1: 'Best Widgets Ranked',
+          meta_title: 't',
+          meta_description: 'd',
+          slug: 'best-widgets',
+          sections: [{ heading: 'H', intent: 'i' }],
+          cta: '   ',
+        }),
+        ctx,
+      ),
+    ).toThrow('outline CTA is required');
   });
 
   test('a complete pillar brief sets its exact focus and broad hub scope', () => {
@@ -160,7 +202,7 @@ describe('outline', () => {
   test('parseOutline parses fenced JSON and applies defaults', () => {
     const out = parseOutline(
       '```json\n{"h1":"Best Widgets Ranked","meta_title":"t","meta_description":"d","slug":"best-widgets","sections":[{"heading":"H","intent":"i"}]}\n```',
-      ctx,
+      { ...ctx, includeCta: false },
     );
     expect(out.h1).toBe('Best Widgets Ranked');
     expect(out.faqs).toEqual([]);
@@ -196,9 +238,11 @@ describe('outline', () => {
     expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide']);
   });
 
-  test('parseOutline canonicalizes a trailing-slash variant to our URL (#186)', () => {
-    const out = parseOutline(outlineJson(['https://a.com/blog/widget-guide/']), withCandidates(2));
-    expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide']);
+  test('parseOutline re-emits a canonical trailing-slash URL after the model omits it', () => {
+    const canonical = withCandidates(2);
+    canonical.linkCandidates[0]!.url = 'https://a.com/blog/widget-guide/';
+    const out = parseOutline(outlineJson(['https://a.com/blog/widget-guide']), canonical);
+    expect(out.internal_links).toEqual(['https://a.com/blog/widget-guide/']);
   });
 
   test('parseOutline yields no links when there are no candidates (#186)', () => {

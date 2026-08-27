@@ -16,7 +16,7 @@ const base = {
       table_of_contents: true,
       llm_instructions: 'old',
     },
-    engagement: { image_style: 'Minimal', youtube_videos: true },
+    engagement: { image_style: 'Minimal', include_cta: true, youtube_videos: true },
     publishing: { auto_publish: false },
   },
 };

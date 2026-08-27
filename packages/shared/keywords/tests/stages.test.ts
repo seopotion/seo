@@ -30,7 +30,7 @@ const presets: SetupPresets = {
       table_of_contents: true,
       llm_instructions: '',
     },
-    engagement: { image_style: '', youtube_videos: true },
+    engagement: { image_style: '', include_cta: true, youtube_videos: true },
     publishing: { auto_publish: false },
   },
 };
@@ -141,6 +141,34 @@ describe('stageSerpFetch', () => {
     expect(out.stats).toMatchObject({ serpFetched: 2, authorityRejected: 1 });
   });
 
+  // A keyword DataForSEO could not answer for is neither accepted nor rejected —
+  // it goes to the below-N tier, where `serp_validated: false` keeps persist from
+  // scheduling it, and the run carries on with the rest of the pool.
+  it('routes a keyword whose SERP fetch failed into belowN and finishes the stage', async () => {
+    const dataForSeo = {
+      ...noopDataForSeo,
+      serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
+        if (keyword === 'boom kw') throw new Error('DataForSEO request failed (provider)');
+        return serp(['blog-c.com', 'blog-d.com']);
+      }),
+    } as unknown as DataForSeoClient;
+    const ctx = makeCtx({ clients: { dataForSeo, llm: noopLlm } });
+    const state = stateWith([
+      cand('boom kw'),
+      cand('ok a'),
+      cand('ok b'),
+      cand('ok c'),
+      cand('ok d'),
+    ]);
+
+    const out = await stageSerpFetch(state, ctx);
+
+    expect(out.candidates.map((c) => c.keyword)).toEqual(['ok a', 'ok b', 'ok c', 'ok d']);
+    expect(out.belowN.map((c) => c.keyword)).toEqual(['boom kw']);
+    expect(out.rejected).toEqual([]);
+    expect(out.stats).toMatchObject({ serpFetched: 5, serpUnvalidated: 1 });
+  });
+
   it('throws when every SERP is authority-dominated, so an empty plan never ships silently', async () => {
     const dataForSeo = {
       ...noopDataForSeo,
@@ -152,7 +180,7 @@ describe('stageSerpFetch', () => {
     const state = stateWith([cand('a'), cand('b')]);
 
     await expect(stageSerpFetch(state, ctx)).rejects.toThrow(
-      /strategy aborted: 2 candidates reached SERP fetch but 0 survived the authority filter/,
+      /strategy aborted: 2 candidates reached SERP fetch but 0 survived \(2 authority-rejected, 0 unfetchable\)/,
     );
   });
 });

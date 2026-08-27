@@ -4,7 +4,9 @@ import {
   type ArticleType,
   normalizeKeyword,
   type SetupPresets,
+  toStrictJsonSchema,
 } from '@shared/schemas';
+import { z } from 'zod';
 import { parseJsonResponse } from './json-response';
 
 const ARTICLE_TYPE_SET = new Set<string>(ARTICLE_TYPES);
@@ -63,6 +65,11 @@ export function buildSeedPrompt(presets: SetupPresets, competitorWins: string[])
   ];
 }
 
+export const SEED_RESPONSE_SCHEMA = toStrictJsonSchema(
+  z.object({ seeds: z.array(z.string()) }),
+  'seed_keywords',
+);
+
 export function parseSeeds(text: string): string[] {
   const parsed = parseJsonResponse(text) as { seeds?: unknown } | null;
   const seeds = parsed?.seeds;
@@ -92,6 +99,13 @@ export function buildRelevancePrompt(keywords: string[], presets: SetupPresets):
     { role: 'user', content: `${businessContext(presets)}\n\nKeywords:\n${list}` },
   ];
 }
+
+export const RELEVANCE_RESPONSE_SCHEMA = toStrictJsonSchema(
+  z.object({
+    scores: z.array(z.object({ index: z.number().int(), relevance: z.number() })),
+  }),
+  'keyword_relevance',
+);
 
 /**
  * Scores for the keywords the model actually answered — and ONLY those. An

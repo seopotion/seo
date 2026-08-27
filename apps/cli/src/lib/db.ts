@@ -59,6 +59,7 @@ import {
   type StrategySnapshot,
   writeSnapshot,
 } from './strategy-snapshot';
+import { resolveOrgId } from './target';
 
 export async function initDb(): Promise<Result<DbInitData>> {
   try {
@@ -93,32 +94,6 @@ export async function migrateDb(): Promise<Result<MigrationReport>> {
 
 function isEntitlementPlan(plan: string): plan is EntitlementPlan {
   return (ENTITLEMENT_PLANS as readonly string[]).includes(plan);
-}
-
-/**
- * Resolve the target org from exactly one of `org` (id, taken as-is) or `user`
- * (email -> their single org). Shared by every org-scoped db subcommand so they
- * accept the same flags and fail with the same codes.
- */
-async function resolveOrgId(org?: string, user?: string): Promise<Result<string>> {
-  if ((org && user) || (!org && !user)) {
-    return fail('BAD_TARGET', 'Provide exactly one of --org or --user.');
-  }
-  if (!user) return ok(org as string);
-
-  const found = await UserRepo.findByEmail(user);
-  if (!found) return fail('USER_NOT_FOUND', `No user with email "${user}".`);
-  const orgs = await OrgRepo.findByUserId(found.id);
-  if (orgs.length > 1) {
-    return fail(
-      'AMBIGUOUS_ORG',
-      `User "${user}" owns ${orgs.length} orgs: ${orgs.map((o) => o.id).join(', ')}.`,
-      'Re-run with --org <id>.',
-    );
-  }
-  const [only] = orgs;
-  if (!only) return fail('ORG_NOT_FOUND', `User "${user}" owns no org.`);
-  return ok(only.id);
 }
 
 /**
@@ -433,11 +408,17 @@ export async function strategyDryRun(input: {
 /**
  * Create and execute a REAL strategy run for one org, in-process (#56): persists
  * candidates, schedules planner entries, writes a strategy_runs doc. The recovery
- * path for a failed org — unlike setOrgPlan's kickoff, NOT gated by claimStrategy,
- * so it can re-run an org regardless of strategy_status. Needs Mongo + provider
- * credentials in the environment.
+ * path for a failed org. Gated by claimStrategy like every other launcher: the
+ * persist stage skips a `completed` org, so running it un-gated would spend the
+ * whole pipeline's credits and schedule nothing. `force` mirrors the admin
+ * force-rerun — reset the status to `failed` first, then claim; the pipeline
+ * dedupes against existing planner keywords, so a re-run tops up rather than
+ * duplicates. Needs Mongo + provider credentials in the environment.
  */
-export async function strategyRun(input: { orgId: string }): Promise<Result<StrategyRunData>> {
+export async function strategyRun(input: {
+  orgId: string;
+  force?: boolean;
+}): Promise<Result<StrategyRunData>> {
   try {
     const org = await OrgRepo.findById(input.orgId);
     if (!org) return fail('ORG_NOT_FOUND', `No org with id "${input.orgId}".`);
@@ -448,9 +429,24 @@ export async function strategyRun(input: { orgId: string }): Promise<Result<Stra
       );
     }
 
-    const run = await createStrategyRun(org.id);
-    await runLocalStrategy(run.id);
-    return ok({ run_id: run.id });
+    if (input.force) await OrgRepo.setStrategyStatus(org.id, 'failed');
+    if (!(await OrgRepo.claimStrategy(org.id))) {
+      return fail(
+        'STRATEGY_NOT_CLAIMABLE',
+        `Org "${org.id}" has strategy_status "${org.strategy_status}" — only none|failed can be run; a completed org would spend the full pipeline and then schedule nothing.`,
+        'Pass --force to reset the status to failed and re-run (tops up the plan; safe to repeat). For a pending org, only force it if you know that run died.',
+      );
+    }
+
+    try {
+      const run = await createStrategyRun(org.id);
+      await runLocalStrategy(run.id);
+      return ok({ run_id: run.id });
+    } catch (e) {
+      // Revert the claim so a retry can reclaim (same as the admin route).
+      await OrgRepo.setStrategyStatus(org.id, 'failed');
+      throw e;
+    }
   } finally {
     await closeDb();
   }

@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
+import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { INLINE_IMAGE_COUNT } from './config';
 import { parseJsonObject } from './json';
@@ -26,6 +27,19 @@ export const ImagePlanSchema = z.object({
 });
 export type ImagePlan = z.infer<typeof ImagePlanSchema>;
 
+const TolerantImagePlanSchema = z.object({
+  cover: ImagePlanSchema.shape.cover,
+  inline: z.array(
+    ImagePlanSchema.shape.inline.element.extend({
+      section_heading: z.string().min(1).optional(),
+    }),
+  ),
+});
+
+// The STRICT plan is the wire contract: section_heading is required, which is
+// exactly the field TolerantImagePlanSchema was written to survive without.
+export const IMAGE_PLAN_RESPONSE_SCHEMA = toStrictJsonSchema(ImagePlanSchema, 'image_plan');
+
 /** H2 heading texts, in order, from markdown content. */
 export function extractH2s(content: string): string[] {
   return content
@@ -37,9 +51,6 @@ export function extractH2s(content: string): string[] {
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
     'You are an art director planning images for one blog article.',
-    'Respond with ONLY a JSON object of this shape:',
-    '{ "cover": { "prompt": string, "alt": string },',
-    '  "inline": [{ "prompt": string, "alt": string, "section_heading": string }] }',
     `Rules: exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
     'EXACTLY from the provided section list, each from a DIFFERENT section. Prompts describe',
     'a single visual scene with no text or words in the image. alt is a meaningful',
@@ -64,7 +75,18 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
 
 /** Parse + validate a plan; throws on wrong count, unknown or duplicate headings. */
 export function parseImagePlan(text: string, headings: string[]): ImagePlan {
-  const plan = ImagePlanSchema.parse(parseJsonObject(text));
+  const parsed = TolerantImagePlanSchema.parse(parseJsonObject(text));
+  const specified = parsed.inline.flatMap((img) =>
+    img.section_heading === undefined ? [] : [img.section_heading],
+  );
+  const available = headings.filter((heading) => !specified.includes(heading));
+  const plan = ImagePlanSchema.parse({
+    ...parsed,
+    inline: parsed.inline.map((img) => ({
+      ...img,
+      section_heading: img.section_heading ?? available.shift(),
+    })),
+  });
   if (plan.inline.length !== INLINE_IMAGE_COUNT)
     throw new Error(`image plan needs exactly ${INLINE_IMAGE_COUNT} inline images`);
   const seen = new Set<string>();

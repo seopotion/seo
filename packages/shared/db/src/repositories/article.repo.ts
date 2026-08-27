@@ -499,6 +499,32 @@ export const ArticleRepo = {
     );
   },
 
+  /**
+   * Re-arm the image pipeline for one article (`db reset-images`). The worker's
+   * idempotency guards — plan set-if-absent, `url === ''` per slot, and the
+   * `images_status === 'complete'` short-circuit — mean a replayed task is a
+   * no-op until the slots are blanked and the status rewound, which is exactly
+   * what this does. Content comes in already stripped of the dead markdown.
+   */
+  async resetImages(
+    id: string,
+    update: { images: ArticleImage[]; content: string; featuredImageUrl: string },
+  ): Promise<boolean> {
+    if (!ObjectId.isValid(id)) return false;
+    const res = await (await collection()).updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          images: update.images,
+          content: update.content,
+          featured_image_url: update.featuredImageUrl,
+          images_status: 'pending',
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
+
   /** Delete every article for an org (used by the `db reset-user` CLI). */
   async deleteByOrgId(orgId: string): Promise<number> {
     const res = await (await collection()).deleteMany({ org_id: orgId });

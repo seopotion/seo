@@ -2,11 +2,21 @@ import type { MetadataRoute } from 'next';
 import { routing } from '../i18n/routing';
 import { languageAlternates, localizedUrl } from '../i18n/urls';
 import { absoluteUrl } from '../lib/seo';
+import { listPosts } from './[locale]/(marketing)/blog/content';
+import { BLOG_LOCALE, blogPath, POST_SLUGS } from './[locale]/(marketing)/blog/registry';
 import { loadDocFrontmatter } from './[locale]/(marketing)/docs/content';
 import { DOCS, docPath } from './[locale]/(marketing)/docs/registry';
 
 const defaultLastModified = new Date('2026-07-01');
-const englishOnlyPaths = new Set(['/terms', '/privacy', '/refunds']);
+// The blog joins the legal pages here: it is published in English only, so it
+// carries no `hreflang` alternates and `/tr/blog…` is never built.
+const englishOnlyPaths = new Set([
+  '/terms',
+  '/privacy',
+  '/refunds',
+  '/blog',
+  ...POST_SLUGS.map(blogPath),
+]);
 const publicPaths = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
   { path: '/pricing', changeFrequency: 'monthly', priority: 0.8 },
@@ -49,8 +59,43 @@ async function docEntries(): Promise<SitemapEntry[]> {
   );
 }
 
+/**
+ * One entry per post, dated from frontmatter — `updated` when the post has been
+ * revised, otherwise its publication date. The `/blog` hub takes the date of the
+ * newest post it lists, which is exactly when the page last changed; the fixed
+ * `defaultLastModified` would go stale the moment a post shipped.
+ */
+async function blogEntries(): Promise<SitemapEntry[]> {
+  const posts = await listPosts();
+  const timestamps = posts.map(({ frontmatter }) =>
+    new Date(frontmatter.updated ?? frontmatter.date).getTime(),
+  );
+
+  return [
+    {
+      path: '/blog',
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+      // An empty blog has no date of its own and falls back to the default.
+      ...(timestamps.length
+        ? { lastModified: { [BLOG_LOCALE]: new Date(Math.max(...timestamps)) } }
+        : {}),
+    },
+    ...posts.map(({ slug }, index) => ({
+      path: blogPath(slug),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+      lastModified: { [BLOG_LOCALE]: new Date(timestamps[index] as number) },
+    })),
+  ];
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const entries: SitemapEntry[] = [...publicPaths, ...(await docEntries())];
+  const entries: SitemapEntry[] = [
+    ...publicPaths,
+    ...(await docEntries()),
+    ...(await blogEntries()),
+  ];
 
   return entries.flatMap((entry) => {
     const locales = englishOnlyPaths.has(entry.path) ? [routing.defaultLocale] : routing.locales;

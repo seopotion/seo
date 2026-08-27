@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
+import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { parseJsonObject } from './json';
 import { completeTopicBrief } from './topic';
@@ -9,15 +10,19 @@ export const SemanticResultSchema = z.object({
   reasons: z.array(z.string()).default([]),
 });
 
+export const SEMANTIC_RESPONSE_SCHEMA = toStrictJsonSchema(SemanticResultSchema, 'semantic_check');
+
 export function buildSemanticCheckPrompt(ctx: GenerationContext, markdown: string): LlmMessage[] {
   const topic = completeTopicBrief(ctx);
   const system = [
-    'You are a strict content compliance reviewer. Respond with ONLY JSON:',
-    '{ "pass": boolean, "reasons": string[] }',
+    'You are a strict content compliance reviewer.',
     'Set pass=false if ANY of these are true:',
     '- the article makes unsupported or unverifiable claims about the business;',
     '- it promotes, recommends, or links to a competitor;',
     '- the target keyword is stuffed unnaturally or is entirely absent;',
+    ctx.includeCta
+      ? '- it lacks one concise, relevant call to action near the end;'
+      : '- it contains a call to action, including an invitation to contact, subscribe, buy, book, download, sign up, or take another next step;',
     topic
       ? '- the article materially ignores its assigned content focus or violates its pillar/support scope;'
       : '',

@@ -541,9 +541,11 @@ row (`name: "Default"`, so multiple presets per site are supported), with ~28 fi
   `table_of_contents`, `mention_similar_products`, `is_first_person_enabled`,
   `are_in_article_emojis_disabled`.
 
-Ours today: `content_seo.{article_style, internal_links(bool), llm_instructions}` +
-`engagement.{image_style}` — ~4 of these ~24 controls. The gap is real but **intentional**
-(baseline generates one reasonable article; the rest are polish toggles).
+Ours today: `content_seo.{article_style, internal_links_count, table_of_contents,
+llm_instructions}` + `engagement.{image_style, youtube_videos, include_cta}` +
+`publishing.auto_publish` — 8 of these ~24 controls. The CTA preference is enforced during
+generation and final semantic validation; table of contents remains stored but unconsumed. The
+remaining gap is intentional article polish rather than a baseline blocker.
 
 **UI confirmation of the Preferences tab (live 2026-07-02).** The settings screen
 (heading "Configure your article preferences") matches the API-derived shape above and pins

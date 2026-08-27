@@ -21,6 +21,9 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     'Include an engaging introduction before the first H2 and a concluding section.',
     'Use the target keyword naturally; never keyword-stuff.',
     'Do not invent unverifiable facts about the business. Never promote competitors.',
+    ctx.includeCta
+      ? 'Include the supplied call to action once, near the end of the article.'
+      : 'Do not include a call to action.',
     topic?.topic_role === 'pillar'
       ? 'Topic scope: write a broad, authoritative cluster overview and hub that orients readers across the subject. Do not exhaustively replace the narrower support articles.'
       : '',
@@ -28,6 +31,9 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
       ? 'Topic scope: go deep on the assigned content focus. Do not broaden it into a second cluster overview, and keep it distinct from the pillar and other article targets.'
       : '',
     `Write the entire article in ${ctx.language}.`,
+    ctx.language === 'English'
+      ? 'Aim for Flesch-Kincaid grade level 8 or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.'
+      : '',
     linkLines.length
       ? 'Link to the internal pages listed below, at most once each, using descriptive anchor text. Use those exact URLs verbatim — never invent, shorten, or alter one — and include no other links of any kind.'
       : 'Do not include any hyperlinks.',
@@ -46,7 +52,7 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     `Sections: ${outline.sections.map((s) => s.heading).join(' | ')}`,
     outline.faqs.length ? `FAQs to answer: ${outline.faqs.map((f) => f.question).join(' | ')}` : '',
     linkLines.length ? `Internal links you may use (title — URL):\n${linkLines.join('\n')}` : '',
-    outline.cta ? `Call to action: ${outline.cta}` : '',
+    ctx.includeCta && outline.cta ? `Call to action: ${outline.cta}` : '',
     ctx.articleStyle ? `Style: ${ctx.articleStyle}` : '',
     ctx.llmInstructions ? `Extra instructions: ${ctx.llmInstructions}` : '',
   ]

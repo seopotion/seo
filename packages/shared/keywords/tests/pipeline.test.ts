@@ -105,7 +105,7 @@ const input = (): PipelineInput => ({
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: '', youtube_videos: true },
+      engagement: { image_style: '', include_cta: true, youtube_videos: true },
       publishing: { auto_publish: false },
     },
   },
@@ -312,7 +312,7 @@ describe('runKeywordPipeline', () => {
     expect(planCalls[0]![0]).toMatchObject({
       model: 'custom-plan-model',
       temperature: 0,
-      responseFormat: 'json',
+      responseSchema: { name: 'content_plan' },
     });
     const planPrompt = planCalls[0]![0].messages.map((message) => message.content).join('\n');
     expect(planPrompt).toContain('guide to membrane fouling');

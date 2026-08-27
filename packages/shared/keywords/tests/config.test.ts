@@ -13,7 +13,7 @@ const presets = {
       table_of_contents: true,
       llm_instructions: '',
     },
-    engagement: { image_style: '', youtube_videos: true },
+    engagement: { image_style: '', include_cta: true, youtube_videos: true },
     publishing: { auto_publish: false },
   },
 } satisfies SetupPresets;
@@ -33,6 +33,16 @@ describe('resolveConfig', () => {
     };
     const c = resolveConfig(global);
     expect(c.locationName).toBe('United States');
+  });
+
+  it("maps Turkey to DataForSEO's Turkiye location name", () => {
+    const turkey = {
+      ...presets,
+      business: { ...presets.business, country: 'Turkey', language: 'Turkish' },
+    };
+    const c = resolveConfig(turkey);
+    expect(c.locationName).toBe('Turkiye');
+    expect(c.languageName).toBe('Turkish');
   });
 
   it('SERP-validates more than a full 30-day plan by default', () => {

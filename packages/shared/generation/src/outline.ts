@@ -1,4 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
+import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { parseJsonObject } from './json';
 import { normalizeUrl } from './links';
@@ -18,6 +19,8 @@ export const OutlineSchema = z.object({
   cta: z.string().default(''),
 });
 
+export const OUTLINE_RESPONSE_SCHEMA = toStrictJsonSchema(OutlineSchema, 'article_outline');
+
 export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
   const canLink = ctx.linkCandidates.length > 0 && ctx.maxInternalLinks > 0;
   const topic = completeTopicBrief(ctx);
@@ -25,13 +28,11 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
   const system = [
     'You are an expert SEO content strategist.',
     'Produce a JSON outline for one blog article that can rank for the target keyword.',
-    'Respond with ONLY a JSON object of this shape:',
-    '{ "h1": string, "meta_title": string, "meta_description": string, "slug": string,',
-    '  "sections": [{ "heading": string, "intent": string }],',
-    '  "faqs": [{ "question": string, "answer": string }],',
-    '  "internal_links": string[], "cta": string }',
     'Rules: h1 must NOT be identical to the keyword; meta_title <= 60 chars;',
     'meta_description between 120 and 160 chars; slug is kebab-case; at least 3 sections.',
+    ctx.includeCta
+      ? 'Set "cta" to one concise, relevant next step for the reader. Do not invent business claims.'
+      : 'Set "cta" to an empty string. Do not include a call to action.',
     '"internal_links" may contain ONLY URLs copied verbatim from the candidate list.',
     'Never invent, shorten, or modify a URL, and never use a placeholder such as "#".',
     topic?.topic_role === 'pillar'
@@ -95,6 +96,8 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
  */
 export function parseOutline(text: string, ctx: GenerationContext): Outline {
   const parsed = OutlineSchema.parse(parseJsonObject(text));
+  const cta = parsed.cta.trim();
+  if (ctx.includeCta && cta.length === 0) throw new Error('outline CTA is required');
   const approved = new Map(ctx.linkCandidates.map((c) => [normalizeUrl(c.url), c.url]));
   const internal_links: string[] = [];
   for (const selected of parsed.internal_links) {
@@ -103,5 +106,5 @@ export function parseOutline(text: string, ctx: GenerationContext): Outline {
     if (internal_links.length >= ctx.maxInternalLinks) break;
     internal_links.push(canonical);
   }
-  return { ...parsed, internal_links };
+  return { ...parsed, cta: ctx.includeCta ? cta : '', internal_links };
 }

@@ -19,10 +19,17 @@ describe('normalizeUrl', () => {
 });
 
 describe('staticSitePostUrl', () => {
-  test('joins base and slug with exactly one slash', () => {
-    expect(staticSitePostUrl('https://a.com/', 'my-post')).toBe('https://a.com/my-post');
-    expect(staticSitePostUrl('https://a.com/posts', '/my-post/')).toBe(
-      'https://a.com/posts/my-post',
+  test('returns a directory URL for a root base', () => {
+    expect(staticSitePostUrl('https://a.com', 'my-post')).toBe('https://a.com/my-post/');
+  });
+
+  test('returns a directory URL for a nested base', () => {
+    expect(staticSitePostUrl('https://a.com/blog', 'my-post')).toBe('https://a.com/blog/my-post/');
+  });
+
+  test('normalizes a trailing base slash and accidental slug slashes', () => {
+    expect(staticSitePostUrl('https://a.com/blog/', '/my-post/')).toBe(
+      'https://a.com/blog/my-post/',
     );
   });
 
@@ -77,7 +84,7 @@ describe('deriveCandidates', () => {
     expect(got).toEqual([
       {
         title: 'Post One',
-        url: 'https://a.com/new-slug',
+        url: 'https://a.com/new-slug/',
         topic_cluster_id: 'topic:widgets',
         topic_role: 'pillar',
       },
@@ -245,14 +252,14 @@ describe('sanitizeLinks', () => {
     );
   });
 
-  test('re-emits the verified canonical URL, not the model variant (#186)', () => {
-    // Verification proved the no-slash form live; a static host may 404 the other.
-    expect(sanitizeLinks('read [our guide](https://a.com/blog/one/ ) now', allowed, 1)).toBe(
-      'read [our guide](https://a.com/blog/one) now',
+  test('re-emits a canonical trailing-slash URL after the model omits it', () => {
+    const canonical = ['https://a.com/blog/one/'];
+    expect(sanitizeLinks('read [our guide](https://a.com/blog/one) now', canonical, 1)).toBe(
+      'read [our guide](https://a.com/blog/one/) now',
     );
     // Anchor text survives verbatim, punctuation and all.
-    expect(sanitizeLinks('[**Our** guide, v2](https://a.com/blog/one/)', allowed, 1)).toBe(
-      '[**Our** guide, v2](https://a.com/blog/one)',
+    expect(sanitizeLinks('[**Our** guide, v2](https://a.com/blog/one)', canonical, 1)).toBe(
+      '[**Our** guide, v2](https://a.com/blog/one/)',
     );
   });
 
@@ -429,7 +436,7 @@ const org = {
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: '', youtube_videos: true },
+      engagement: { image_style: '', include_cta: false, youtube_videos: true },
       publishing: { auto_publish: false },
     },
   },
@@ -455,6 +462,7 @@ describe('buildContext link fields', () => {
       },
     ]);
     expect(ctx.maxInternalLinks).toBe(2);
+    expect(ctx.includeCta).toBe(false);
     expect(ctx.linkCandidates).toEqual([
       {
         title: 'One',
