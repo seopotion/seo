@@ -45,6 +45,9 @@ describe('onboarding integrations UI', () => {
     expect(html.match(/disabled=""/g)).toHaveLength(2);
     expect(html).toContain('WordPress.com');
     expect(html).toContain('Framer');
+    expect(html).toContain('providers.staticSite');
+    expect(html).toContain('customSiteNotice');
+    expect(html).toContain('setupLater');
     expect(html).toContain('connect');
     expect(html).not.toContain('aria-pressed');
   });

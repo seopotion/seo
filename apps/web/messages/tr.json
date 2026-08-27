@@ -1115,17 +1115,20 @@
       "comingSoon": "Yakında",
       "connect": "Bağla",
       "connectedSuccess": "WordPress bağlandı. Onboarding'i tamamlayabilir veya bağlantıyı değiştirebilirsiniz.",
+      "customSiteNotice": "Onboarding sonrasında GitHub deponuz üzerinden yayınlayın.",
       "loadError": "Bağlı entegrasyonlarınız yüklenemedi.",
       "loading": "Kontrol ediliyor…",
       "optionalNotice": "Şimdi bir yayın platformu bağlayın veya bu isteğe bağlı adımı atlayıp onboarding'i tamamlayın.",
       "providers": {
         "framer": "Framer",
+        "staticSite": "Özel site (GitHub)",
         "wordpress": "Kendi sunucunuzdaki WordPress"
       },
       "referralSource": "Bizi nereden duydunuz?",
       "replace": "Değiştir",
       "retry": "Tekrar dene",
       "selectOption": "Bir seçenek seç",
+      "setupLater": "Ayarlar'da kur",
       "settingsNotice": "Entegrasyonları daha sonra Ayarlar'dan bağlayabilir, değiştirebilir veya bağlantısını kesebilirsiniz.",
       "title": "Entegrasyonlar ve Referans Kaynağı"
     },
