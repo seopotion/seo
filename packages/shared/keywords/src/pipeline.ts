@@ -79,6 +79,7 @@ export async function runKeywordPipeline(input: PipelineInput): Promise<Pipeline
     serpChecked: state.stats.serpChecked as number,
     serpFetched: state.stats.serpFetched as number,
     authorityRejected: state.stats.authorityRejected as number,
+    serpUnvalidated: state.stats.serpUnvalidated as number,
     serpValidated: state.candidates.length,
     accepted: state.candidates.length,
     rejectedByReason,

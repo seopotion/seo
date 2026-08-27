@@ -101,3 +101,61 @@ it('fetches SERPs concurrently and preserves input order', async () => {
   expect(accepted.map((c) => c.keyword)).toEqual(['first', 'k2', 'k3', 'dup']);
   expect(rejected).toEqual([]);
 });
+
+// A live SERP call is the one thing in this stage that talks to a flaky third
+// party. Before this, one keyword's 40101 rejected the whole Promise.all and
+// killed a production strategy run 4 stages deep. A keyword we could not fetch
+// is unvalidated, not rejected — it survives into the below-N tier where
+// `serp_validated: false` keeps it unschedulable.
+it('keeps the batch alive when one SERP fetch fails and marks that keyword unvalidated', async () => {
+  const dataForSeo = {
+    serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
+      if (keyword === 'boom') throw new Error('DataForSEO request failed (provider)');
+      return serp(['blogx.com', 'blogy.com', 'blogz.com', 'blogw.com']);
+    }),
+  } as unknown as DataForSeoClient;
+
+  const { accepted, rejected, unvalidated } = await validateSerp(
+    ['k1', 'boom', 'k3', 'k4', 'k5'].map(cand),
+    { dataForSeo, config },
+  );
+
+  expect(accepted.map((c) => c.keyword)).toEqual(['k1', 'k3', 'k4', 'k5']);
+  expect(unvalidated.map((c) => c.keyword)).toEqual(['boom']);
+  expect(unvalidated[0]!.serp_validated).toBe(false);
+  expect(unvalidated[0]!.rejection_reason).toBeNull();
+  expect(rejected).toEqual([]);
+});
+
+it('aborts when the failed share of SERP fetches exceeds maxSerpFailureRate', async () => {
+  const dataForSeo = {
+    serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
+      if (keyword !== 'ok') throw new Error('DataForSEO request failed (provider)');
+      return serp(['blogx.com']);
+    }),
+  } as unknown as DataForSeoClient;
+
+  await expect(
+    validateSerp(['ok', 'a', 'b', 'c'].map(cand), {
+      dataForSeo,
+      config: { ...config, maxSerpFailureRate: 0.5 },
+    }),
+  ).rejects.toThrow(/3 of 4/);
+});
+
+it('tolerates failures at exactly maxSerpFailureRate', async () => {
+  const dataForSeo = {
+    serpGoogleOrganic: vi.fn(async ({ keyword }: { keyword: string }) => {
+      if (keyword === 'boom') throw new Error('DataForSEO request failed (provider)');
+      return serp(['blogx.com']);
+    }),
+  } as unknown as DataForSeoClient;
+
+  const { accepted, unvalidated } = await validateSerp(['boom', 'k2', 'k3', 'k4'].map(cand), {
+    dataForSeo,
+    config: { ...config, maxSerpFailureRate: 0.25 },
+  });
+
+  expect(accepted).toHaveLength(3);
+  expect(unvalidated).toHaveLength(1);
+});

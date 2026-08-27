@@ -1,7 +1,13 @@
 import type { SearchIntent } from '@shared/schemas';
 import { SEARCH_INTENTS } from '@shared/schemas';
 import { bodySnippet } from '../errors';
-import { categorizeApiStatus, categorizeHttpStatus, DataForSeoError, isRetryable } from './errors';
+import {
+  categorizeApiStatus,
+  categorizeHttpStatus,
+  DataForSeoError,
+  isRetryable,
+  NO_SEARCH_RESULTS_CODE,
+} from './errors';
 import type {
   BacklinksSummary,
   DataForSeoConfig,
@@ -173,6 +179,7 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       const src = [errBody?.tasks?.[0], errBody].find(
         (s) => typeof s?.status_code === 'number' && s.status_code >= 30000,
       );
+      if (src?.status_code === NO_SEARCH_RESULTS_CODE) return [];
       const category = src?.status_code
         ? categorizeApiStatus(src.status_code)
         : categorizeHttpStatus(res.status);
@@ -195,6 +202,17 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
     // logs name the rejected field instead of a bare category.
     const detail = (msg?: string) => (msg ? `: ${msg}` : '');
 
+    const taskResult = body.tasks?.[0];
+
+    // "No Search Results." is DataForSEO reporting an empty SERP, not a failed
+    // call — a long-tail keyword nobody searches must not fail the caller.
+    if (
+      body.status_code === NO_SEARCH_RESULTS_CODE ||
+      taskResult?.status_code === NO_SEARCH_RESULTS_CODE
+    ) {
+      return [];
+    }
+
     if (typeof body.status_code === 'number' && body.status_code >= 30000) {
       const category = categorizeApiStatus(body.status_code);
       throw new DataForSeoError(
@@ -203,7 +221,6 @@ export function createDataForSeoClient(config: DataForSeoConfig): DataForSeoClie
       );
     }
 
-    const taskResult = body.tasks?.[0];
     if (taskResult?.status_code && taskResult.status_code >= 30000) {
       const category = categorizeApiStatus(taskResult.status_code);
       throw new DataForSeoError(

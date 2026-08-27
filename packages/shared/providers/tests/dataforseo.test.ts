@@ -444,6 +444,73 @@ describe('serpGoogleOrganic', () => {
     ]);
   });
 
+  // The prod incident (#241 follow-up): a live SERP call came back HTTP 200 with
+  // task status_code 40101 "Internal SE Server Error." — Google, not us. It was
+  // categorized as auth, so the retry loop was skipped and the strategy run died.
+  test('retries a task-level 40101 (Internal SE Server Error) and succeeds', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status_code: 20000,
+            tasks: [{ status_code: 40101, status_message: 'Internal SE Server Error.' }],
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        serpResponse([
+          { type: 'organic', rank_absolute: 1, url: 'https://a.com', domain: 'a.com', title: 'A' },
+        ]),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const out = await client().serpGoogleOrganic({ keyword: 'seo tools' });
+
+    expect(out).toEqual([{ rank: 1, url: 'https://a.com', domain: 'a.com', title: 'A' }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  // 40102 is DataForSEO reporting the SERP was empty, not a failure. Throwing on
+  // it would fail a strategy run over a long-tail keyword nobody searches.
+  test('returns an empty SERP for a task-level 40102 (No Search Results)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status_code: 20000,
+          tasks: [{ status_code: 40102, status_message: 'No Search Results.' }],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      client().serpGoogleOrganic({ keyword: 'zzz nobody searches this' }),
+    ).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  // DataForSEO mirrors task errors in the HTTP status too (see the client's
+  // !res.ok branch), so a 40102 arriving as a non-200 is the same non-failure.
+  test('returns an empty SERP for a 40102 delivered as a non-200', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            status_code: 40102,
+            status_message: 'No Search Results.',
+            tasks: [{ status_code: 40102, status_message: 'No Search Results.' }],
+          }),
+          { status: 404 },
+        ),
+      ),
+    );
+    await expect(client().serpGoogleOrganic({ keyword: 'zzz' })).resolves.toEqual([]);
+  });
+
   test('posts to the SERP live advanced endpoint with the keyword', async () => {
     const fetchMock = vi.fn().mockResolvedValue(serpResponse([]));
     vi.stubGlobal('fetch', fetchMock);
