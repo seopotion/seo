@@ -189,11 +189,12 @@ describe('launchGeneration', () => {
   test('no ARN, no wait: fire-and-forget with a .catch attached', async () => {
     vi.stubEnv('ARTICLE_STATE_MACHINE_ARN', '');
     delete process.env.ARTICLE_STATE_MACHINE_ARN;
-    let resolveRun: () => void = () => {};
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectRun: (err: Error) => void = () => {};
     runLocalArticleRunMock.mockImplementationOnce(
       () =>
-        new Promise<void>((resolve) => {
-          resolveRun = resolve;
+        new Promise<void>((_resolve, reject) => {
+          rejectRun = reject;
         }),
     );
 
@@ -202,9 +203,13 @@ describe('launchGeneration', () => {
     expect(result).toEqual({ run_id: 'run1' });
     expect(sfnSend).not.toHaveBeenCalled();
     expect(runLocalArticleRunMock).toHaveBeenCalledWith('run1');
-    // Resolving (or rejecting) the still-pending local run must not throw
-    // unhandled — a .catch is attached even though launchGeneration didn't wait.
-    resolveRun();
+
+    // launchGeneration already resolved without waiting on the local run; a
+    // later rejection of that run must be caught (not an unhandled
+    // rejection) by the .catch attached to the fire-and-forget call.
+    rejectRun(new Error('boom'));
+    await vi.waitFor(() => expect(consoleError).toHaveBeenCalled());
+    consoleError.mockRestore();
   });
 });
 
