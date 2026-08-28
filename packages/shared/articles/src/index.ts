@@ -5,7 +5,9 @@ export { ArticleFatalError, ArticleRetryableError, toArticleError } from './erro
 export { enqueuePublishTask } from './sqs';
 export { stageDraft } from './stages/draft';
 export { stageFinalize } from './stages/finalize';
+export { stageHandoffPublish } from './stages/handoff';
 export { READABILITY_MAX_PASSES, stageHumanize } from './stages/humanize';
+export { stageImagesPlan, stageImagesRender } from './stages/images';
 export { stageOutline } from './stages/outline';
 export { stagePrepare } from './stages/prepare';
 export type { StageOutcome } from './stages/types';
