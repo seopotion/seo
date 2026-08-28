@@ -5,6 +5,7 @@
  */
 import {
   ArticleRepo,
+  ArticleRunRepo,
   CandidateRepo,
   closeDb,
   ensureIndexes,
@@ -611,6 +612,7 @@ export async function deleteOrgs(input: {
       subscriptions: 0,
       integrations: 0,
       strategy_runs: 0,
+      article_runs: 0,
       gsc_analytics_cache: 0,
     };
     const orgIds = targets.map((o) => o.id);
@@ -645,6 +647,7 @@ export async function deleteOrgs(input: {
       deleted.subscriptions += await SubscriptionRepo.deleteByOrgId(id);
       deleted.integrations += await IntegrationRepo.deleteByOrgId(id);
       deleted.strategy_runs += await StrategyRunRepo.deleteByOrgId(id);
+      deleted.article_runs += await ArticleRunRepo.deleteByOrgId(id);
       deleted.gsc_analytics_cache += await GscAnalyticsCacheRepo.deleteByOrgId(id);
       // The org doc goes last: a crash mid-purge leaves it findable, so a
       // re-run picks the same target up instead of orphaning its data.

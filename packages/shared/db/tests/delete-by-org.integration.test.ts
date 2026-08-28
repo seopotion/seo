@@ -2,6 +2,7 @@ import { ObjectId } from 'mongodb';
 import { afterAll, describe, expect, test } from 'vitest';
 import { closeDb, getDb } from '../src/client';
 import { ArticleRepo } from '../src/repositories/article.repo';
+import { ArticleRunRepo } from '../src/repositories/article-run.repo';
 import { CandidateRepo } from '../src/repositories/candidate.repo';
 import { GscAnalyticsCacheRepo } from '../src/repositories/gsc-analytics-cache.repo';
 import { IntegrationRepo } from '../src/repositories/integration.repo';
@@ -92,6 +93,21 @@ describe('delete-by-org (integration)', () => {
     ]);
 
     expect(await StrategyRunRepo.deleteByOrgId(orgA)).toBe(2);
+    expect(await col.countDocuments({ org_id: orgA })).toBe(0);
+    expect(await col.countDocuments({ org_id: orgB })).toBe(1);
+  });
+
+  test("ArticleRunRepo.deleteByOrgId removes only that org's runs", async () => {
+    const col = (await getDb()).collection('article_runs');
+    const orgA = `reset_arun_a_${timestamp}`;
+    const orgB = `reset_arun_b_${timestamp}`;
+    await col.insertMany([
+      { org_id: orgA, status: 'failed' },
+      { org_id: orgA, status: 'completed' },
+      { org_id: orgB, status: 'completed' },
+    ]);
+
+    expect(await ArticleRunRepo.deleteByOrgId(orgA)).toBe(2);
     expect(await col.countDocuments({ org_id: orgA })).toBe(0);
     expect(await col.countDocuments({ org_id: orgB })).toBe(1);
   });

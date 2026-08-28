@@ -117,6 +117,7 @@ export interface DeleteOrgData {
     subscriptions: number;
     integrations: number;
     strategy_runs: number;
+    article_runs: number;
     gsc_analytics_cache: number;
   };
 }
