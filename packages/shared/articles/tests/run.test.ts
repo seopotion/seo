@@ -273,4 +273,18 @@ describe('markArticleRunFailed', () => {
     expect(keywordFailGeneration).not.toHaveBeenCalled();
     expect(runRepoSetStatus).not.toHaveBeenCalled();
   });
+
+  test('skips failGeneration when working.article_id is set (post-finalize failure) but still marks the run failed', async () => {
+    runRepoFindById.mockResolvedValue(
+      makeRun({
+        working: { article_id: 'art1' },
+        stages: { images_render: failedStage('image render blew up') },
+      }),
+    );
+
+    await markArticleRunFailed('run1');
+
+    expect(keywordFailGeneration).not.toHaveBeenCalled();
+    expect(runRepoSetStatus).toHaveBeenCalledWith('run1', 'failed');
+  });
 });

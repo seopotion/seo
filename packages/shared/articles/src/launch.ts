@@ -51,13 +51,15 @@ export async function launchGeneration(
   opts?: { wait?: boolean },
 ): Promise<{ run_id: string } | null> {
   if (!(await KeywordRepo.claimGeneration(keywordId))) return null;
-  let run: ArticleRun;
+  let run: ArticleRun | undefined;
   try {
     run = await createArticleRun(orgId, keywordId);
     await start(run, opts);
   } catch (err) {
     // Release the claim so tomorrow's scheduler (or an admin) can relaunch.
     await KeywordRepo.failGeneration(keywordId, (err as Error).message).catch(() => {});
+    // Don't leave a created run doc stuck in 'running' forever.
+    if (run) await ArticleRunRepo.setStatus(run.id, 'failed').catch(() => {});
     throw err;
   }
   return { run_id: run.id };
@@ -107,6 +109,12 @@ export async function launchImageRepair(
       article_id: articleId,
     },
   });
-  await start(run, opts);
+  try {
+    await start(run, opts);
+  } catch (err) {
+    // Don't leave a created run doc stuck in 'running' forever.
+    await ArticleRunRepo.setStatus(run.id, 'failed').catch(() => {});
+    throw err;
+  }
   return { run_id: run.id };
 }

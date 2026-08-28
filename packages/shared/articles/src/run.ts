@@ -116,7 +116,15 @@ export async function runLocalArticleRun(
 export async function markArticleRunFailed(runId: string): Promise<void> {
   const run = await ArticleRunRepo.findById(runId);
   if (!run) return;
-  const stageError = Object.values(run.stages).find((s) => s.status === 'failed')?.error;
-  await KeywordRepo.failGeneration(run.keyword_id, stageError ?? 'execution failed');
+  // Once finalize has linked an article (working.article_id set), the failure
+  // is scoped to images/handoff — the keyword already generated its article
+  // and must not be flipped back to 'failed' (that leaves article_id set with
+  // generation_status: 'failed', a state resetGeneration can't clear and a
+  // redrive can't repair since finalize short-circuits on article_id). It's
+  // already surfaced via the CloudWatch metricFailed alarm.
+  if (run.working.article_id === null) {
+    const stageError = Object.values(run.stages).find((s) => s.status === 'failed')?.error;
+    await KeywordRepo.failGeneration(run.keyword_id, stageError ?? 'execution failed');
+  }
   await ArticleRunRepo.setStatus(runId, 'failed');
 }

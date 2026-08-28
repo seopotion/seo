@@ -8,6 +8,7 @@ const {
   keywordFailGeneration,
   articleFindById,
   runRepoCreate,
+  runRepoSetStatus,
   sfnSend,
   runLocalArticleRunMock,
 } = vi.hoisted(() => ({
@@ -17,6 +18,7 @@ const {
   keywordFailGeneration: vi.fn(async () => {}),
   articleFindById: vi.fn(),
   runRepoCreate: vi.fn(),
+  runRepoSetStatus: vi.fn(async () => {}),
   sfnSend: vi.fn(async () => ({})),
   runLocalArticleRunMock: vi.fn(async () => {}),
 }));
@@ -29,7 +31,7 @@ vi.mock('@shared/db', () => ({
     failGeneration: keywordFailGeneration,
   },
   ArticleRepo: { findById: articleFindById },
-  ArticleRunRepo: { create: runRepoCreate },
+  ArticleRunRepo: { create: runRepoCreate, setStatus: runRepoSetStatus },
 }));
 
 vi.mock('@aws-sdk/client-sfn', () => ({
@@ -152,6 +154,18 @@ describe('launchGeneration', () => {
       'kw1',
       expect.stringContaining('missing or has no presets'),
     );
+    // No run was ever created, so there is nothing to mark failed.
+    expect(runRepoSetStatus).not.toHaveBeenCalled();
+  });
+
+  test('a start() failure after the run is created releases the claim, marks the run failed, and propagates', async () => {
+    vi.stubEnv('ARTICLE_STATE_MACHINE_ARN', 'arn:aws:states:us-east-1:123:stateMachine:article');
+    sfnSend.mockRejectedValueOnce(new Error('StartExecution boom'));
+
+    await expect(launchGeneration('org1', 'kw1')).rejects.toThrow('StartExecution boom');
+
+    expect(keywordFailGeneration).toHaveBeenCalledWith('kw1', 'StartExecution boom');
+    expect(runRepoSetStatus).toHaveBeenCalledWith('run1', 'failed');
   });
 
   test('with ARTICLE_STATE_MACHINE_ARN set, starts a Step Functions execution', async () => {
@@ -274,5 +288,14 @@ describe('launchImageRepair', () => {
 
     await expect(launchImageRepair('org1', 'art1')).rejects.toBeInstanceOf(ArticleFatalError);
     expect(runRepoCreate).not.toHaveBeenCalled();
+  });
+
+  test('a start() failure marks the run failed and propagates', async () => {
+    vi.stubEnv('ARTICLE_STATE_MACHINE_ARN', 'arn:aws:states:us-east-1:123:stateMachine:article');
+    sfnSend.mockRejectedValueOnce(new Error('StartExecution boom'));
+
+    await expect(launchImageRepair('org1', 'art1')).rejects.toThrow('StartExecution boom');
+
+    expect(runRepoSetStatus).toHaveBeenCalledWith('run2', 'failed');
   });
 });
