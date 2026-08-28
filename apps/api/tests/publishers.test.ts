@@ -69,6 +69,7 @@ const article: Article = {
   images: [],
   images_status: 'complete',
   video: null,
+  readability: null,
 };
 const staticSite: Extract<Integration, { provider: 'static-site' }> = {
   id: 'integration-1',

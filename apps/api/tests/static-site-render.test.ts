@@ -58,6 +58,7 @@ function article(over: Partial<Article> = {}): Article {
     ],
     images_status: 'complete',
     video: null,
+    readability: null,
     ...over,
   };
 }

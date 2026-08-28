@@ -1,6 +1,7 @@
 export type { SetupStatus, StrategyStatus } from '@shared/types';
 export * from './admin-action';
 export * from './article';
+export * from './article-run';
 export * from './candidate';
 export * from './gsc';
 export * from './integration';
