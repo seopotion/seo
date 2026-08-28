@@ -1,5 +1,10 @@
 export type { ArticleStageClients } from './clients';
 export { getArticleStageClients } from './clients';
+export { contextFromRun } from './context';
 export { ArticleFatalError, ArticleRetryableError, toArticleError } from './errors';
 export { enqueuePublishTask } from './sqs';
+export { stageDraft } from './stages/draft';
+export { stageOutline } from './stages/outline';
+export { stagePrepare } from './stages/prepare';
+export type { StageOutcome } from './stages/types';
 export { storeImage } from './storage';
