@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ArticleSchema, ImageTask, PublishTask } from '../src';
+import { ArticleSchema, PublishTask } from '../src';
 
 const baseDoc = {
   id: 'a1',
@@ -49,16 +49,6 @@ describe('article image fields (#51)', () => {
 
   test('rejects an unknown images_status', () => {
     expect(() => ArticleSchema.parse({ ...baseDoc, images_status: 'nope' })).toThrow();
-  });
-});
-
-describe('ImageTask', () => {
-  test('validates the queue contract', () => {
-    expect(ImageTask.parse({ org_id: 'o', article_id: 'a' })).toEqual({
-      org_id: 'o',
-      article_id: 'a',
-    });
-    expect(() => ImageTask.parse({ org_id: 'o' })).toThrow();
   });
 });
 

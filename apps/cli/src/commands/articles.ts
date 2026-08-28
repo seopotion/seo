@@ -1,9 +1,10 @@
 /**
  * `articles` command group — on-demand article pipeline operations (spec:
  * docs/superpowers/specs/2026-08-22-article-cli-design.md). Reads/writes
- * whatever MONGO_URI targets; generate-next/publish enqueue to whatever
- * GENERATION_QUEUE_URL / PUBLISH_QUEUE_URL target, and the deployed workers
- * there do the actual work.
+ * whatever MONGO_URI targets; generate-next launches an article-generation
+ * run via @shared/articles (Step Functions when ARTICLE_STATE_MACHINE_ARN is
+ * set, in-process otherwise); publish enqueues to whatever PUBLISH_QUEUE_URL
+ * targets, and the deployed publish worker does the actual work.
  */
 import { defineCommand } from 'citty';
 import { EXIT, type ExitCode, type OutputMode, type Result, type WaitReport } from '../types';
@@ -16,11 +17,13 @@ const EXIT_BY_CODE: Record<string, ExitCode> = {
 };
 
 /**
- * A timed-out or failed `--wait` exits OP_FAILED even though the enqueue
- * itself succeeded — never claim success the pipeline didn't earn.
+ * A timed-out or failed `--wait`, or any per-target launch failure, exits
+ * OP_FAILED even though the command overall succeeded — never claim success
+ * the pipeline didn't earn.
  */
-function exitFor(result: Result<{ wait?: WaitReport | null }>): ExitCode {
+function exitFor(result: Result<{ wait?: WaitReport | null; failures?: unknown[] }>): ExitCode {
   if (!result.ok) return EXIT_BY_CODE[result.error.code] ?? EXIT.USER_ERROR;
+  if (result.data.failures && result.data.failures.length > 0) return EXIT.OP_FAILED;
   const wait = result.data.wait;
   if (wait && (wait.timed_out || wait.outcomes.some((o) => !o.ok))) return EXIT.OP_FAILED;
   return EXIT.SUCCESS;
@@ -120,7 +123,7 @@ export const articlesCommand = defineCommand({
         ...targetArgs,
         count: {
           type: 'string' as const,
-          description: 'Keywords to enqueue (default 1)',
+          description: 'Keywords to generate (default 1)',
           default: '1',
         },
         ...waitArgs('900'),
@@ -144,7 +147,7 @@ export const articlesCommand = defineCommand({
           }
           const { generateNext } = await import('../lib/articles');
           emitter.warn(
-            'Enqueues REAL generation work (LLM + image credits) to whatever GENERATION_QUEUE_URL targets, for the org in whatever MONGO_URI targets.',
+            'Launches REAL generation work (LLM + image credits) for the org in whatever MONGO_URI targets.',
           );
           emitter.step('articles:generate-next', 'start');
           const result = await generateNext({

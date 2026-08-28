@@ -9,10 +9,11 @@
  * short-circuits on `images_status: 'complete'`, so a replayed task does
  * nothing until the dead slots read as unfilled again.
  *
- * Dry run by default. `--enqueue` (with `--apply`) puts the ImageTask back on
- * the images queue; without it the command only reports the ids to replay.
+ * Dry run by default. `--enqueue` (with `--apply`) launches an image-repair
+ * run for each reset article; without it the command only reports the ids to
+ * replay.
  */
-import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { launchImageRepair } from '@shared/articles';
 import { ArticleRepo, closeDb } from '@shared/db';
 import type { Article, ArticleImage } from '@shared/schemas';
 import { fail, ok, type ResetImagesData, type Result } from '../types';
@@ -88,19 +89,6 @@ export function planReset(
   };
 }
 
-async function enqueueImageTask(orgId: string, articleId: string): Promise<void> {
-  const queueUrl = process.env.IMAGES_QUEUE_URL;
-  if (!queueUrl) throw new Error('IMAGES_QUEUE_URL is required for --enqueue');
-  const endpoint = process.env.SQS_ENDPOINT;
-  const client = new SQSClient(endpoint ? { endpoint } : {});
-  await client.send(
-    new SendMessageCommand({
-      QueueUrl: queueUrl,
-      MessageBody: JSON.stringify({ org_id: orgId, article_id: articleId }),
-    }),
-  );
-}
-
 export async function resetImages(opts: {
   org?: string;
   article?: string;
@@ -152,7 +140,11 @@ export async function resetImages(opts: {
       if (!opts.apply) continue;
       await ArticleRepo.resetImages(article.id, plan);
       if (opts.enqueue) {
-        await enqueueImageTask(article.org_id, article.id);
+        // wait: true — this CLI command closes the shared Mongo connection and
+        // exits right after resetImages returns, which would otherwise race
+        // launchImageRepair's fire-and-forget local run (see apps/cli/src/lib/
+        // db.ts's launchStrategy call for the same fix).
+        await launchImageRepair(article.org_id, article.id, { wait: true });
         enqueued += 1;
       }
     }

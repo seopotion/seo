@@ -1,4 +1,5 @@
 import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
+import { launchImageRepair } from '@shared/articles';
 import { ArticleRepo, OrgRepo } from '@shared/db';
 import {
   META_DESCRIPTION_MAX,
@@ -6,7 +7,6 @@ import {
   META_TITLE_MAX,
   type Org,
 } from '@shared/schemas';
-import { enqueueImageTask } from '../../clients/sqs';
 import { recordWordPressPublication } from '../../lib/publications';
 import { publishWordPressArticle, updateWordPressArticle } from '../../lib/publishers';
 import { PublishingFailure } from '../../lib/publishing-errors';
@@ -376,7 +376,7 @@ const articles = new OpenAPIHono<AdminEnv>()
         200: {
           content: { 'application/json': { schema: schemas.AdminEnqueuedResponse } },
           description:
-            "Image task enqueued; the worker's set-if-absent plan and per-slot guards make replay safe",
+            "Image repair run started; the article's set-if-absent plan and per-slot guards make replay safe",
         },
         401: { description: 'Missing or invalid admin token' },
         404: {
@@ -390,7 +390,7 @@ const articles = new OpenAPIHono<AdminEnv>()
       const article = await ArticleRepo.findById(article_id);
       if (!article) return c.json({ error: 'not_found' }, 404);
 
-      await enqueueImageTask({ org_id: article.org_id, article_id: article.id });
+      await launchImageRepair(article.org_id, article.id);
       await audit(c, {
         action: 'article.images_replay',
         org_id: article.org_id,

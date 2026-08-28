@@ -18,6 +18,7 @@ const {
   deleteSubscriptionsByOrgId,
   deleteIntegrationsByOrgId,
   deleteStrategyRunsByOrgId,
+  deleteArticleRunsByOrgId,
   deleteGscCacheByOrgId,
   listAllSummaries,
   listActiveByOrg,
@@ -66,6 +67,7 @@ const {
   deleteSubscriptionsByOrgId: vi.fn(async () => 1),
   deleteIntegrationsByOrgId: vi.fn(async () => 1),
   deleteStrategyRunsByOrgId: vi.fn(async () => 4),
+  deleteArticleRunsByOrgId: vi.fn(async () => 6),
   deleteGscCacheByOrgId: vi.fn(async () => 5),
   // Two orgs: `keep` sweeps target whichever is not named.
   listAllSummaries: vi.fn(async () => [
@@ -113,6 +115,7 @@ vi.mock('@shared/db', () => ({
   SubscriptionRepo: { deleteByOrgId: deleteSubscriptionsByOrgId, listActiveByOrg },
   IntegrationRepo: { deleteByOrgId: deleteIntegrationsByOrgId },
   StrategyRunRepo: { deleteByOrgId: deleteStrategyRunsByOrgId },
+  ArticleRunRepo: { deleteByOrgId: deleteArticleRunsByOrgId },
   GscAnalyticsCacheRepo: { deleteByOrgId: deleteGscCacheByOrgId },
 }));
 
@@ -565,6 +568,7 @@ describe('deleteOrgs', () => {
       deleteSubscriptionsByOrgId,
       deleteIntegrationsByOrgId,
       deleteStrategyRunsByOrgId,
+      deleteArticleRunsByOrgId,
       deleteGscCacheByOrgId,
       deleteOrgById,
     ]) {
@@ -581,6 +585,7 @@ describe('deleteOrgs', () => {
       subscriptions: 1,
       integrations: 1,
       strategy_runs: 4,
+      article_runs: 6,
       gsc_analytics_cache: 5,
     });
   });

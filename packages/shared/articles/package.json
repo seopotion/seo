@@ -1,0 +1,19 @@
+{
+  "name": "@shared/articles",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/client-sfn": "^3.1075.0",
+    "@aws-sdk/client-sqs": "^3.1075.0",
+    "@shared/db": "*",
+    "@shared/generation": "*",
+    "@shared/providers": "*",
+    "@shared/schemas": "*"
+  }
+}

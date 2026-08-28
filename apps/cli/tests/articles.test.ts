@@ -45,6 +45,15 @@ vi.mock('@aws-sdk/client-sqs', () => ({
   },
 }));
 
+const { launchGeneration } = vi.hoisted(() => ({
+  launchGeneration: vi.fn(
+    async (_orgId: string, keywordId: string): Promise<{ run_id: string } | null> => ({
+      run_id: `run_${keywordId}`,
+    }),
+  ),
+}));
+vi.mock('@shared/articles', () => ({ launchGeneration }));
+
 // The real index pulls the whole generation pipeline into the graph.
 vi.mock('@shared/generation', () => ({ MAX_GENERATION_ATTEMPTS: 3 }));
 
@@ -107,7 +116,6 @@ const integration = (provider: string) => ({ org_id: 'o1', provider });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.GENERATION_QUEUE_URL = 'https://sqs.test/generation';
   process.env.PUBLISH_QUEUE_URL = 'https://sqs.test/publish';
 });
 
@@ -199,7 +207,7 @@ describe('generateNext', () => {
     repos.orgFindById.mockResolvedValue(paidOrg());
   });
 
-  test('enqueues the next N eligible keywords, oldest scheduled_date first', async () => {
+  test('launches the next N eligible keywords, oldest scheduled_date first', async () => {
     repos.keywordListByOrg.mockResolvedValueOnce([
       pending('k1', '2026-08-23', { article_id: 'a0', generation_status: 'generated' }),
       pending('k2', '2026-08-24'),
@@ -210,16 +218,15 @@ describe('generateNext', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // k1 is generated, k3 is out of attempts — k2 and k4 are the next two.
-    expect(result.data.enqueued.map((e) => e.keyword_id)).toEqual(['k2', 'k4']);
-    // 1 preflight probe + 2 sends.
-    expect(sqs.send).toHaveBeenCalledTimes(3);
-    const bodies = sqs.send.mock.calls
-      .slice(1)
-      .map((call) => JSON.parse((call[0] as { input: { MessageBody: string } }).input.MessageBody));
-    expect(bodies).toEqual([
-      { org_id: 'o1', keyword_id: 'k2' },
-      { org_id: 'o1', keyword_id: 'k4' },
+    expect(result.data.enqueued).toEqual([
+      { keyword_id: 'k2', keyword: 'widgets', run_id: 'run_k2' },
+      { keyword_id: 'k4', keyword: 'widgets', run_id: 'run_k4' },
     ]);
+    expect(launchGeneration).toHaveBeenCalledTimes(2);
+    // wait: true unconditionally, regardless of --wait — see finding 1 (the
+    // CLI process would otherwise race the fire-and-forget local run).
+    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k2', { wait: true });
+    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k4', { wait: true });
   });
 
   test('retries a failed keyword with attempts left', async () => {
@@ -232,6 +239,34 @@ describe('generateNext', () => {
     expect(result.data.enqueued.map((e) => e.keyword_id)).toEqual(['k1']);
   });
 
+  test('a claim-lost (null) launch is omitted from the result', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([pending('k1', '2026-08-20')]);
+    launchGeneration.mockResolvedValueOnce(null);
+    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.enqueued).toEqual([]);
+    expect(result.data.failures).toEqual([]);
+  });
+
+  test('one target throwing is recorded as a failure and does not lose the rest of the batch', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([
+      pending('k1', '2026-08-20'),
+      pending('k2', '2026-08-21'),
+    ]);
+    launchGeneration.mockRejectedValueOnce(new Error('org missing presets'));
+    const result = await generateNext({ org: 'o1', count: 2, wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.failures).toEqual([
+      { keyword_id: 'k1', keyword: 'widgets', error: 'org missing presets' },
+    ]);
+    expect(result.data.enqueued).toEqual([
+      { keyword_id: 'k2', keyword: 'widgets', run_id: 'run_k2' },
+    ]);
+    expect(launchGeneration).toHaveBeenCalledTimes(2);
+  });
+
   test('fails NO_KEYWORDS_DUE when nothing is eligible', async () => {
     repos.keywordListByOrg.mockResolvedValueOnce([
       pending('k1', '2026-08-20', { article_id: 'a1', generation_status: 'generated' }),
@@ -240,39 +275,12 @@ describe('generateNext', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'NO_KEYWORDS_DUE' } });
   });
 
-  test('fails QUEUE_URL_MISSING without GENERATION_QUEUE_URL, before touching Mongo', async () => {
-    delete process.env.GENERATION_QUEUE_URL;
-    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
-    expect(result).toMatchObject({ ok: false, error: { code: 'QUEUE_URL_MISSING' } });
-    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
-  });
-
-  test('maps expired credentials to AWS_NOT_AUTHENTICATED, before touching Mongo', async () => {
-    sqs.send.mockRejectedValueOnce(
-      Object.assign(new Error('The security token included in the request is expired'), {
-        name: 'ExpiredTokenException',
-      }),
-    );
-    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
-    expect(result).toMatchObject({ ok: false, error: { code: 'AWS_NOT_AUTHENTICATED' } });
-    expect(repos.keywordListByOrg).not.toHaveBeenCalled();
-  });
-
-  test('maps other probe failures to SQS_UNAVAILABLE', async () => {
-    sqs.send.mockRejectedValueOnce(
-      Object.assign(new Error('queue does not exist'), { name: 'QueueDoesNotExist' }),
-    );
-    const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
-    expect(result).toMatchObject({ ok: false, error: { code: 'SQS_UNAVAILABLE' } });
-  });
-
   test('fails ORG_NOT_PAID before listing keywords, so --wait never burns its timeout', async () => {
     repos.orgFindById.mockResolvedValue(paidOrg({ plan: 'free' }));
     const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
     expect(result).toMatchObject({ ok: false, error: { code: 'ORG_NOT_PAID' } });
     expect(repos.keywordListByOrg).not.toHaveBeenCalled();
-    // Only the preflight probe — no generation task was enqueued.
-    expect(sqs.send).toHaveBeenCalledTimes(1);
+    expect(launchGeneration).not.toHaveBeenCalled();
   });
 
   test('fails ORG_NOT_FINALIZED when the org has no presets', async () => {
@@ -280,7 +288,7 @@ describe('generateNext', () => {
     const result = await generateNext({ org: 'o1', count: 1, wait: false, timeoutMs: 0 });
     expect(result).toMatchObject({ ok: false, error: { code: 'ORG_NOT_FINALIZED' } });
     expect(repos.keywordListByOrg).not.toHaveBeenCalled();
-    expect(sqs.send).toHaveBeenCalledTimes(1);
+    expect(launchGeneration).not.toHaveBeenCalled();
   });
 });
 

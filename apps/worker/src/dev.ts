@@ -1,7 +1,5 @@
 import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import type { SQSEvent, SQSHandler, SQSRecord } from 'aws-lambda';
-import { handler as generationHandler } from './generation';
-import { handler as imagesHandler } from './images';
 import { handler as scanHandler } from './index';
 import { handler as publishHandler } from './publish';
 
@@ -9,8 +7,8 @@ import { handler as publishHandler } from './publish';
  * Local worker runner — long-polls the local SQS queues and invokes the same
  * Lambda handlers for each message (then deletes it). In AWS these are SQS event
  * sources; here we poll. Run with `npm run dev -w worker`. The scan queue is
- * required; strategy no longer flows through SQS (the API's local launcher runs
- * it in-process — see @shared/strategy).
+ * required; strategy and article generation no longer flow through SQS (the
+ * API's local launcher runs them in-process — see @shared/strategy, @shared/articles).
  */
 const endpoint = process.env.SQS_ENDPOINT;
 
@@ -75,13 +73,9 @@ async function pollQueue(
 }
 
 const scanUrl = process.env.SCAN_QUEUE_URL;
-const generationUrl = process.env.GENERATION_QUEUE_URL;
-const imagesUrl = process.env.IMAGES_QUEUE_URL;
 const publishUrl = process.env.PUBLISH_QUEUE_URL;
 if (!scanUrl) throw new Error('SCAN_QUEUE_URL is required for the local worker poller');
 
 const pollers = [pollQueue('scan', scanUrl, scanHandler)];
-if (generationUrl) pollers.push(pollQueue('generation', generationUrl, generationHandler));
-if (imagesUrl) pollers.push(pollQueue('images', imagesUrl, imagesHandler));
 if (publishUrl) pollers.push(pollQueue('publish', publishUrl, publishHandler, 1));
 await Promise.all(pollers);

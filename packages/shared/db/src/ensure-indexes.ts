@@ -86,4 +86,7 @@ export async function ensureIndexes(): Promise<void> {
   await db.collection('admin_actions').createIndex({ at: -1 });
   // Strategy runs are looked up per org, newest first (#56).
   await db.collection('strategy_runs').createIndex({ org_id: 1, created_at: -1 });
+  // Article runs are looked up per org, newest first, and per keyword.
+  await db.collection('article_runs').createIndex({ org_id: 1, created_at: -1 });
+  await db.collection('article_runs').createIndex({ keyword_id: 1, created_at: -1 });
 }

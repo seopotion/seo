@@ -181,4 +181,17 @@ describe('article + humanize prompts', () => {
     expect(joined).not.toContain('Assigned content focus');
     expect(joined).not.toContain('Topic scope:');
   });
+
+  test('humanize retry prompt carries the readability feedback', () => {
+    const messages = buildHumanizePrompt(ctx, '# Draft', { attempt: 1, grade: 11.2, target: 8 });
+    const system = messages[0]!.content;
+    expect(system).toContain('11.2');
+    expect(system).toContain('grade level 8');
+    expect(system).toContain('previous attempt');
+  });
+
+  test('humanize prompt without feedback is unchanged', () => {
+    const system = buildHumanizePrompt(ctx, '# Draft')[0]!.content;
+    expect(system).not.toContain('previous attempt');
+  });
 });

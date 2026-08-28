@@ -120,6 +120,7 @@ function article(id: string, slug: string): Article {
     images: [],
     images_status: 'complete',
     video: null,
+    readability: null,
   };
 }
 

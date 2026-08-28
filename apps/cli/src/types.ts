@@ -117,6 +117,7 @@ export interface DeleteOrgData {
     subscriptions: number;
     integrations: number;
     strategy_runs: number;
+    article_runs: number;
     gsc_analytics_cache: number;
   };
 }
@@ -448,13 +449,10 @@ export interface WaitReport {
 
 export interface GenerateNextData {
   org_id: string;
-  enqueued: {
-    keyword_id: string;
-    keyword: string;
-    scheduled_date: string;
-    generation_status: string;
-    generation_attempts: number;
-  }[];
+  /** Only the keywords that were actually claimed and launched. */
+  enqueued: { keyword_id: string; keyword: string; run_id: string }[];
+  /** Keywords whose launch threw (claim already released); the rest of the batch still ran. */
+  failures: { keyword_id: string; keyword: string; error: string }[];
   /** Null unless --wait was passed. */
   wait: WaitReport | null;
 }
