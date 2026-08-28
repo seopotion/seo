@@ -19,12 +19,10 @@ const wp = vi.hoisted(() => ({
 }));
 vi.mock('../src/clients/wordpress', () => wp);
 
-const { enqueueImageTask } = vi.hoisted(() => ({ enqueueImageTask: vi.fn() }));
-vi.mock('../src/clients/sqs', () => ({
-  enqueueImageTask,
-  enqueueGenerateTask: vi.fn(),
-  enqueueScanTask: vi.fn(),
+const { launchImageRepair } = vi.hoisted(() => ({
+  launchImageRepair: vi.fn(async () => ({ run_id: 'run_1' })),
 }));
+vi.mock('@shared/articles', () => ({ launchImageRepair }));
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
@@ -340,7 +338,7 @@ describe('POST /admin/v0/articles/{article_id}/images (replay)', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ enqueued: true });
-    expect(enqueueImageTask).toHaveBeenCalledWith({ org_id: org.id, article_id: article.id });
+    expect(launchImageRepair).toHaveBeenCalledWith(org.id, article.id);
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'article.images_replay',
@@ -356,6 +354,6 @@ describe('POST /admin/v0/articles/{article_id}/images (replay)', () => {
       await authed(),
     );
     expect(res.status).toBe(404);
-    expect(enqueueImageTask).not.toHaveBeenCalled();
+    expect(launchImageRepair).not.toHaveBeenCalled();
   });
 });

@@ -11,17 +11,10 @@ vi.mock('@shared/db', () => ({
   closeDb,
 }));
 
-const { send } = vi.hoisted(() => ({
-  send: vi.fn(async (_command: { input: { MessageBody: string } }) => ({})),
+const { launchImageRepair } = vi.hoisted(() => ({
+  launchImageRepair: vi.fn(async () => ({ run_id: 'run_1' })),
 }));
-vi.mock('@aws-sdk/client-sqs', () => ({
-  SQSClient: class {
-    send = send;
-  },
-  SendMessageCommand: class {
-    constructor(readonly input: unknown) {}
-  },
-}));
+vi.mock('@shared/articles', () => ({ launchImageRepair }));
 
 import { planReset, resetImages, stripImageMarkdown } from '../src/lib/images';
 
@@ -115,7 +108,6 @@ describe('planReset', () => {
 describe('resetImages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.IMAGES_QUEUE_URL;
   });
 
   test('requires a host', async () => {
@@ -152,20 +144,19 @@ describe('resetImages', () => {
       'a1',
       expect.objectContaining({ featuredImageUrl: '' }),
     );
-    expect(send).not.toHaveBeenCalled();
+    expect(launchImageRepair).not.toHaveBeenCalled();
   });
 
-  test('--enqueue sends one ImageTask per reset article', async () => {
-    process.env.IMAGES_QUEUE_URL = 'https://sqs/images';
+  test('--enqueue launches one image-repair run per reset article', async () => {
     listByOrg.mockResolvedValueOnce({ articles: [article()], total: 1 });
     const res = await resetImages({ host: DEAD, org: 'o1', apply: true, enqueue: true });
     expect(res.ok && res.data.enqueued).toBe(1);
-    expect(send).toHaveBeenCalledTimes(1);
-    const body = send.mock.calls[0]?.[0].input.MessageBody as string;
-    expect(JSON.parse(body)).toEqual({ org_id: 'o1', article_id: 'a1' });
+    expect(launchImageRepair).toHaveBeenCalledTimes(1);
+    expect(launchImageRepair).toHaveBeenCalledWith('o1', 'a1');
   });
 
-  test('--enqueue without IMAGES_QUEUE_URL fails loudly', async () => {
+  test('--enqueue surfaces a launch failure as RESET_IMAGES_FAILED', async () => {
+    launchImageRepair.mockRejectedValueOnce(new Error('article not found in org'));
     listByOrg.mockResolvedValueOnce({ articles: [article()], total: 1 });
     const res = await resetImages({ host: DEAD, org: 'o1', apply: true, enqueue: true });
     expect(res.ok === false && res.error.code).toBe('RESET_IMAGES_FAILED');

@@ -376,7 +376,7 @@ export const dbCommand = defineCommand({
         },
         enqueue: {
           type: 'boolean',
-          description: 'With --apply, requeue the image task (needs IMAGES_QUEUE_URL)',
+          description: 'With --apply, launch an image-repair run for each reset article',
           default: false,
         },
         ...outputOption,

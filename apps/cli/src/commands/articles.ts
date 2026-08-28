@@ -1,9 +1,10 @@
 /**
  * `articles` command group — on-demand article pipeline operations (spec:
  * docs/superpowers/specs/2026-08-22-article-cli-design.md). Reads/writes
- * whatever MONGO_URI targets; generate-next/publish enqueue to whatever
- * GENERATION_QUEUE_URL / PUBLISH_QUEUE_URL target, and the deployed workers
- * there do the actual work.
+ * whatever MONGO_URI targets; generate-next launches an article-generation
+ * run via @shared/articles (Step Functions when ARTICLE_STATE_MACHINE_ARN is
+ * set, in-process otherwise); publish enqueues to whatever PUBLISH_QUEUE_URL
+ * targets, and the deployed publish worker does the actual work.
  */
 import { defineCommand } from 'citty';
 import { EXIT, type ExitCode, type OutputMode, type Result, type WaitReport } from '../types';
@@ -144,7 +145,7 @@ export const articlesCommand = defineCommand({
           }
           const { generateNext } = await import('../lib/articles');
           emitter.warn(
-            'Enqueues REAL generation work (LLM + image credits) to whatever GENERATION_QUEUE_URL targets, for the org in whatever MONGO_URI targets.',
+            'Launches REAL generation work (LLM + image credits) for the org in whatever MONGO_URI targets.',
           );
           emitter.step('articles:generate-next', 'start');
           const result = await generateNext({

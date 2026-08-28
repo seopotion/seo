@@ -449,13 +449,8 @@ export interface WaitReport {
 
 export interface GenerateNextData {
   org_id: string;
-  enqueued: {
-    keyword_id: string;
-    keyword: string;
-    scheduled_date: string;
-    generation_status: string;
-    generation_attempts: number;
-  }[];
+  /** Only the keywords that were actually claimed and launched. */
+  enqueued: { keyword_id: string; keyword: string; run_id: string }[];
   /** Null unless --wait was passed. */
   wait: WaitReport | null;
 }

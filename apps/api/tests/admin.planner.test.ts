@@ -17,8 +17,10 @@ const repos = vi.hoisted(() => ({
 }));
 vi.mock('@shared/db', () => repos);
 
-const { enqueueGenerateTask } = vi.hoisted(() => ({ enqueueGenerateTask: vi.fn() }));
-vi.mock('../src/clients/sqs', () => ({ enqueueGenerateTask }));
+const { launchGeneration } = vi.hoisted(() => ({
+  launchGeneration: vi.fn(async () => ({ run_id: 'run_1' })),
+}));
+vi.mock('@shared/articles', () => ({ launchGeneration }));
 
 import { testClient } from 'hono/testing';
 import adminApp, { type AdminAppType } from '../src/admin';
@@ -192,7 +194,7 @@ describe('POST /admin/v0/scheduled/{keyword_id}/generate', () => {
     const res = await generate(keyword.id);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'org_not_paid' });
-    expect(enqueueGenerateTask).not.toHaveBeenCalled();
+    expect(launchGeneration).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 
@@ -206,7 +208,7 @@ describe('POST /admin/v0/scheduled/{keyword_id}/generate', () => {
     const res = await generate(keyword.id);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: 'generation_terminal' });
-    expect(enqueueGenerateTask).not.toHaveBeenCalled();
+    expect(launchGeneration).not.toHaveBeenCalled();
   });
 
   test('failed keyword on a paid org enqueues (retry-now) and audits', async () => {
@@ -219,10 +221,7 @@ describe('POST /admin/v0/scheduled/{keyword_id}/generate', () => {
     const res = await generate(keyword.id);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ enqueued: true });
-    expect(enqueueGenerateTask).toHaveBeenCalledWith({
-      org_id: paidOrg.id,
-      keyword_id: keyword.id,
-    });
+    expect(launchGeneration).toHaveBeenCalledWith(paidOrg.id, keyword.id);
     expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'keyword.generate_now' }),
     );

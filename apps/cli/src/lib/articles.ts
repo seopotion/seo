@@ -1,14 +1,16 @@
 /**
  * Article pipeline operations (spec: docs/superpowers/specs/
- * 2026-08-22-article-cli-design.md). Inspection reads Mongo; generate-next and
- * publish enqueue SQS tasks that the deployed workers consume — the CLI never
- * generates or publishes in-process, so a run exercises the deployed pipeline.
+ * 2026-08-22-article-cli-design.md). Inspection reads Mongo. generate-next
+ * launches an article-generation run via `@shared/articles` (a Step Functions
+ * execution when deployed, in-process locally). publish enqueues SQS tasks
+ * that the deployed publish worker consumes.
  */
 import { GetQueueAttributesCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { launchGeneration } from '@shared/articles';
 import { ArticleRepo, closeDb, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { MAX_GENERATION_ATTEMPTS } from '@shared/generation';
 import type { Article, IntegrationProvider, PublishingError } from '@shared/schemas';
-import { GenerateTask, INTEGRATION_PROVIDERS, isPaid, PublishTask } from '@shared/schemas';
+import { INTEGRATION_PROVIDERS, isPaid, PublishTask } from '@shared/schemas';
 import {
   type ArticleShowData,
   type ArticlesListData,
@@ -299,18 +301,6 @@ export async function generateNext(opts: {
   wait: boolean;
   timeoutMs: number;
 }): Promise<Result<GenerateNextData>> {
-  const queueUrl = process.env.GENERATION_QUEUE_URL;
-  if (!queueUrl) {
-    return fail(
-      'QUEUE_URL_MISSING',
-      'GENERATION_QUEUE_URL is not set.',
-      'Point it at the staging generation queue (aws sqs list-queues), or at ElasticMQ with SQS_ENDPOINT for local dev.',
-    );
-  }
-  const probe = await preflightQueue(queueUrl);
-  if (!probe.ok) return probe;
-  const client = probe.data;
-
   try {
     const resolved = await resolveOrgId(opts.org, opts.user);
     if (!resolved.ok) return resolved;
@@ -355,37 +345,28 @@ export async function generateNext(opts: {
     }
 
     const targets = eligible.slice(0, opts.count);
+    const launched: { keyword_id: string; keyword: string; run_id: string }[] = [];
     for (const target of targets) {
-      await client.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(GenerateTask.parse({ org_id: orgId, keyword_id: target.id })),
-        }),
-      );
+      // `wait: opts.wait` — locally a `--wait` run executes the whole pipeline
+      // in-process before the outcome poll below (which then sees the terminal
+      // state immediately); deployed, `wait` is a no-op and the poll below does
+      // the watching.
+      const res = await launchGeneration(orgId, target.id, { wait: opts.wait });
+      if (res)
+        launched.push({ keyword_id: target.id, keyword: target.keyword, run_id: res.run_id });
     }
 
     let wait: WaitReport | null = null;
-    if (opts.wait) {
+    if (opts.wait && launched.length > 0) {
       const providers = await expectedProviders(orgId);
       wait = await pollUntil(
-        () => Promise.all(targets.map((t) => generationOutcome(t.id, providers))),
+        () => Promise.all(launched.map((l) => generationOutcome(l.keyword_id, providers))),
         opts.timeoutMs,
       );
     }
 
-    return ok({
-      org_id: orgId,
-      enqueued: targets.map((k) => ({
-        keyword_id: k.id,
-        keyword: k.keyword,
-        scheduled_date: k.scheduled_date,
-        generation_status: k.generation_status,
-        generation_attempts: k.generation_attempts,
-      })),
-      wait,
-    });
+    return ok({ org_id: orgId, enqueued: launched, wait });
   } finally {
-    client.destroy();
     await closeDb();
   }
 }
