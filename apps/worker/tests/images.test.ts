@@ -85,14 +85,14 @@ vi.mock('../src/providers', () => ({
 }));
 
 const { storeImage } = vi.hoisted(() => ({
-  // Content-addressing lives in src/storage.ts and is tested there; here the key
-  // base + extension are what the worker is responsible for.
+  // Content-addressing lives in @shared/articles's storage.ts and is tested there;
+  // here the key base + extension are what the worker is responsible for.
   storeImage: vi.fn(
     async (keyBase: string, _bytes: Uint8Array, _contentType: string, ext: string) =>
       `https://cdn.example/${keyBase}.${ext}`,
   ),
 }));
-vi.mock('../src/storage', () => ({ storeImage }));
+vi.mock('@shared/articles', () => ({ storeImage }));
 
 import type { ArticleImage } from '@shared/schemas';
 import { handler } from '../src/images';

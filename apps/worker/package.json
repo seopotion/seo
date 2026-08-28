@@ -10,6 +10,7 @@
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.1075.0",
     "@aws-sdk/client-s3": "^3.1075.0",
+    "@shared/articles": "*",
     "@shared/db": "*",
     "@shared/generation": "*",
     "@shared/keywords": "*",

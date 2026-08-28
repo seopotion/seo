@@ -1,3 +1,4 @@
+import { storeImage } from '@shared/articles';
 import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
 import {
   buildImagePlanPrompt,
@@ -15,7 +16,6 @@ import { getGscTokenKey } from '../../api/src/lib/secrets';
 import { logger } from './logger';
 import { getImageClients } from './providers';
 import { enqueuePublishTask } from './queue';
-import { storeImage } from './storage';
 
 /** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
 const IMAGE_MODEL = 'fal-ai/flux-2';
