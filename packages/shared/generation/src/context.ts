@@ -6,7 +6,7 @@ import type { GenerationContext } from './types';
  * `linkCandidates` are the verified internal-link targets the caller resolved
  * (#186); an empty list means this article gets no internal links. */
 export function buildContext(
-  org: Org,
+  org: Pick<Org, 'presets'>,
   keyword: Keyword,
   linkCandidates: LinkCandidate[] = [],
 ): GenerationContext {

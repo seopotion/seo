@@ -8,6 +8,7 @@ export {
 } from './config';
 export { buildContext } from './context';
 export { generateArticle } from './generate';
+export type { HumanizeFeedback } from './humanize';
 export { buildHumanizePrompt } from './humanize';
 export type { ImagePlan, ImagePlanInput } from './images';
 export {
@@ -36,9 +37,19 @@ export {
   sanitizeLinks,
   staticSitePostUrl,
 } from './links';
-export { buildOutlinePrompt, OutlineSchema, parseOutline } from './outline';
+export {
+  buildOutlinePrompt,
+  OUTLINE_RESPONSE_SCHEMA,
+  OutlineSchema,
+  parseOutline,
+} from './outline';
 export { fleschKincaidGrade } from './readability';
-export { buildSemanticCheckPrompt, parseSemanticResult, SemanticResultSchema } from './semantic';
+export {
+  buildSemanticCheckPrompt,
+  parseSemanticResult,
+  SEMANTIC_RESPONSE_SCHEMA,
+  SemanticResultSchema,
+} from './semantic';
 export type { CompleteTopicBrief, TopicBriefFields } from './topic';
 export { completeTopicBrief } from './topic';
 export type * from './types';
