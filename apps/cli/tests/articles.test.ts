@@ -223,8 +223,10 @@ describe('generateNext', () => {
       { keyword_id: 'k4', keyword: 'widgets', run_id: 'run_k4' },
     ]);
     expect(launchGeneration).toHaveBeenCalledTimes(2);
-    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k2', { wait: false });
-    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k4', { wait: false });
+    // wait: true unconditionally, regardless of --wait — see finding 1 (the
+    // CLI process would otherwise race the fire-and-forget local run).
+    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k2', { wait: true });
+    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k4', { wait: true });
   });
 
   test('retries a failed keyword with attempts left', async () => {
@@ -244,6 +246,25 @@ describe('generateNext', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.enqueued).toEqual([]);
+    expect(result.data.failures).toEqual([]);
+  });
+
+  test('one target throwing is recorded as a failure and does not lose the rest of the batch', async () => {
+    repos.keywordListByOrg.mockResolvedValueOnce([
+      pending('k1', '2026-08-20'),
+      pending('k2', '2026-08-21'),
+    ]);
+    launchGeneration.mockRejectedValueOnce(new Error('org missing presets'));
+    const result = await generateNext({ org: 'o1', count: 2, wait: false, timeoutMs: 0 });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.failures).toEqual([
+      { keyword_id: 'k1', keyword: 'widgets', error: 'org missing presets' },
+    ]);
+    expect(result.data.enqueued).toEqual([
+      { keyword_id: 'k2', keyword: 'widgets', run_id: 'run_k2' },
+    ]);
+    expect(launchGeneration).toHaveBeenCalledTimes(2);
   });
 
   test('fails NO_KEYWORDS_DUE when nothing is eligible', async () => {

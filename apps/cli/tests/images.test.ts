@@ -152,7 +152,7 @@ describe('resetImages', () => {
     const res = await resetImages({ host: DEAD, org: 'o1', apply: true, enqueue: true });
     expect(res.ok && res.data.enqueued).toBe(1);
     expect(launchImageRepair).toHaveBeenCalledTimes(1);
-    expect(launchImageRepair).toHaveBeenCalledWith('o1', 'a1');
+    expect(launchImageRepair).toHaveBeenCalledWith('o1', 'a1', { wait: true });
   });
 
   test('--enqueue surfaces a launch failure as RESET_IMAGES_FAILED', async () => {

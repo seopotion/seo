@@ -33,6 +33,18 @@ describe('generation scheduler', () => {
     await expect(runScheduler()).resolves.toBe(1);
   });
 
+  test('one keyword throwing does not abort the rest of the sweep', async () => {
+    listDueForGeneration.mockResolvedValue([
+      { id: 'k1', org_id: 'o1' },
+      { id: 'k2', org_id: 'o2' },
+    ]);
+    launchGeneration.mockRejectedValueOnce(new Error('org missing presets'));
+    await expect(runScheduler()).resolves.toBe(2);
+    expect(launchGeneration).toHaveBeenCalledTimes(2);
+    expect(launchGeneration).toHaveBeenCalledWith('o1', 'k1', { wait: true });
+    expect(launchGeneration).toHaveBeenCalledWith('o2', 'k2', { wait: true });
+  });
+
   test('passes today (yyyy-mm-dd) and the attempt cap to the repo', async () => {
     listDueForGeneration.mockResolvedValue([]);
     await runScheduler();

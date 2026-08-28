@@ -140,7 +140,11 @@ export async function resetImages(opts: {
       if (!opts.apply) continue;
       await ArticleRepo.resetImages(article.id, plan);
       if (opts.enqueue) {
-        await launchImageRepair(article.org_id, article.id);
+        // wait: true — this CLI command closes the shared Mongo connection and
+        // exits right after resetImages returns, which would otherwise race
+        // launchImageRepair's fire-and-forget local run (see apps/cli/src/lib/
+        // db.ts's launchStrategy call for the same fix).
+        await launchImageRepair(article.org_id, article.id, { wait: true });
         enqueued += 1;
       }
     }

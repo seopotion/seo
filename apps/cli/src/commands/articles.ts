@@ -17,11 +17,13 @@ const EXIT_BY_CODE: Record<string, ExitCode> = {
 };
 
 /**
- * A timed-out or failed `--wait` exits OP_FAILED even though the enqueue
- * itself succeeded — never claim success the pipeline didn't earn.
+ * A timed-out or failed `--wait`, or any per-target launch failure, exits
+ * OP_FAILED even though the command overall succeeded — never claim success
+ * the pipeline didn't earn.
  */
-function exitFor(result: Result<{ wait?: WaitReport | null }>): ExitCode {
+function exitFor(result: Result<{ wait?: WaitReport | null; failures?: unknown[] }>): ExitCode {
   if (!result.ok) return EXIT_BY_CODE[result.error.code] ?? EXIT.USER_ERROR;
+  if (result.data.failures && result.data.failures.length > 0) return EXIT.OP_FAILED;
   const wait = result.data.wait;
   if (wait && (wait.timed_out || wait.outcomes.some((o) => !o.ok))) return EXIT.OP_FAILED;
   return EXIT.SUCCESS;
@@ -121,7 +123,7 @@ export const articlesCommand = defineCommand({
         ...targetArgs,
         count: {
           type: 'string' as const,
-          description: 'Keywords to enqueue (default 1)',
+          description: 'Keywords to generate (default 1)',
           default: '1',
         },
         ...waitArgs('900'),

@@ -306,29 +306,29 @@ export async function generateNext(opts: {
     if (!resolved.ok) return resolved;
     const orgId = resolved.data;
 
-    // The generation worker fails these permanently (no retry) — check them up
+    // launchGeneration fails these permanently (no retry) — check them up
     // front so `--wait` doesn't burn its whole timeout on a doomed org.
     const org = await OrgRepo.findById(orgId);
     if (!org) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
     if (!org.presets) {
       return fail(
         'ORG_NOT_FINALIZED',
-        `Org "${orgId}" has no presets — the generation worker would fail it permanently.`,
+        `Org "${orgId}" has no presets — launching generation would fail it permanently.`,
         'Finish onboarding for this org first.',
       );
     }
     if (!isPaid(org)) {
       return fail(
         'ORG_NOT_PAID',
-        `Org "${orgId}" is on plan "${org.plan}" — the generation worker refuses unpaid orgs.`,
+        `Org "${orgId}" is on plan "${org.plan}" — generation refuses unpaid orgs.`,
         `npm run cli -- db set-plan --org ${orgId} --plan paid`,
       );
     }
 
     // Same eligibility as the scheduler's listDueForGeneration, minus the date
-    // cap (the worker never checks scheduled_date — only the scheduler does) and
-    // scoped to one org. listByOrg sorts by scheduled_date asc, so "next" is
-    // simply the head of the filtered list.
+    // cap (the generation pipeline never checks scheduled_date — only the
+    // scheduler does) and scoped to one org. listByOrg sorts by scheduled_date
+    // asc, so "next" is simply the head of the filtered list.
     const keywords = await KeywordRepo.listByOrg(orgId);
     const eligible = keywords.filter(
       (k) =>
@@ -346,14 +346,27 @@ export async function generateNext(opts: {
 
     const targets = eligible.slice(0, opts.count);
     const launched: { keyword_id: string; keyword: string; run_id: string }[] = [];
+    const failures: { keyword_id: string; keyword: string; error: string }[] = [];
     for (const target of targets) {
-      // `wait: opts.wait` — locally a `--wait` run executes the whole pipeline
-      // in-process before the outcome poll below (which then sees the terminal
-      // state immediately); deployed, `wait` is a no-op and the poll below does
-      // the watching.
-      const res = await launchGeneration(orgId, target.id, { wait: opts.wait });
-      if (res)
-        launched.push({ keyword_id: target.id, keyword: target.keyword, run_id: res.run_id });
+      try {
+        // wait: true unconditionally — this CLI process closes the shared
+        // Mongo connection and exits right after generateNext returns, which
+        // would otherwise race launchGeneration's fire-and-forget local run
+        // (see apps/cli/src/lib/db.ts's launchStrategy call for the same fix).
+        // `--wait` (opts.wait) only controls the outcome poll below now.
+        const res = await launchGeneration(orgId, target.id, { wait: true });
+        if (res)
+          launched.push({ keyword_id: target.id, keyword: target.keyword, run_id: res.run_id });
+      } catch (e) {
+        // launchGeneration already released the claim (KeywordRepo.failGeneration)
+        // before rethrowing — record the failure and keep launching the rest
+        // of the batch instead of losing it to one bad keyword.
+        failures.push({
+          keyword_id: target.id,
+          keyword: target.keyword,
+          error: (e as Error).message,
+        });
+      }
     }
 
     let wait: WaitReport | null = null;
@@ -365,7 +378,7 @@ export async function generateNext(opts: {
       );
     }
 
-    return ok({ org_id: orgId, enqueued: launched, wait });
+    return ok({ org_id: orgId, enqueued: launched, failures, wait });
   } finally {
     await closeDb();
   }
