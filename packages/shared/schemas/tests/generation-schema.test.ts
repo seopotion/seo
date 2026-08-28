@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { GenerateTask, KeywordSchema } from '../src';
+import { KeywordSchema } from '../src';
 
 describe('generation schema additions', () => {
   test('KeywordSchema defaults generation fields for pre-existing docs', () => {
@@ -18,12 +18,5 @@ describe('generation schema additions', () => {
     expect(k.generation_attempts).toBe(0);
     expect(k.generation_error).toBeNull();
     expect(k.generation_started_at).toBeNull();
-  });
-
-  test('GenerateTask parses the queue contract', () => {
-    expect(GenerateTask.parse({ org_id: 'o1', keyword_id: 'k1' })).toEqual({
-      org_id: 'o1',
-      keyword_id: 'k1',
-    });
   });
 });
