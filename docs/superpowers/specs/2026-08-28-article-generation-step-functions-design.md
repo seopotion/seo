@@ -42,6 +42,22 @@ deviations are fine where the article pipeline's shape differs.
 - Deviating from the strategy machine's exact shape is acceptable (confirmed by user) —
   the readability Choice-state loop is the main deviation.
 
+**Amended at implementation:**
+
+- `generation_attempts`/`MAX_GENERATION_ATTEMPTS`/`claimGeneration` are retained as the
+  launch-time guard — the counter now counts launches (scheduler days / admin clicks),
+  capping how many runs a permanently failing keyword can burn; the stale-claim window
+  widened to 2 h (> the 1 h machine timeout). `admin images-regenerate` is served by a
+  pre-completed 'repair run' on the same machine rather than a retained images queue.
+- CLI launch sites pass `wait: true` unconditionally (not `wait: opts.wait`): a
+  fire-and-forget local run would race the CLI's `closeDb()` and process exit — same fix
+  the strategy CLI carries. The `--wait` flag now only governs the outcome poll.
+  `generate-next` gained a `failures[]` result field so one target's pipeline failure
+  doesn't abort the batch.
+- The state-machine ARN is granted/injected on the Admin Lambda (where the launch call
+  sites actually live) in addition to the API Lambda; the scheduler Lambda launches
+  executions directly.
+
 ## Architecture
 
 ### Launch
