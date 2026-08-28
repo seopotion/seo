@@ -4,6 +4,7 @@ export { contextFromRun } from './context';
 export { ArticleFatalError, ArticleRetryableError, toArticleError } from './errors';
 export { enqueuePublishTask } from './sqs';
 export { stageDraft } from './stages/draft';
+export { stageFinalize } from './stages/finalize';
 export { READABILITY_MAX_PASSES, stageHumanize } from './stages/humanize';
 export { stageOutline } from './stages/outline';
 export { stagePrepare } from './stages/prepare';
