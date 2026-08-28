@@ -2,6 +2,13 @@ export type { ArticleStageClients } from './clients';
 export { getArticleStageClients } from './clients';
 export { contextFromRun } from './context';
 export { ArticleFatalError, ArticleRetryableError, toArticleError } from './errors';
+export { createArticleRun, launchGeneration, launchImageRepair } from './launch';
+export {
+  executeArticleStage,
+  markArticleRunFailed,
+  runLocalArticleRun,
+  type StageResult,
+} from './run';
 export { enqueuePublishTask } from './sqs';
 export { stageDraft } from './stages/draft';
 export { stageFinalize } from './stages/finalize';

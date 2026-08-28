@@ -58,13 +58,19 @@ export const outlineJson = JSON.stringify({
 
 /** Builds a fully-parsed ArticleRun, using `presets`/`keyword` as the launch snapshot. */
 export function makeRun(
-  overrides: { working?: Record<string, unknown>; presets?: typeof presets } = {},
+  overrides: {
+    working?: Record<string, unknown>;
+    presets?: typeof presets;
+    status?: ArticleRun['status'];
+    stages?: ArticleRun['stages'];
+  } = {},
 ): ArticleRun {
   return ArticleRunSchema.parse({
     id: 'run1',
     org_id: 'o1',
     keyword_id: 'k1',
-    status: 'running',
+    status: overrides.status ?? 'running',
+    stages: overrides.stages ?? {},
     input: { website_url: 'https://x.com', presets: overrides.presets ?? presets, keyword },
     working: {
       link_candidates: [],
