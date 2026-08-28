@@ -823,7 +823,9 @@ const readability = {
 - [ ] **Step 2: Run** — FAIL. **Step 3: Implement** per above. **Step 4: Run** — PASS.
 - [ ] **Step 5: Commit** — `git commit -m "feat(articles): finalize stage — validate, video, persist, readability stamp"`
 
----### Task 8: Images + handoff stages (moves from the images worker)
+---
+
+### Task 8: Images + handoff stages (moves from the images worker)
 
 **Files:**
 - Create: `packages/shared/articles/src/stages/images.ts`, `src/stages/handoff.ts`
