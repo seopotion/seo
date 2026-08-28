@@ -1,0 +1,38 @@
+services:
+  wordpress-db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: wordpress-root
+    volumes:
+      - wordpress-db-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress:
+    image: wordpress:6.9-php8.3-apache
+    depends_on:
+      wordpress-db:
+        condition: service_healthy
+    ports:
+      - '8080:80'
+    environment:
+      WORDPRESS_DB_HOST: wordpress-db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DEBUG: '1'
+    volumes:
+      - wordpress-data:/var/www/html
+      - ./scripts/seed-wordpress.php:/opt/order66/seed-wordpress.php:ro
+      - ./scripts/assets/order66-coffee-hero.png:/opt/order66/order66-coffee-hero.png:ro
+      - ./scripts/wordpress.htaccess:/var/www/html/.htaccess:ro
+
+volumes:
+  wordpress-db-data:
+  wordpress-data:

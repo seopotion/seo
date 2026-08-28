@@ -1,3 +1,4 @@
+import { GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -22,6 +23,12 @@ export const integrationOptions = [
     id: 'wordpress',
     name: 'WordPress.org',
     logoSrc: '/integrations/wordpress-org.svg',
+    comingSoon: false,
+  },
+  {
+    id: 'static-site',
+    name: null,
+    logoSrc: null,
     comingSoon: false,
   },
   {
@@ -73,8 +80,29 @@ export function IntegrationsStep({
         <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {integrationOptions.map((integration) => {
             const isWordPress = integration.id === 'wordpress';
+            const isStaticSite = integration.id === 'static-site';
             const isConnected = isWordPress && wordpressConnected;
             const isLoading = isWordPress && integrationsLoading;
+
+            if (isStaticSite) {
+              return (
+                <div
+                  key={integration.id}
+                  className="flex min-h-16 items-center gap-3 rounded-md border border-input bg-background px-3 py-3 text-left"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center">
+                    <GitBranch aria-hidden className="size-5 text-slate-700" />
+                  </span>
+                  <span className="grid min-w-0 gap-1">
+                    <span className="font-semibold">{t('providers.staticSite')}</span>
+                    <span className="text-muted-foreground text-xs">{t('customSiteNotice')}</span>
+                  </span>
+                  <Badge className="ml-auto shrink-0" variant="secondary">
+                    {t('setupLater')}
+                  </Badge>
+                </div>
+              );
+            }
 
             return (
               <Button
