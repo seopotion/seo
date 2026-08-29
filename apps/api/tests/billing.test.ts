@@ -9,8 +9,20 @@ vi.mock('../src/lib/load-owned-org', () => ({ loadOwnedOrg }));
 const { applyBillingEvent } = vi.hoisted(() => ({ applyBillingEvent: vi.fn() }));
 vi.mock('../src/lib/billing/apply-event', () => ({ applyBillingEvent }));
 
-const { findLatestByOrg } = vi.hoisted(() => ({ findLatestByOrg: vi.fn() }));
-vi.mock('@shared/db', () => ({ SubscriptionRepo: { findLatestByOrg } }));
+const { findLatestByOrg, promoCodeRepo, promoRedemptionRepo } = vi.hoisted(() => ({
+  findLatestByOrg: vi.fn(),
+  promoCodeRepo: { findByCode: vi.fn() },
+  promoRedemptionRepo: {
+    upsertPending: vi.fn(),
+    countConfirmed: vi.fn(),
+    findConfirmedByCodeAndOrg: vi.fn(),
+  },
+}));
+vi.mock('@shared/db', () => ({
+  SubscriptionRepo: { findLatestByOrg },
+  PromoCodeRepo: promoCodeRepo,
+  PromoRedemptionRepo: promoRedemptionRepo,
+}));
 
 const {
   createCheckout,
@@ -113,6 +125,86 @@ describe('POST /portal', () => {
     const res = await testClient(app).portal.$post({ json: { org_id: 'o1' } });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ url: 'https://ls/billing' });
+  });
+});
+
+describe('POST /promo/validate', () => {
+  const promo = {
+    id: 'p'.repeat(24),
+    code: 'LAUNCH30',
+    name: 'Launch promo',
+    percent: 30,
+    duration: 'repeating' as const,
+    duration_in_months: 3,
+    max_redemptions: 50,
+    active: true,
+    ls_discount_id: 'disc_1',
+    created_at: new Date(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadOwnedOrg.mockResolvedValue({ id: 'o1', user_id: 'u1', plan: 'free' });
+    promoRedemptionRepo.findConfirmedByCodeAndOrg.mockResolvedValue(null);
+    promoRedemptionRepo.countConfirmed.mockResolvedValue(0);
+  });
+
+  test('403 when the org is not owned', async () => {
+    loadOwnedOrg.mockResolvedValueOnce(null);
+    const res = await testClient(app).promo.validate.$post({
+      json: { org_id: 'o1', code: 'LAUNCH30' },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('200 with the discount terms; input is trimmed and uppercased', async () => {
+    promoCodeRepo.findByCode.mockResolvedValueOnce(promo);
+    const res = await testClient(app).promo.validate.$post({
+      json: { org_id: 'o1', code: '  launch30 ' },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      valid: true,
+      code: 'LAUNCH30',
+      percent: 30,
+      duration: 'repeating',
+      duration_in_months: 3,
+    });
+    expect(promoCodeRepo.findByCode).toHaveBeenCalledWith('LAUNCH30');
+  });
+
+  test.each([
+    ['not_found', () => promoCodeRepo.findByCode.mockResolvedValueOnce(null)],
+    ['inactive', () => promoCodeRepo.findByCode.mockResolvedValueOnce({ ...promo, active: false })],
+    [
+      'expired',
+      () =>
+        promoCodeRepo.findByCode.mockResolvedValueOnce({
+          ...promo,
+          expires_at: new Date(Date.now() - 1000),
+        }),
+    ],
+    [
+      'already_redeemed',
+      () => {
+        promoCodeRepo.findByCode.mockResolvedValueOnce(promo);
+        promoRedemptionRepo.findConfirmedByCodeAndOrg.mockResolvedValueOnce({ id: 'r1' });
+      },
+    ],
+    [
+      'exhausted',
+      () => {
+        promoCodeRepo.findByCode.mockResolvedValueOnce(promo);
+        promoRedemptionRepo.countConfirmed.mockResolvedValueOnce(50);
+      },
+    ],
+  ])('422 %s', async (reason, arrange) => {
+    arrange();
+    const res = await testClient(app).promo.validate.$post({
+      json: { org_id: 'o1', code: 'LAUNCH30' },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ valid: false, reason });
   });
 });
 
