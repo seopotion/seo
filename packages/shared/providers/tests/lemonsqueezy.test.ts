@@ -172,3 +172,110 @@ describe('lemonsqueezy createCheckout', () => {
     expect(sent.data.relationships.variant.data.id).toBe('201');
   });
 });
+
+describe('lemonsqueezy createCheckout (discounts)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const okCheckout = () =>
+    new Response(JSON.stringify({ data: { attributes: { url: 'https://ls/checkout/x' } } }), {
+      status: 201,
+    });
+
+  test('always disables the hosted discount field; passes discount_code when given', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okCheckout());
+    await provider.createCheckout({
+      tier: 'paid',
+      orgId: 'o1',
+      userEmail: 'a@b.c',
+      discountCode: 'LAUNCH30',
+    });
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.data.attributes.checkout_options).toEqual({ discount: false });
+    expect(body.data.attributes.checkout_data.discount_code).toBe('LAUNCH30');
+  });
+
+  test('omits discount_code when no code is applied (field still disabled)', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okCheckout());
+    await provider.createCheckout({ tier: 'paid', orgId: 'o1', userEmail: 'a@b.c' });
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.data.attributes.checkout_options).toEqual({ discount: false });
+    expect('discount_code' in body.data.attributes.checkout_data).toBe(false);
+  });
+});
+
+describe('lemonsqueezy createDiscount / deleteDiscount', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  test('createDiscount maps repeating fields and limits; returns the LS id', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ data: { id: 'disc_9' } }), { status: 201 }));
+    const res = await provider.createDiscount({
+      name: 'Launch promo',
+      code: 'LAUNCH30',
+      percent: 30,
+      duration: 'repeating',
+      durationInMonths: 3,
+      maxRedemptions: 50,
+      expiresAt: new Date('2026-12-31T00:00:00Z'),
+    });
+    expect(res).toEqual({ providerDiscountId: 'disc_9' });
+    const [url, init] = spy.mock.calls[0] ?? [];
+    expect(String(url)).toBe('https://api.lemonsqueezy.com/v1/discounts');
+    const attrs = JSON.parse(String(init?.body)).data.attributes;
+    expect(attrs).toEqual({
+      name: 'Launch promo',
+      code: 'LAUNCH30',
+      amount: 30,
+      amount_type: 'percent',
+      duration: 'repeating',
+      duration_in_months: 3,
+      is_limited_redemptions: true,
+      max_redemptions: 50,
+      expires_at: '2026-12-31T00:00:00.000Z',
+    });
+    expect(JSON.parse(String(init?.body)).data.relationships.store.data.id).toBe(cfg.storeId);
+  });
+
+  test('createDiscount forever/unlimited sends no months/limits keys', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ data: { id: 'disc_10' } }), { status: 201 }),
+      );
+    await provider.createDiscount({
+      name: 'Team free',
+      code: 'TEAMFREE',
+      percent: 100,
+      duration: 'forever',
+    });
+    const attrs = JSON.parse(String(spy.mock.calls[0]?.[1]?.body)).data.attributes;
+    expect(attrs).toEqual({
+      name: 'Team free',
+      code: 'TEAMFREE',
+      amount: 100,
+      amount_type: 'percent',
+      duration: 'forever',
+    });
+  });
+
+  test('createDiscount throws on a non-2xx response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 422 }));
+    await expect(
+      provider.createDiscount({ name: 'X', code: 'XXX', percent: 10, duration: 'once' }),
+    ).rejects.toThrow(/discount create failed: 422/);
+  });
+
+  test('deleteDiscount DELETEs; 404 is success (already gone); 500 throws', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response('boom', { status: 500 }));
+    await provider.deleteDiscount('disc_9');
+    expect(String(spy.mock.calls[0]?.[0])).toBe('https://api.lemonsqueezy.com/v1/discounts/disc_9');
+    expect(spy.mock.calls[0]?.[1]?.method).toBe('DELETE');
+    await provider.deleteDiscount('disc_9'); // 404 -> resolves
+    await expect(provider.deleteDiscount('disc_9')).rejects.toThrow(/discount delete failed: 500/);
+  });
+});

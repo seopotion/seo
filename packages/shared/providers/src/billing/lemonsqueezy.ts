@@ -50,7 +50,7 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
   return {
     name: 'lemonsqueezy',
 
-    async createCheckout({ tier, orgId, userEmail }) {
+    async createCheckout({ tier, orgId, userEmail, discountCode }) {
       const res = await fetch(`${LS_API}/checkouts`, {
         method: 'POST',
         headers: {
@@ -62,7 +62,13 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
           data: {
             type: 'checkouts',
             attributes: {
-              checkout_data: { email: userEmail, custom: { org_id: orgId } },
+              checkout_data: {
+                email: userEmail,
+                custom: { org_id: orgId },
+                ...(discountCode ? { discount_code: discountCode } : {}),
+              },
+              // Codes must pass our validation first — hide LS's own field.
+              checkout_options: { discount: false },
               product_options: { redirect_url: cfg.redirectUrl },
             },
             relationships: {
@@ -156,6 +162,59 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
         throw new Error(
           `LemonSqueezy subscription cancel failed: ${res.status} ${await res.text()}`,
         );
+      }
+    },
+
+    async createDiscount({
+      name,
+      code,
+      percent,
+      duration,
+      durationInMonths,
+      maxRedemptions,
+      expiresAt,
+    }) {
+      const res = await fetch(`${LS_API}/discounts`, {
+        method: 'POST',
+        headers: {
+          Accept: JSON_API,
+          'Content-Type': JSON_API,
+          Authorization: `Bearer ${cfg.apiKey}`,
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'discounts',
+            attributes: {
+              name,
+              code,
+              amount: percent,
+              amount_type: 'percent',
+              duration,
+              ...(duration === 'repeating' ? { duration_in_months: durationInMonths } : {}),
+              ...(maxRedemptions
+                ? { is_limited_redemptions: true, max_redemptions: maxRedemptions }
+                : {}),
+              ...(expiresAt ? { expires_at: expiresAt.toISOString() } : {}),
+            },
+            relationships: { store: { data: { type: 'stores', id: cfg.storeId } } },
+          },
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`LemonSqueezy discount create failed: ${res.status} ${await res.text()}`);
+      }
+      const json = (await res.json()) as { data: { id: string } };
+      return { providerDiscountId: json.data.id };
+    },
+
+    async deleteDiscount(providerDiscountId) {
+      const res = await fetch(`${LS_API}/discounts/${providerDiscountId}`, {
+        method: 'DELETE',
+        headers: { Accept: JSON_API, Authorization: `Bearer ${cfg.apiKey}` },
+      });
+      // 404 = already deleted — deactivation must be idempotent.
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`LemonSqueezy discount delete failed: ${res.status} ${await res.text()}`);
       }
     },
 

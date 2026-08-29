@@ -1,4 +1,4 @@
-import type { PaidTier, SubscriptionStatus } from '@shared/schemas';
+import type { PaidTier, PromoDuration, SubscriptionStatus } from '@shared/schemas';
 
 /**
  * Provider-neutral billing events. Every provider's webhook parser emits these;
@@ -34,12 +34,29 @@ export type BillingEvent =
 export interface BillingProvider {
   readonly name: 'lemonsqueezy';
 
-  /** Create a hosted checkout for a tier; embeds `orgId` for round-trip correlation. */
+  /** Create a hosted checkout for a tier; embeds `orgId` for round-trip correlation.
+   * The hosted checkout's own discount field is always disabled — codes only
+   * enter through our validated flow (promo design spec §5). */
   createCheckout(input: {
     tier: PaidTier;
     orgId: string;
     userEmail: string;
+    discountCode?: string;
   }): Promise<{ url: string }>;
+
+  /** Create the provider-side discount backing a promo code. */
+  createDiscount(input: {
+    name: string;
+    code: string;
+    percent: number;
+    duration: PromoDuration;
+    durationInMonths?: number;
+    maxRedemptions?: number;
+    expiresAt?: Date;
+  }): Promise<{ providerDiscountId: string }>;
+
+  /** Delete the provider-side discount (deactivation). Already-deleted is success. */
+  deleteDiscount(providerDiscountId: string): Promise<void>;
 
   /** Verify the provider signature over the RAW request body. */
   verifyWebhook(rawBody: string, signature: string): boolean;
