@@ -116,6 +116,27 @@
       "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
       "generic": "Ödeme başlatılamadı. Tekrar deneyin."
     },
+    "promo": {
+      "apply": "Uygula",
+      "applied": "{code} uygulandı — {discount}",
+      "applying": "Kontrol ediliyor…",
+      "discount": {
+        "forever": "Süresiz %{percent} indirim",
+        "once": "İlk ödemede %{percent} indirim",
+        "repeating": "{months} ay boyunca %{percent} indirim"
+      },
+      "errors": {
+        "already_redeemed": "Bu kod bu organizasyon için zaten kullanılmış.",
+        "exhausted": "Bu kod kullanım limitine ulaştı.",
+        "expired": "Bu kodun süresi dolmuş.",
+        "generic": "Kod kontrol edilemedi. Tekrar deneyin.",
+        "inactive": "Bu kod artık aktif değil.",
+        "not_found": "Böyle bir kod yok."
+      },
+      "placeholder": "Kodu girin",
+      "remove": "Kaldır",
+      "title": "Promosyon kodunuz var mı?"
+    },
     "redirecting": "Yönlendiriliyor…",
     "status": {
       "loading": "Organizasyonunuz yükleniyor...",
