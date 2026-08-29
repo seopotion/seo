@@ -5,6 +5,8 @@ import {
   CANDIDATE_STATUSES,
   IMAGES_STATUSES,
   ONBOARDING_INTEGRATIONS,
+  PROMO_DURATIONS,
+  PROMO_REDEMPTION_STATUSES,
   REJECTION_REASONS,
   SEARCH_INTENTS,
   SerpCompetitorSchema,
@@ -146,7 +148,8 @@ const AdminAuditAction = z
     at: z.string(),
     actor: z.string(),
     action: z.string(),
-    org_id: z.string(),
+    /** null for org-independent actions (promo codes). */
+    org_id: z.string().nullable(),
     entity: z.object({ type: z.string(), id: z.string() }).nullable(),
     payload: z.unknown(),
     before: z.unknown().nullable(),
@@ -304,3 +307,69 @@ const AdminArticleListItem = z
 export const AdminArticlesResponse = z
   .object({ articles: z.array(AdminArticleListItem), total: z.number().int() })
   .openapi('AdminArticlesResponse');
+
+// --- Promo codes (design spec 2026-08-29) ---
+
+export const AdminPromoCodeParams = z.object({ promo_code_id: z.string() });
+
+export const AdminPromoCodeCreateBody = z
+  .object({
+    /** Omit to have the server generate a random 8-char code. */
+    code: z
+      .string()
+      .regex(/^[A-Z0-9]{3,32}$/)
+      .optional(),
+    name: z.string().trim().min(1).max(200),
+    percent: z.number().int().min(1).max(100),
+    /** repeating counts months against billing cycles: a 3-month code on a
+     * yearly checkout discounts the whole first yearly payment (spec §2). */
+    duration: z.enum(PROMO_DURATIONS),
+    duration_in_months: z.number().int().min(1).max(120).optional(),
+    max_redemptions: z.number().int().min(1).optional(),
+    expires_at: z.coerce.date().optional(),
+    affiliate: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((b) => (b.duration === 'repeating') === (b.duration_in_months !== undefined), {
+    message: 'duration_in_months is required iff duration is repeating',
+  })
+  .openapi('AdminPromoCodeCreateBody');
+
+const AdminPromoCode = z
+  .object({
+    id: z.string(),
+    code: z.string(),
+    name: z.string(),
+    percent: z.number().int(),
+    duration: z.enum(PROMO_DURATIONS),
+    duration_in_months: z.number().int().nullable(),
+    max_redemptions: z.number().int().nullable(),
+    expires_at: z.string().nullable(),
+    active: z.boolean(),
+    affiliate: z.string().nullable(),
+    ls_discount_id: z.string(),
+    confirmed_redemptions: z.number().int(),
+    created_at: z.string(),
+  })
+  .openapi('AdminPromoCode');
+
+export const AdminPromoCodeResponse = z
+  .object({ promo_code: AdminPromoCode })
+  .openapi('AdminPromoCodeResponse');
+
+export const AdminPromoCodesResponse = z
+  .object({ promo_codes: z.array(AdminPromoCode) })
+  .openapi('AdminPromoCodesResponse');
+
+const AdminPromoRedemption = z
+  .object({
+    id: z.string(),
+    org_id: z.string(),
+    status: z.enum(PROMO_REDEMPTION_STATUSES),
+    created_at: z.string(),
+    confirmed_at: z.string().nullable(),
+  })
+  .openapi('AdminPromoRedemption');
+
+export const AdminPromoRedemptionsResponse = z
+  .object({ redemptions: z.array(AdminPromoRedemption) })
+  .openapi('AdminPromoRedemptionsResponse');

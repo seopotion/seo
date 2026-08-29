@@ -9,6 +9,14 @@ const repos = vi.hoisted(() => ({
     restoreRejected: vi.fn(),
   },
   AdminActionRepo: { insert: vi.fn() },
+  PromoCodeRepo: {
+    create: vi.fn(),
+    findByCode: vi.fn(),
+    findById: vi.fn(),
+    list: vi.fn(),
+    deactivate: vi.fn(),
+  },
+  PromoRedemptionRepo: { countConfirmed: vi.fn(), listByCode: vi.fn() },
   addCandidates: vi.fn(),
   scheduleCandidate: vi.fn(),
 }));

@@ -21,6 +21,14 @@ vi.mock('@shared/db', () => ({
   KeywordRepo: {},
   ArticleRepo: {},
   AdminActionRepo: {},
+  PromoCodeRepo: {
+    create: vi.fn(),
+    findByCode: vi.fn(),
+    findById: vi.fn(),
+    list: vi.fn(),
+    deactivate: vi.fn(),
+  },
+  PromoRedemptionRepo: { countConfirmed: vi.fn(), listByCode: vi.fn() },
 }));
 
 import { testClient } from 'hono/testing';

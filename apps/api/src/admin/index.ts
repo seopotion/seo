@@ -9,6 +9,7 @@ import candidates from './routes/candidates';
 import login from './routes/login';
 import orgs from './routes/orgs';
 import planner from './routes/planner';
+import promoCodes from './routes/promo-codes';
 
 /**
  * Admin operator app (epic #150) — served by its own Lambda (admin-index.ts),
@@ -51,7 +52,8 @@ const routes = app
   .route(`/admin/${API_VERSION}`, orgs)
   .route(`/admin/${API_VERSION}`, candidates)
   .route(`/admin/${API_VERSION}`, planner)
-  .route(`/admin/${API_VERSION}`, articles);
+  .route(`/admin/${API_VERSION}`, articles)
+  .route(`/admin/${API_VERSION}`, promoCodes);
 
 export default app;
 export type AdminAppType = typeof routes;

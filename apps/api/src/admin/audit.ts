@@ -29,7 +29,9 @@ export type AdminActionName =
   | 'article.update_content'
   | 'article.wordpress_publish'
   | 'article.wordpress_update'
-  | 'article.images_replay';
+  | 'article.images_replay'
+  | 'promo_code.create'
+  | 'promo_code.deactivate';
 
 /**
  * Record a successful mutation in the append-only audit log. Called explicitly
@@ -42,7 +44,7 @@ export async function audit(
   c: Context<AdminEnv>,
   input: {
     action: AdminActionName;
-    org_id: string;
+    org_id?: string;
     entity?: { type: string; id: string };
     payload?: unknown;
     before?: unknown;
@@ -52,7 +54,7 @@ export async function audit(
     await AdminActionRepo.insert({
       actor: c.var.adminAuth.email,
       action: input.action,
-      org_id: input.org_id,
+      org_id: input.org_id ?? null,
       entity: input.entity ?? null,
       payload: input.payload ?? null,
       before: input.before ?? null,
