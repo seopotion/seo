@@ -89,4 +89,10 @@ export async function ensureIndexes(): Promise<void> {
   // Article runs are looked up per org, newest first, and per keyword.
   await db.collection('article_runs').createIndex({ org_id: 1, created_at: -1 });
   await db.collection('article_runs').createIndex({ keyword_id: 1, created_at: -1 });
+  // Promo codes (design spec 2026-08-29): unique code for validation lookups;
+  // one redemption row per (code, org) makes upsertPending idempotent and
+  // once-per-org enforceable at the database layer.
+  await db.collection('promo_codes').createIndex({ code: 1 }, { unique: true });
+  await db.collection('promo_redemptions').createIndex({ code_id: 1, org_id: 1 }, { unique: true });
+  await db.collection('promo_redemptions').createIndex({ org_id: 1 });
 }
