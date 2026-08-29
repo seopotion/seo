@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { SubscriptionRepo } from '@shared/db';
+import { PromoRedemptionRepo, SubscriptionRepo } from '@shared/db';
+import type { PromoCode } from '@shared/schemas';
 import { isPaid, planRank } from '@shared/schemas';
 import { getBillingProvider } from '../clients/billing';
 import { applyBillingEvent } from '../lib/billing/apply-event';
@@ -32,17 +33,37 @@ const billing = new OpenAPIHono<AuthEnv>()
         },
         403: { description: 'Org not found or not owned by the caller' },
         409: { description: 'Already subscribed at this tier or higher' },
+        422: {
+          content: { 'application/json': { schema: schemas.CheckoutPromoErrorResponse } },
+          description: 'The promo code failed validation',
+        },
       },
     }),
     async (c) => {
-      const { org_id, tier } = c.req.valid('json');
+      const { org_id, tier, promo_code } = c.req.valid('json');
       const { userId, email } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.body(null, 403);
       // Already entitled at an equal-or-higher tier -> send them to the portal instead.
       if (isPaid(org) && planRank(org.plan) >= planRank(tier)) return c.body(null, 409);
+      // Re-validate at checkout time — the code may have died since apply.
+      let promo: PromoCode | undefined;
+      if (promo_code) {
+        const result = await validatePromoCode(promo_code, org.id);
+        if (!result.ok) {
+          return c.json({ error: 'invalid_promo' as const, reason: result.reason }, 422);
+        }
+        promo = result.promo;
+      }
       const provider = await getBillingProvider();
-      const { url } = await provider.createCheckout({ tier, orgId: org.id, userEmail: email });
+      const { url } = await provider.createCheckout({
+        tier,
+        orgId: org.id,
+        userEmail: email,
+        discountCode: promo?.code,
+      });
+      // Pending until the subscription webhook confirms; idempotent per (code, org).
+      if (promo) await PromoRedemptionRepo.upsertPending(promo.id, promo.code, org.id);
       return c.json({ url }, 200);
     },
   )

@@ -5,6 +5,8 @@ export const CheckoutBody = z
   .object({
     org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
     tier: z.enum(PAID_TIERS).openapi({ example: 'paid' }),
+    /** Already-validated promo code; re-validated server-side at checkout. */
+    promo_code: z.string().trim().min(1).max(64).optional().openapi({ example: 'LAUNCH30' }),
   })
   .openapi('CheckoutBody');
 
@@ -53,3 +55,7 @@ export const PromoValidateResponse = z
 export const PromoInvalidResponse = z
   .object({ valid: z.literal(false), reason: z.enum(PROMO_REJECT_REASONS) })
   .openapi('PromoInvalidResponse');
+
+export const CheckoutPromoErrorResponse = z
+  .object({ error: z.literal('invalid_promo'), reason: z.enum(PROMO_REJECT_REASONS) })
+  .openapi('CheckoutPromoErrorResponse');

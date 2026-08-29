@@ -106,6 +106,59 @@ describe('POST /checkout', () => {
       userEmail: 'u1@example.com',
     });
   });
+
+  test('422 invalid_promo when the code fails validation; no checkout created', async () => {
+    loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'free' });
+    promoCodeRepo.findByCode.mockResolvedValueOnce(null);
+    const res = await testClient(app).checkout.$post({
+      json: { org_id: 'o1', tier: 'paid', promo_code: 'NOPE' },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: 'invalid_promo', reason: 'not_found' });
+    expect(createCheckout).not.toHaveBeenCalled();
+    expect(promoRedemptionRepo.upsertPending).not.toHaveBeenCalled();
+  });
+
+  test('200 with a valid promo: passes discountCode and records a pending redemption', async () => {
+    loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'free' });
+    promoCodeRepo.findByCode.mockResolvedValueOnce({
+      id: 'p'.repeat(24),
+      code: 'LAUNCH30',
+      name: 'Launch promo',
+      percent: 30,
+      duration: 'repeating',
+      duration_in_months: 3,
+      active: true,
+      ls_discount_id: 'disc_1',
+      created_at: new Date(),
+    });
+    promoRedemptionRepo.findConfirmedByCodeAndOrg.mockResolvedValueOnce(null);
+    createCheckout.mockResolvedValueOnce({ url: 'https://ls/checkout/promo' });
+    const res = await testClient(app).checkout.$post({
+      json: { org_id: 'o1', tier: 'paid', promo_code: 'launch30' },
+    });
+    expect(res.status).toBe(200);
+    expect(createCheckout).toHaveBeenCalledWith({
+      tier: 'paid',
+      orgId: 'o1',
+      userEmail: 'u1@example.com',
+      discountCode: 'LAUNCH30',
+    });
+    expect(promoRedemptionRepo.upsertPending).toHaveBeenCalledWith(
+      'p'.repeat(24),
+      'LAUNCH30',
+      'o1',
+    );
+  });
+
+  test('checkout without a promo neither validates nor records anything', async () => {
+    loadOwnedOrg.mockResolvedValueOnce({ id: 'o1', user_id: 'u1', plan: 'free' });
+    createCheckout.mockResolvedValueOnce({ url: 'https://ls/checkout/abc' });
+    const res = await testClient(app).checkout.$post({ json: { org_id: 'o1', tier: 'paid' } });
+    expect(res.status).toBe(200);
+    expect(promoCodeRepo.findByCode).not.toHaveBeenCalled();
+    expect(promoRedemptionRepo.upsertPending).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /portal', () => {
