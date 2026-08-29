@@ -104,6 +104,17 @@ export const AutoPublishStateSchema = z.object({
 });
 export type AutoPublishState = z.infer<typeof AutoPublishStateSchema>;
 
+/** Readability measured at generation time (#readability gate, 2026-08-28 spec). */
+export const ArticleReadabilitySchema = z.object({
+  metric: z.literal('flesch_kincaid_grade'),
+  grade: z.number().nullable(),
+  target: z.number(),
+  target_met: z.boolean(),
+  /** Humanize passes consumed (1 = passed first try). */
+  attempts: z.number().int(),
+});
+export type ArticleReadability = z.infer<typeof ArticleReadabilitySchema>;
+
 /**
  * Article entity. `title` is the generated SEO title (distinct from `keyword`);
  * `keyword` is denormalized so the Content History table renders without a join.
@@ -147,6 +158,8 @@ export const ArticleSchema = z.object({
   images_status: z.enum(IMAGES_STATUSES).default('pending'),
   // YouTube embed (#85). Defaulted so pre-#85 docs still parse.
   video: ArticleVideoSchema.nullable().default(null),
+  // Readability gate result (2026-08-28 spec). Defaulted so older docs parse.
+  readability: ArticleReadabilitySchema.nullable().default(null),
 });
 export type Article = z.infer<typeof ArticleSchema>;
 

@@ -30,6 +30,8 @@ import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import {
+  Choice,
+  Condition,
   DefinitionBody,
   JsonPath,
   StateMachine,
@@ -369,19 +371,6 @@ export class ApiStack extends Stack {
       treatMissingData: TreatMissingData.NOT_BREACHING,
     });
 
-    // Dead-letter queue: generation tasks that fail repeatedly land here.
-    const generationDlq = new Queue(this, 'GenerationDlq', {
-      retentionPeriod: Duration.days(14),
-    });
-
-    // Generation task queue. Visibility timeout >= worker timeout so an
-    // in-flight message isn't redelivered mid-generation. After maxReceiveCount
-    // failed deliveries the message moves to the DLQ.
-    const generationQueue = new Queue(this, 'GenerationQueue', {
-      visibilityTimeout: Duration.minutes(15),
-      deadLetterQueue: { queue: generationDlq, maxReceiveCount: 3 },
-    });
-
     // Article images (#51): private per-stage bucket + CloudFront (OAC) — durable,
     // provider-independent image URLs. Objects are immutable at a given key
     // (retries overwrite BEFORE the URL is stored), so long default TTLs are safe.
@@ -423,48 +412,6 @@ export class ApiStack extends Stack {
       },
     });
 
-    // Dead-letter queue: image tasks that fail repeatedly land here.
-    const imagesDlq = new Queue(this, 'ImagesDlq', {
-      retentionPeriod: Duration.days(14),
-    });
-
-    // Image task queue. Visibility timeout >= worker timeout so an in-flight
-    // message isn't redelivered mid-generation (image generation is slow).
-    const imagesQueue = new Queue(this, 'ImagesQueue', {
-      visibilityTimeout: Duration.minutes(15),
-      deadLetterQueue: { queue: imagesDlq, maxReceiveCount: 3 },
-    });
-
-    // Images worker Lambda — consumes image tasks; plans, generates, and stores
-    // article images. FAL_KEY follows the existing synth-time provider-secret
-    // pattern (SSM provisioning deferred — #9/#43).
-    const imagesWorkerFn = new NodejsFunction(this, 'ImagesWorkerFn', {
-      entry: join(projectRoot, 'apps/worker/src/images.ts'),
-      projectRoot,
-      depsLockFilePath,
-      handler: 'handler',
-      runtime: Runtime.NODEJS_22_X,
-      timeout: Duration.minutes(10),
-      memorySize: 512,
-      environment: {
-        ...mongoEnv,
-        OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
-        FAL_KEY_PARAM: cfg.falKeyParam,
-        IMAGES_BUCKET: imagesBucket.bucketName,
-        IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
-        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
-        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
-      },
-      bundling,
-    });
-    imagesWorkerFn.addEventSource(new SqsEventSource(imagesQueue, { batchSize: 1 }));
-    mongoUriParam.grantRead(imagesWorkerFn);
-    openRouterApiKeyParam.grantRead(imagesWorkerFn);
-    falKeyParam.grantRead(imagesWorkerFn);
-    gscTokenKeyParam.grantRead(imagesWorkerFn);
-    imagesBucket.grantPut(imagesWorkerFn);
-    publishQueue.grantSendMessages(imagesWorkerFn);
-
     const publishWorkerFn = new NodejsFunction(this, 'PublishWorkerFn', {
       entry: join(projectRoot, 'apps/worker/src/publish.ts'),
       projectRoot,
@@ -486,9 +433,35 @@ export class ApiStack extends Stack {
     gscTokenKeyParam.grantRead(publishWorkerFn);
     githubAppKeyParam.grantRead(publishWorkerFn);
 
-    // Generation worker Lambda — consumes generation tasks; produces articles.
-    const generationWorkerFn = new NodejsFunction(this, 'GenerationWorkerFn', {
-      entry: join(projectRoot, 'apps/worker/src/generation.ts'),
+    // Scheduler Lambda — daily EventBridge trigger; fans out due entries as
+    // article-generation state machine executions (gains ARTICLE_STATE_MACHINE_ARN
+    // after the state machine below is defined). No provider secret needed (it
+    // only reads Mongo + starts executions).
+    const generationSchedulerFn = new NodejsFunction(this, 'GenerationSchedulerFn', {
+      entry: join(projectRoot, 'apps/worker/src/generation-scheduler.ts'),
+      projectRoot,
+      depsLockFilePath,
+      handler: 'handler',
+      runtime: Runtime.NODEJS_22_X,
+      timeout: Duration.minutes(2),
+      memorySize: 256,
+      environment: mongoEnv,
+      bundling,
+    });
+    mongoUriParam.grantRead(generationSchedulerFn);
+
+    // Daily at 07:00 UTC — articles generate on/after their scheduled day.
+    new Rule(this, 'GenerationSchedule', {
+      schedule: Schedule.cron({ minute: '0', hour: '7' }),
+      targets: [new LambdaFunction(generationSchedulerFn)],
+    });
+
+    // Article stage Lambda — invoked once per Step Functions Task state with
+    // {run_id, org_id, stage} by the article state machine below, and by the
+    // EventBridge failure rule on a terminal execution failure. Env is the
+    // union of the deleted GenerationWorkerFn's and ImagesWorkerFn's (#178).
+    const articleStageFn = new NodejsFunction(this, 'ArticleStageFn', {
+      entry: join(projectRoot, 'apps/worker/src/article-run.ts'),
       projectRoot,
       depsLockFilePath,
       handler: 'handler',
@@ -499,39 +472,111 @@ export class ApiStack extends Stack {
         ...mongoEnv,
         OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
         YOUTUBE_API_KEY_PARAM: cfg.youtubeApiKeyParam,
-        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
+        FAL_KEY_PARAM: cfg.falKeyParam,
+        IMAGES_BUCKET: imagesBucket.bucketName,
+        IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
+        PUBLISH_QUEUE_URL: publishQueue.queueUrl,
+        GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
       },
       bundling,
     });
-    generationWorkerFn.addEventSource(new SqsEventSource(generationQueue, { batchSize: 1 }));
-    mongoUriParam.grantRead(generationWorkerFn);
-    openRouterApiKeyParam.grantRead(generationWorkerFn);
-    youtubeApiKeyParam.grantRead(generationWorkerFn);
-    imagesQueue.grantSendMessages(generationWorkerFn);
+    mongoUriParam.grantRead(articleStageFn);
+    openRouterApiKeyParam.grantRead(articleStageFn);
+    youtubeApiKeyParam.grantRead(articleStageFn);
+    falKeyParam.grantRead(articleStageFn);
+    gscTokenKeyParam.grantRead(articleStageFn);
+    imagesBucket.grantPut(articleStageFn);
+    publishQueue.grantSendMessages(articleStageFn);
 
-    // Scheduler Lambda — daily EventBridge trigger; fans out due entries to the
-    // generation queue. No provider secret needed (it only reads Mongo + sends SQS).
-    const generationSchedulerFn = new NodejsFunction(this, 'GenerationSchedulerFn', {
-      entry: join(projectRoot, 'apps/worker/src/generation-scheduler.ts'),
-      projectRoot,
-      depsLockFilePath,
-      handler: 'handler',
-      runtime: Runtime.NODEJS_22_X,
-      timeout: Duration.minutes(2),
-      memorySize: 256,
-      environment: {
-        ...mongoEnv,
-        GENERATION_QUEUE_URL: generationQueue.queueUrl,
-      },
-      bundling,
+    // Article state machine (2026-08-28 spec): linear stages + a readability
+    // Choice that loops humanize until the stage reports readability_ok (the
+    // stage itself caps the loop at 3 passes, so no machine-side counter).
+    // Same recipe as strategy: per-stage retries on ArticleRetryableError, no
+    // Catch states (redrive-friendly), EventBridge failure stamping below.
+    const articleStage = (stage: string, timeout: Duration) => {
+      const task = new LambdaInvoke(this, `Article_${stage}`, {
+        lambdaFunction: articleStageFn,
+        payload: TaskInput.fromObject({
+          run_id: JsonPath.stringAt('$.run_id'),
+          org_id: JsonPath.stringAt('$.org_id'),
+          stage,
+        }),
+        resultPath: JsonPath.DISCARD,
+        taskTimeout: Timeout.duration(timeout),
+      });
+      task.addRetry({
+        errors: ['ArticleRetryableError', 'States.Timeout'],
+        maxAttempts: 3,
+        interval: Duration.seconds(30),
+        backoffRate: 2,
+      });
+      return task;
+    };
+
+    // humanize is the one state whose output survives: the Choice reads it.
+    const humanizeTask = new LambdaInvoke(this, 'Article_humanize', {
+      lambdaFunction: articleStageFn,
+      payload: TaskInput.fromObject({
+        run_id: JsonPath.stringAt('$.run_id'),
+        org_id: JsonPath.stringAt('$.org_id'),
+        stage: 'humanize',
+      }),
+      resultSelector: { 'readability_ok.$': '$.Payload.readability_ok' },
+      resultPath: '$.humanize',
+      taskTimeout: Timeout.duration(Duration.minutes(5)),
     });
-    generationQueue.grantSendMessages(generationSchedulerFn);
-    mongoUriParam.grantRead(generationSchedulerFn);
+    humanizeTask.addRetry({
+      errors: ['ArticleRetryableError', 'States.Timeout'],
+      maxAttempts: 3,
+      interval: Duration.seconds(30),
+      backoffRate: 2,
+    });
 
-    // Daily at 07:00 UTC — articles generate on/after their scheduled day.
-    new Rule(this, 'GenerationSchedule', {
-      schedule: Schedule.cron({ minute: '0', hour: '7' }),
-      targets: [new LambdaFunction(generationSchedulerFn)],
+    const finalizeChain = articleStage('finalize', Duration.minutes(5))
+      .next(articleStage('images_plan', Duration.minutes(3)))
+      .next(articleStage('images_render', Duration.minutes(9)))
+      .next(articleStage('handoff_publish', Duration.minutes(2)));
+
+    const readabilityGate = new Choice(this, 'Article_readability_gate')
+      .when(Condition.booleanEquals('$.humanize.readability_ok', true), finalizeChain)
+      .otherwise(humanizeTask);
+
+    const articleDefinition = articleStage('prepare', Duration.minutes(3))
+      .next(articleStage('outline', Duration.minutes(5)))
+      .next(articleStage('draft', Duration.minutes(5)))
+      .next(humanizeTask.next(readabilityGate));
+
+    const articleStateMachine = new StateMachine(this, 'ArticleStateMachine', {
+      definitionBody: DefinitionBody.fromChainable(articleDefinition),
+      timeout: Duration.hours(1),
+    });
+
+    articleStateMachine.grantStartExecution(apiFn);
+    apiFn.addEnvironment('ARTICLE_STATE_MACHINE_ARN', articleStateMachine.stateMachineArn);
+    articleStateMachine.grantStartExecution(generationSchedulerFn);
+    generationSchedulerFn.addEnvironment(
+      'ARTICLE_STATE_MACHINE_ARN',
+      articleStateMachine.stateMachineArn,
+    );
+
+    new Rule(this, 'ArticleExecutionFailedRule', {
+      eventPattern: {
+        source: ['aws.states'],
+        detailType: ['Step Functions Execution Status Change'],
+        detail: {
+          status: ['FAILED', 'TIMED_OUT', 'ABORTED'],
+          stateMachineArn: [articleStateMachine.stateMachineArn],
+        },
+      },
+      targets: [new LambdaFunction(articleStageFn)],
+    });
+
+    // Replaces the generation/images DLQs as the "a customer got no article" signal.
+    new Alarm(this, 'ArticleExecutionsFailedAlarm', {
+      metric: articleStateMachine.metricFailed({ period: Duration.minutes(5) }),
+      threshold: 1,
+      evaluationPeriods: 1,
+      treatMissingData: TreatMissingData.NOT_BREACHING,
     });
 
     // DB-init Lambda — creates MongoDB indexes. Invoked at deploy time by the
@@ -614,20 +659,18 @@ export class ApiStack extends Stack {
         ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
         GOOGLE_CLIENT_ID: cfg.googleClientId,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
-        GENERATION_QUEUE_URL: generationQueue.queueUrl,
-        IMAGES_QUEUE_URL: imagesQueue.queueUrl,
         STRATEGY_STATE_MACHINE_ARN: strategyStateMachine.stateMachineArn,
+        ARTICLE_STATE_MACHINE_ARN: articleStateMachine.stateMachineArn,
       },
       bundling,
     });
     scanQueue.grantSendMessages(adminFn);
-    generationQueue.grantSendMessages(adminFn);
-    imagesQueue.grantSendMessages(adminFn);
     mongoUriParam.grantRead(adminFn);
     grantDataForSeo(adminFn);
     adminJwtSecretParam.grantRead(adminFn);
     adminOperatorsParam.grantRead(adminFn);
     strategyStateMachine.grantStartExecution(adminFn);
+    articleStateMachine.grantStartExecution(adminFn);
 
     const adminHttpApi = new HttpApi(this, 'AdminHttpApi');
     adminHttpApi.addRoutes({

@@ -37,6 +37,7 @@ const article: Article = {
   publications: [],
   auto_publish: { preflight_error: null, attempts: [] },
   video: null,
+  readability: null,
 };
 
 describe('WordPress client', () => {

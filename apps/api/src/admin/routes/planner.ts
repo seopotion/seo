@@ -1,7 +1,7 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
+import { launchGeneration } from '@shared/articles';
 import { CandidateRepo, isDuplicateKeyError, KeywordRepo, OrgRepo } from '@shared/db';
 import { isPaid } from '@shared/schemas';
-import { enqueueGenerateTask } from '../../clients/sqs';
 import { audit } from '../audit';
 import { toAdminScheduledKeyword } from '../dto';
 import type { AdminEnv } from '../middleware';
@@ -196,9 +196,10 @@ const planner = new OpenAPIHono<AdminEnv>()
         return c.json({ error: 'generation_terminal' }, 409);
       }
 
-      // No status flip here — the worker's atomic claimGeneration makes
-      // double-clicks, scheduler races, and SQS redeliveries converge.
-      await enqueueGenerateTask({ org_id: org.id, keyword_id: keyword.id });
+      // Claim-lost (already in flight) intentionally still reports enqueued:
+      // same silent dedupe the SQS worker's claim used to provide. Launch
+      // errors (missing presets etc.) propagate -> 500, surfaced to admin.
+      await launchGeneration(org.id, keyword.id);
       await audit(c, {
         action: 'keyword.generate_now',
         org_id: org.id,

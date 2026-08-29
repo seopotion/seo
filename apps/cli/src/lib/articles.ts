@@ -1,14 +1,16 @@
 /**
  * Article pipeline operations (spec: docs/superpowers/specs/
- * 2026-08-22-article-cli-design.md). Inspection reads Mongo; generate-next and
- * publish enqueue SQS tasks that the deployed workers consume — the CLI never
- * generates or publishes in-process, so a run exercises the deployed pipeline.
+ * 2026-08-22-article-cli-design.md). Inspection reads Mongo. generate-next
+ * launches an article-generation run via `@shared/articles` (a Step Functions
+ * execution when deployed, in-process locally). publish enqueues SQS tasks
+ * that the deployed publish worker consumes.
  */
 import { GetQueueAttributesCommand, SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { launchGeneration } from '@shared/articles';
 import { ArticleRepo, closeDb, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { MAX_GENERATION_ATTEMPTS } from '@shared/generation';
 import type { Article, IntegrationProvider, PublishingError } from '@shared/schemas';
-import { GenerateTask, INTEGRATION_PROVIDERS, isPaid, PublishTask } from '@shared/schemas';
+import { INTEGRATION_PROVIDERS, isPaid, PublishTask } from '@shared/schemas';
 import {
   type ArticleShowData,
   type ArticlesListData,
@@ -299,46 +301,34 @@ export async function generateNext(opts: {
   wait: boolean;
   timeoutMs: number;
 }): Promise<Result<GenerateNextData>> {
-  const queueUrl = process.env.GENERATION_QUEUE_URL;
-  if (!queueUrl) {
-    return fail(
-      'QUEUE_URL_MISSING',
-      'GENERATION_QUEUE_URL is not set.',
-      'Point it at the staging generation queue (aws sqs list-queues), or at ElasticMQ with SQS_ENDPOINT for local dev.',
-    );
-  }
-  const probe = await preflightQueue(queueUrl);
-  if (!probe.ok) return probe;
-  const client = probe.data;
-
   try {
     const resolved = await resolveOrgId(opts.org, opts.user);
     if (!resolved.ok) return resolved;
     const orgId = resolved.data;
 
-    // The generation worker fails these permanently (no retry) — check them up
+    // launchGeneration fails these permanently (no retry) — check them up
     // front so `--wait` doesn't burn its whole timeout on a doomed org.
     const org = await OrgRepo.findById(orgId);
     if (!org) return fail('ORG_NOT_FOUND', `No org with id "${orgId}".`);
     if (!org.presets) {
       return fail(
         'ORG_NOT_FINALIZED',
-        `Org "${orgId}" has no presets — the generation worker would fail it permanently.`,
+        `Org "${orgId}" has no presets — launching generation would fail it permanently.`,
         'Finish onboarding for this org first.',
       );
     }
     if (!isPaid(org)) {
       return fail(
         'ORG_NOT_PAID',
-        `Org "${orgId}" is on plan "${org.plan}" — the generation worker refuses unpaid orgs.`,
+        `Org "${orgId}" is on plan "${org.plan}" — generation refuses unpaid orgs.`,
         `npm run cli -- db set-plan --org ${orgId} --plan paid`,
       );
     }
 
     // Same eligibility as the scheduler's listDueForGeneration, minus the date
-    // cap (the worker never checks scheduled_date — only the scheduler does) and
-    // scoped to one org. listByOrg sorts by scheduled_date asc, so "next" is
-    // simply the head of the filtered list.
+    // cap (the generation pipeline never checks scheduled_date — only the
+    // scheduler does) and scoped to one org. listByOrg sorts by scheduled_date
+    // asc, so "next" is simply the head of the filtered list.
     const keywords = await KeywordRepo.listByOrg(orgId);
     const eligible = keywords.filter(
       (k) =>
@@ -355,37 +345,41 @@ export async function generateNext(opts: {
     }
 
     const targets = eligible.slice(0, opts.count);
+    const launched: { keyword_id: string; keyword: string; run_id: string }[] = [];
+    const failures: { keyword_id: string; keyword: string; error: string }[] = [];
     for (const target of targets) {
-      await client.send(
-        new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: JSON.stringify(GenerateTask.parse({ org_id: orgId, keyword_id: target.id })),
-        }),
-      );
+      try {
+        // wait: true unconditionally — this CLI process closes the shared
+        // Mongo connection and exits right after generateNext returns, which
+        // would otherwise race launchGeneration's fire-and-forget local run
+        // (see apps/cli/src/lib/db.ts's launchStrategy call for the same fix).
+        // `--wait` (opts.wait) only controls the outcome poll below now.
+        const res = await launchGeneration(orgId, target.id, { wait: true });
+        if (res)
+          launched.push({ keyword_id: target.id, keyword: target.keyword, run_id: res.run_id });
+      } catch (e) {
+        // launchGeneration already released the claim (KeywordRepo.failGeneration)
+        // before rethrowing — record the failure and keep launching the rest
+        // of the batch instead of losing it to one bad keyword.
+        failures.push({
+          keyword_id: target.id,
+          keyword: target.keyword,
+          error: (e as Error).message,
+        });
+      }
     }
 
     let wait: WaitReport | null = null;
-    if (opts.wait) {
+    if (opts.wait && launched.length > 0) {
       const providers = await expectedProviders(orgId);
       wait = await pollUntil(
-        () => Promise.all(targets.map((t) => generationOutcome(t.id, providers))),
+        () => Promise.all(launched.map((l) => generationOutcome(l.keyword_id, providers))),
         opts.timeoutMs,
       );
     }
 
-    return ok({
-      org_id: orgId,
-      enqueued: targets.map((k) => ({
-        keyword_id: k.id,
-        keyword: k.keyword,
-        scheduled_date: k.scheduled_date,
-        generation_status: k.generation_status,
-        generation_attempts: k.generation_attempts,
-      })),
-      wait,
-    });
+    return ok({ org_id: orgId, enqueued: launched, failures, wait });
   } finally {
-    client.destroy();
     await closeDb();
   }
 }

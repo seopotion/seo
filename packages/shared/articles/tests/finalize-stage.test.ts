@@ -1,0 +1,187 @@
+import type { LlmClient, YouTubeClient } from '@shared/providers';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const { createArticle, linkArticle } = vi.hoisted(() => ({
+  createArticle: vi.fn(async (_doc: unknown) => ({ id: 'a1' })),
+  linkArticle: vi.fn(async () => {}),
+}));
+vi.mock('@shared/db', () => ({
+  ArticleRepo: { create: createArticle },
+  KeywordRepo: { linkArticle },
+}));
+
+import { ArticleFatalError } from '../src/errors';
+import { stageFinalize } from '../src/stages/finalize';
+import { keyword, makeRun, presets } from './fixtures';
+
+// Copied from packages/shared/generation/tests/generate.test.ts — clears
+// WORD_COUNT_FLOOR (800) and carries two distinct H2 sections.
+const content = `# Best Widgets For Makers\n\n${'Intro paragraph words here. '.repeat(20)}\n\n## One\n\n${'Body one content unique. '.repeat(100)}\n\n## Two\n\n${'Body two content unique. '.repeat(100)}\n`;
+
+const outline = {
+  h1: 'Best Widgets For Makers',
+  meta_title: 'Best Widgets For Makers 2026',
+  meta_description: 'x'.repeat(140),
+  slug: 'best-widgets',
+  sections: [
+    { heading: 'One', intent: 'i' },
+    { heading: 'Two', intent: 'i' },
+  ],
+  faqs: [],
+  internal_links: [],
+  cta: 'Compare the best option for your needs.',
+};
+
+const presetsNoVideo = {
+  ...presets,
+  article_preferences: {
+    ...presets.article_preferences,
+    engagement: { ...presets.article_preferences.engagement, youtube_videos: false },
+  },
+};
+
+function llmReplying(...texts: string[]): LlmClient {
+  const complete = vi.fn();
+  for (const text of texts) {
+    complete.mockResolvedValueOnce({
+      text,
+      model: 'test',
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0.01 },
+    });
+  }
+  return { complete };
+}
+
+const semanticPass = '{"pass":true,"reasons":[]}';
+
+function youtubeThat(impl?: () => Promise<never>): YouTubeClient {
+  return { searchVideos: vi.fn(impl ?? (async () => [])) };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('stageFinalize', () => {
+  test('happy path: creates the article with the readability object and links the keyword', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat();
+    const run = makeRun({
+      working: {
+        outline,
+        content,
+        readability_grade: 6,
+        humanize_attempts: [{ attempt: 1, grade: 6, content }],
+      },
+      presets: presetsNoVideo,
+    });
+
+    const result = await stageFinalize(run, { llm, youtube });
+
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(createArticle).toHaveBeenCalledWith({
+      org_id: 'o1',
+      keyword_id: keyword.id,
+      title: outline.h1,
+      meta_title: outline.meta_title,
+      slug: outline.slug,
+      keyword: keyword.keyword,
+      topic_cluster_id: keyword.topic_cluster_id,
+      topic_cluster_label: keyword.topic_cluster_label,
+      topic_role: keyword.topic_role,
+      topic_content_focus: keyword.topic_content_focus,
+      topic_primary_keyword: keyword.topic_primary_keyword,
+      meta_description: outline.meta_description,
+      featured_image_url: '',
+      content,
+      video: null,
+      difficulty: keyword.difficulty,
+      search_volume: keyword.search_volume,
+      status: 'generated',
+      published_at: null,
+      readability: {
+        metric: 'flesch_kincaid_grade',
+        grade: 6,
+        target: 8,
+        target_met: true,
+        attempts: 1,
+      },
+    });
+    expect(linkArticle).toHaveBeenCalledWith(keyword.id, 'a1');
+    expect(result).toEqual({ completed: true, working: { article_id: 'a1' } });
+  });
+
+  test('semantic failure throws ArticleFatalError and creates no article', async () => {
+    const llm = llmReplying('{"pass":false,"reasons":["promotes rival"]}');
+    const youtube = youtubeThat();
+    const run = makeRun({
+      working: { outline, content, readability_grade: 6 },
+      presets: presetsNoVideo,
+    });
+
+    await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
+      new ArticleFatalError('validation: semantic'),
+    );
+    expect(createArticle).not.toHaveBeenCalled();
+  });
+
+  test('redrive guard: article_id already set returns immediately without creating', async () => {
+    const complete = vi.fn(() => {
+      throw new Error('must not be called');
+    });
+    const llm: LlmClient = { complete };
+    const youtube = youtubeThat();
+    const run = makeRun({ working: { outline, content, article_id: 'existing-1' } });
+
+    const result = await stageFinalize(run, { llm, youtube });
+
+    expect(result).toEqual({ completed: true, working: { article_id: 'existing-1' } });
+    expect(createArticle).not.toHaveBeenCalled();
+    expect(linkArticle).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  test('video step failure is swallowed: article still created with video null', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat(async () => {
+      throw new Error('quota exceeded');
+    });
+    const run = makeRun({
+      working: { outline, content, readability_grade: 6 },
+      // default fixture presets have youtube_videos: true
+    });
+
+    const result = await stageFinalize(run, { llm, youtube });
+
+    expect(youtube.searchVideos).toHaveBeenCalledTimes(1);
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(createArticle.mock.calls[0]![0]).toMatchObject({ video: null });
+    expect(result).toEqual({ completed: true, working: { article_id: 'a1' } });
+  });
+
+  test('grade above target stamps target_met: false', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat();
+    const attempts = [
+      { attempt: 1, grade: 14, content: 'x' },
+      { attempt: 2, grade: 10, content: 'y' },
+      { attempt: 3, grade: 9.4, content },
+    ];
+    const run = makeRun({
+      working: { outline, content, readability_grade: 9.4, humanize_attempts: attempts },
+      presets: presetsNoVideo,
+    });
+
+    await stageFinalize(run, { llm, youtube });
+
+    expect(createArticle.mock.calls[0]![0]).toMatchObject({
+      readability: {
+        metric: 'flesch_kincaid_grade',
+        grade: 9.4,
+        target: 8,
+        target_met: false,
+        attempts: 3,
+      },
+    });
+  });
+});

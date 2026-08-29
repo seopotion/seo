@@ -127,11 +127,12 @@ export const KeywordRepo = {
   /**
    * Atomically claim a keyword for generation. Succeeds only when it is
    * unlinked and not already terminal/in-flight (a 'generating' claim older
-   * than 15min is treated as stale and reclaimable). Mirrors OrgRepo.claimStrategy.
+   * than 2h is treated as stale and reclaimable — must exceed the article
+   * state machine's 1h execution timeout). Mirrors OrgRepo.claimStrategy.
    */
   async claimGeneration(id: string): Promise<boolean> {
     if (!ObjectId.isValid(id)) return false;
-    const staleBefore = new Date(Date.now() - 15 * 60 * 1000);
+    const staleBefore = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const res = await (await collection()).updateOne(
       {
         _id: new ObjectId(id),
