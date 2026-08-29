@@ -1,6 +1,7 @@
 import type { LlmMessage } from '@shared/providers';
 import { toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
+import { META_DESCRIPTION_MAX, META_DESCRIPTION_MIN } from './config';
 import { parseJsonObject } from './json';
 import { normalizeUrl } from './links';
 import { completeTopicBrief } from './topic';
@@ -89,6 +90,24 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
 }
 
 /**
+ * Trim an over-long meta_description back under the validator's ceiling,
+ * preferring a word boundary. The model is asked for 120-160 chars and aims at
+ * the ceiling (observed median 157), so overshoot is routine — and it used to
+ * be fatal, killing the whole run at `finalize` after draft+humanize had
+ * already been paid for. Clamping here keeps `validateArticle` a backstop
+ * invariant instead of a coin flip.
+ */
+function clampMetaDescription(value: string): string {
+  const text = value.trim();
+  if (text.length <= META_DESCRIPTION_MAX) return text;
+  const cut = text.slice(0, META_DESCRIPTION_MAX);
+  const lastSpace = cut.lastIndexOf(' ');
+  // Only honour the word boundary while it stays above the validator's floor.
+  const trimmed = lastSpace >= META_DESCRIPTION_MIN ? cut.slice(0, lastSpace) : cut;
+  return trimmed.replace(/[\s,;:.!?-]+$/, '');
+}
+
+/**
  * Parse the outline and reduce `internal_links` to targets we can vouch for:
  * each must match a supplied candidate, appear once, and fit under the ceiling.
  * Selections are rewritten to OUR canonical URL, so a trailing-slash variant
@@ -106,5 +125,10 @@ export function parseOutline(text: string, ctx: GenerationContext): Outline {
     if (internal_links.length >= ctx.maxInternalLinks) break;
     internal_links.push(canonical);
   }
-  return { ...parsed, cta: ctx.includeCta ? cta : '', internal_links };
+  return {
+    ...parsed,
+    meta_description: clampMetaDescription(parsed.meta_description),
+    cta: ctx.includeCta ? cta : '',
+    internal_links,
+  };
 }
