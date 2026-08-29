@@ -10,6 +10,14 @@ const repos = vi.hoisted(() => ({
     recordPublication: vi.fn(),
   },
   AdminActionRepo: { insert: vi.fn() },
+  PromoCodeRepo: {
+    create: vi.fn(),
+    findByCode: vi.fn(),
+    findById: vi.fn(),
+    list: vi.fn(),
+    deactivate: vi.fn(),
+  },
+  PromoRedemptionRepo: { countConfirmed: vi.fn(), listByCode: vi.fn() },
 }));
 vi.mock('@shared/db', () => repos);
 

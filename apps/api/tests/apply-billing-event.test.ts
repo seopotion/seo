@@ -10,6 +10,7 @@ const {
   findById,
   claimStrategy,
   setStrategyStatus,
+  confirmPendingByOrg,
 } = vi.hoisted(() => ({
   upsertFromEvent: vi.fn(),
   updateFromEvent: vi.fn(),
@@ -19,10 +20,12 @@ const {
   findById: vi.fn(),
   claimStrategy: vi.fn(),
   setStrategyStatus: vi.fn(),
+  confirmPendingByOrg: vi.fn(),
 }));
 vi.mock('@shared/db', () => ({
   SubscriptionRepo: { upsertFromEvent, updateFromEvent, findActiveByOrg, listActiveByOrg },
   OrgRepo: { setPlan, findById, claimStrategy, setStrategyStatus },
+  PromoRedemptionRepo: { confirmPendingByOrg },
 }));
 
 const { launchStrategy } = vi.hoisted(() => ({ launchStrategy: vi.fn() }));
@@ -115,6 +118,18 @@ describe('applyBillingEvent', () => {
     launchStrategy.mockRejectedValueOnce(new Error('no queue'));
     await expect(applyBillingEvent(activated, provider)).rejects.toThrow('no queue');
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'failed');
+  });
+
+  test('activated confirms the org’s pending promo redemptions', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    await applyBillingEvent(activated, provider);
+    expect(confirmPendingByOrg).toHaveBeenCalledWith(activated.orgId);
+  });
+
+  test('a redemption-confirm failure never fails the webhook (entitlement already applied)', async () => {
+    upsertFromEvent.mockResolvedValueOnce({ org_id: 'o1' });
+    confirmPendingByOrg.mockRejectedValueOnce(new Error('mongo down'));
+    await expect(applyBillingEvent(activated, provider)).resolves.toBeUndefined();
   });
 
   test('updated active: keeps plan on the tier', async () => {

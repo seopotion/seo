@@ -9,6 +9,8 @@ export * from './json-schema';
 export * from './keyword';
 export * from './org';
 export * from './presets';
+export * from './promo-code';
+export * from './promo-redemption';
 export * from './scan';
 export * from './strategy-run';
 export * from './subscription';
