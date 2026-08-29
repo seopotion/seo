@@ -1,4 +1,4 @@
-import { OrgRepo, SubscriptionRepo } from '@shared/db';
+import { OrgRepo, PromoRedemptionRepo, SubscriptionRepo } from '@shared/db';
 import type { BillingEvent, BillingProvider } from '@shared/providers';
 import { launchStrategy } from '@shared/strategy';
 import { logger } from '../../logger';
@@ -40,6 +40,16 @@ export async function applyBillingEvent(
         current_period_end: event.currentPeriodEnd,
       });
       await OrgRepo.setPlan(event.orgId, event.tier);
+      // Attribution only — must never fail entitlement. Correlates by org (the
+      // accepted caveat in the promo design spec §5).
+      try {
+        await PromoRedemptionRepo.confirmPendingByOrg(event.orgId);
+      } catch (err) {
+        logger.warn('promo redemption confirm failed', {
+          org_id: event.orgId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
       // Paying after onboarding must bootstrap the keyword/article pipeline the
       // same way /setup/finalize does for orgs paid at finalize time — flipping
       // the plan alone leaves the org permanently dormant (#47). claimStrategy

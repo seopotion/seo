@@ -116,6 +116,27 @@
       "already_subscribed": "You're already subscribed to this plan. Manage your billing from Settings instead.",
       "generic": "Could not start checkout. Try again."
     },
+    "promo": {
+      "apply": "Apply",
+      "applied": "{code} applied — {discount}",
+      "applying": "Checking…",
+      "discount": {
+        "forever": "{percent}% off forever",
+        "once": "{percent}% off your first payment",
+        "repeating": "{percent}% off for {months} months"
+      },
+      "errors": {
+        "already_redeemed": "This code has already been used for this organization.",
+        "exhausted": "This code has reached its redemption limit.",
+        "expired": "This code has expired.",
+        "generic": "Could not check the code. Try again.",
+        "inactive": "This code is no longer active.",
+        "not_found": "That code doesn't exist."
+      },
+      "placeholder": "Enter code",
+      "remove": "Remove",
+      "title": "Have a promo code?"
+    },
     "redirecting": "Redirecting…",
     "status": {
       "loading": "Loading your organization...",

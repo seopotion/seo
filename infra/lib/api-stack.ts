@@ -624,8 +624,11 @@ export class ApiStack extends Stack {
 
     // Admin API (epic #150) — its own Lambda + HTTP API: separate URL, separate
     // secret, separate bundle. The customer Lambda contains zero admin code and
-    // the admin Lambda is granted ONLY its own secrets — never the customer JWT
-    // secret, GSC token key, Google client secret, or LemonSqueezy params.
+    // the admin Lambda is granted its own secrets plus the LemonSqueezy API key
+    // — never the customer JWT secret, GSC token key, or Google client secret.
+    // The LS key is needed because the admin promo-code routes
+    // (apps/api/src/admin/routes/promo-codes.ts) call createDiscount/
+    // deleteDiscount directly against the LS API via getBillingProvider().
     //
     // Admin signing secret, created out-of-band like the others:
     //   aws ssm put-parameter --name /seo/<stage>/admin/jwt-secret --type SecureString --value <secret>
@@ -661,6 +664,12 @@ export class ApiStack extends Stack {
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_STATE_MACHINE_ARN: strategyStateMachine.stateMachineArn,
         ARTICLE_STATE_MACHINE_ARN: articleStateMachine.stateMachineArn,
+        // Promo-code mint/deactivate (apps/api/src/admin/routes/promo-codes.ts)
+        // call the LS discounts API via getBillingProvider(). Only the API key
+        // + store id are needed — createDiscount/deleteDiscount never touch the
+        // webhook secret or variant ids, so those stay ungranted here.
+        LEMONSQUEEZY_API_KEY_PARAM: cfg.lemonSqueezyApiKeyParam,
+        LEMONSQUEEZY_STORE_ID: cfg.lemonSqueezyStoreId,
       },
       bundling,
     });
@@ -669,6 +678,7 @@ export class ApiStack extends Stack {
     grantDataForSeo(adminFn);
     adminJwtSecretParam.grantRead(adminFn);
     adminOperatorsParam.grantRead(adminFn);
+    lemonSqueezyApiKeyParam.grantRead(adminFn);
     strategyStateMachine.grantStartExecution(adminFn);
     articleStateMachine.grantStartExecution(adminFn);
 

@@ -6,6 +6,8 @@ import type {
   GscConnection,
   Keyword,
   Org,
+  PromoCode,
+  PromoRedemption,
   Subscription,
 } from '@shared/schemas';
 import { isGscConnected } from '@shared/schemas';
@@ -197,5 +199,38 @@ export function toAdminArticleDetail(a: Article): z.infer<typeof schemas.Article
     updated_at: a.updated_at ? a.updated_at.toISOString() : null,
     published_at: a.published_at ? a.published_at.toISOString() : null,
     video: a.video,
+  };
+}
+
+export function toAdminPromoCode(
+  promo: PromoCode,
+  confirmedRedemptions: number,
+): z.infer<typeof schemas.AdminPromoCodeResponse>['promo_code'] {
+  return {
+    id: promo.id,
+    code: promo.code,
+    name: promo.name,
+    percent: promo.percent,
+    duration: promo.duration,
+    duration_in_months: promo.duration_in_months ?? null,
+    max_redemptions: promo.max_redemptions ?? null,
+    expires_at: promo.expires_at?.toISOString() ?? null,
+    active: promo.active,
+    affiliate: promo.affiliate ?? null,
+    ls_discount_id: promo.ls_discount_id,
+    confirmed_redemptions: confirmedRedemptions,
+    created_at: promo.created_at.toISOString(),
+  };
+}
+
+export function toAdminPromoRedemption(
+  row: PromoRedemption,
+): z.infer<typeof schemas.AdminPromoRedemptionsResponse>['redemptions'][number] {
+  return {
+    id: row.id,
+    org_id: row.org_id,
+    status: row.status,
+    created_at: row.created_at.toISOString(),
+    confirmed_at: row.confirmed_at?.toISOString() ?? null,
   };
 }

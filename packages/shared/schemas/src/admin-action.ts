@@ -12,7 +12,8 @@ export const AdminActionSchema = z.object({
   actor: z.string(),
   /** Action name, e.g. 'org.set_plan' — see AdminActionName in apps/api. */
   action: z.string(),
-  org_id: z.string(),
+  /** null for org-independent actions (promo codes). */
+  org_id: z.string().nullable(),
   entity: z.object({ type: z.string(), id: z.string() }).nullable(),
   /** Request body as received. */
   payload: z.unknown(),

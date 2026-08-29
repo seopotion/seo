@@ -1,9 +1,11 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { SubscriptionRepo } from '@shared/db';
+import { PromoRedemptionRepo, SubscriptionRepo } from '@shared/db';
+import type { PromoCode } from '@shared/schemas';
 import { isPaid, planRank } from '@shared/schemas';
 import { getBillingProvider } from '../clients/billing';
 import { applyBillingEvent } from '../lib/billing/apply-event';
 import { loadOwnedOrg } from '../lib/load-owned-org';
+import { validatePromoCode } from '../lib/promo/validate-code';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/billing';
 
@@ -31,17 +33,37 @@ const billing = new OpenAPIHono<AuthEnv>()
         },
         403: { description: 'Org not found or not owned by the caller' },
         409: { description: 'Already subscribed at this tier or higher' },
+        422: {
+          content: { 'application/json': { schema: schemas.CheckoutPromoErrorResponse } },
+          description: 'The promo code failed validation',
+        },
       },
     }),
     async (c) => {
-      const { org_id, tier } = c.req.valid('json');
+      const { org_id, tier, promo_code } = c.req.valid('json');
       const { userId, email } = c.get('auth');
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.body(null, 403);
       // Already entitled at an equal-or-higher tier -> send them to the portal instead.
       if (isPaid(org) && planRank(org.plan) >= planRank(tier)) return c.body(null, 409);
+      // Re-validate at checkout time — the code may have died since apply.
+      let promo: PromoCode | undefined;
+      if (promo_code) {
+        const result = await validatePromoCode(promo_code, org.id);
+        if (!result.ok) {
+          return c.json({ error: 'invalid_promo' as const, reason: result.reason }, 422);
+        }
+        promo = result.promo;
+      }
       const provider = await getBillingProvider();
-      const { url } = await provider.createCheckout({ tier, orgId: org.id, userEmail: email });
+      const { url } = await provider.createCheckout({
+        tier,
+        orgId: org.id,
+        userEmail: email,
+        discountCode: promo?.code,
+      });
+      // Pending until the subscription webhook confirms; idempotent per (code, org).
+      if (promo) await PromoRedemptionRepo.upsertPending(promo.id, promo.code, org.id);
       return c.json({ url }, 200);
     },
   )
@@ -75,6 +97,52 @@ const billing = new OpenAPIHono<AuthEnv>()
       const provider = await getBillingProvider();
       const { url } = await provider.getCustomerPortalUrl(sub.provider_customer_id);
       return c.json({ url }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['billing'],
+      method: 'post',
+      path: '/promo/validate',
+      summary: 'Validate a promo code for an org (pre-checkout)',
+      security: [{ Bearer: [] }],
+      middleware: [authMiddleware] as const,
+      request: {
+        body: {
+          content: { 'application/json': { schema: schemas.PromoValidateBody } },
+          required: true,
+        },
+      },
+      responses: {
+        200: {
+          content: { 'application/json': { schema: schemas.PromoValidateResponse } },
+          description: 'The code is applicable; discount terms for display',
+        },
+        403: { description: 'Org not found or not owned by the caller' },
+        422: {
+          content: { 'application/json': { schema: schemas.PromoInvalidResponse } },
+          description: 'Code rejected (see reason)',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id, code } = c.req.valid('json');
+      const { userId } = c.get('auth');
+      const org = await loadOwnedOrg(org_id, userId);
+      if (!org) return c.body(null, 403);
+      const result = await validatePromoCode(code, org.id);
+      if (!result.ok) return c.json({ valid: false as const, reason: result.reason }, 422);
+      const { promo } = result;
+      return c.json(
+        {
+          valid: true as const,
+          code: promo.code,
+          percent: promo.percent,
+          duration: promo.duration,
+          duration_in_months: promo.duration_in_months,
+        },
+        200,
+      );
     },
   )
   .openapi(

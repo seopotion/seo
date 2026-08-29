@@ -37,6 +37,29 @@ class CheckoutApiError extends Error {
   }
 }
 
+type AppliedPromo = {
+  code: string;
+  percent: number;
+  duration: 'once' | 'repeating' | 'forever';
+  duration_in_months?: number;
+};
+type PromoReason =
+  | 'not_found'
+  | 'inactive'
+  | 'expired'
+  | 'exhausted'
+  | 'already_redeemed'
+  | 'generic';
+
+class PromoApiError extends Error {
+  reason: PromoReason | 'unauthorized';
+  constructor(reason: PromoReason | 'unauthorized') {
+    super(reason);
+    this.name = 'PromoApiError';
+    this.reason = reason;
+  }
+}
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -52,6 +75,9 @@ export default function BillingPage() {
   } = useActiveOrganization();
   const [activationState, setActivationState] = useState<ActivationState>('idle');
   const [checkoutError, setCheckoutError] = useState<CheckoutError | null>(null);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [promoError, setPromoError] = useState<PromoReason | null>(null);
 
   const goToLogin = useCallback(() => {
     clearToken();
@@ -124,12 +150,52 @@ export default function BillingPage() {
     };
   }, [checkActivation, router]);
 
+  const promoMutation = useMutation({
+    mutationFn: async (code: string): Promise<AppliedPromo> => {
+      if (!organization) throw new Error('organization_required');
+      const response = await api.api.v0.billing.promo.validate.$post({
+        json: { org_id: organization.id, code },
+      });
+      const status = response.status as number;
+      if (status === 401) throw new PromoApiError('unauthorized');
+      if (status === 422) {
+        const body = (await response.json()) as { reason: PromoReason };
+        throw new PromoApiError(body.reason);
+      }
+      if (!response.ok) throw new PromoApiError('generic');
+      return (await response.json()) as AppliedPromo;
+    },
+    onSuccess: (promo) => {
+      setAppliedPromo(promo);
+      setPromoInput('');
+      setPromoError(null);
+    },
+    onError: (error) => {
+      if (error instanceof PromoApiError) {
+        if (error.reason === 'unauthorized') {
+          goToLogin();
+          return;
+        }
+        setPromoError(error.reason);
+        return;
+      }
+      setPromoError('generic');
+    },
+  });
+
+  function discountLabel(promo: AppliedPromo): string {
+    return t(`promo.discount.${promo.duration}`, {
+      percent: promo.percent,
+      months: promo.duration_in_months ?? 0,
+    });
+  }
+
   const checkoutMutation = useMutation({
     mutationFn: async (tier: Tier) => {
       if (!organization) throw new Error('organization_required');
 
       const response = await api.api.v0.billing.checkout.$post({
-        json: { org_id: organization.id, tier },
+        json: { org_id: organization.id, tier, promo_code: appliedPromo?.code },
       });
       const status = response.status as number;
 
@@ -141,6 +207,12 @@ export default function BillingPage() {
         throw new CheckoutApiError('already_subscribed');
       }
 
+      if (status === 422) {
+        const body = (await response.json()) as { reason: PromoReason };
+        setAppliedPromo(null);
+        throw new PromoApiError(body.reason);
+      }
+
       if (!response.ok) {
         throw new CheckoutApiError('generic');
       }
@@ -149,6 +221,16 @@ export default function BillingPage() {
       window.location.assign(url);
     },
     onError: (error) => {
+      if (error instanceof PromoApiError) {
+        if (error.reason === 'unauthorized') {
+          goToLogin();
+          return;
+        }
+
+        setPromoError(error.reason);
+        return;
+      }
+
       if (!(error instanceof CheckoutApiError)) {
         setCheckoutError('generic');
         return;
@@ -165,6 +247,7 @@ export default function BillingPage() {
 
   function startCheckout(tier: Tier) {
     setCheckoutError(null);
+    setPromoError(null);
     checkoutMutation.mutate(tier);
   }
 
@@ -237,6 +320,57 @@ export default function BillingPage() {
           </Card>
         ))}
       </div>
+
+      <Card className="border-slate-200 shadow-none">
+        <CardContent className="grid gap-2 pt-6">
+          <p className="font-medium text-slate-950 text-sm">{t('promo.title')}</p>
+          {appliedPromo ? (
+            <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
+              <span>
+                {t('promo.applied', {
+                  code: appliedPromo.code,
+                  discount: discountLabel(appliedPromo),
+                })}
+              </span>
+              <Button
+                onClick={() => {
+                  setAppliedPromo(null);
+                  setPromoError(null);
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                {t('promo.remove')}
+              </Button>
+            </div>
+          ) : (
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (promoInput.trim() !== '') promoMutation.mutate(promoInput);
+              }}
+            >
+              <input
+                className="w-48 rounded-md border border-slate-200 px-3 py-1.5 text-sm uppercase"
+                onChange={(event) => setPromoInput(event.target.value)}
+                placeholder={t('promo.placeholder')}
+                value={promoInput}
+              />
+              <Button
+                disabled={promoMutation.isPending || promoInput.trim() === ''}
+                type="submit"
+                variant="outline"
+              >
+                {promoMutation.isPending ? t('promo.applying') : t('promo.apply')}
+              </Button>
+            </form>
+          )}
+          {promoError ? (
+            <p className="text-red-600 text-sm">{t(`promo.errors.${promoError}`)}</p>
+          ) : null}
+        </CardContent>
+      </Card>
     </div>
   );
 }
