@@ -28,7 +28,7 @@ write. None of them touch prod guards; never point them at prod.
 | `db set-plan --org\|--user [--plan free\|paid\|expert]` (default `paid`) | Sets `org.plan`. **If the org is finalized** (`setup_complete` + presets) and the plan is paid/expert, it also claims and **runs the 30-day strategy job** — in-process from your machine when `STRATEGY_STATE_MACHINE_ARN` is unset | no |
 | `db reset-user --user <email>` | Deletes the user's orgs + keywords, candidates, articles, GSC connections, subscriptions (cancelling active LemonSqueezy subs first). User doc stays → next login re-runs onboarding | **no** |
 | `db delete-user --user <email>` | `reset-user` + deletes the user document | **no** |
-| `db delete-org --org <id>[,<id>…] \| --keep <id>[,…] [--apply]` | Deletes the orgs and *every* org-scoped doc (the `reset-user` set plus integrations, strategy runs, GSC cache). Users and the append-only `admin_actions` log are untouched. `--keep` inverts: delete every org **except** these — an unknown id in either list aborts the whole sweep | yes (default) |
+| `db delete-org --org <id>[,<id>…] \| --keep <id>[,…] [--apply]` | Deletes the orgs and *every* org-scoped doc (the `reset-user` set plus integrations, strategy runs, article runs, GSC cache). Users and the append-only `admin_actions` log are untouched. `--keep` inverts: delete every org **except** these — an unknown id in either list aborts the whole sweep | yes (default) |
 
 Typical flows:
 
@@ -62,8 +62,8 @@ npm run --silent cli -- db delete-org --org <id1>,<id2> --apply --output json
 - **Paid ≠ auto-publish.** Publishing also needs the preset
   `article_preferences.publishing.auto_publish = true` (default false; set in
   the dashboard) and a connected provider (`integrations` row).
-- **`reset-user` leaves orphans**: it predates `integrations`, `strategy_runs`
-  and `gsc_analytics_cache` and does not delete them. Harmless for re-onboarding
+- **`reset-user` leaves orphans**: it predates `integrations`, `strategy_runs`,
+  `article_runs` and `gsc_analytics_cache` and does not delete them. Harmless for re-onboarding
   (new org = new id), but for a clean DB find the org id first
   (`articles list --user …` returns `org_id`) and use `db delete-org --apply`.
 - **`SUB_CANCEL_FAILED`** → an org has an active LemonSqueezy sub and
