@@ -58,6 +58,11 @@ const MESSAGES: Record<string, string> = {
   invalid_integration_key: "The plugin rejected that key — check it in the customer's WordPress.",
   integration_not_configured:
     'The plugin is installed but its integration is not switched on for this site.',
+
+  // Promo codes.
+  code_exists:
+    'That code is already in use — pick a different one or leave it blank to generate one.',
+  already_inactive: 'This code is already inactive.',
 };
 
 export function errorMessage(code: string): string {

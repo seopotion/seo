@@ -15,6 +15,7 @@ import { AuditTab } from './pages/org/AuditTab';
 import { OverviewTab } from './pages/org/OverviewTab';
 import { PlannerTab } from './pages/org/PlannerTab';
 import { PoolTab } from './pages/org/PoolTab';
+import { PromoCodesPage } from './pages/PromoCodesPage';
 import { SearchPage } from './pages/SearchPage';
 
 // A data router rather than <BrowserRouter>: `useBlocker` — the article
@@ -36,6 +37,7 @@ const router = createBrowserRouter(
         </Route>
         {/* Workspace-independent, so an article link stands on its own. */}
         <Route path="/articles/:articleId" element={<ArticlePage />} />
+        <Route path="/promo-codes" element={<PromoCodesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </>,

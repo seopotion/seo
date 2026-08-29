@@ -343,3 +343,49 @@ export async function retryImages(articleId: string) {
     }),
   );
 }
+
+// --- Promo codes ---
+
+/** Codes, newest first, each carrying its confirmed-redemption count. */
+export async function fetchPromoCodes() {
+  return unwrap(await adminApi.admin.v0['promo-codes'].$get());
+}
+
+export type PromoCode = Awaited<ReturnType<typeof fetchPromoCodes>>['promo_codes'][number];
+
+/** Exactly the create body: `code` blank means server-generated. */
+export type PromoCodeInput = {
+  code?: string;
+  name: string;
+  percent: number;
+  duration: PromoCode['duration'];
+  duration_in_months?: number;
+  max_redemptions?: number;
+  expires_at?: string;
+  affiliate?: string;
+};
+
+export async function createPromoCode(input: PromoCodeInput) {
+  return unwrap(await adminApi.admin.v0['promo-codes'].$post({ json: input }));
+}
+
+export async function deactivatePromoCode(promoCodeId: string) {
+  return unwrap(
+    await adminApi.admin.v0['promo-codes'][':promo_code_id'].deactivate.$post({
+      param: { promo_code_id: promoCodeId },
+    }),
+  );
+}
+
+/** The affiliate attribution report for one code — newest redemption first. */
+export async function fetchPromoRedemptions(promoCodeId: string) {
+  return unwrap(
+    await adminApi.admin.v0['promo-codes'][':promo_code_id'].redemptions.$get({
+      param: { promo_code_id: promoCodeId },
+    }),
+  );
+}
+
+export type PromoRedemption = Awaited<
+  ReturnType<typeof fetchPromoRedemptions>
+>['redemptions'][number];
