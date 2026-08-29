@@ -11,7 +11,7 @@ const collection = async () => (await getDb()).collection('promo_codes');
 
 function toEntity(doc: WithId<Document>): PromoCode {
   const { _id, ...rest } = doc;
-  const data = { id: _id.toString(), ...rest };
+  const data = { id: _id.toString(), ...rest } as Record<string, unknown>;
   // Convert null to undefined for optional fields
   if (data.duration_in_months === null) {
     delete data.duration_in_months;
