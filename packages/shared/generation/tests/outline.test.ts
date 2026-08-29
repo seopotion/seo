@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { META_DESCRIPTION_MAX, META_DESCRIPTION_MIN } from '../src/config';
 import { buildOutlinePrompt, parseOutline } from '../src/outline';
 import type { GenerationContext } from '../src/types';
 
@@ -270,5 +271,45 @@ describe('outline', () => {
     };
 
     expect(parseOutline(outlineJson([]), semantic).internal_links).toEqual([]);
+  });
+});
+
+describe('meta_description bounds', () => {
+  const outlineWithMeta = (meta: string) =>
+    `{"h1":"Best Widgets Ranked","meta_title":"t","meta_description":${JSON.stringify(
+      meta,
+    )},"slug":"s","sections":[{"heading":"H","intent":"i"}]}`;
+
+  test('parseOutline clamps an over-length meta_description to the validator ceiling', () => {
+    const long =
+      'Discover how reverse osmosis systems strip dissolved salts and stubborn contaminants out of seawater, and learn why disciplined membrane maintenance keeps desalination plants running at full capacity.';
+    expect(long.length).toBeGreaterThan(META_DESCRIPTION_MAX);
+
+    const out = parseOutline(outlineWithMeta(long), { ...ctx, includeCta: false });
+
+    expect(out.meta_description.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(out.meta_description.length).toBeGreaterThanOrEqual(META_DESCRIPTION_MIN);
+  });
+
+  test('parseOutline clamps on a word boundary rather than mid-word', () => {
+    const long =
+      'Discover how reverse osmosis systems strip dissolved salts and stubborn contaminants out of seawater, and learn why disciplined membrane maintenance keeps desalination plants running at full capacity.';
+
+    const out = parseOutline(outlineWithMeta(long), { ...ctx, includeCta: false });
+
+    expect(out.meta_description.length).toBeLessThan(long.length);
+    expect(long.startsWith(out.meta_description)).toBe(true);
+    expect(out.meta_description).not.toMatch(/[\s,;:]$/);
+  });
+
+  test('parseOutline leaves an in-bounds meta_description untouched', () => {
+    const fine =
+      'Reverse osmosis strips dissolved salts from seawater. Learn how membrane maintenance keeps a desalination plant running at its full rated capacity.';
+    expect(fine.length).toBeGreaterThanOrEqual(META_DESCRIPTION_MIN);
+    expect(fine.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+
+    const out = parseOutline(outlineWithMeta(fine), { ...ctx, includeCta: false });
+
+    expect(out.meta_description).toBe(fine);
   });
 });
