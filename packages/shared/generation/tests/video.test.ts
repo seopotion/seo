@@ -79,6 +79,16 @@ describe('injectBlockAfterHeading', () => {
       /heading not found/,
     );
   });
+
+  test('anchors to an indented heading the same way extractH2s reads it', () => {
+    expect(injectBlockAfterHeading('   ## Intro\n\ntext', 'Intro', '<iframe/>')).toBe(
+      '   ## Intro\n\n<iframe/>\n\ntext',
+    );
+    // 4 spaces is an indented code block, so there is no heading to anchor to
+    expect(() => injectBlockAfterHeading('    ## Intro\n\ntext', 'Intro', 'x')).toThrow(
+      /heading not found/,
+    );
+  });
 });
 
 describe('languageCodeFromName', () => {

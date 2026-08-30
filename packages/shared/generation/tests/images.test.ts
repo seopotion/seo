@@ -40,6 +40,15 @@ describe('extractH2s', () => {
     ].join('\n');
     expect(extractH2s(fenced)).toEqual(['Real Section']);
   });
+
+  test('honours CommonMark indentation: up to 3 spaces is a heading, 4+ is code', () => {
+    expect(extractH2s('   ## Three Space')).toEqual(['Three Space']);
+    // 4+ spaces or a tab opens an indented code block — not a heading
+    expect(extractH2s('    ## Four Space')).toEqual([]);
+    expect(extractH2s('\t## Tab Indented')).toEqual([]);
+    // ### stays excluded whatever the indent
+    expect(extractH2s('   ### Three Space H3')).toEqual([]);
+  });
 });
 
 describe('buildImagePlanPrompt', () => {

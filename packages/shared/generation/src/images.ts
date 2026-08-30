@@ -47,13 +47,17 @@ export const IMAGE_PLAN_RESPONSE_SCHEMA = toStrictJsonSchema(ImagePlanSchema, 'i
  * fenced code sample is not mistaken for a section (an image slot or video
  * embed anchored to it would land inside the code block); the heading text
  * still comes from the original line.
+ *
+ * Up to 3 leading spaces still opens a heading per CommonMark — the same bound
+ * `FENCE_RE` uses. A 4th space (or a tab) makes it indented code instead, which
+ * is why that case needs no masking to be excluded.
  */
 export function extractH2s(content: string): string[] {
   const lines = content.split('\n');
   return maskCode(content)
     .split('\n')
     .flatMap((masked, i) =>
-      /^##\s+/.test(masked) ? [(lines[i] as string).replace(/^##\s+/, '').trim()] : [],
+      /^ {0,3}##\s+/.test(masked) ? [(lines[i] as string).replace(/^ {0,3}##\s+/, '').trim()] : [],
     );
 }
 
@@ -118,7 +122,8 @@ export function injectBlockAfterHeading(content: string, heading: string, block:
   const lines = content.split('\n');
   const masked = maskCode(content).split('\n');
   const idx = lines.findIndex(
-    (l, i) => /^##\s+/.test(masked[i] as string) && l.replace(/^##\s+/, '').trim() === heading,
+    (l, i) =>
+      /^ {0,3}##\s+/.test(masked[i] as string) && l.replace(/^ {0,3}##\s+/, '').trim() === heading,
   );
   if (idx === -1) throw new Error(`heading not found in content: ${heading}`);
   lines.splice(idx + 1, 0, '', block);
