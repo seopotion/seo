@@ -72,6 +72,13 @@ describe('injectBlockAfterHeading', () => {
   test('throws when the heading is missing', () => {
     expect(() => injectBlockAfterHeading('## Other\n', 'Intro', 'x')).toThrow(/heading not found/);
   });
+
+  test('a heading that only exists inside a fenced code block is not found', () => {
+    const fenced = ['```markdown', '## Intro', '```', '', 'text'].join('\n');
+    expect(() => injectBlockAfterHeading(fenced, 'Intro', '<iframe/>')).toThrow(
+      /heading not found/,
+    );
+  });
 });
 
 describe('languageCodeFromName', () => {

@@ -23,6 +23,23 @@ describe('extractH2s', () => {
     expect(extractH2s(content)).toEqual(headings);
     expect(extractH2s('# only h1\n\n### h3')).toEqual([]);
   });
+
+  test('heading-shaped lines inside a fenced code block are not headings', () => {
+    const fenced = [
+      '# Title',
+      '',
+      'intro',
+      '',
+      '## Real Section',
+      '',
+      '```markdown',
+      '## Fake Section',
+      '```',
+      '',
+      'body',
+    ].join('\n');
+    expect(extractH2s(fenced)).toEqual(['Real Section']);
+  });
 });
 
 describe('buildImagePlanPrompt', () => {
@@ -100,5 +117,23 @@ describe('injectImageAfterHeading', () => {
 
   test('is anchored to the exact heading — unknown heading throws', () => {
     expect(() => injectImageAfterHeading(content, 'Missing', 'a', 'u')).toThrow(/not found/);
+  });
+
+  test('skips a heading-shaped line inside a fenced code block', () => {
+    const fenced = [
+      '```markdown',
+      '## First Section',
+      '```',
+      '',
+      '## First Section',
+      '',
+      'body',
+    ].join('\n');
+    const out = injectImageAfterHeading(fenced, 'First Section', 'alt one', 'https://cdn/x.png');
+    const lines = out.split('\n');
+    // the code sample is untouched; the image lands after the real heading
+    expect(lines.slice(0, 3)).toEqual(['```markdown', '## First Section', '```']);
+    expect(lines[5]).toBe('');
+    expect(lines[6]).toBe('![alt one](https://cdn/x.png)');
   });
 });
