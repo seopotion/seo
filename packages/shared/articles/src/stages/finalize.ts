@@ -73,8 +73,13 @@ export async function stageFinalize(
       message: semantic.reasons.join('; ') || 'semantic check failed',
     });
 
+  // Carry each failure's message, not just its code: a bare `validation:
+  // semantic` tells an operator nothing, and the reviewer's reasons are the
+  // only record of WHY the article was thrown away.
   if (failures.length)
-    throw new ArticleFatalError(`validation: ${failures.map((f) => f.code).join(', ')}`);
+    throw new ArticleFatalError(
+      `validation: ${failures.map((f) => `${f.code}: ${f.message}`).join(' | ')}`,
+    );
 
   // YouTube embed (#85): best-effort — any failure logs and the article
   // ships without a video; never fail or delay generation over this.
