@@ -72,6 +72,25 @@ describe('validateArticle', () => {
     expect(codes).toContain('duplicate_section');
   });
 
+  test('shell comments inside a fenced code block are not counted as H1s', () => {
+    const content = `${goodBody}\n\n## Deploying\n\n\`\`\`bash\n# Your workflow is this simple:\ngit push piper main\n# Piper detects the push and deploys automatically\n\`\`\`\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).not.toContain('h1_count');
+  });
+
+  test('a heading-shaped line inside a fenced code block does not split sections', () => {
+    const sample = '```md\n## Heading syntax\nUse one H1 per page.\n```';
+    const content = `# T\n\n${'intro words here. '.repeat(40)}\n\n## First\n\n${'Body words for the first section. '.repeat(80)}\n\n${sample}\n\n## Second\n\n${'Body words for the second section. '.repeat(80)}\n\n${sample}\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).toEqual([]);
+  });
+
+  test('a section whose body is only a code block is not an empty section', () => {
+    const content = `# T\n\n${'intro words here. '.repeat(40)}\n\n## Install\n\n\`\`\`bash\nnpm install piper\n\`\`\`\n\n## Notes\n\n${'Distinct trailing body words. '.repeat(150)}\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).not.toContain('empty_section');
+  });
+
   test('countWords ignores markdown punctuation', () => {
     expect(countWords('# Hello **world**')).toBe(2);
   });
