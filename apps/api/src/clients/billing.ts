@@ -34,6 +34,8 @@ export async function getBillingProvider(): Promise<BillingProvider> {
       expert: config.LEMONSQUEEZY_VARIANT_EXPERT,
     },
     // The page that polls entitlement after checkout — see apps/web /billing.
-    redirectUrl: `${config.WEB_ORIGIN}/billing?checkout=success`,
+    // `tier` tells that page which tier to wait for; it falls back to the paid
+    // capability when the param is absent (checkout links minted before this).
+    redirectUrl: (tier) => `${config.WEB_ORIGIN}/billing?checkout=success&tier=${tier}`,
   });
 }

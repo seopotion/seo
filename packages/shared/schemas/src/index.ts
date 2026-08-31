@@ -1,4 +1,4 @@
-export type { SetupStatus, StrategyStatus } from '@shared/types';
+export type { EntitlementPlan, SetupStatus, StrategyStatus } from '@shared/types';
 export * from './admin-action';
 export * from './article';
 export * from './article-run';

@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { SETUP_STATUSES } from '@shared/types';
+import { ENTITLEMENT_PLANS, SETUP_STATUSES } from '@shared/types';
 
 export const LoginBody = z
   .object({
@@ -25,6 +25,9 @@ const Organization = z
       keyword_research: z.boolean(),
       keyword_scheduling: z.boolean(),
     }),
+    // Display-only: lets the billing page label the current plan and offer
+    // higher tiers. Gate features on `capabilities`, never on this.
+    billing_tier: z.enum(ENTITLEMENT_PLANS),
   })
   .openapi('Organization');
 

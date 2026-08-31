@@ -1,6 +1,6 @@
 'use client';
 
-import type { SetupStatus } from '@shared/schemas';
+import type { EntitlementPlan, SetupStatus } from '@shared/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
@@ -10,6 +10,9 @@ import { dashboardQueryKeys } from './dashboard-query-keys';
 import { clearWorkspaceStatusCache } from './session';
 
 export type ProductOrganization = {
+  // Display-only (see apps/api/src/schemas/core.ts) — gate features on
+  // `capabilities`, never on this.
+  billing_tier: EntitlementPlan;
   capabilities: {
     keyword_research: boolean;
     keyword_scheduling: boolean;

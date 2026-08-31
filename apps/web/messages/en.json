@@ -113,8 +113,14 @@
     },
     "description": "Unlock keyword research and scheduling by upgrading your plan.",
     "errors": {
-      "already_subscribed": "You're already subscribed to this plan. Manage your billing from Settings instead.",
+      "already_subscribed": "You're already subscribed to this plan. Use Manage billing to change your subscription.",
       "generic": "Could not start checkout. Try again."
+    },
+    "manage": {
+      "description": "You have an active paid subscription. Manage your payment method or cancel from the billing portal.",
+      "error": "Could not open the billing portal. Try again.",
+      "open": "Manage billing",
+      "opening": "Opening..."
     },
     "promo": {
       "apply": "Apply",
@@ -142,6 +148,12 @@
       "loading": "Loading your organization...",
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again."
+    },
+    "subscribedDescription": "Your plan and payment details.",
+    "subscribedTitle": "Billing",
+    "tierState": {
+      "current": "Current plan",
+      "owned": "Included in your plan"
     },
     "tiers": {
       "expert": {
@@ -277,6 +289,11 @@
       "product_guide": "Product guide"
     },
     "calendarLabel": "Content calendar grid",
+    "calendarNav": {
+      "nextMonth": "Next month",
+      "previousMonth": "Previous month",
+      "today": "Today"
+    },
     "chooseKeyword": {
       "actions": {
         "close": "Close keyword chooser",
@@ -324,7 +341,7 @@
     "contentCalendar": {
       "title": "Content Calendar"
     },
-    "description": "Plan one article per day across the next 45 days.",
+    "description": "Plan one article per day, month by month.",
     "modal": {
       "keyword": "Keyword",
       "notGenerated": "This article has not been generated yet.",
@@ -813,14 +830,6 @@
       "save": "Save",
       "saving": "Saving..."
     },
-    "billing": {
-      "description": "You have an active paid subscription. Manage your payment method or cancel from the billing portal.",
-      "freeDescription": "Upgrade to unlock keyword research and scheduling.",
-      "manage": "Manage billing",
-      "manageError": "Could not open the billing portal. Try again.",
-      "opening": "Opening...",
-      "upgradeCta": "View plans"
-    },
     "googleSearchConsole": {
       "badges": {
         "connected": "Connected",
@@ -890,7 +899,6 @@
     },
     "tabs": {
       "audienceCompetitors": "Audience & Competitors",
-      "billing": "Billing",
       "business": "Business",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",
@@ -1438,6 +1446,10 @@
       "articleSettings": {
         "description": "Set your preferences for all future articles.",
         "label": "Article Settings"
+      },
+      "billing": {
+        "description": "Review your plan, upgrade, and manage payment details.",
+        "label": "Billing"
       },
       "contentPlanner": {
         "description": "Plan topics, keywords, publishing cadence, and content priorities.",

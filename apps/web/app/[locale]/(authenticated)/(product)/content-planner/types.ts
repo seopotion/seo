@@ -104,6 +104,9 @@ export type ArticleLoadApiError = 'generic' | 'not_found';
 export type CalendarDay = {
   date: Date;
   dateKey: string;
-  inRange: boolean;
+  // Belongs to the month being displayed, rather than the padding days that
+  // complete the first and last week rows.
+  inMonth: boolean;
+  isPast: boolean;
   article?: PlannerArticle;
 };
