@@ -277,6 +277,11 @@
       "product_guide": "Product guide"
     },
     "calendarLabel": "Content calendar grid",
+    "calendarNav": {
+      "nextMonth": "Next month",
+      "previousMonth": "Previous month",
+      "today": "Today"
+    },
     "chooseKeyword": {
       "actions": {
         "close": "Close keyword chooser",
@@ -324,7 +329,7 @@
     "contentCalendar": {
       "title": "Content Calendar"
     },
-    "description": "Plan one article per day across the next 45 days.",
+    "description": "Plan one article per day, month by month.",
     "modal": {
       "keyword": "Keyword",
       "notGenerated": "This article has not been generated yet.",

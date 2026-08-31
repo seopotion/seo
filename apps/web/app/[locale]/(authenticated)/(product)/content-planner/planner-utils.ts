@@ -13,7 +13,6 @@ import type {
   TargetKeywordStatus,
 } from './types';
 
-export const DAYS_IN_RANGE = 45;
 export const RESEARCH_SEED_MAX_LENGTH = 200;
 
 const CANDIDATE_SCHEDULE_CONFLICTS = new Set<CandidateScheduleError>([
@@ -228,26 +227,36 @@ function getPlannerTargetKeywordStatus(article: PlannerArticle): TargetKeywordSt
   return 'scheduled';
 }
 
-export function buildCalendarWeeks(rangeStart: Date, articles: PlannerArticle[]): CalendarDay[][] {
-  const rangeEnd = addDays(rangeStart, DAYS_IN_RANGE - 1);
-  const gridStart = startOfWeekMonday(rangeStart);
+/**
+ * Whole-week grid for one calendar month: the Monday on or before the 1st
+ * through the Sunday on or after the last day, so every row has 7 cells.
+ * Articles attach only to in-month days: a keyword scheduled on a padding day
+ * belongs to the neighbouring month's grid, and would otherwise render twice.
+ */
+export function buildMonthWeeks(
+  monthStart: Date,
+  articles: PlannerArticle[],
+  today: Date,
+): CalendarDay[][] {
+  const monthEnd = endOfMonth(monthStart);
   const articleByDate = new Map(articles.map((article) => [article.scheduledDate, article]));
   const weeks: CalendarDay[][] = [];
-  let cursor = gridStart;
+  let cursor = startOfWeekMonday(monthStart);
 
-  while (cursor <= rangeEnd) {
+  while (cursor <= monthEnd) {
     const week: CalendarDay[] = [];
 
     for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
       const date = addDays(cursor, dayOffset);
       const dateKey = toDateKey(date);
-      const inRange = date >= rangeStart && date <= rangeEnd;
+      const inMonth = isSameMonth(date, monthStart);
 
       week.push({
-        article: inRange ? articleByDate.get(dateKey) : undefined,
+        article: inMonth ? articleByDate.get(dateKey) : undefined,
         date,
         dateKey,
-        inRange,
+        inMonth,
+        isPast: date < today,
       });
     }
 
@@ -262,6 +271,24 @@ export function startOfToday() {
   const today = new Date();
 
   return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+export function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+/** Only ever called with a month start, so there is no end-of-month clamping to do. */
+export function addMonths(monthStart: Date, months: number) {
+  return new Date(monthStart.getFullYear(), monthStart.getMonth() + months, 1);
+}
+
+export function isSameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+function endOfMonth(date: Date) {
+  // Day 0 of the next month is the last day of this one.
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }
 
 function startOfWeekMonday(date: Date) {
@@ -310,8 +337,8 @@ export function formatDayNumber(date: Date, locale: string) {
   return new Intl.DateTimeFormat(locale, { day: 'numeric' }).format(date);
 }
 
-export function formatMonth(date: Date, locale: string) {
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
+export function formatMonthYear(date: Date, locale: string) {
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(date);
 }
 
 export function formatNumber(value: number, locale: string) {
@@ -329,8 +356,4 @@ export function slugifyArticleTitle(value: string) {
     .replace(/^-+|-+$/g, '');
 
   return slug || 'article-draft';
-}
-
-export function isFirstDayOfMonth(date: Date) {
-  return date.getDate() === 1;
 }
