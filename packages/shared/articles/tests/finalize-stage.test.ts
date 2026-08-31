@@ -120,7 +120,23 @@ describe('stageFinalize', () => {
     });
 
     await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
-      new ArticleFatalError('validation: semantic'),
+      new ArticleFatalError('validation: semantic: promotes rival'),
+    );
+    expect(createArticle).not.toHaveBeenCalled();
+  });
+
+  test('the thrown message carries every failure reason, not just the codes', async () => {
+    const llm = llmReplying('{"pass":false,"reasons":["promotes rival","no CTA"]}');
+    const youtube = youtubeThat();
+    const run = makeRun({
+      working: { outline, content: `${content}\n\n# Stray H1\n`, readability_grade: 6 },
+      presets: presetsNoVideo,
+    });
+
+    await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
+      new ArticleFatalError(
+        'validation: h1_count: expected 1 H1, found 2 | semantic: promotes rival; no CTA',
+      ),
     );
     expect(createArticle).not.toHaveBeenCalled();
   });

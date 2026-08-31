@@ -16,23 +16,31 @@ export function countWords(md: string): number {
     .filter(Boolean).length;
 }
 
-/** Text before the first H2 (the introduction). */
-function introText(lines: string[]): string {
-  const firstH2 = lines.findIndex((l) => /^##\s+/.test(l));
-  const body = (firstH2 === -1 ? lines : lines.slice(0, firstH2)).filter((l) => !/^#\s+/.test(l));
-  return body.join('\n').trim();
+/**
+ * Text before the first H2 (the introduction). `masked` is the code-masked
+ * twin of `lines` and decides where headings are; the text itself comes from
+ * `lines` so a section written entirely as a code sample still counts as body.
+ */
+function introText(lines: string[], masked: string[]): string {
+  const firstH2 = masked.findIndex((l) => /^ {0,3}##\s+/.test(l));
+  const end = firstH2 === -1 ? lines.length : firstH2;
+  return lines
+    .slice(0, end)
+    .filter((_, i) => !/^ {0,3}#\s+/.test(masked[i] as string))
+    .join('\n')
+    .trim();
 }
 
 /** Body text of each H2 section (excludes the heading line). */
-function sectionBodies(lines: string[]): string[] {
+function sectionBodies(lines: string[], masked: string[]): string[] {
   const bodies: string[] = [];
   let current: string[] | null = null;
-  for (const line of lines) {
-    if (/^##\s+/.test(line)) {
+  for (let i = 0; i < lines.length; i++) {
+    if (/^ {0,3}##\s+/.test(masked[i] as string)) {
       if (current) bodies.push(current.join('\n').trim());
       current = [];
     } else if (current) {
-      current.push(line);
+      current.push(lines[i] as string);
     }
   }
   if (current) bodies.push(current.join('\n').trim());
@@ -52,8 +60,17 @@ export function validateArticle(
 ): ValidationFailure[] {
   const failures: ValidationFailure[] = [];
   const lines = article.content.split('\n');
-  const h1Count = lines.filter((l) => /^#\s+/.test(l)).length;
-  const h2Count = lines.filter((l) => /^##\s+/.test(l)).length;
+  // Headings are detected on the code-masked twin: `maskCode` blanks fenced
+  // lines to same-length spaces and inline spans cannot cross a newline, so the
+  // two arrays stay index-aligned. Without this a `# comment` in a bash sample
+  // reads as an H1 and fails the article outright.
+  //
+  // The 0-3 space bound is CommonMark's, and the same one `FENCE_RE` uses: a
+  // 4th space (or a tab) makes the line indented code, which is why indented
+  // blocks need no masking here to be excluded.
+  const masked = maskCode(article.content).split('\n');
+  const h1Count = masked.filter((l) => /^ {0,3}#\s+/.test(l)).length;
+  const h2Count = masked.filter((l) => /^ {0,3}##\s+/.test(l)).length;
 
   if (countWords(article.content) < WORD_COUNT_FLOOR)
     failures.push({ code: 'word_count', message: `below ${WORD_COUNT_FLOOR} words` });
@@ -73,10 +90,10 @@ export function validateArticle(
     failures.push({ code: 'h1_count', message: `expected 1 H1, found ${h1Count}` });
   if (h2Count < MIN_H2)
     failures.push({ code: 'h2_count', message: `fewer than ${MIN_H2} H2 sections` });
-  if (introText(lines).length === 0)
+  if (introText(lines, masked).length === 0)
     failures.push({ code: 'empty_intro', message: 'missing introduction' });
 
-  const bodies = sectionBodies(lines);
+  const bodies = sectionBodies(lines, masked);
   if (bodies.some((b) => b.length === 0))
     failures.push({ code: 'empty_section', message: 'a section has an empty body' });
   if (new Set(bodies).size !== bodies.length)
