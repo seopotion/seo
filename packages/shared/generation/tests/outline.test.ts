@@ -55,7 +55,7 @@ const outlineJson = (internal_links: string[]) =>
     slug: 'best-widgets',
     sections: [{ heading: 'H', intent: 'i' }],
     internal_links,
-    cta: 'Compare the available options.',
+    cta: 'Compare the available Acme options.',
   });
 
 describe('outline', () => {
@@ -103,6 +103,14 @@ describe('outline', () => {
     expect(joined).toContain('no internal link candidates');
   });
 
+  test('buildOutlinePrompt requires the CTA to name the business (#262)', () => {
+    const joined = buildOutlinePrompt(ctx)
+      .map((message) => message.content)
+      .join('\n');
+
+    expect(joined).toContain('names Acme');
+  });
+
   test('buildOutlinePrompt requires an empty CTA when CTA generation is disabled', () => {
     const joined = buildOutlinePrompt({ ...ctx, includeCta: false })
       .map((message) => message.content)
@@ -141,6 +149,38 @@ describe('outline', () => {
         ctx,
       ),
     ).toThrow('outline CTA is required');
+  });
+
+  test('parseOutline rejects a CTA that never names the business (#262)', () => {
+    expect(() =>
+      parseOutline(
+        JSON.stringify({
+          h1: 'Best Widgets Ranked',
+          meta_title: 't',
+          meta_description: 'd',
+          slug: 'best-widgets',
+          sections: [{ heading: 'H', intent: 'i' }],
+          cta: 'Explore open-source widget platforms today.',
+        }),
+        ctx,
+      ),
+    ).toThrow('outline CTA must name the business');
+  });
+
+  test('parseOutline accepts a CTA naming the business case-insensitively (#262)', () => {
+    const out = parseOutline(
+      JSON.stringify({
+        h1: 'Best Widgets Ranked',
+        meta_title: 't',
+        meta_description: 'd',
+        slug: 'best-widgets',
+        sections: [{ heading: 'H', intent: 'i' }],
+        cta: 'Try ACME widgets today.',
+      }),
+      ctx,
+    );
+
+    expect(out.cta).toBe('Try ACME widgets today.');
   });
 
   test('a complete pillar brief sets its exact focus and broad hub scope', () => {
