@@ -15,6 +15,7 @@ import type { PipelineInput, PipelineResult, PipelineStats } from './types';
 
 const EMPTY_REASON_COUNTS: Record<RejectionReason, number> = {
   brand_navigation: 0,
+  competitor_brand: 0,
   clustered_duplicate: 0,
   difficulty_ceiling: 0,
   relevance_floor: 0,

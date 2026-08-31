@@ -32,7 +32,11 @@ const cand = (keyword: string): WorkingCandidate => ({
 });
 
 describe('brandNavFilter', () => {
-  const opts = { orgName: 'Acme Robotics', websiteUrl: 'https://acmerobotics.io' };
+  const opts = {
+    orgName: 'Acme Robotics',
+    websiteUrl: 'https://acmerobotics.io',
+    competitors: [],
+  };
 
   it('rejects brand-name and domain-label matches', () => {
     const { survivors, rejected } = brandNavFilter(
@@ -59,8 +63,46 @@ describe('brandNavFilter', () => {
     const { survivors } = brandNavFilter([cand('good vacuum guide')], {
       orgName: 'GoShop',
       websiteUrl: 'https://go.com',
+      competitors: [],
     });
     expect(survivors).toHaveLength(1);
+  });
+
+  it('rejects competitor-brand keywords with a competitor_brand reason (#265)', () => {
+    const { survivors, rejected } = brandNavFilter(
+      [cand('dokploy'), cand('dokploy alternative'), cand('self hosted paas')],
+      { ...opts, competitors: ['dokploy.com'] },
+    );
+    expect(survivors.map((c) => c.keyword)).toEqual(['self hosted paas']);
+    expect(rejected.map((c) => c.rejection_reason)).toEqual([
+      'competitor_brand',
+      'competitor_brand',
+    ]);
+  });
+
+  it('accepts competitor domains given as full URLs', () => {
+    const { survivors, rejected } = brandNavFilter([cand('coolify vs dokku')], {
+      ...opts,
+      competitors: ['https://www.coolify.io/pricing'],
+    });
+    expect(survivors).toHaveLength(0);
+    expect(rejected[0]!.rejection_reason).toBe('competitor_brand');
+  });
+
+  it('does not reject keywords that merely contain a competitor label as a substring', () => {
+    const { survivors } = brandNavFilter([cand('good vacuum guide')], {
+      ...opts,
+      competitors: ['go.com'],
+    });
+    expect(survivors).toHaveLength(1);
+  });
+
+  it('keeps brand_navigation as the reason when a keyword hits both the org brand and a competitor', () => {
+    const { rejected } = brandNavFilter([cand('acme vs dokploy')], {
+      ...opts,
+      competitors: ['dokploy.com'],
+    });
+    expect(rejected[0]!.rejection_reason).toBe('brand_navigation');
   });
 });
 
