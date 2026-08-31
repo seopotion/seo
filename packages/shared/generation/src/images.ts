@@ -61,13 +61,34 @@ export function extractH2s(content: string): string[] {
     );
 }
 
+/**
+ * Appended to every prompt before it reaches the image model. The planner is
+ * already told to avoid lettering, but flux-2 renders garbled text whenever the
+ * scene merely *implies* it (a screen, a sign, a label), so the ban is repeated
+ * at the point of generation — where it also covers plans made before this rule.
+ */
+export const NO_TEXT_DIRECTIVE = [
+  'Absolutely no text anywhere in the image: no words, letters, numbers, captions,',
+  'labels, signage, watermarks, logos or brand marks. Surfaces that would normally',
+  'carry writing — screens, monitors, signs, packaging, documents, book covers,',
+  'clothing — are blank, abstract or turned away from the camera.',
+].join(' ');
+
+/** Prompt as sent to the image model: the planned scene plus the no-text ban. */
+export function withNoTextDirective(prompt: string): string {
+  return `${prompt.trim()}\n\n${NO_TEXT_DIRECTIVE}`;
+}
+
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
     'You are an art director planning images for one blog article.',
     `Rules: exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
     'EXACTLY from the provided section list, each from a DIFFERENT section. Prompts describe',
-    'a single visual scene with no text or words in the image. alt is a meaningful',
-    `description of the image for screen readers, written in ${input.language}.`,
+    'a single visual scene that contains NO text and NO logos: never ask for words, letters,',
+    'numbers, captions, labels, signs, screens showing an interface, documents, whiteboards,',
+    'book covers, branded packaging or the business logo. Prefer subjects that carry no',
+    'lettering at all; when a scene needs a screen or a sign, describe it as blank or out of',
+    `frame. alt is a meaningful description of the image for screen readers, written in ${input.language}.`,
   ].join('\n');
 
   const user = [

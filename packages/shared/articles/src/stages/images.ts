@@ -5,6 +5,7 @@ import {
   IMAGE_PLAN_RESPONSE_SCHEMA,
   injectImageAfterHeading,
   parseImagePlan,
+  withNoTextDirective,
 } from '@shared/generation';
 import type { ImageResult, LlmClient } from '@shared/providers';
 import type { ArticleImage, ArticleRun } from '@shared/schemas';
@@ -149,7 +150,10 @@ export async function stageImagesRender(
   for (const [i, slot] of article.images.entries()) {
     if (slot.url !== '') continue;
     const res = await image.generate({
-      prompt: slot.prompt,
+      // The planner is told to avoid lettering, but flux-2 still renders
+      // garbled words on any surface that implies them — so the ban is
+      // restated here, which also covers slots planned before that rule.
+      prompt: withNoTextDirective(slot.prompt),
       model: IMAGE_MODEL,
       size: SLOT_SIZE[slot.role],
       // fal encodes WebP itself, so no PNG is ever downloaded, stored or
