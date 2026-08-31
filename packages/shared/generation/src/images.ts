@@ -79,6 +79,72 @@ export function withNoTextDirective(prompt: string): string {
   return `${prompt.trim()}\n\n${NO_TEXT_DIRECTIVE}`;
 }
 
+/**
+ * Subjects that carry lettering whatever the prompt says not to. A staging run
+ * with the ban AND the style-precedence line in the planner prompt still asked
+ * for "a split-screen technical visualization" and published a diagram of
+ * garbled headings, so the ban is enforced here instead of merely stated (#280).
+ */
+const TEXT_RISK =
+  /\b(?:diagrams?|flow ?charts?|infographics?|split[- ](?:screens?|scenes?)|screenshots?|charts?|graphs?|dashboards?|interfaces?|UIs?|terminals?|monitors?|screens?|displaying|displays?|code|whiteboards?|documents?|book covers?|posters?|banners?|signage|signs?|labell?ed|labels?|captions?|annotat(?:ed|ions?)|logos?|watermarks?|typography|fonts?|texts?|words?|lettering|letters?|headings?|titles?)\b/i;
+
+/**
+ * A prompt may say what it is avoiding — "no text or signage", "free of
+ * lettering" — and that phrasing must not read as a request for it. The
+ * negation carries across a whole list, which is how these are usually
+ * written: "no words, letters, captions or logos".
+ */
+const BANNED_NOUN =
+  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing)';
+const QUALIFIER = '(?:(?:any|all|visible|readable|other)\\s+)*';
+const NEGATED = new RegExp(
+  `\\b(?:no|not|non|without|free of|devoid of|avoid(?:ing)?|omit(?:ting)?|exclude|excluding|never)\\s+${QUALIFIER}${BANNED_NOUN}(?:\\s*(?:,|,?\\s*(?:or|and|nor))\\s*${QUALIFIER}${BANNED_NOUN})*`,
+  'gi',
+);
+
+/**
+ * The banned subject a prompt asks for, or null when it is safe. Negated
+ * mentions are dropped first, so "a quiet workshop, no text or signage"
+ * passes while "a labelled diagram" does not.
+ */
+export function findTextRisk(prompt: string): string | null {
+  const match = TEXT_RISK.exec(prompt.replace(NEGATED, ' '));
+  return match ? (match[0] as string).toLowerCase() : null;
+}
+
+/** Every slot whose prompt asks for a banned subject, labelled for feedback. */
+export function findImagePlanTextRisks(plan: ImagePlan): { slot: string; term: string }[] {
+  return [
+    { slot: 'cover', prompt: plan.cover.prompt },
+    ...plan.inline.map((img) => ({ slot: img.section_heading, prompt: img.prompt })),
+  ].flatMap(({ slot, prompt }) => {
+    const term = findTextRisk(prompt);
+    return term ? [{ slot, term }] : [];
+  });
+}
+
+/** The correction handed back to the planner for one more attempt. */
+export function buildImagePlanRetryPrompt(risks: { slot: string; term: string }[]): LlmMessage {
+  return {
+    role: 'user',
+    content: [
+      `Rejected: ${risks.map((r) => `"${r.slot}" asks for ${r.term}`).join('; ')}.`,
+      'Those subjects always render as unreadable lettering. Replan EVERY entry as a scene a',
+      'photographer could shoot — people, hardware, places, materials, or abstract light and',
+      'texture — with no surface that would carry writing. Keep the same sections.',
+    ].join(' '),
+  };
+}
+
+/**
+ * Last resort when the planner will not stop asking for lettering: a plain
+ * wordless scene for the slot's subject. Worse than a good planned prompt,
+ * far better than a published diagram of garbled text.
+ */
+export function wordlessPrompt(subject: string): string {
+  return `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field. No text, lettering, signage or logos anywhere in the frame.`;
+}
+
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
     'You are an art director planning images for one blog article.',

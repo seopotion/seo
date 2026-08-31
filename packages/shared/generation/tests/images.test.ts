@@ -2,11 +2,15 @@ import { describe, expect, test } from 'vitest';
 import { INLINE_IMAGE_COUNT } from '../src/config';
 import {
   buildImagePlanPrompt,
+  buildImagePlanRetryPrompt,
   extractH2s,
+  findImagePlanTextRisks,
+  findTextRisk,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
   withNoTextDirective,
+  wordlessPrompt,
 } from '../src/images';
 
 const content = '# Title\n\nintro\n\n## First Section\n\nbody one\n\n## Second Section\n\nbody two';
@@ -169,5 +173,69 @@ describe('injectImageAfterHeading', () => {
     expect(lines.slice(0, 3)).toEqual(['```markdown', '## First Section', '```']);
     expect(lines[5]).toBe('');
     expect(lines[6]).toBe('![alt one](https://cdn/x.png)');
+  });
+});
+
+describe('findTextRisk', () => {
+  test.each([
+    ['A technical diagram showing a Git push command', 'diagram'],
+    ['A split-screen technical visualization of two architectures', 'split-screen'],
+    ['A monitor displaying a dashboard of deployment metrics', 'monitor'],
+    ['A workbench with labelled drawers', 'labelled'],
+    ['A storefront with signage above the door', 'signage'],
+    ['A laptop showing a CLI screenshot', 'screenshot'],
+  ])('flags %s', (prompt, term) => {
+    expect(findTextRisk(prompt)).toBe(term);
+  });
+
+  test.each([
+    'A Raspberry Pi and a laptop on a wooden desk under warm lamp light',
+    'A server rack with blinking indicators, no text or signage anywhere',
+    'A quiet workshop bench, free of lettering and without any logos',
+    'Abstract flowing light representing encrypted data, avoiding words',
+  ])('passes %s', (prompt) => {
+    expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  // The gate runs on the PLANNED prompt, before withNoTextDirective appends the
+  // ban — the directive names the very surfaces it is forbidding, so it is not
+  // meant to survive this check.
+});
+
+describe('image plan text gate', () => {
+  const risky = {
+    cover: { prompt: 'An infographic of the deployment flow', alt: 'a' },
+    inline: [
+      { prompt: 'A calm photo of a server rack', alt: 'b', section_heading: 'First Section' },
+      {
+        prompt: 'A whiteboard covered in architecture notes',
+        alt: 'c',
+        section_heading: 'Second Section',
+      },
+    ],
+  };
+
+  test('reports every offending slot with the term it asked for', () => {
+    expect(findImagePlanTextRisks(risky)).toEqual([
+      { slot: 'cover', term: 'infographic' },
+      { slot: 'Second Section', term: 'whiteboard' },
+    ]);
+  });
+
+  test('a clean plan has no risks', () => {
+    expect(findImagePlanTextRisks(validPlan)).toEqual([]);
+  });
+
+  test('the retry names each rejected slot and its term', () => {
+    const retry = buildImagePlanRetryPrompt(findImagePlanTextRisks(risky));
+    expect(retry.role).toBe('user');
+    expect(retry.content).toContain('"cover" asks for infographic');
+    expect(retry.content).toContain('"Second Section" asks for whiteboard');
+  });
+
+  test('the wordless fallback names the subject and is itself safe', () => {
+    const prompt = wordlessPrompt('Setting Up Your Home Server');
+    expect(prompt).toContain('Setting Up Your Home Server');
+    expect(findTextRisk(prompt)).toBeNull();
   });
 });
