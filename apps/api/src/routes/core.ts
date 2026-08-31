@@ -67,6 +67,7 @@ const core = new OpenAPIHono<AuthEnv>()
             keyword_research: isPaid(o),
             keyword_scheduling: isPaid(o),
           },
+          billing_tier: o.plan,
         })),
       });
     },

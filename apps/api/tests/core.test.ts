@@ -23,6 +23,8 @@ vi.mock('@shared/db', () => ({
               user_id: 'user_1',
               website_url: 'https://example.com',
               setup_status: 'setup_complete',
+              plan: 'free',
+              strategy_status: 'none',
               wordpress_token: 'never-return-this-token',
               wordpress_connected_at: new Date('2026-07-14T10:00:00.000Z'),
               created_at: new Date(),
@@ -78,11 +80,12 @@ describe('core auth routes', () => {
     expect(json.organizations[0]?.id).toBe('org_1');
     expect(JSON.stringify(json)).not.toContain('never-return-this-token');
     expect(json.organizations[0]).not.toHaveProperty('wordpress_token');
-    // Free/legacy org (no plan): capabilities are computed server-side as false.
+    // Free org: capabilities are computed server-side as false.
     expect(json.organizations[0]?.capabilities).toEqual({
       keyword_research: false,
       keyword_scheduling: false,
     });
+    expect(json.organizations[0]?.billing_tier).toBe('free');
   });
 
   test('GET /organizations reports capabilities true for a paid org', async () => {
@@ -104,6 +107,34 @@ describe('core auth routes', () => {
     });
     expect(res.status).toBe(200);
     const json = await res.json();
+    expect(json.organizations[0]?.capabilities).toEqual({
+      keyword_research: true,
+      keyword_scheduling: true,
+    });
+    expect(json.organizations[0]?.billing_tier).toBe('paid');
+  });
+
+  test('GET /organizations reports billing_tier for an expert org', async () => {
+    const { OrgRepo } = await import('@shared/db');
+    vi.mocked(OrgRepo.findByUserId).mockResolvedValueOnce([
+      {
+        id: 'org_expert',
+        user_id: 'user_1',
+        website_url: 'https://example.com',
+        setup_status: 'setup_complete',
+        plan: 'expert',
+        strategy_status: 'none',
+        created_at: new Date(),
+      },
+    ]);
+    const token = await login();
+    const res = await client.api.v0.core.organizations.$get(undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.organizations[0]?.billing_tier).toBe('expert');
+    // Entitlement still comes from capabilities, never from billing_tier.
     expect(json.organizations[0]?.capabilities).toEqual({
       keyword_research: true,
       keyword_scheduling: true,
