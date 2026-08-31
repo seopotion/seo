@@ -150,6 +150,7 @@ export async function stageGather(
   const brand = brandNavFilter(deduped, {
     orgName: ctx.presets.business.name,
     websiteUrl: ctx.websiteUrl,
+    competitors: ctx.competitors,
   });
 
   return {
