@@ -1,8 +1,8 @@
 # Billing as a top-level tab
 
 **Date:** 2026-08-31
-**Status:** Approved, ready for implementation
-**Issue:** [#131 — [billing] Expose plan/tier so frontend can distinguish paid vs expert](https://github.com/seopotion/seo/issues/131)
+**Status:** Implemented
+**Issue:** [#131](https://github.com/seopotion/seo/issues/131) — [billing] Expose plan/tier so frontend can distinguish paid vs expert
 
 ## Problem
 
