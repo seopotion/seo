@@ -57,28 +57,30 @@ export default async function BlogIndexPage() {
         type="application/ld+json"
       />
 
-      <header className="border-gray-100 border-b pb-8">
+      <header className="border-border border-b pb-8">
         <p className="mb-2 font-semibold text-amber-600 text-sm">Blog</p>
-        <h1 className="font-bold text-3xl text-gray-900 md:text-4xl">
+        <h1 className="font-bold text-3xl text-foreground md:text-4xl">
           Notes on getting found in search
         </h1>
-        <p className="mt-3 text-gray-600 text-lg">{DESCRIPTION}</p>
+        <p className="mt-3 text-muted-foreground text-lg">{DESCRIPTION}</p>
       </header>
 
       <ul className="mt-10 grid gap-4">
         {posts.map(({ slug, frontmatter }) => (
           <li key={slug}>
             <Link
-              className="block rounded-xl border border-gray-200 p-6 no-underline transition-colors hover:border-amber-300 hover:bg-amber-50/40"
+              className="block rounded-xl border border-border p-6 no-underline transition-colors hover:border-amber-300 hover:bg-amber-50/40"
               href={blogPath(slug)}
             >
-              <p className="flex flex-wrap items-center gap-x-2 text-gray-500 text-sm">
+              <p className="flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
                 <time dateTime={frontmatter.date}>{formatPostDate(frontmatter.date)}</time>
                 <span aria-hidden="true">·</span>
                 <span>{readPostSource(slug).readingMinutes} min read</span>
               </p>
-              <h2 className="mt-2 font-semibold text-gray-900 text-xl">{frontmatter.title}</h2>
-              <p className="mt-2 text-gray-600 leading-relaxed">{frontmatter.description}</p>
+              <h2 className="mt-2 font-semibold text-foreground text-xl">{frontmatter.title}</h2>
+              <p className="mt-2 text-muted-foreground leading-relaxed">
+                {frontmatter.description}
+              </p>
               <span className="mt-4 inline-block font-medium text-amber-700 text-sm">
                 Read the post →
               </span>

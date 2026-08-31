@@ -135,8 +135,8 @@ export function StaticSiteDialog({
       onClose={handleClose}
       open={open}
     >
-      <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
-        <h2 id={titleId} className="min-w-0 font-semibold text-lg text-slate-950">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
+        <h2 id={titleId} className="min-w-0 font-semibold text-lg text-foreground">
           {staticSiteT('provider')}
         </h2>
         <Button
@@ -155,8 +155,8 @@ export function StaticSiteDialog({
         {integration ? (
           <>
             {/* `owner/repo@branch`, built server-side. */}
-            <p className="truncate font-medium text-slate-950 text-sm">{integration.target}</p>
-            <p className="text-slate-500 text-sm">
+            <p className="truncate font-medium text-foreground text-sm">{integration.target}</p>
+            <p className="text-muted-foreground text-sm">
               {t('connectedOn', {
                 date: dateFormatter.format(new Date(integration.connected_at)),
               })}
@@ -174,13 +174,13 @@ export function StaticSiteDialog({
           </>
         ) : (
           <>
-            <p className="text-slate-600 text-sm">{staticSiteT('description')}</p>
-            <p className="text-slate-500 text-sm">{staticSiteT('beforeRedirect')}</p>
+            <p className="text-muted-foreground text-sm">{staticSiteT('description')}</p>
+            <p className="text-muted-foreground text-sm">{staticSiteT('beforeRedirect')}</p>
           </>
         )}
         {/* Connecting only gets the files into their repo — rendering them is
             code they have to write, so the guide belongs in both states. */}
-        <p className="text-slate-500 text-sm">
+        <p className="text-muted-foreground text-sm">
           <Link
             className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
             href="/docs/custom-site"
@@ -194,7 +194,7 @@ export function StaticSiteDialog({
         ) : null}
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-slate-200 border-t px-4 py-4 sm:px-6">
+      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-border border-t px-4 py-4 sm:px-6">
         {/* Same hand-off either way — only the label changes, because a dead
             installation is not something the user should have to guess is fixable. */}
         <Button

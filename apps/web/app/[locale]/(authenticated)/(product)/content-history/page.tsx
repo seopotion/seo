@@ -4,7 +4,16 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { Archive, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, CardContent, Separator } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  EmptyState,
+  PageDescription,
+  PageTitle,
+  Separator,
+} from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
@@ -178,19 +187,19 @@ export default function ContentHistoryPage() {
     <div className="grid gap-4">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
-          <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
+          <PageTitle>{t('title')}</PageTitle>
+          <PageDescription>{t('description')}</PageDescription>
         </div>
-        <Badge variant="secondary" className="w-fit bg-slate-200 text-slate-700">
+        <Badge variant="secondary" className="w-fit bg-muted text-foreground">
           {t('articlesCount', { count: totalArticles })}
         </Badge>
       </header>
 
       <section
         aria-label={t('tableLabel')}
-        className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
+        className="hidden overflow-hidden rounded-lg border border-border bg-card md:block"
       >
-        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.8fr)_6rem_5rem_minmax(9rem,0.7fr)_7rem] border-slate-200 border-b bg-slate-50 px-4 py-2 font-semibold text-slate-600 text-xs">
+        <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(9rem,0.8fr)_6rem_5rem_minmax(9rem,0.7fr)_7rem] border-border border-b bg-muted/50 px-4 py-2 font-semibold text-muted-foreground text-xs">
           <span>{t('columns.articleName')}</span>
           <span>{t('columns.keyword')}</span>
           <span>{t('columns.volume')}</span>
@@ -200,9 +209,9 @@ export default function ContentHistoryPage() {
         </div>
 
         {statusMessage ? (
-          <StatusState message={statusMessage} />
+          <EmptyState>{statusMessage}</EmptyState>
         ) : articles.length > 0 ? (
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-border">
             {articles.map((article) => (
               <DesktopArticleRow
                 key={article.id}
@@ -214,13 +223,13 @@ export default function ContentHistoryPage() {
             ))}
           </div>
         ) : (
-          <EmptyState t={t} />
+          <NoArticlesState t={t} />
         )}
       </section>
 
       <section aria-label={t('listLabel')} className="grid gap-2 md:hidden">
         {statusMessage ? (
-          <StatusState message={statusMessage} framed />
+          <EmptyState framed>{statusMessage}</EmptyState>
         ) : articles.length > 0 ? (
           articles.map((article) => (
             <MobileArticleCard
@@ -232,7 +241,7 @@ export default function ContentHistoryPage() {
             />
           ))
         ) : (
-          <EmptyState t={t} framed />
+          <NoArticlesState t={t} framed />
         )}
       </section>
 
@@ -270,22 +279,22 @@ function DesktopArticleRow({
       aria-label={t('actions.openArticle', { title: article.title })}
       className={cn(
         rowClassName,
-        'text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+        'text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
       )}
     >
       <ArticleName title={article.title} linked />
-      <span className="min-w-0 truncate px-3 text-slate-600">{article.keyword}</span>
-      <span className="min-w-0 truncate text-slate-600">
+      <span className="min-w-0 truncate px-3 text-muted-foreground">{article.keyword}</span>
+      <span className="min-w-0 truncate text-muted-foreground">
         {formatNumber(article.volume, locale)}
       </span>
-      <span className="min-w-0 truncate text-slate-600">
+      <span className="min-w-0 truncate text-muted-foreground">
         {formatNumber(article.difficulty, locale)}
       </span>
       <span className="grid min-w-0 gap-1 pr-2">
         <StatusBadge status={article.status} t={t} />
         <AutoPublishStatusIndicator article={article} t={t} />
       </span>
-      <time dateTime={article.publishedAt} className="min-w-0 truncate text-slate-600">
+      <time dateTime={article.publishedAt} className="min-w-0 truncate text-muted-foreground">
         {publishedDate}
       </time>
     </Link>
@@ -309,9 +318,9 @@ function MobileArticleCard({
     <Link
       href={`/content-history/${article.id}`}
       aria-label={t('actions.openArticle', { title: article.title })}
-      className="block rounded-lg transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="block rounded-lg transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Card className="gap-3 border-slate-200 py-4 shadow-none">
+      <Card className="gap-3 border-border py-4 shadow-none">
         <CardContent className="grid gap-3 px-4">
           <div className="grid gap-2">
             <ArticleName title={article.title} linked />
@@ -323,24 +332,24 @@ function MobileArticleCard({
           <Separator />
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div className="min-w-0">
-              <dt className="text-slate-500 text-xs">{t('columns.keyword')}</dt>
-              <dd className="mt-1 truncate font-medium text-slate-700">{article.keyword}</dd>
+              <dt className="text-muted-foreground text-xs">{t('columns.keyword')}</dt>
+              <dd className="mt-1 truncate font-medium text-foreground">{article.keyword}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-slate-500 text-xs">{t('columns.volume')}</dt>
-              <dd className="mt-1 truncate font-medium text-slate-700">
+              <dt className="text-muted-foreground text-xs">{t('columns.volume')}</dt>
+              <dd className="mt-1 truncate font-medium text-foreground">
                 {formatNumber(article.volume, locale)}
               </dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-slate-500 text-xs">{t('columns.difficulty')}</dt>
-              <dd className="mt-1 truncate font-medium text-slate-700">
+              <dt className="text-muted-foreground text-xs">{t('columns.difficulty')}</dt>
+              <dd className="mt-1 truncate font-medium text-foreground">
                 {formatNumber(article.difficulty, locale)}
               </dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-slate-500 text-xs">{t('columns.publishDate')}</dt>
-              <dd className="mt-1 truncate font-medium text-slate-700">
+              <dt className="text-muted-foreground text-xs">{t('columns.publishDate')}</dt>
+              <dd className="mt-1 truncate font-medium text-foreground">
                 <time dateTime={article.publishedAt}>{publishedDate}</time>
               </dd>
             </div>
@@ -354,8 +363,10 @@ function MobileArticleCard({
 function ArticleName({ linked = false, title }: { linked?: boolean; title: string }) {
   return (
     <span className="flex min-w-0 items-center gap-2 pr-3">
-      <span className="min-w-0 truncate font-medium text-slate-950">{title}</span>
-      {linked ? <FileText className="size-3.5 shrink-0 text-slate-400" aria-hidden="true" /> : null}
+      <span className="min-w-0 truncate font-medium text-foreground">{title}</span>
+      {linked ? (
+        <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      ) : null}
     </span>
   );
 }
@@ -381,7 +392,7 @@ function StatusBadge({
           ? 'bg-emerald-100 text-emerald-700'
           : status === 'generated'
             ? 'bg-sky-100 text-sky-700'
-            : 'bg-slate-200 text-slate-700',
+            : 'bg-muted text-foreground',
       )}
     >
       {t(`articleStatuses.${status}`)}
@@ -420,19 +431,19 @@ function AutoPublishStatusIndicator({
                   ? 'bg-sky-100 text-sky-700'
                   : aggregate.status === 'published'
                     ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-slate-100 text-slate-600',
+                    : 'bg-muted text-muted-foreground',
         )}
       >
         {t('autoPublishing.shortLabel', { status })}
       </Badge>
       {aggregate.partialSuccess ? (
-        <span className="text-slate-500 text-xs">{t('autoPublishing.partialSuccess')}</span>
+        <span className="text-muted-foreground text-xs">{t('autoPublishing.partialSuccess')}</span>
       ) : null}
     </span>
   );
 }
 
-function EmptyState({
+function NoArticlesState({
   framed = false,
   t,
 }: {
@@ -440,33 +451,15 @@ function EmptyState({
   t: ReturnType<typeof useTranslations<'ContentHistoryPage'>>;
 }) {
   return (
-    <div
-      className={cn(
-        'grid place-items-center bg-white px-4 py-12',
-        framed && 'rounded-lg border border-slate-200',
-      )}
-    >
+    <EmptyState framed={framed}>
       <div className="grid max-w-sm justify-items-center text-center">
-        <span className="flex size-10 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+        <span className="flex size-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Archive className="size-5" aria-hidden="true" />
         </span>
-        <h2 className="mt-4 font-semibold text-base text-slate-950">{t('empty.title')}</h2>
-        <p className="mt-2 text-slate-600 text-sm leading-6">{t('empty.description')}</p>
+        <h2 className="mt-4 font-semibold text-base text-foreground">{t('empty.title')}</h2>
+        <p className="mt-2 text-muted-foreground text-sm leading-6">{t('empty.description')}</p>
       </div>
-    </div>
-  );
-}
-
-function StatusState({ framed = false, message }: { framed?: boolean; message: string }) {
-  return (
-    <div
-      className={cn(
-        'grid place-items-center bg-white px-4 py-12 text-center text-slate-600 text-sm',
-        framed && 'rounded-lg border border-slate-200',
-      )}
-    >
-      {message}
-    </div>
+    </EmptyState>
   );
 }
 
@@ -494,11 +487,11 @@ function PaginationControls({
   return (
     <nav
       aria-label={t('pagination.label')}
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-card px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="min-w-0">
-        <p className="truncate text-slate-700 text-sm">{rangeLabel}</p>
-        <p className="mt-0.5 truncate text-slate-500 text-xs">
+        <p className="truncate text-foreground text-sm">{rangeLabel}</p>
+        <p className="mt-0.5 truncate text-muted-foreground text-xs">
           {t('pagination.perPage', { count: pageSize })}
         </p>
       </div>
@@ -515,7 +508,9 @@ function PaginationControls({
           <ChevronLeft className="size-4" aria-hidden="true" />
           {t('pagination.previous')}
         </Button>
-        <span className="min-w-20 text-center font-medium text-slate-600 text-sm">{pageLabel}</span>
+        <span className="min-w-20 text-center font-medium text-muted-foreground text-sm">
+          {pageLabel}
+        </span>
         <Button
           type="button"
           variant="outline"

@@ -3,13 +3,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle, Search, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { Button, Modal } from '@/components/ui';
+import {
+  Button,
+  Modal,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
-import { cn } from '@/lib/utils';
 import {
   formatDateFromKey,
   formatNumber,
@@ -195,12 +202,12 @@ export function ChooseKeywordModal({
 
   return (
     <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
-      <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-slate-950">
+          <h2 id={titleId} className="font-semibold text-lg text-foreground">
             {t('title', { date: formattedDate })}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">{t('description')}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
         </div>
         <Button
           type="button"
@@ -313,37 +320,37 @@ function CandidateList({
 }) {
   return (
     <>
-      <div className="hidden overflow-hidden rounded-lg border border-slate-200 md:block">
-        <table aria-label={t('tableLabel')} className="w-full table-fixed text-left text-sm">
-          <thead className="border-slate-200 border-b bg-slate-50 text-slate-600">
-            <tr>
-              <TableHeading className="w-[28%]">{t('columns.keyword')}</TableHeading>
-              <TableHeading>{t('columns.difficulty')}</TableHeading>
-              <TableHeading>{t('columns.volume')}</TableHeading>
-              <TableHeading>{t('columns.intent')}</TableHeading>
-              <TableHeading>{t('columns.opportunityScore')}</TableHeading>
-              <TableHeading className="w-44">
+      <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+        <Table aria-label={t('tableLabel')} className="table-fixed">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[28%]">{t('columns.keyword')}</TableHead>
+              <TableHead>{t('columns.difficulty')}</TableHead>
+              <TableHead>{t('columns.volume')}</TableHead>
+              <TableHead>{t('columns.intent')}</TableHead>
+              <TableHead>{t('columns.opportunityScore')}</TableHead>
+              <TableHead className="w-44">
                 <span className="sr-only">{t('columns.action')}</span>
-              </TableHeading>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {candidates.map((candidate) => (
-              <tr key={candidate.id}>
-                <td className="wrap-break-words px-4 py-3 font-medium text-slate-950">
+              <TableRow key={candidate.id}>
+                <TableCell className="wrap-break-words font-medium text-foreground">
                   {candidate.keyword}
-                </td>
+                </TableCell>
                 <MetricCell locale={locale} t={targetKeywordsT} value={candidate.difficulty} />
                 <MetricCell locale={locale} t={targetKeywordsT} value={candidate.search_volume} />
-                <td className="truncate px-4 py-3 text-slate-600">
+                <TableCell className="truncate text-muted-foreground">
                   {formatIntent(candidate, targetKeywordsT)}
-                </td>
+                </TableCell>
                 <MetricCell
                   locale={locale}
                   t={targetKeywordsT}
                   value={candidate.opportunity_score}
                 />
-                <td className="px-4 py-3">
+                <TableCell>
                   <ScheduleAction
                     candidate={candidate}
                     onSchedule={() => onSchedule(candidate)}
@@ -351,20 +358,17 @@ function CandidateList({
                     schedulingPending={schedulingPending}
                     t={t}
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <ul aria-label={t('listLabel')} className="grid list-none gap-2 md:hidden">
         {candidates.map((candidate) => (
-          <li
-            key={candidate.id}
-            className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
-          >
-            <h3 className="wrap-break-words font-semibold text-slate-950 text-sm">
+          <li key={candidate.id} className="grid gap-3 rounded-lg border border-border bg-card p-3">
+            <h3 className="wrap-break-words font-semibold text-foreground text-sm">
               {candidate.keyword}
             </h3>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -425,7 +429,7 @@ function ScheduleAction({
         {pending ? t('actions.scheduling') : t('actions.schedule')}
       </Button>
       {!candidate.schedulable ? (
-        <p className="max-w-44 text-slate-500 text-xs">{t('missingMetrics')}</p>
+        <p className="max-w-44 text-muted-foreground text-xs">{t('missingMetrics')}</p>
       ) : null}
     </div>
   );
@@ -441,9 +445,9 @@ function ChooserEmptyState({
   return (
     <div className="flex min-h-52 items-center justify-center text-center">
       <div className="grid max-w-md justify-items-center gap-2">
-        <Search className="size-5 text-slate-400" aria-hidden="true" />
-        <h3 className="font-semibold text-slate-950 text-sm">{t('states.emptyTitle')}</h3>
-        <p className="text-slate-600 text-sm">{t('states.emptyDescription')}</p>
+        <Search className="size-5 text-muted-foreground" aria-hidden="true" />
+        <h3 className="font-semibold text-foreground text-sm">{t('states.emptyTitle')}</h3>
+        <p className="text-muted-foreground text-sm">{t('states.emptyDescription')}</p>
         <Button type="button" variant="outline" size="sm" onClick={onResearch}>
           <Search className="size-4" aria-hidden="true" />
           {t('actions.research')}
@@ -459,21 +463,13 @@ function ChooserState({ loading = false, message }: { loading?: boolean; message
       role={loading ? 'status' : undefined}
       className="flex min-h-40 items-center justify-center text-center"
     >
-      <div className="grid max-w-md justify-items-center gap-2 text-slate-600 text-sm">
+      <div className="grid max-w-md justify-items-center gap-2 text-muted-foreground text-sm">
         {loading ? (
-          <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
         ) : null}
         <p>{message}</p>
       </div>
     </div>
-  );
-}
-
-function TableHeading({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <th scope="col" className={cn('px-4 py-2 font-semibold text-xs', className)}>
-      {children}
-    </th>
   );
 }
 
@@ -486,14 +482,14 @@ function MetricCell({
   t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
   value: number | null;
 }) {
-  return <td className="px-4 py-3 text-slate-600">{formatMetric(value, locale, t)}</td>;
+  return <TableCell className="text-muted-foreground">{formatMetric(value, locale, t)}</TableCell>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 truncate font-medium text-slate-800 text-sm">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 truncate font-medium text-foreground text-sm">{value}</dd>
     </div>
   );
 }

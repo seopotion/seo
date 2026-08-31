@@ -324,11 +324,11 @@ export default async function TermsPage({ params }: TermsPageProps) {
   if (locale !== 'en') redirect('/terms');
 
   return (
-    <main className="bg-white px-6 py-16 text-gray-700 sm:py-24">
+    <main className="bg-white px-6 py-16 text-foreground sm:py-24">
       <article className="mx-auto max-w-3xl">
-        <header className="mb-12 border-gray-200 border-b pb-8">
-          <h1 className="font-bold text-4xl text-gray-900 sm:text-5xl">Terms of Service</h1>
-          <p className="mt-4 text-gray-500">Last updated: August 13, 2026</p>
+        <header className="mb-12 border-border border-b pb-8">
+          <h1 className="font-bold text-4xl text-foreground sm:text-5xl">Terms of Service</h1>
+          <p className="mt-4 text-muted-foreground">Last updated: August 13, 2026</p>
           <div className="mt-8 space-y-4 leading-7">
             <p>
               These Terms of Service (&quot;Terms&quot;) govern your access to and use of Seopotion,
@@ -359,7 +359,7 @@ export default async function TermsPage({ params }: TermsPageProps) {
         <div className="space-y-10 leading-7">
           {sections.map((section) => (
             <section key={section.title}>
-              <h2 className="mb-4 font-bold text-2xl text-gray-900">{section.title}</h2>
+              <h2 className="mb-4 font-bold text-2xl text-foreground">{section.title}</h2>
               <div className="space-y-4">
                 {section.paragraphs.map((paragraph) => (
                   <p key={paragraph} className="whitespace-pre-line">

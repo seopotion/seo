@@ -72,8 +72,8 @@ export function IntegrationsStep({
 
   return (
     <div>
-      <h2 className="font-bold text-2xl text-gray-900">{t('title')}</h2>
-      <p className="mt-2 text-gray-600 text-sm">{t('optionalNotice')}</p>
+      <h2 className="font-bold text-2xl text-foreground">{t('title')}</h2>
+      <p className="mt-2 text-muted-foreground text-sm">{t('optionalNotice')}</p>
 
       <div className="mt-6">
         <p className="font-medium text-sm leading-none">{t('availableIntegrations')}</p>
@@ -91,7 +91,7 @@ export function IntegrationsStep({
                   className="flex min-h-16 items-center gap-3 rounded-md border border-input bg-background px-3 py-3 text-left"
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center">
-                    <GitBranch aria-hidden className="size-5 text-slate-700" />
+                    <GitBranch aria-hidden className="size-5 text-foreground" />
                   </span>
                   <span className="grid min-w-0 gap-1">
                     <span className="font-semibold">{t('providers.staticSite')}</span>
@@ -154,7 +154,7 @@ export function IntegrationsStep({
             <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel>
           </div>
         ) : null}
-        <p className="mt-2 text-gray-500 text-sm">{t('settingsNotice')}</p>
+        <p className="mt-2 text-muted-foreground text-sm">{t('settingsNotice')}</p>
       </div>
 
       <div className="mt-6">

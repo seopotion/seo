@@ -11,7 +11,17 @@ import {
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
-import { Badge, Button, Input } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { formatCount, formatCtr, formatPosition, needsAttention } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -83,12 +93,12 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
     <section aria-labelledby="analytics-articles-title" className="grid gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 id="analytics-articles-title" className="font-semibold text-base text-slate-950">
+          <h2 id="analytics-articles-title" className="font-semibold text-base text-foreground">
             {t('table.title')}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">{t('table.description')}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t('table.description')}</p>
         </div>
-        <Badge variant="secondary" className="w-fit bg-slate-200 text-slate-700">
+        <Badge variant="secondary" className="w-fit bg-muted text-foreground">
           {t('table.articleCount', { count: articles.length })}
         </Badge>
       </div>
@@ -97,7 +107,7 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
         <label className="relative block flex-1" htmlFor="analytics-article-filter">
           <span className="sr-only">{t('table.filterLabel')}</span>
           <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
           />
           <Input
@@ -108,7 +118,7 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
               setPage(1);
             }}
             placeholder={t('table.filterPlaceholder')}
-            className="bg-white pl-9"
+            className="bg-card pl-9"
           />
         </label>
         <Button
@@ -123,11 +133,11 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="w-full min-w-5xl border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-slate-200 border-b bg-slate-50 text-slate-600">
-              <th className="px-4 py-3 font-semibold">{t('table.columns.title')}</th>
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <Table className="min-w-5xl border-collapse">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="py-3 text-sm">{t('table.columns.title')}</TableHead>
               <SortableHeader
                 activeSort={sort}
                 label={t('table.columns.publishedDate')}
@@ -164,10 +174,10 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
                 sortKey="position"
                 updateSort={updateSort}
               />
-              <th className="px-4 py-3 font-semibold">{t('table.columns.trend')}</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+              <TableHead className="py-3 text-sm">{t('table.columns.trend')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {visibleArticles.map((article) => (
               <ArticleRow
                 key={article.article_id}
@@ -177,10 +187,10 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
                 openArticle={openArticle}
               />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
         {visibleArticles.length === 0 ? (
-          <div className="grid min-h-40 place-items-center px-4 text-center text-slate-600 text-sm">
+          <div className="grid min-h-40 place-items-center px-4 text-center text-muted-foreground text-sm">
             {articles.length === 0 ? t('table.empty') : t('table.noMatches')}
           </div>
         ) : null}
@@ -188,9 +198,9 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
 
       <nav
         aria-label={t('table.pagination.label')}
-        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        className="flex flex-col gap-3 rounded-lg border border-border bg-card px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
       >
-        <p className="text-slate-600 text-sm">{rangeLabel}</p>
+        <p className="text-muted-foreground text-sm">{rangeLabel}</p>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -201,7 +211,7 @@ export function AnalyticsArticleTable({ articles }: { articles: AnalyticsArticle
             <ChevronLeft className="size-4" aria-hidden="true" />
             {t('table.pagination.previous')}
           </Button>
-          <span className="min-w-20 text-center text-slate-600 text-sm">
+          <span className="min-w-20 text-center text-muted-foreground text-sm">
             {t('table.pagination.page', { page: currentPage, total: totalPages })}
           </span>
           <Button
@@ -234,16 +244,16 @@ function SortableHeader({
   const Icon = !active ? ChevronsUpDown : activeSort.direction === 'asc' ? ArrowUp : ArrowDown;
 
   return (
-    <th className="px-4 py-3 font-semibold">
+    <TableHead className="py-3 text-sm">
       <button
         type="button"
-        className="inline-flex items-center gap-1 whitespace-nowrap hover:text-slate-950"
+        className="inline-flex items-center gap-1 whitespace-nowrap hover:text-foreground"
         onClick={() => updateSort(sortKey)}
       >
         {label}
         <Icon className="size-3.5" aria-hidden="true" />
       </button>
-    </th>
+    </TableHead>
   );
 }
 
@@ -262,10 +272,10 @@ function ArticleRow({
   const attention = needsAttention(article);
 
   return (
-    <tr
+    <TableRow
       tabIndex={0}
       aria-label={t('table.openArticle', { title: article.title })}
-      className="cursor-pointer text-slate-700 transition-colors hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className="cursor-pointer text-foreground transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       onClick={() => openArticle(article.article_id)}
       onKeyDown={(event) => {
         if (event.key === 'Enter' || event.key === ' ') {
@@ -274,17 +284,17 @@ function ArticleRow({
         }
       }}
     >
-      <td className="max-w-80 px-4 py-3">
+      <TableCell className="max-w-80">
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-slate-950">{article.title}</span>
+          <span className="truncate font-medium text-foreground">{article.title}</span>
           {attention ? (
             <Badge className="border-transparent bg-amber-100 text-amber-800" variant="secondary">
               {t('table.attentionBadge')}
             </Badge>
           ) : null}
         </div>
-      </td>
-      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-muted-foreground">
         {article.published_at ? (
           <time dateTime={article.published_at}>
             {formatDate(article.published_at, dateFormatter)}
@@ -292,28 +302,30 @@ function ArticleRow({
         ) : (
           '—'
         )}
-      </td>
-      <td className="px-4 py-3 tabular-nums">{formatCount(article.days_live, locale)}</td>
+      </TableCell>
+      <TableCell className="tabular-nums">{formatCount(article.days_live, locale)}</TableCell>
       {article.data_state === 'awaiting' ? (
-        <td colSpan={5} className="px-4 py-3 font-medium text-slate-500">
+        <TableCell colSpan={5} className="font-medium text-muted-foreground">
           {t('table.awaitingData')}
-        </td>
+        </TableCell>
       ) : (
         <>
-          <td className="px-4 py-3 tabular-nums">{formatCount(article.clicks, locale)}</td>
-          <td className="px-4 py-3 tabular-nums">{formatCount(article.impressions, locale)}</td>
-          <td className="px-4 py-3 tabular-nums">{formatCtr(article.ctr, locale)}</td>
-          <td className="px-4 py-3 tabular-nums">{formatPosition(article.position, locale)}</td>
-          <td className="px-4 py-3">
+          <TableCell className="tabular-nums">{formatCount(article.clicks, locale)}</TableCell>
+          <TableCell className="tabular-nums">{formatCount(article.impressions, locale)}</TableCell>
+          <TableCell className="tabular-nums">{formatCtr(article.ctr, locale)}</TableCell>
+          <TableCell className="tabular-nums">{formatPosition(article.position, locale)}</TableCell>
+          <TableCell>
             {article.data_state === 'gathering' ? (
-              <span className="whitespace-nowrap text-slate-500">{t('table.stillGathering')}</span>
+              <span className="whitespace-nowrap text-muted-foreground">
+                {t('table.stillGathering')}
+              </span>
             ) : (
               <Trend trend={article.trend} />
             )}
-          </td>
+          </TableCell>
         </>
       )}
-    </tr>
+    </TableRow>
   );
 }
 
@@ -330,7 +342,7 @@ function Trend({ trend }: { trend: AnalyticsArticle['trend'] }) {
           ? 'text-emerald-700'
           : normalizedTrend === 'down'
             ? 'text-rose-700'
-            : 'text-slate-500',
+            : 'text-muted-foreground',
       )}
     >
       <Icon className="size-4" aria-hidden="true" />

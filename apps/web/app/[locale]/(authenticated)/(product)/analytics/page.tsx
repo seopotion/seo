@@ -4,7 +4,15 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  PageDescription,
+  PageTitle,
+} from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
@@ -111,8 +119,8 @@ export default function AnalyticsPage() {
     <div className="grid gap-6" aria-busy={summaryQuery.isFetching || articlesQuery.isFetching}>
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
-          <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('description')}</p>
+          <PageTitle>{t('title')}</PageTitle>
+          <PageDescription>{t('description')}</PageDescription>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <ToggleGroup
@@ -134,10 +142,10 @@ export default function AnalyticsPage() {
 
       <AnalyticsSummaryCards summary={summaryQuery.data} />
 
-      <Card className="border-slate-200 shadow-none">
+      <Card className="border-border shadow-none">
         <CardHeader>
           <CardTitle>{t('chart.title')}</CardTitle>
-          <p className="text-slate-600 text-sm">{t('chart.description')}</p>
+          <p className="text-muted-foreground text-sm">{t('chart.description')}</p>
         </CardHeader>
         <CardContent>
           <AnalyticsChart allowMetricToggle series={summaryQuery.data.series} />
@@ -164,8 +172,8 @@ function ToggleGroup<T extends string>({
 }) {
   return (
     <fieldset>
-      <legend className="mb-1 font-medium text-slate-500 text-xs">{label}</legend>
-      <div className="flex w-fit rounded-md border border-slate-200 bg-white p-1">
+      <legend className="mb-1 font-medium text-muted-foreground text-xs">{label}</legend>
+      <div className="flex w-fit rounded-md border border-border bg-card p-1">
         {options.map((option) => (
           <Button
             key={option}

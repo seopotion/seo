@@ -39,7 +39,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-stretch bg-slate-950/40 sm:place-items-center sm:p-4"
+      className="fixed inset-0 z-50 grid place-items-stretch bg-foreground/40 sm:place-items-center sm:p-4"
       role="presentation"
     >
       <button
@@ -55,7 +55,7 @@ export function Modal({
         aria-labelledby={labelledBy}
         tabIndex={-1}
         className={cn(
-          'relative flex h-dvh w-full flex-col bg-white shadow-lg sm:h-[min(90dvh,760px)] sm:max-w-5xl sm:rounded-lg sm:border sm:border-slate-200',
+          'relative flex h-dvh w-full flex-col bg-card shadow-lg sm:h-[min(90dvh,760px)] sm:max-w-5xl sm:rounded-lg sm:border sm:border-border',
           className,
         )}
       >

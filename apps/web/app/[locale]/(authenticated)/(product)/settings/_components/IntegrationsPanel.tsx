@@ -85,7 +85,7 @@ export function IntegrationsPanel({
             name={t('providers.wordpress')}
           >
             {connectedQuery.isLoading ? (
-              <p className="text-slate-500 text-xs">{t('loading')}</p>
+              <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
               <p className="text-red-600 text-xs">{t('loadError')}</p>
             ) : (
@@ -94,20 +94,22 @@ export function IntegrationsPanel({
                   variant="secondary"
                   className={cn(
                     'w-fit border-transparent',
-                    isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700',
+                    isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-foreground',
                   )}
                 >
                   {t(isConnected ? 'badges.connected' : 'badges.notConnected')}
                 </Badge>
                 {wordpressIntegration ? (
                   <>
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {t('connectedOn', {
                         date: dateFormatter.format(new Date(wordpressIntegration.connected_at)),
                       })}
                     </p>
                     {organization?.website_url ? (
-                      <p className="truncate text-slate-500 text-xs">{organization.website_url}</p>
+                      <p className="truncate text-muted-foreground text-xs">
+                        {organization.website_url}
+                      </p>
                     ) : null}
                   </>
                 ) : null}
@@ -125,11 +127,11 @@ export function IntegrationsPanel({
           </IntegrationCard>
 
           <IntegrationCard
-            logo={<GitBranch aria-hidden className="size-5 text-slate-700" />}
+            logo={<GitBranch aria-hidden className="size-5 text-foreground" />}
             name={staticSiteT('provider')}
           >
             {connectedQuery.isLoading ? (
-              <p className="text-slate-500 text-xs">{t('loading')}</p>
+              <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
               <p className="text-red-600 text-xs">{t('loadError')}</p>
             ) : (
@@ -139,7 +141,7 @@ export function IntegrationsPanel({
                   className={cn(
                     'w-fit border-transparent',
                     !staticSiteIntegration
-                      ? 'bg-slate-200 text-slate-700'
+                      ? 'bg-muted text-foreground'
                       : staticSiteError
                         ? 'bg-amber-100 text-amber-800'
                         : 'bg-emerald-100 text-emerald-700',
@@ -154,10 +156,10 @@ export function IntegrationsPanel({
                 {staticSiteIntegration ? (
                   <>
                     {/* `owner/repo@branch`, built server-side. */}
-                    <p className="truncate font-medium text-slate-950 text-xs">
+                    <p className="truncate font-medium text-foreground text-xs">
                       {staticSiteIntegration.target}
                     </p>
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {t('connectedOn', {
                         date: dateFormatter.format(new Date(staticSiteIntegration.connected_at)),
                       })}
@@ -258,10 +260,10 @@ function IntegrationCard({
   name: string;
 }) {
   return (
-    <div className="grid content-start gap-2 rounded-md border border-slate-200 bg-white p-4">
+    <div className="grid content-start gap-2 rounded-md border border-border bg-card p-4">
       <div className="flex items-center gap-3">
         <span className="flex size-9 items-center justify-center">{logo}</span>
-        <p className="font-semibold text-slate-950 text-sm">{name}</p>
+        <p className="font-semibold text-foreground text-sm">{name}</p>
       </div>
       {children}
     </div>

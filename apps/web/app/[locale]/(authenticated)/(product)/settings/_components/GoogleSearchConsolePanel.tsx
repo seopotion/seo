@@ -125,11 +125,11 @@ export function GoogleSearchConsolePanel({
     <div className="grid gap-4">
       {justConnected ? <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel> : null}
 
-      <div className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
-        <p className="text-slate-500 text-sm">{t('description')}</p>
+      <div className="grid gap-4 rounded-md border border-border bg-card p-4">
+        <p className="text-muted-foreground text-sm">{t('description')}</p>
 
         {statusQuery.isPending ? (
-          <p className="text-slate-500 text-sm">{t('statusLoading')}</p>
+          <p className="text-muted-foreground text-sm">{t('statusLoading')}</p>
         ) : statusQuery.isError ? (
           <StatusPanel tone="error">{t('statusError')}</StatusPanel>
         ) : status?.connected ? (
@@ -142,16 +142,16 @@ export function GoogleSearchConsolePanel({
             </Badge>
             <dl className="grid gap-2 text-sm">
               <div className="grid gap-0.5">
-                <dt className="text-slate-500 text-xs">{t('connectedAccount')}</dt>
-                <dd className="truncate text-slate-950">{status.google_email}</dd>
+                <dt className="text-muted-foreground text-xs">{t('connectedAccount')}</dt>
+                <dd className="truncate text-foreground">{status.google_email}</dd>
               </div>
               <div className="grid gap-0.5">
-                <dt className="text-slate-500 text-xs">{t('property')}</dt>
-                <dd className="truncate text-slate-950">{status.site_url}</dd>
+                <dt className="text-muted-foreground text-xs">{t('property')}</dt>
+                <dd className="truncate text-foreground">{status.site_url}</dd>
               </div>
             </dl>
             {status.connected_at ? (
-              <p className="text-slate-500 text-xs">
+              <p className="text-muted-foreground text-xs">
                 {t('connectedOn', { date: dateFormatter.format(new Date(status.connected_at)) })}
               </p>
             ) : null}
@@ -173,7 +173,7 @@ export function GoogleSearchConsolePanel({
               </Button>
               {confirmingDisconnect ? (
                 <>
-                  <span className="text-slate-600 text-sm">{t('disconnectConfirm')}</span>
+                  <span className="text-muted-foreground text-sm">{t('disconnectConfirm')}</span>
                   <Button
                     type="button"
                     variant="destructive"
@@ -220,7 +220,7 @@ export function GoogleSearchConsolePanel({
           </div>
         ) : (
           <div className="grid gap-4">
-            <ul className="grid gap-2 text-slate-600 text-sm">
+            <ul className="grid gap-2 text-muted-foreground text-sm">
               <li className="flex items-start gap-2">
                 <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 {t('benefit1')}
@@ -230,7 +230,7 @@ export function GoogleSearchConsolePanel({
                 {t('benefit2')}
               </li>
             </ul>
-            <p className="text-slate-500 text-xs">{t('readOnlyNote')}</p>
+            <p className="text-muted-foreground text-xs">{t('readOnlyNote')}</p>
             <Button
               type="button"
               className="w-fit"

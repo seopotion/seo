@@ -54,9 +54,9 @@ export function ManageSubscriptionCard({
   }
 
   return (
-    <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+    <div className="grid gap-3 rounded-md border border-border bg-card p-4">
       {portalError ? <StatusPanel tone="error">{t('error')}</StatusPanel> : null}
-      <p className="text-slate-600 text-sm">{t('description')}</p>
+      <p className="text-muted-foreground text-sm">{t('description')}</p>
       <Button
         className="w-fit"
         disabled={!organization || portalMutation.isPending}

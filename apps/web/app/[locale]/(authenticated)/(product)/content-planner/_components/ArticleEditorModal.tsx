@@ -74,7 +74,7 @@ export function ArticleEditorModal({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 grid bg-slate-950/40',
+        'fixed inset-0 z-50 grid bg-foreground/40',
         showsFullEditor
           ? 'place-items-stretch p-0 sm:place-items-center sm:p-4'
           : 'place-items-center p-4',
@@ -103,7 +103,7 @@ export function ArticleEditorModal({
           aria-modal="true"
           aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
           tabIndex={-1}
-          className="relative flex h-dvh w-full flex-col bg-white shadow-lg sm:h-[min(92dvh,900px)] sm:max-w-6xl sm:rounded-lg sm:border sm:border-slate-200"
+          className="relative flex h-dvh w-full flex-col bg-card shadow-lg sm:h-[min(92dvh,900px)] sm:max-w-6xl sm:rounded-lg sm:border sm:border-border"
         >
           <ArticleEditorPanel
             canSave={editor.canSave}
@@ -180,18 +180,18 @@ function PlannedArticleDetails({
       aria-modal="true"
       aria-labelledby="planner-article-detail-title"
       tabIndex={-1}
-      className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+      className="relative w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-slate-500 text-sm">{t('modal.title')}</p>
+          <p className="text-muted-foreground text-sm">{t('modal.title')}</p>
           <h2
             id="planner-article-detail-title"
-            className="mt-1 line-clamp-3 font-semibold text-base text-slate-950"
+            className="mt-1 line-clamp-3 font-semibold text-base text-foreground"
           >
             {article.keyword}
           </h2>
-          <p className="mt-2 text-slate-600 text-sm">{t('modal.notGenerated')}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{t('modal.notGenerated')}</p>
         </div>
         <Button
           type="button"
@@ -223,7 +223,7 @@ function PlannedArticleDetails({
           value={formatDateFromKey(article.scheduledDate, locale)}
         />
         <div className="grid gap-1">
-          <dt className="text-slate-500">{t('modal.status')}</dt>
+          <dt className="text-muted-foreground">{t('modal.status')}</dt>
           <dd>
             <StatusBadge status={article.status} t={t} />
           </dd>
@@ -248,7 +248,7 @@ function ArticleEditorMessageCard({
       aria-modal="true"
       aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
       tabIndex={-1}
-      className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+      className="relative w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-lg"
     >
       {children}
     </div>

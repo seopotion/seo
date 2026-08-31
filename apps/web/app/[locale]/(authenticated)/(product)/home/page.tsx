@@ -121,7 +121,7 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="rounded-md border border-slate-200 bg-white p-6 text-slate-600 text-sm">
+      <div className="rounded-md border border-border bg-card p-6 text-muted-foreground text-sm">
         {t('loading')}
       </div>
     );
@@ -147,7 +147,7 @@ export default function HomePage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('articles.title')}</CardTitle>
           </CardHeader>
@@ -161,16 +161,16 @@ export default function HomePage() {
         </Card>
 
         {/*
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('backlinks.title')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-slate-600 text-sm">{t('backlinks.description')}</p>
+            <p className="text-muted-foreground text-sm">{t('backlinks.description')}</p>
             <button
               type="button"
               disabled
-              className="mt-4 rounded-md border border-slate-200 px-3 py-2 font-medium text-slate-400 text-sm"
+              className="mt-4 rounded-md border border-border px-3 py-2 font-medium text-muted-foreground text-sm"
             >
               {t('backlinks.upgrade')}
             </button>
@@ -178,12 +178,12 @@ export default function HomePage() {
         </Card>
         */}
 
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('recommended.title')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="grid gap-2 text-slate-600 text-sm">
+            <ul className="grid gap-2 text-muted-foreground text-sm">
               {actions.map((action) => (
                 <li key={action.key}>
                   <ActionLabel action={action} />
@@ -193,7 +193,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('bestArticles.title')}</CardTitle>
           </CardHeader>
@@ -201,10 +201,10 @@ export default function HomePage() {
             {data.best.gated ? (
               <GatedCard message={t('bestArticles.gated')} cta={t('bestArticles.gatedCta')} />
             ) : data.best.articles.length === 0 ? (
-              <p className="text-slate-600 text-sm">{t('bestArticles.empty')}</p>
+              <p className="text-muted-foreground text-sm">{t('bestArticles.empty')}</p>
             ) : (
               <div className="grid gap-3">
-                <p className="text-slate-500 text-xs">{t('bestArticles.subtitle')}</p>
+                <p className="text-muted-foreground text-xs">{t('bestArticles.subtitle')}</p>
                 <ul className="grid gap-2">
                   {data.best.articles.slice(0, 5).map((article) => (
                     <li
@@ -215,11 +215,11 @@ export default function HomePage() {
                         href={article.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="truncate text-slate-700 hover:text-slate-950 hover:underline"
+                        className="truncate text-foreground hover:text-foreground hover:underline"
                       >
                         {article.title ?? pathLabel(article.url)}
                       </a>
-                      <span className="shrink-0 text-slate-500 tabular-nums">
+                      <span className="shrink-0 text-muted-foreground tabular-nums">
                         {t('bestArticles.clicks', { count: article.clicks })}
                       </span>
                     </li>
@@ -230,7 +230,7 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('searchPerformance.title')}</CardTitle>
           </CardHeader>
@@ -242,7 +242,7 @@ export default function HomePage() {
               />
             ) : (
               <div className="grid gap-3">
-                <p className="text-slate-500 text-xs">{t('searchPerformance.subtitle')}</p>
+                <p className="text-muted-foreground text-xs">{t('searchPerformance.subtitle')}</p>
                 <div className="grid grid-cols-2 gap-4">
                   <Stat
                     label={t('searchPerformance.clicks')}
@@ -283,7 +283,7 @@ function pathLabel(url: string): string {
 function GatedCard({ cta, message }: { cta: string; message: string }) {
   return (
     <div className="grid gap-2">
-      <p className="text-slate-600 text-sm">{message}</p>
+      <p className="text-muted-foreground text-sm">{message}</p>
       <Link className="text-emerald-700 text-sm hover:underline" href={SETTINGS_GSC_HREF}>
         {cta}
       </Link>
@@ -309,8 +309,8 @@ function ActionLabel({ action }: { action: RecommendedAction }) {
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div>
-      <div className="font-semibold text-3xl text-slate-950">{value}</div>
-      <div className="mt-1 text-slate-500 text-sm">{label}</div>
+      <div className="font-semibold text-3xl text-foreground">{value}</div>
+      <div className="mt-1 text-muted-foreground text-sm">{label}</div>
     </div>
   );
 }

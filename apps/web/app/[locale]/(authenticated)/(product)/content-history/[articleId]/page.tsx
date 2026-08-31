@@ -12,7 +12,7 @@ import {
   ArticleEditorDetailItem,
   ArticleEditorPanel,
 } from '@/components/article/ArticleEditorPanel';
-import { Badge, Button, Separator } from '@/components/ui';
+import { Badge, Button, EmptyState, PageDescription, PageTitle, Separator } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import {
@@ -493,7 +493,7 @@ export default function ArticleDetailPage() {
     <div className="grid gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Button asChild variant="link" className="mb-2 text-slate-600">
+          <Button asChild variant="link" className="mb-2 text-muted-foreground">
             <Link
               href="/content-history"
               // Leaving the route would drop the draft; the editor's own
@@ -508,9 +508,9 @@ export default function ArticleDetailPage() {
               {t('actions.back')}
             </Link>
           </Button>
-          <h1 className="font-semibold text-lg text-slate-950">{article?.title ?? t('title')}</h1>
+          <PageTitle>{article?.title ?? t('title')}</PageTitle>
           {article?.meta_description ? (
-            <p className="mt-1 max-w-3xl text-slate-600 text-sm">{article.meta_description}</p>
+            <PageDescription className="max-w-3xl">{article.meta_description}</PageDescription>
           ) : null}
         </div>
         {article ? (
@@ -581,10 +581,10 @@ export default function ArticleDetailPage() {
               ) : null}
             </div>
             {publishBlocked && (showSiteButton || showWordPressButton) ? (
-              <p className="text-slate-500 text-xs">{t('status.editingBlocksPublish')}</p>
+              <p className="text-muted-foreground text-xs">{t('status.editingBlocksPublish')}</p>
             ) : null}
             {!publishBlocked && showWordPressButton && wordpressConnected === false ? (
-              <p className="text-slate-500 text-xs">
+              <p className="text-muted-foreground text-xs">
                 {t.rich('wordpress.connectFirst', {
                   link: (chunks) => (
                     <Link className="underline" href="/settings?tab=integrations">
@@ -598,11 +598,7 @@ export default function ArticleDetailPage() {
         ) : null}
       </div>
 
-      {statusMessage ? (
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center text-slate-600 text-sm">
-          {statusMessage}
-        </div>
-      ) : null}
+      {statusMessage ? <EmptyState framed>{statusMessage}</EmptyState> : null}
 
       {siteActionState === 'published' ? (
         <StatusPanel tone="success">
@@ -668,7 +664,7 @@ export default function ArticleDetailPage() {
       {editing && article && draftArticle ? (
         <section
           aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
-          className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+          className="overflow-hidden rounded-lg border border-border bg-card"
         >
           <ArticleEditorPanel
             canSave={editor.canSave}
@@ -711,7 +707,7 @@ export default function ArticleDetailPage() {
           />
         </section>
       ) : article ? (
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <section className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label={t('labels.slug')} value={article.slug} />
             <DetailItem label={t('labels.keywordId')} value={article.keyword_id} />
@@ -738,7 +734,7 @@ export default function ArticleDetailPage() {
               width={1280}
               height={720}
               unoptimized
-              className="aspect-video w-full rounded-md border border-slate-200 object-cover"
+              className="aspect-video w-full rounded-md border border-border object-cover"
             />
           ) : null}
 
@@ -801,14 +797,14 @@ function AutomaticPublishingPanel({
   return (
     <section
       aria-labelledby="automatic-publishing-title"
-      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6"
+      className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:p-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 id="automatic-publishing-title" className="font-semibold text-slate-950 text-base">
+          <h2 id="automatic-publishing-title" className="font-semibold text-foreground text-base">
             {t('publishing.title')}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">{t('publishing.description')}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t('publishing.description')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AutoPublishAggregateBadge status={aggregate.status} label={aggregateLabel} />
@@ -839,7 +835,7 @@ function AutomaticPublishingPanel({
       </div>
 
       {retryAvailable && publishBlocked ? (
-        <p id="automatic-publishing-retry-blocked" className="text-slate-600 text-sm">
+        <p id="automatic-publishing-retry-blocked" className="text-muted-foreground text-sm">
           {t('publishing.retry.editingBlocked')}
         </p>
       ) : null}
@@ -900,11 +896,11 @@ function AutomaticPublishingPanel({
           ))}
         </div>
       ) : article.auto_publish_error ? null : (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600 text-sm">
+        <div className="rounded-md border border-border bg-muted/50 px-4 py-4 text-muted-foreground text-sm">
           <p>{t('publishing.empty')}</p>
           <Link
             href="/article-settings"
-            className="mt-2 inline-flex font-medium text-slate-950 underline underline-offset-2"
+            className="mt-2 inline-flex font-medium text-foreground underline underline-offset-2"
           >
             {t('publishing.settingsLink')}
           </Link>
@@ -936,7 +932,7 @@ function AutoPublishAggregateBadge({
                 ? 'bg-sky-100 text-sky-700'
                 : status === 'published'
                   ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-100 text-slate-600',
+                  : 'bg-muted text-muted-foreground',
       )}
     >
       {label}
@@ -957,9 +953,9 @@ function ProviderPublishingCard({
   const remoteUrl = getSafePublicationUrl(publication?.remote_url ?? null);
 
   return (
-    <article className="grid min-w-0 gap-3 rounded-md border border-slate-200 p-4">
+    <article className="grid min-w-0 gap-3 rounded-md border border-border p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-medium text-slate-950">{t(`publishing.providers.${provider}`)}</h3>
+        <h3 className="font-medium text-foreground">{t(`publishing.providers.${provider}`)}</h3>
         <AttemptStatusBadge attempt={attempt} hasPublication={Boolean(publication)} t={t} />
       </header>
 
@@ -1003,7 +999,7 @@ function ProviderPublishingCard({
       ) : null}
 
       {publication ? (
-        <div className="grid gap-3 border-slate-200 border-t pt-3">
+        <div className="grid gap-3 border-border border-t pt-3">
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <PublishingDetail label={t('publishing.labels.slug')} value={publication.slug} />
             <PublishingDateDetail
@@ -1026,7 +1022,7 @@ function ProviderPublishingCard({
           </dl>
           {remoteUrl ? (
             <a
-              className="inline-flex w-fit items-center gap-1.5 font-medium text-slate-950 text-sm underline underline-offset-2"
+              className="inline-flex w-fit items-center gap-1.5 font-medium text-foreground text-sm underline underline-offset-2"
               href={remoteUrl}
               rel="noopener noreferrer"
               target="_blank"
@@ -1075,7 +1071,7 @@ function AttemptStatusBadge({
                 ? 'bg-sky-100 text-sky-700'
                 : attempt?.status === 'published' || hasPublication
                   ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-100 text-slate-600',
+                  : 'bg-muted text-muted-foreground',
       )}
     >
       {label}
@@ -1086,8 +1082,8 @@ function AttemptStatusBadge({
 function PublishingDetail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-slate-800">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1103,8 +1099,8 @@ function PublishingDateDetail({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 font-medium text-slate-800">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 font-medium text-foreground">
         <time dateTime={dateTime}>{formatDate(dateTime, formatter)}</time>
       </dd>
     </div>
@@ -1191,7 +1187,7 @@ function ArticleStatusBadge({
           ? 'bg-emerald-100 text-emerald-700'
           : status === 'generated'
             ? 'bg-sky-100 text-sky-700'
-            : 'bg-slate-200 text-slate-700',
+            : 'bg-muted text-foreground',
       )}
     >
       {t(`statuses.${status}`)}
@@ -1202,8 +1198,8 @@ function ArticleStatusBadge({
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-1 truncate font-medium text-slate-950">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-1 truncate font-medium text-foreground">{value}</dd>
     </div>
   );
 }

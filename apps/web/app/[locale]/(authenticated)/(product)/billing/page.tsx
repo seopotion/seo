@@ -308,10 +308,10 @@ export default function BillingPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="font-semibold text-slate-950 text-xl">
+        <h1 className="font-semibold text-foreground text-xl">
           {isSubscribed ? t('subscribedTitle') : t('title')}
         </h1>
-        <p className="mt-1 text-slate-600 text-sm">
+        <p className="mt-1 text-muted-foreground text-sm">
           {isSubscribed ? t('subscribedDescription') : t('description')}
         </p>
       </div>
@@ -329,7 +329,7 @@ export default function BillingPage() {
           const state = tierState(currentTier, tier);
 
           return (
-            <Card key={tier} className="border-slate-200 shadow-none">
+            <Card key={tier} className="border-border shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                   {t(`tiers.${tier}.name`)}
@@ -341,7 +341,7 @@ export default function BillingPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <p className="text-slate-600 text-sm">{t(`tiers.${tier}.description`)}</p>
+                <p className="text-muted-foreground text-sm">{t(`tiers.${tier}.description`)}</p>
                 {state === 'upgrade' ? (
                   <Button
                     disabled={!organization || checkoutMutation.isPending}
@@ -359,9 +359,9 @@ export default function BillingPage() {
       </div>
 
       {hasPurchasableTier(currentTier) ? (
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardContent className="grid gap-2 pt-6">
-            <p className="font-medium text-slate-950 text-sm">{t('promo.title')}</p>
+            <p className="font-medium text-foreground text-sm">{t('promo.title')}</p>
             {appliedPromo ? (
               <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
                 <span>
@@ -390,7 +390,7 @@ export default function BillingPage() {
                 }}
               >
                 <input
-                  className="w-48 rounded-md border border-slate-200 px-3 py-1.5 text-sm uppercase"
+                  className="w-48 rounded-md border border-border px-3 py-1.5 text-sm uppercase"
                   onChange={(event) => setPromoInput(event.target.value)}
                   placeholder={t('promo.placeholder')}
                   value={promoInput}
@@ -427,7 +427,7 @@ function StatusPanel({
       className={cn(
         'rounded-md border px-4 py-3 text-sm',
         tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-slate-200 bg-white text-slate-600',
+        tone === 'neutral' && 'border-border bg-card text-muted-foreground',
       )}
     >
       {children}

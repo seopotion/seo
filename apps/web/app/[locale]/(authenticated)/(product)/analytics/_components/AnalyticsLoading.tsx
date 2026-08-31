@@ -1,18 +1,20 @@
+import { Skeleton } from '@/components/ui';
+
 export function AnalyticsLoading() {
   return (
-    <div className="grid animate-pulse gap-4" aria-hidden="true">
-      <div className="h-16 rounded-lg bg-slate-200" />
+    <div className="grid gap-4" aria-hidden="true">
+      <Skeleton className="h-16 rounded-lg" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {['clicks', 'impressions', 'ctr', 'position'].map((metric) => (
-          <div key={metric} className="h-32 rounded-lg bg-slate-200" />
+          <Skeleton key={metric} className="h-32 rounded-lg" />
         ))}
       </div>
-      <div className="h-96 rounded-lg bg-slate-200" />
-      <div className="h-80 rounded-lg bg-slate-200" />
+      <Skeleton className="h-96 rounded-lg" />
+      <Skeleton className="h-80 rounded-lg" />
     </div>
   );
 }
 
 export function AnalyticsChartLoading() {
-  return <div className="h-80 animate-pulse rounded-md bg-slate-100" aria-hidden="true" />;
+  return <Skeleton className="h-80 bg-muted" aria-hidden="true" />;
 }
