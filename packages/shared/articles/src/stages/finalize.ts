@@ -66,7 +66,7 @@ export async function stageFinalize(
     messages: buildSemanticCheckPrompt(ctx, content),
     responseSchema: SEMANTIC_RESPONSE_SCHEMA,
   });
-  const semantic = parseSemanticResult(semRes.text);
+  const semantic = parseSemanticResult(semRes.text, ctx);
   if (!semantic.pass)
     failures.push({
       code: 'semantic',

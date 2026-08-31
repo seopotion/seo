@@ -49,7 +49,7 @@ export {
   buildSemanticCheckPrompt,
   parseSemanticResult,
   SEMANTIC_RESPONSE_SCHEMA,
-  SemanticResultSchema,
+  SemanticVerdictSchema,
 } from './semantic';
 export type { CompleteTopicBrief, TopicBriefFields } from './topic';
 export { completeTopicBrief } from './topic';
