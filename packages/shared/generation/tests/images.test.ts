@@ -82,6 +82,8 @@ describe('buildImagePlanPrompt', () => {
       headings,
     });
     expect(messages[0]!.content).toContain('NO text and NO logos');
+    // An org whose image_style asks for screenshots must not win over the ban.
+    expect(messages[0]!.content).toContain('image style NEVER overrides these rules');
   });
 });
 
