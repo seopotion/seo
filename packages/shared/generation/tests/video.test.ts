@@ -72,6 +72,23 @@ describe('injectBlockAfterHeading', () => {
   test('throws when the heading is missing', () => {
     expect(() => injectBlockAfterHeading('## Other\n', 'Intro', 'x')).toThrow(/heading not found/);
   });
+
+  test('a heading that only exists inside a fenced code block is not found', () => {
+    const fenced = ['```markdown', '## Intro', '```', '', 'text'].join('\n');
+    expect(() => injectBlockAfterHeading(fenced, 'Intro', '<iframe/>')).toThrow(
+      /heading not found/,
+    );
+  });
+
+  test('anchors to an indented heading the same way extractH2s reads it', () => {
+    expect(injectBlockAfterHeading('   ## Intro\n\ntext', 'Intro', '<iframe/>')).toBe(
+      '   ## Intro\n\n<iframe/>\n\ntext',
+    );
+    // 4 spaces is an indented code block, so there is no heading to anchor to
+    expect(() => injectBlockAfterHeading('    ## Intro\n\ntext', 'Intro', 'x')).toThrow(
+      /heading not found/,
+    );
+  });
 });
 
 describe('languageCodeFromName', () => {
