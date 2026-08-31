@@ -100,17 +100,17 @@ export function ArticleEditorPanel({
               {t('status.saving')}
             </span>
           ) : saveState === 'error' ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1 font-medium text-red-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-error-subtle px-2.5 py-1 font-medium text-error text-xs">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {t('status.saveFailed')}
             </span>
           ) : dirty ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 font-medium text-amber-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-warning-subtle px-2.5 py-1 font-medium text-warning text-xs">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {t('status.unsavedChanges')}
             </span>
           ) : saveState === 'saved' ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-success-subtle px-2.5 py-1 font-medium text-success text-xs">
               <Check className="size-3.5" aria-hidden="true" />
               {t('actions.saved')}
             </span>
@@ -335,8 +335,8 @@ export function ArticleEditorPanel({
 
       <footer className="shrink-0 border-border border-t bg-card">
         {saveError ? (
-          <div className="border-red-200 border-b bg-red-50 px-4 py-3 sm:px-5">
-            <p className="text-red-800 text-sm">
+          <div className="border-error-border border-b bg-error-subtle px-4 py-3 sm:px-5">
+            <p className="text-error text-sm">
               {saveError === 'invalid'
                 ? t('status.saveInvalid')
                 : saveError === 'not_found'
@@ -347,8 +347,8 @@ export function ArticleEditorPanel({
         ) : null}
 
         {showCloseConfirmation ? (
-          <div className="flex flex-col gap-3 border-amber-200 border-b bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <p className="text-amber-800 text-sm">{t('closeConfirmation.description')}</p>
+          <div className="flex flex-col gap-3 border-warning-border border-b bg-warning-subtle px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-warning text-sm">{t('closeConfirmation.description')}</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="outline" onClick={onDiscardAndClose}>
                 {t('actions.discard')}
@@ -431,10 +431,10 @@ export function ArticleEditorStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'published'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'deleted'
-            ? 'bg-red-100 text-red-700'
-            : 'bg-sky-100 text-sky-700',
+            ? 'bg-error-muted text-error'
+            : 'bg-info-muted text-info',
       )}
     >
       {t(`articleStatuses.${status}`)}
@@ -465,10 +465,10 @@ function ImageStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'complete'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'failed'
-            ? 'bg-red-100 text-red-700'
-            : 'bg-amber-100 text-amber-700',
+            ? 'bg-error-muted text-error'
+            : 'bg-warning-muted text-warning',
       )}
     >
       {t(`imageStatuses.${status}`)}
@@ -516,12 +516,7 @@ function EditorField({
 
 function FieldMessage({ children, tone }: { children: ReactNode; tone: 'error' | 'warning' }) {
   return (
-    <p
-      className={cn(
-        'wrap-break-word text-xs',
-        tone === 'error' ? 'text-red-600' : 'text-amber-700',
-      )}
-    >
+    <p className={cn('wrap-break-word text-xs', tone === 'error' ? 'text-error' : 'text-warning')}>
       {children}
     </p>
   );
@@ -529,7 +524,7 @@ function FieldMessage({ children, tone }: { children: ReactNode; tone: 'error' |
 
 function Counter({ current, max, warning }: { current: number; max: number; warning: boolean }) {
   return (
-    <span className={cn('text-xs', warning ? 'text-amber-700' : 'text-muted-foreground')}>
+    <span className={cn('text-xs', warning ? 'text-warning' : 'text-muted-foreground')}>
       {current} / {max}
     </span>
   );

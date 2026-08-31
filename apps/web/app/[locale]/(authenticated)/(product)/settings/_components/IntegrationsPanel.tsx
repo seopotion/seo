@@ -5,9 +5,8 @@ import { GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { StatusPanel } from '@/components/integrations/StatusPanel';
 import { WordPressDialog } from '@/components/integrations/WordPressDialog';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, StatusPanel } from '@/components/ui';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { PUBLISH_ERROR_KEYS, RECONNECT_CODES, useConnectedIntegrations } from '@/lib/integrations';
 import type { ProductOrganization } from '@/lib/organizations';
@@ -87,14 +86,14 @@ export function IntegrationsPanel({
             {connectedQuery.isLoading ? (
               <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
-              <p className="text-red-600 text-xs">{t('loadError')}</p>
+              <p className="text-error text-xs">{t('loadError')}</p>
             ) : (
               <>
                 <Badge
                   variant="secondary"
                   className={cn(
                     'w-fit border-transparent',
-                    isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-foreground',
+                    isConnected ? 'bg-success-muted text-success' : 'bg-muted text-foreground',
                   )}
                 >
                   {t(isConnected ? 'badges.connected' : 'badges.notConnected')}
@@ -133,7 +132,7 @@ export function IntegrationsPanel({
             {connectedQuery.isLoading ? (
               <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
-              <p className="text-red-600 text-xs">{t('loadError')}</p>
+              <p className="text-error text-xs">{t('loadError')}</p>
             ) : (
               <>
                 <Badge
@@ -143,8 +142,8 @@ export function IntegrationsPanel({
                     !staticSiteIntegration
                       ? 'bg-muted text-foreground'
                       : staticSiteError
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-700',
+                        ? 'bg-warning-muted text-warning'
+                        : 'bg-success-muted text-success',
                   )}
                 >
                   {staticSiteIntegration
@@ -166,7 +165,7 @@ export function IntegrationsPanel({
                     </p>
                     {/* A dead connection has to be visible without opening anything. */}
                     {staticSiteError ? (
-                      <p className="text-amber-700 text-xs">
+                      <p className="text-warning text-xs">
                         {staticSiteT(
                           PUBLISH_ERROR_KEYS[staticSiteError.code] ?? 'publishErrors.unknown',
                         )}

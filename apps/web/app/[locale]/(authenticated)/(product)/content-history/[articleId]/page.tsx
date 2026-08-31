@@ -5,14 +5,22 @@ import { ArrowLeft, ExternalLink, Pencil, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArticleContentPreview } from '@/components/article/ArticleContentPreview';
 import {
   ARTICLE_EDITOR_TITLE_ID,
   ArticleEditorDetailItem,
   ArticleEditorPanel,
 } from '@/components/article/ArticleEditorPanel';
-import { Badge, Button, EmptyState, PageDescription, PageTitle, Separator } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  PageDescription,
+  PageTitle,
+  Separator,
+  StatusPanel,
+} from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import {
@@ -745,29 +753,6 @@ export default function ArticleDetailPage() {
   );
 }
 
-function StatusPanel({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: 'error' | 'success' | 'warning';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      role={tone === 'error' ? 'alert' : 'status'}
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 function AutomaticPublishingPanel({
   aggregate,
   article,
@@ -861,10 +846,7 @@ function AutomaticPublishingPanel({
       ) : null}
 
       {article.auto_publish_error ? (
-        <div
-          role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm"
-        >
+        <StatusPanel role="alert" tone="error">
           <h3 className="font-medium">{t('publishing.preflightError')}</h3>
           <div className="mt-1">
             <LocalizedPublishingError
@@ -872,12 +854,12 @@ function AutomaticPublishingPanel({
               t={t}
             />
           </div>
-          <p className="mt-1 text-red-700 text-xs">
+          <p className="mt-1 text-error text-xs">
             {t('publishing.errorAt', {
               date: formatDate(article.auto_publish_error.at, dateTimeFormatter),
             })}
           </p>
-        </div>
+        </StatusPanel>
       ) : null}
 
       {aggregate.partialSuccess ? (
@@ -923,15 +905,15 @@ function AutoPublishAggregateBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'needs_attention'
-          ? 'bg-red-100 text-red-700'
+          ? 'bg-error-muted text-error'
           : status === 'retrying'
-            ? 'bg-amber-100 text-amber-800'
+            ? 'bg-warning-muted text-warning'
             : status === 'publishing'
               ? 'bg-violet-100 text-violet-700'
               : status === 'queued'
-                ? 'bg-sky-100 text-sky-700'
+                ? 'bg-info-muted text-info'
                 : status === 'published'
-                  ? 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-success-muted text-success'
                   : 'bg-muted text-muted-foreground',
       )}
     >
@@ -983,14 +965,14 @@ function ProviderPublishingCard({
       {attempt?.last_error ? (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-800 text-sm"
+          className="rounded-md border border-error-border bg-error-subtle px-3 py-2 text-error text-sm"
         >
           <p className="font-medium">{t('publishing.lastError')}</p>
           <LocalizedPublishingError
             error={getPublishingErrorPresentation(attempt.last_error.code)}
             t={t}
           />
-          <p className="mt-1 text-red-700 text-xs">
+          <p className="mt-1 text-error text-xs">
             {t('publishing.errorAt', {
               date: formatDate(attempt.last_error.at, dateTimeFormatter),
             })}
@@ -1062,15 +1044,15 @@ function AttemptStatusBadge({
       className={cn(
         'w-fit border-transparent',
         attempt?.status === 'failed' || attempt?.status === 'cancelled'
-          ? 'bg-red-100 text-red-700'
+          ? 'bg-error-muted text-error'
           : attempt?.status === 'retrying'
-            ? 'bg-amber-100 text-amber-800'
+            ? 'bg-warning-muted text-warning'
             : attempt?.status === 'publishing'
               ? 'bg-violet-100 text-violet-700'
               : attempt?.status === 'queued'
-                ? 'bg-sky-100 text-sky-700'
+                ? 'bg-info-muted text-info'
                 : attempt?.status === 'published' || hasPublication
-                  ? 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-success-muted text-success'
                   : 'bg-muted text-muted-foreground',
       )}
     >
@@ -1184,9 +1166,9 @@ function ArticleStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'published'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'generated'
-            ? 'bg-sky-100 text-sky-700'
+            ? 'bg-info-muted text-info'
             : 'bg-muted text-foreground',
       )}
     >

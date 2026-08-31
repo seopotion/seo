@@ -4,8 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
-import { StatusPanel } from '@/components/integrations/StatusPanel';
-import { Button, Modal } from '@/components/ui';
+import { Button, Modal, StatusPanel } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -182,7 +181,7 @@ export function StaticSiteDialog({
             code they have to write, so the guide belongs in both states. */}
         <p className="text-muted-foreground text-sm">
           <Link
-            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
+            className="font-medium text-warning underline underline-offset-2 hover:text-warning"
             href="/docs/custom-site"
             target="_blank"
           >
@@ -235,7 +234,7 @@ export function StaticSiteDialog({
             <Button
               type="button"
               variant="ghost"
-              className="text-red-600 hover:text-red-700"
+              className="text-error hover:text-error"
               onClick={() => setConfirmingDisconnect(true)}
             >
               {staticSiteT('disconnect')}

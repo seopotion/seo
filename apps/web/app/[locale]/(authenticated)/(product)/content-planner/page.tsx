@@ -559,12 +559,12 @@ function FailedStrategyPanel({
   return (
     <section
       role="alert"
-      className="flex h-30 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-6 py-12 text-center"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-error-border bg-error-subtle px-6 py-12 text-center"
     >
       <div className="grid justify-items-center gap-2">
-        <AlertTriangle className="size-5 text-red-600" aria-hidden="true" />
-        <h2 className="font-semibold text-base text-red-950">{heading}</h2>
-        <p className="text-red-800 text-sm">{supportingText}</p>
+        <AlertTriangle className="size-5 text-error" aria-hidden="true" />
+        <h2 className="font-semibold text-base text-error">{heading}</h2>
+        <p className="text-error text-sm">{supportingText}</p>
       </div>
     </section>
   );
@@ -744,19 +744,11 @@ function PlannerStatusBadge({
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
   if (article.status === 'generated') {
-    return (
-      <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-700">
-        {t('statuses.generated')}
-      </Badge>
-    );
+    return <Badge variant="success">{t('statuses.generated')}</Badge>;
   }
 
   if (article.generationStatus === 'pending') {
-    return (
-      <Badge variant="secondary" className="border-transparent bg-sky-100 text-sky-700">
-        {t('targetKeywords.statuses.scheduled')}
-      </Badge>
-    );
+    return <Badge variant="info">{t('targetKeywords.statuses.scheduled')}</Badge>;
   }
 
   return null;

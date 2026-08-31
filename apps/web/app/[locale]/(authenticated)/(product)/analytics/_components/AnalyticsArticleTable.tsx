@@ -287,11 +287,7 @@ function ArticleRow({
       <TableCell className="max-w-80">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium text-foreground">{article.title}</span>
-          {attention ? (
-            <Badge className="border-transparent bg-amber-100 text-amber-800" variant="secondary">
-              {t('table.attentionBadge')}
-            </Badge>
-          ) : null}
+          {attention ? <Badge variant="warning">{t('table.attentionBadge')}</Badge> : null}
         </div>
       </TableCell>
       <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -339,9 +335,9 @@ function Trend({ trend }: { trend: AnalyticsArticle['trend'] }) {
       className={cn(
         'inline-flex items-center gap-1 font-medium',
         normalizedTrend === 'up'
-          ? 'text-emerald-700'
+          ? 'text-success'
           : normalizedTrend === 'down'
-            ? 'text-red-700'
+            ? 'text-error'
             : 'text-muted-foreground',
       )}
     >

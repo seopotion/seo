@@ -389,9 +389,9 @@ function StatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'published'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'generated'
-            ? 'bg-sky-100 text-sky-700'
+            ? 'bg-info-muted text-info'
             : 'bg-muted text-foreground',
       )}
     >
@@ -422,15 +422,15 @@ function AutoPublishStatusIndicator({
         className={cn(
           'h-auto w-fit max-w-full whitespace-normal border-transparent px-2 py-0.5 text-left text-xs',
           aggregate.status === 'needs_attention'
-            ? 'bg-red-100 text-red-700'
+            ? 'bg-error-muted text-error'
             : aggregate.status === 'retrying'
-              ? 'bg-amber-100 text-amber-800'
+              ? 'bg-warning-muted text-warning'
               : aggregate.status === 'publishing'
                 ? 'bg-violet-100 text-violet-700'
                 : aggregate.status === 'queued'
-                  ? 'bg-sky-100 text-sky-700'
+                  ? 'bg-info-muted text-info'
                   : aggregate.status === 'published'
-                    ? 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-success-muted text-success'
                     : 'bg-muted text-muted-foreground',
         )}
       >

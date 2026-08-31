@@ -194,11 +194,11 @@ function AnalyticsError({ message }: { message: string }) {
   const t = useTranslations('AnalyticsPage');
 
   return (
-    <Card className="border-amber-200 bg-amber-50 shadow-none">
+    <Card className="border-warning-border bg-warning-subtle shadow-none">
       <CardHeader>
         <CardTitle>{t('states.errorTitle')}</CardTitle>
       </CardHeader>
-      <CardContent className="text-amber-900 text-sm">{message}</CardContent>
+      <CardContent className="text-warning text-sm">{message}</CardContent>
     </Card>
   );
 }

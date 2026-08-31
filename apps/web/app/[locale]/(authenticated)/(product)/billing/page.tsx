@@ -2,9 +2,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, StatusPanel } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
@@ -15,7 +14,6 @@ import {
   useActiveOrganization,
 } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import { ManageSubscriptionCard } from './_components/ManageSubscriptionCard';
 import {
   hasPurchasableTier,
@@ -334,7 +332,7 @@ export default function BillingPage() {
                 <CardTitle className="flex items-center justify-between gap-2">
                   {t(`tiers.${tier}.name`)}
                   {state === 'upgrade' ? null : (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 text-xs">
+                    <span className="rounded-full bg-success-muted px-2 py-0.5 font-medium text-success text-xs">
                       {t(`tierState.${state}`)}
                     </span>
                   )}
@@ -363,7 +361,7 @@ export default function BillingPage() {
           <CardContent className="grid gap-2 pt-6">
             <p className="font-medium text-foreground text-sm">{t('promo.title')}</p>
             {appliedPromo ? (
-              <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
+              <div className="flex items-center justify-between rounded-md border border-success-border bg-success-subtle px-3 py-2 text-success text-sm">
                 <span>
                   {t('promo.applied', {
                     code: appliedPromo.code,
@@ -405,32 +403,11 @@ export default function BillingPage() {
               </form>
             )}
             {promoError ? (
-              <p className="text-red-600 text-sm">{t(`promo.errors.${promoError}`)}</p>
+              <p className="text-error text-sm">{t(`promo.errors.${promoError}`)}</p>
             ) : null}
           </CardContent>
         </Card>
       ) : null}
-    </div>
-  );
-}
-
-function StatusPanel({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'error' | 'neutral';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-border bg-card text-muted-foreground',
-      )}
-    >
-      {children}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusPanel,
   Textarea,
 } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
@@ -542,28 +543,6 @@ export default function SettingsPage() {
         </div>
       ) : null}
     </form>
-  );
-}
-
-function StatusPanel({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'error' | 'neutral' | 'success';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-border bg-card text-muted-foreground',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      )}
-    >
-      {children}
-    </div>
   );
 }
 

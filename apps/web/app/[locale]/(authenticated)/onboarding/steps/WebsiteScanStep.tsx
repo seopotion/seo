@@ -42,8 +42,8 @@ export function WebsiteScanStep({
           {scanState === 'scanning' ? t('scanningButton') : t('scanButton')}
         </Button>
         {scanState === 'complete' && (
-          <Alert className="border-emerald-200 bg-emerald-50 py-2 text-emerald-900 sm:flex-1">
-            <AlertDescription className="text-emerald-800">{t('completeMessage')}</AlertDescription>
+          <Alert className="border-success-border bg-success-subtle py-2 text-success sm:flex-1">
+            <AlertDescription className="text-success">{t('completeMessage')}</AlertDescription>
           </Alert>
         )}
         {scanState === 'scanning' && (

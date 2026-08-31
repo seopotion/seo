@@ -4,7 +4,7 @@ import { DEFAULT_CONTENT_PATH } from '@shared/schemas';
 import { useSearchParams } from 'next/navigation';
 import { hasLocale, useLocale, useTranslations } from 'next-intl';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Input, Label, PageTitle } from '@/components/ui';
+import { Badge, Button, Input, Label, PageTitle, StatusPanel } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
 import { api } from '@/lib/api';
@@ -319,12 +319,9 @@ function CallbackInner() {
 
 function ErrorPanel({ children }: { children: string }) {
   return (
-    <p
-      aria-live="polite"
-      className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm"
-    >
+    <StatusPanel aria-live="polite" tone="error">
       {children}
-    </p>
+    </StatusPanel>
   );
 }
 

@@ -231,7 +231,7 @@ export function TargetKeywordsSection({
             {t('actions.research')}
           </Button>
           {researchAvailable && !canResearch ? (
-            <p className="text-amber-700 text-xs">{t('researchPaidFeature')}</p>
+            <p className="text-warning text-xs">{t('researchPaidFeature')}</p>
           ) : null}
         </div>
       </header>
@@ -239,7 +239,7 @@ export function TargetKeywordsSection({
       {loadError ? (
         <div
           role="alert"
-          className="flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col items-start gap-2 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <span>{t('states.loadError')}</span>
           <Button type="button" variant="outline" size="sm" onClick={onRetry}>
@@ -507,9 +507,7 @@ function DeleteCandidateAction({
         type="button"
         variant={confirming ? 'outline' : 'ghost'}
         size={confirming ? 'sm' : 'icon'}
-        className={cn(
-          confirming ? 'text-red-700' : 'size-8 text-muted-foreground hover:text-red-700',
-        )}
+        className={cn(confirming ? 'text-error' : 'size-8 text-muted-foreground hover:text-error')}
         aria-label={t(confirming ? 'actions.confirmDelete' : 'actions.delete', { keyword })}
         disabled={pending}
         onClick={onDelete}
@@ -522,7 +520,7 @@ function DeleteCandidateAction({
         {confirming && !pending ? t('actions.confirmDeleteLabel') : null}
       </Button>
       {error ? (
-        <p role="alert" className="max-w-44 text-red-700 text-xs">
+        <p role="alert" className="max-w-44 text-error text-xs">
           {t(`deleteErrors.${error}`)}
         </p>
       ) : null}
@@ -556,7 +554,7 @@ function SortHeaderButton({
         aria-hidden="true"
         className={cn(
           'size-3.5 transition-opacity',
-          active ? 'text-sky-600 opacity-100' : 'opacity-40 group-hover:opacity-70',
+          active ? 'text-info opacity-100' : 'opacity-40 group-hover:opacity-70',
         )}
       />
     </button>
@@ -639,16 +637,16 @@ function StatusFilterHeader({
         onClick={() => setOpen((current) => !current)}
         className={cn(
           '-mx-1 flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          filtering ? 'text-sky-700' : 'text-muted-foreground hover:text-foreground',
+          filtering ? 'text-info' : 'text-muted-foreground hover:text-foreground',
         )}
       >
         <span>{label}</span>
         <ListFilter
           aria-hidden="true"
-          className={cn('size-3.5', filtering ? 'text-sky-600' : 'opacity-40')}
+          className={cn('size-3.5', filtering ? 'text-info' : 'opacity-40')}
         />
         {filtering ? (
-          <span className="flex min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 font-semibold text-[10px] text-white leading-4">
+          <span className="flex min-w-4 items-center justify-center rounded-full bg-info px-1 font-semibold text-[10px] text-white leading-4">
             {activeCount}
           </span>
         ) : null}
@@ -668,7 +666,7 @@ function StatusFilterHeader({
                   type="button"
                   disabled={!filtering}
                   onClick={onClear}
-                  className="rounded px-1 py-0.5 font-medium text-sky-700 text-xs transition-colors hover:text-sky-800 disabled:cursor-default disabled:text-muted-foreground/50"
+                  className="rounded px-1 py-0.5 font-medium text-info text-xs transition-colors hover:text-info disabled:cursor-default disabled:text-muted-foreground/50"
                 >
                   {t('filter.clear')}
                 </button>
@@ -688,7 +686,7 @@ function StatusFilterHeader({
                         <span
                           className={cn(
                             'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
-                            checked ? 'border-sky-600 bg-sky-600 text-white' : 'border-input',
+                            checked ? 'border-info-border bg-info text-white' : 'border-input',
                           )}
                         >
                           {checked ? <Check className="size-3" aria-hidden="true" /> : null}
@@ -765,10 +763,10 @@ function TargetKeywordStatusBadge({
       className={cn(
         'border-transparent',
         status === 'available' && 'bg-muted text-foreground',
-        status === 'scheduled' && 'bg-sky-100 text-sky-700',
-        status === 'generating' && 'bg-amber-100 text-amber-700',
-        status === 'generated' && 'bg-emerald-100 text-emerald-700',
-        status === 'failed' && 'bg-red-100 text-red-700',
+        status === 'scheduled' && 'bg-info-muted text-info',
+        status === 'generating' && 'bg-warning-muted text-warning',
+        status === 'generated' && 'bg-success-muted text-success',
+        status === 'failed' && 'bg-error-muted text-error',
       )}
     >
       {t(`statuses.${status}`)}

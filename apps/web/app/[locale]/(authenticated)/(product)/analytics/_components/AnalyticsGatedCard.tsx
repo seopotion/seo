@@ -11,7 +11,7 @@ export function AnalyticsGatedCard() {
   return (
     <Card className="border-border shadow-none">
       <CardHeader>
-        <span className="flex size-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
+        <span className="flex size-10 items-center justify-center rounded-md bg-success-subtle text-success">
           <Cable className="size-5" aria-hidden="true" />
         </span>
         <CardTitle className="mt-2">{t('gated.title')}</CardTitle>
@@ -19,7 +19,7 @@ export function AnalyticsGatedCard() {
       <CardContent className="grid gap-2">
         <p className="max-w-2xl text-muted-foreground text-sm">{t('gated.description')}</p>
         <Link
-          className="w-fit font-medium text-emerald-700 text-sm hover:underline"
+          className="w-fit font-medium text-success text-sm hover:underline"
           href="/settings?tab=googleSearchConsole"
         >
           {t('gated.cta')}

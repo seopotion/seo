@@ -2,7 +2,6 @@ import { GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { StatusPanel } from '@/components/integrations/StatusPanel';
 import { WordPressDialog } from '@/components/integrations/WordPressDialog';
 import {
   Badge,
@@ -13,6 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusPanel,
 } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { referralSources } from '../constants';
@@ -143,7 +143,7 @@ export function IntegrationsStep({
         </div>
         {integrationsError ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <p className="text-red-600 text-sm">{t('loadError')}</p>
+            <p className="text-error text-sm">{t('loadError')}</p>
             <Button onClick={onRetryIntegrations} size="sm" variant="outline">
               {t('retry')}
             </Button>

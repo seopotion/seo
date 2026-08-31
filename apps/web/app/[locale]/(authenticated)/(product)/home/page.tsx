@@ -141,7 +141,7 @@ export default function HomePage() {
   return (
     <div>
       {loadError && (
-        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-sm">
+        <div className="mb-4 rounded-md border border-warning-border bg-warning-subtle px-4 py-3 text-warning text-sm">
           {t('loadError')}
         </div>
       )}
@@ -156,7 +156,7 @@ export default function HomePage() {
               <Stat label={t('articles.published')} value={data?.published ?? 0} />
               <Stat label={t('articles.planned')} value={data?.planned ?? 0} />
             </div>
-            <p className="mt-4 text-emerald-700 text-sm">{t('articles.cta')}</p>
+            <p className="mt-4 text-success text-sm">{t('articles.cta')}</p>
           </CardContent>
         </Card>
 
@@ -284,7 +284,7 @@ function GatedCard({ cta, message }: { cta: string; message: string }) {
   return (
     <div className="grid gap-2">
       <p className="text-muted-foreground text-sm">{message}</p>
-      <Link className="text-emerald-700 text-sm hover:underline" href={SETTINGS_GSC_HREF}>
+      <Link className="text-success text-sm hover:underline" href={SETTINGS_GSC_HREF}>
         {cta}
       </Link>
     </div>
@@ -300,7 +300,7 @@ function ActionLabel({ action }: { action: RecommendedAction }) {
   }
 
   return (
-    <Link className="text-emerald-700 hover:underline" href={action.href}>
+    <Link className="text-success hover:underline" href={action.href}>
       {label}
     </Link>
   );

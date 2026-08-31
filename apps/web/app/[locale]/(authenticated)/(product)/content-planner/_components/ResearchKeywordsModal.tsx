@@ -272,9 +272,9 @@ export function ResearchKeywordsModal({
 
       {!canResearch || upgradeRequired ? (
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-          <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 px-5 py-6 text-center">
-            <h3 className="font-semibold text-amber-950">{t('upgrade.title')}</h3>
-            <p className="mt-2 text-amber-800 text-sm">{t('upgrade.description')}</p>
+          <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
+            <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
+            <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
             <Button asChild className="mt-4" size="sm">
               <Link href="/billing">{t('upgrade.cta')}</Link>
             </Button>
@@ -314,7 +314,7 @@ export function ResearchKeywordsModal({
             <div className="flex min-h-5 items-start justify-between gap-3">
               <div id="research-keyword-error" role={searchError ? 'alert' : undefined}>
                 {searchError ? (
-                  <p className="text-red-600 text-xs">{t(`errors.${searchError}`)}</p>
+                  <p className="text-error text-xs">{t(`errors.${searchError}`)}</p>
                 ) : null}
               </div>
               <span className="shrink-0 text-muted-foreground text-xs">
@@ -502,7 +502,7 @@ function AddKeywordAction({
         {pending ? t('actions.adding') : state ? t(`actions.${state}`) : t('actions.add')}
       </Button>
       {error ? (
-        <p role="alert" className="text-red-600 text-xs">
+        <p role="alert" className="text-error text-xs">
           {t(`addErrors.${error}`)}
         </p>
       ) : null}

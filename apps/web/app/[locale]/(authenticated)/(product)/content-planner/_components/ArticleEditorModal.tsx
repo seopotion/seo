@@ -267,7 +267,7 @@ function StatusBadge({
       variant="secondary"
       className={cn(
         'w-fit border-transparent',
-        status === 'generated' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700',
+        status === 'generated' ? 'bg-success-muted text-success' : 'bg-info-muted text-info',
       )}
     >
       {t(`statuses.${status}`)}

@@ -11,6 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusPanel,
   Switch,
 } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -21,7 +22,6 @@ import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import { articleStyles, internalLinkCounts } from '../../onboarding/constants';
 import {
   type ArticleSettingsForm,
@@ -412,33 +412,12 @@ export default function ArticleSettingsPage() {
   );
 }
 
-function StatusPanel({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'error' | 'neutral' | 'success';
-}) {
-  return (
-    <div
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-border bg-card text-muted-foreground',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 function AutoPublishNotice({ children, id }: { children: ReactNode; id: string }) {
   return (
     <p
       id={id}
       role="status"
-      className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 text-sm"
+      className="rounded-md border border-warning-border bg-warning-subtle px-3 py-2 text-warning text-sm"
     >
       {children}
     </p>
@@ -447,7 +426,7 @@ function AutoPublishNotice({ children, id }: { children: ReactNode; id: string }
 
 function SettingsLink({ children, href }: { children: ReactNode; href: string }) {
   return (
-    <Link className="font-medium text-amber-950 underline underline-offset-2" href={href}>
+    <Link className="font-medium text-warning underline underline-offset-2" href={href}>
       {children}
     </Link>
   );

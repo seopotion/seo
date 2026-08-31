@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { hasLocale, useLocale, useTranslations } from 'next-intl';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Badge, Button, PageTitle } from '@/components/ui';
+import { Badge, Button, PageTitle, StatusPanel } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
 import { api } from '@/lib/api';
@@ -114,9 +114,7 @@ function CallbackInner() {
 
         {errorKey ? (
           <>
-            <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
-              {t(`errors.${errorKey}`)}
-            </p>
+            <StatusPanel tone="error">{t(`errors.${errorKey}`)}</StatusPanel>
             <Button asChild variant="outline" className="w-fit">
               <Link href={SETTINGS_HREF}>{t('backToSettings')}</Link>
             </Button>
@@ -172,12 +170,7 @@ function CallbackInner() {
                           {site.site_url}
                         </span>
                         {recommended === site.site_url ? (
-                          <Badge
-                            variant="secondary"
-                            className="border-transparent bg-emerald-100 text-emerald-700"
-                          >
-                            {t('recommended')}
-                          </Badge>
+                          <Badge variant="success">{t('recommended')}</Badge>
                         ) : null}
                       </span>
                       <span className="text-muted-foreground text-xs">{site.permission_level}</span>

@@ -4,11 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, ExternalLink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
-import { Button, Input, Label, Modal } from '@/components/ui';
+import { Button, Input, Label, Modal, StatusPanel } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
-import { StatusPanel } from './StatusPanel';
 
 type WordPressErrorKey = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 type FailedStep = 1 | 2 | null;
@@ -282,12 +281,12 @@ function StepHeading({ failed, index, title }: { failed: boolean; index: number;
       <span
         className={cn(
           'flex size-6 items-center justify-center rounded-full text-background text-xs',
-          failed ? 'bg-red-600' : 'bg-foreground',
+          failed ? 'bg-destructive' : 'bg-foreground',
         )}
       >
         {index}
       </span>
-      <p className={cn('font-medium text-sm', failed ? 'text-red-700' : 'text-foreground')}>
+      <p className={cn('font-medium text-sm', failed ? 'text-error' : 'text-foreground')}>
         {title}
       </p>
     </div>

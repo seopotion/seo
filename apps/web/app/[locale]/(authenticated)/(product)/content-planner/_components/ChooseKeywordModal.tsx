@@ -224,9 +224,9 @@ export function ChooseKeywordModal({
 
       {showUpgrade ? (
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-          <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 px-5 py-6 text-center">
-            <h3 className="font-semibold text-amber-950">{t('upgrade.title')}</h3>
-            <p className="mt-2 text-amber-800 text-sm">{t('upgrade.description')}</p>
+          <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
+            <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
+            <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
             <Button asChild className="mt-4" size="sm">
               <Link href="/billing">{t('upgrade.cta')}</Link>
             </Button>
@@ -237,7 +237,7 @@ export function ChooseKeywordModal({
           {scheduleError ? (
             <div
               role="alert"
-              className="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm"
+              className="mb-3 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm"
             >
               {t(`errors.${scheduleError}`)}
             </div>
@@ -246,7 +246,7 @@ export function ChooseKeywordModal({
           {loadError ? (
             <div
               role="alert"
-              className="mb-3 flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm sm:flex-row sm:items-center sm:justify-between"
+              className="mb-3 flex flex-col items-start gap-2 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{t('states.loadError')}</span>
               <Button

@@ -54,9 +54,9 @@ function DeltaBadge({ metric, value }: { metric: AnalyticsMetric; value: number 
       className={cn(
         'border-transparent tabular-nums',
         sentiment === 'positive'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : sentiment === 'negative'
-            ? 'bg-red-100 text-red-700'
+            ? 'bg-error-muted text-error'
             : 'bg-muted text-muted-foreground',
       )}
     >

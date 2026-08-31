@@ -22,6 +22,7 @@ export {
 } from './select';
 export { Separator } from './separator';
 export { Skeleton } from './skeleton';
+export { StatusPanel, statusPanelVariants } from './status-panel';
 export { Switch } from './switch';
 export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 export { Textarea } from './textarea';

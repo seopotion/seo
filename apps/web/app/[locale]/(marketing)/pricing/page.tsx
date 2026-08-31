@@ -53,7 +53,7 @@ function CellValue({
     return (
       <svg
         aria-label={includedLabel}
-        className="mx-auto h-5 w-5 text-emerald-500"
+        className="mx-auto h-5 w-5 text-success"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -145,7 +145,7 @@ export default function PricingPage() {
             className={`font-medium text-sm ${annual ? 'text-foreground' : 'text-muted-foreground'}`}
           >
             {t('annual')}
-            <span className="ml-1 font-semibold text-emerald-600 text-xs">{t('save')}</span>
+            <span className="ml-1 font-semibold text-success text-xs">{t('save')}</span>
           </span>
         </div>
 
@@ -199,7 +199,7 @@ export default function PricingPage() {
                   <li key={feature} className="flex items-start gap-2 text-foreground text-sm">
                     <svg
                       aria-hidden="true"
-                      className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-success"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -216,9 +216,7 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <p className="mb-3 text-center font-medium text-emerald-700 text-xs">
-                {t('guarantee')}
-              </p>
+              <p className="mb-3 text-center font-medium text-success text-xs">{t('guarantee')}</p>
               <Link
                 href="/"
                 className={`block w-full rounded-lg px-4 py-2.5 text-center font-medium text-sm transition-colors ${
