@@ -1444,6 +1444,10 @@
         "description": "Gelecekteki tüm makaleler için tercihlerinizi belirleyin.",
         "label": "Makale Ayarları"
       },
+      "billing": {
+        "description": "Planınızı inceleyin, yükseltin ve ödeme bilgilerinizi yönetin.",
+        "label": "Faturalandırma"
+      },
       "contentPlanner": {
         "description": "Konuları, anahtar kelimeleri, yayın temposunu ve içerik önceliklerini planlayın.",
         "label": "İçerik Planlayıcı"

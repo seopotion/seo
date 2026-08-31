@@ -1444,6 +1444,10 @@
         "description": "Set your preferences for all future articles.",
         "label": "Article Settings"
       },
+      "billing": {
+        "description": "Review your plan, upgrade, and manage payment details.",
+        "label": "Billing"
+      },
       "contentPlanner": {
         "description": "Plan topics, keywords, publishing cadence, and content priorities.",
         "label": "Content Planner"
