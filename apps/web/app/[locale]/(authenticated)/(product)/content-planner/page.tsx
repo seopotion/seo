@@ -1,7 +1,7 @@
 'use client';
 
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -19,15 +19,17 @@ import { ResearchKeywordsModal } from './_components/ResearchKeywordsModal';
 import { TargetKeywordsSection } from './_components/TargetKeywordsSection';
 import { createPlannerFixtureArticles } from './fixtures';
 import {
-  buildCalendarWeeks,
+  addMonths,
+  buildMonthWeeks,
   combineTargetKeywords,
   formatDate,
   formatDayNumber,
-  formatMonth,
+  formatMonthYear,
   formatNumber,
   formatWeekday,
-  isFirstDayOfMonth,
+  isSameMonth,
   mapPlannerKeywords,
+  startOfMonth,
   startOfToday,
 } from './planner-utils';
 import type { CalendarDay, PlannerArticle } from './types';
@@ -78,6 +80,7 @@ export default function ContentPlannerPage() {
     organizationId: string;
     status: StrategyStatus;
   } | null>(null);
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(startOfToday()));
   const [selectedArticle, setSelectedArticle] = useState<PlannerArticle | null>(null);
   const [chooserDateKey, setChooserDateKey] = useState<string | null>(null);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
@@ -112,6 +115,15 @@ export default function ContentPlannerPage() {
     setResearchModalOpen(false);
     setChooserDateKey(dateKey);
   }, []);
+  const handlePreviousMonth = useCallback(() => {
+    setVisibleMonth((month) => addMonths(month, -1));
+  }, []);
+  const handleNextMonth = useCallback(() => {
+    setVisibleMonth((month) => addMonths(month, 1));
+  }, []);
+  const handleToday = useCallback(() => {
+    setVisibleMonth(startOfMonth(startOfToday()));
+  }, []);
   const handleSelectArticle = useCallback((article: PlannerArticle) => {
     setChooserDateKey(null);
     setResearchModalOpen(false);
@@ -124,6 +136,7 @@ export default function ContentPlannerPage() {
     }
 
     organizationIdRef.current = organization?.id;
+    setVisibleMonth(startOfMonth(startOfToday()));
     setSelectedArticle(null);
     setChooserDateKey(null);
     setResearchModalOpen(false);
@@ -304,13 +317,14 @@ export default function ContentPlannerPage() {
     !organizationLoading &&
     !organizationError;
   const calendarWeeks = useMemo(
-    () => buildCalendarWeeks(today, plannerArticles),
-    [plannerArticles, today],
+    () => buildMonthWeeks(visibleMonth, plannerArticles, today),
+    [plannerArticles, today, visibleMonth],
   );
-  const activeDays = useMemo(
-    () => calendarWeeks.flat().filter((day) => day.inRange),
+  const monthDays = useMemo(
+    () => calendarWeeks.flat().filter((day) => day.inMonth),
     [calendarWeeks],
   );
+  const isCurrentMonth = isSameMonth(visibleMonth, today);
   const weekdayLabels = useMemo(
     () => calendarWeeks[0]?.map((day) => formatWeekday(day.date, locale, 'short')) ?? [],
     [calendarWeeks, locale],
@@ -340,9 +354,20 @@ export default function ContentPlannerPage() {
         ) : (
           <>
             <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <h2 className="font-semibold text-base text-slate-950">
-                {t('contentCalendar.title')}
-              </h2>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <h2 className="font-semibold text-base text-slate-950">
+                  {t('contentCalendar.title')}
+                </h2>
+                <CalendarMonthNav
+                  isCurrentMonth={isCurrentMonth}
+                  locale={locale}
+                  onNextMonth={handleNextMonth}
+                  onPreviousMonth={handlePreviousMonth}
+                  onToday={handleToday}
+                  t={t}
+                  visibleMonth={visibleMonth}
+                />
+              </div>
               <SummaryPill
                 label={t('scheduledCount', { count: plannerArticles.length })}
                 value={t('oneArticlePerDay')}
@@ -377,7 +402,7 @@ export default function ContentPlannerPage() {
             </section>
 
             <section aria-label={t('agendaLabel')} className="grid gap-2 md:hidden">
-              {activeDays.map((day) => (
+              {monthDays.map((day) => (
                 <PlannerAgendaRow
                   canSchedule={canScheduleKeywords}
                   chooserAvailable={schedulingAvailable}
@@ -439,6 +464,63 @@ export default function ContentPlannerPage() {
         organizationId={organization?.id ?? ''}
       />
     </>
+  );
+}
+
+function CalendarMonthNav({
+  isCurrentMonth,
+  locale,
+  onNextMonth,
+  onPreviousMonth,
+  onToday,
+  t,
+  visibleMonth,
+}: {
+  isCurrentMonth: boolean;
+  locale: string;
+  onNextMonth: () => void;
+  onPreviousMonth: () => void;
+  onToday: () => void;
+  t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
+  visibleMonth: Date;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-8"
+        aria-label={t('calendarNav.previousMonth')}
+        onClick={onPreviousMonth}
+      >
+        <ChevronLeft className="size-4" aria-hidden="true" />
+      </Button>
+      {/* Announced on change so the arrows are not silent for screen readers. */}
+      <p aria-live="polite" className="min-w-36 text-center font-medium text-slate-950 text-sm">
+        {formatMonthYear(visibleMonth, locale)}
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="size-8"
+        aria-label={t('calendarNav.nextMonth')}
+        onClick={onNextMonth}
+      >
+        <ChevronRight className="size-4" aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="ml-1 h-8"
+        disabled={isCurrentMonth}
+        onClick={onToday}
+      >
+        {t('calendarNav.today')}
+      </Button>
+    </div>
   );
 }
 
@@ -504,7 +586,7 @@ function PlannerDayCell({
 }) {
   const cellClassName = cn(
     'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2 text-left',
-    day.inRange ? 'bg-white' : 'bg-slate-50 text-slate-400',
+    day.inMonth ? 'bg-white' : 'bg-slate-50 text-slate-400',
   );
 
   const content = (
@@ -512,15 +594,12 @@ function PlannerDayCell({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p
-            className={cn('font-semibold text-slate-950 text-sm', !day.inRange && 'text-slate-400')}
+            className={cn('font-semibold text-slate-950 text-sm', !day.inMonth && 'text-slate-400')}
           >
             {formatDayNumber(day.date, locale)}
           </p>
         </div>
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-          {isFirstDayOfMonth(day.date) && (
-            <span className="truncate text-slate-500 text-xs">{formatMonth(day.date, locale)}</span>
-          )}
           {day.article && <PlannerStatusBadge article={day.article} t={t} />}
         </div>
       </div>
@@ -528,7 +607,7 @@ function PlannerDayCell({
       <div className="flex min-h-0 flex-1 items-end">
         {day.article ? (
           <ArticleSummary article={day.article} locale={locale} t={t} />
-        ) : day.inRange ? (
+        ) : day.inMonth && !day.isPast ? (
           <Button
             type="button"
             variant="outline"
@@ -610,7 +689,7 @@ function PlannerAgendaRow({
 
       {day.article ? (
         <ArticleSummary article={day.article} locale={locale} t={t} />
-      ) : (
+      ) : day.isPast ? null : (
         <Button
           type="button"
           variant="outline"

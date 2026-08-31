@@ -277,6 +277,11 @@
       "product_guide": "Ürün rehberi"
     },
     "calendarLabel": "İçerik takvimi ızgarası",
+    "calendarNav": {
+      "nextMonth": "Sonraki ay",
+      "previousMonth": "Önceki ay",
+      "today": "Bugün"
+    },
     "chooseKeyword": {
       "actions": {
         "close": "Anahtar kelime seçiciyi kapat",
@@ -324,7 +329,7 @@
     "contentCalendar": {
       "title": "İçerik Takvimi"
     },
-    "description": "Önümüzdeki 45 gün boyunca her gün için bir makale planlayın.",
+    "description": "Ay ay, her gün için bir makale planlayın.",
     "modal": {
       "keyword": "Anahtar kelime",
       "notGenerated": "Bu makale henüz oluşturulmadı.",

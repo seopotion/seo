@@ -1,12 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import {
+  addMonths,
+  buildMonthWeeks,
   combineResearchResults,
   combineTargetKeywords,
   getCandidateAddApiError,
   getCandidateScheduleError,
   getKeywordResearchApiError,
   isCandidateScheduleSuccess,
+  isSameMonth,
   mapPlannerKeywords,
+  startOfMonth,
+  toDateKey,
   validateResearchSeed,
 } from '../app/[locale]/(authenticated)/(product)/content-planner/planner-utils';
 import type {
@@ -313,5 +318,113 @@ describe('target keyword combining', () => {
     );
 
     expect(targetKeyword?.status).toBe(status);
+  });
+});
+
+describe('month navigation helpers', () => {
+  test('startOfMonth normalizes to the first day at local midnight', () => {
+    const monthStart = startOfMonth(new Date(2026, 8, 17, 13, 45));
+
+    expect(toDateKey(monthStart)).toBe('2026-09-01');
+    expect(monthStart.getHours()).toBe(0);
+  });
+
+  test('addMonths rolls the year over in both directions', () => {
+    expect(toDateKey(addMonths(new Date(2026, 11, 1), 1))).toBe('2027-01-01');
+    expect(toDateKey(addMonths(new Date(2026, 0, 1), -1))).toBe('2025-12-01');
+  });
+
+  test('addMonths from a 31-day month does not overflow into the next one', () => {
+    // Feb has no 31st: naive date math would land on March 3rd.
+    expect(toDateKey(addMonths(new Date(2026, 0, 1), 1))).toBe('2026-02-01');
+  });
+
+  test('isSameMonth separates the same month number in different years', () => {
+    expect(isSameMonth(new Date(2026, 8, 1), new Date(2026, 8, 30))).toBe(true);
+    expect(isSameMonth(new Date(2026, 8, 1), new Date(2025, 8, 1))).toBe(false);
+  });
+});
+
+describe('buildMonthWeeks', () => {
+  const today = new Date(2026, 8, 17);
+
+  test('pads to whole Monday-start weeks when the month starts mid-week', () => {
+    // 2026-09-01 is a Tuesday, 2026-09-30 a Wednesday.
+    const weeks = buildMonthWeeks(new Date(2026, 8, 1), [], today);
+
+    expect(weeks.every((week) => week.length === 7)).toBe(true);
+    expect(toDateKey(weeks[0]![0]!.date)).toBe('2026-08-31');
+    expect(toDateKey(weeks.at(-1)!.at(-1)!.date)).toBe('2026-10-04');
+  });
+
+  test('adds no leading padding when the month starts on a Monday', () => {
+    // 2026-06-01 is a Monday.
+    const weeks = buildMonthWeeks(new Date(2026, 5, 1), [], today);
+
+    expect(toDateKey(weeks[0]![0]!.date)).toBe('2026-06-01');
+    expect(weeks[0]![0]!.inMonth).toBe(true);
+  });
+
+  test('spans six rows for a 31-day month starting on a Sunday', () => {
+    // 2026-11-01 is a Sunday: one day in the first row, so November needs six.
+    const weeks = buildMonthWeeks(new Date(2026, 10, 1), [], today);
+
+    expect(weeks).toHaveLength(6);
+    expect(weeks.flat().filter((day) => day.inMonth)).toHaveLength(30);
+  });
+
+  test('flags padding days as outside the month', () => {
+    const days = buildMonthWeeks(new Date(2026, 8, 1), [], today).flat();
+    const byKey = new Map(days.map((day) => [day.dateKey, day]));
+
+    expect(byKey.get('2026-08-31')?.inMonth).toBe(false);
+    expect(byKey.get('2026-09-01')?.inMonth).toBe(true);
+    expect(byKey.get('2026-09-30')?.inMonth).toBe(true);
+    expect(byKey.get('2026-10-01')?.inMonth).toBe(false);
+  });
+
+  test('marks days before today as past, and today itself as not past', () => {
+    const byKey = new Map(
+      buildMonthWeeks(new Date(2026, 8, 1), [], today)
+        .flat()
+        .map((day) => [day.dateKey, day]),
+    );
+
+    expect(byKey.get('2026-09-16')?.isPast).toBe(true);
+    expect(byKey.get('2026-09-17')?.isPast).toBe(false);
+    expect(byKey.get('2026-09-18')?.isPast).toBe(false);
+  });
+
+  test('attaches an article to its scheduled day', () => {
+    const [article] = mapPlannerKeywords([plannerKeyword({ scheduled_date: '2026-09-10' })]);
+    const byKey = new Map(
+      buildMonthWeeks(new Date(2026, 8, 1), [article!], today)
+        .flat()
+        .map((day) => [day.dateKey, day]),
+    );
+
+    expect(byKey.get('2026-09-10')?.article?.keyword).toBe(article!.keyword);
+    expect(byKey.get('2026-09-11')?.article).toBeUndefined();
+  });
+
+  test('leaves an article off the padding day it falls on', () => {
+    // 2026-08-31 pads September's first row; the article belongs to August's grid.
+    const [article] = mapPlannerKeywords([plannerKeyword({ scheduled_date: '2026-08-31' })]);
+    const september = buildMonthWeeks(new Date(2026, 8, 1), [article!], today).flat();
+    const august = buildMonthWeeks(new Date(2026, 7, 1), [article!], today).flat();
+
+    expect(september.find((day) => day.dateKey === '2026-08-31')?.article).toBeUndefined();
+    expect(august.find((day) => day.dateKey === '2026-08-31')?.article?.keyword).toBe(
+      article!.keyword,
+    );
+  });
+
+  test('shows articles scheduled in a past month', () => {
+    const [article] = mapPlannerKeywords([plannerKeyword({ scheduled_date: '2026-07-20' })]);
+    const july = buildMonthWeeks(new Date(2026, 6, 1), [article!], today).flat();
+    const day = july.find((entry) => entry.dateKey === '2026-07-20');
+
+    expect(day?.article?.keyword).toBe(article!.keyword);
+    expect(day?.isPast).toBe(true);
   });
 });
