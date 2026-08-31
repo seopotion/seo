@@ -688,6 +688,15 @@ Declare `currentTier` and `isSubscribed` with the other derived values, above th
 
 Leave the activation poll, its redirect to `/home`, and all four early returns exactly as they are.
 
+> **Superseded by post-review fixes.** Leaving the poll alone turned out to be
+> wrong for a `paid` org buying `expert`: its success predicate
+> (`capabilities.keyword_research`) is already true before that purchase, so the
+> poll returned on its first iteration. The poll's interval, timeout, states and
+> `/home` redirect are unchanged, but its predicate now compares the purchased
+> tier (threaded through the checkout redirect) against `billing_tier`. The
+> heading was likewise made state-dependent. See the spec's *Post-review
+> amendments*.
+
 - [ ] **Step 5: Drop the tab from Settings**
 
 `apps/web/app/[locale]/(authenticated)/(product)/settings/page.tsx`:

@@ -10,8 +10,11 @@ export interface LemonSqueezyConfig {
   webhookSecret: string;
   storeId: string;
   variantByTier: Record<PaidTier, string>;
-  /** Where checkout sends the buyer afterwards (the app's activation page). */
-  redirectUrl: string;
+  /** Where checkout sends the buyer afterwards (the app's activation page).
+   * Takes the purchased tier so the page can wait for *that* tier to land —
+   * a `paid` org upgrading to `expert` is already entitled, so a tier-less
+   * redirect gives the activation poll nothing to wait on. */
+  redirectUrl: (tier: PaidTier) => string;
 }
 
 /** LS date fields can be null (e.g. `renews_at` after cancellation) — never
@@ -69,7 +72,7 @@ export function createLemonSqueezyProvider(cfg: LemonSqueezyConfig): BillingProv
               },
               // Codes must pass our validation first — hide LS's own field.
               checkout_options: { discount: false },
-              product_options: { redirect_url: cfg.redirectUrl },
+              product_options: { redirect_url: cfg.redirectUrl(tier) },
             },
             relationships: {
               store: { data: { type: 'stores', id: cfg.storeId } },

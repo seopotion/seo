@@ -7,7 +7,8 @@ const cfg = {
   webhookSecret: 'whsec_test',
   storeId: '111',
   variantByTier: { paid: '201', expert: '202' } as const,
-  redirectUrl: 'https://app.example.com/billing?checkout=success',
+  redirectUrl: (tier: 'paid' | 'expert') =>
+    `https://app.example.com/billing?checkout=success&tier=${tier}`,
 };
 const provider = createLemonSqueezyProvider(cfg);
 
@@ -168,7 +169,7 @@ describe('lemonsqueezy createCheckout', () => {
     const sent = JSON.parse(String(init?.body));
     expect(sent.data.attributes.checkout_data.custom).toEqual({ org_id: 'o1' });
     expect(sent.data.attributes.checkout_data.email).toBe('u@e.com');
-    expect(sent.data.attributes.product_options.redirect_url).toBe(cfg.redirectUrl);
+    expect(sent.data.attributes.product_options.redirect_url).toBe(cfg.redirectUrl('paid'));
     expect(sent.data.relationships.variant.data.id).toBe('201');
   });
 });

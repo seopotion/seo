@@ -17,7 +17,14 @@ import {
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { ManageSubscriptionCard } from './_components/ManageSubscriptionCard';
-import { hasPurchasableTier, TIERS, type Tier, tierState } from './tiers';
+import {
+  hasPurchasableTier,
+  isActivated,
+  parsePurchasedTier,
+  TIERS,
+  type Tier,
+  tierState,
+} from './tiers';
 
 // Mirrors the onboarding scan-status poll (apps/web/app/[locale]/(authenticated)/onboarding/api.ts).
 const ACTIVATION_POLL_INTERVAL_MS = 2000;
@@ -88,6 +95,13 @@ export default function BillingPage() {
     async (isCancelled: () => boolean = () => false) => {
       setActivationState('checking');
 
+      // Which tier the provider says was bought. Read here rather than passed in
+      // so the retry button polls for the same thing the redirect did — the
+      // param stays on the URL until we navigate away.
+      const purchasedTier = parsePurchasedTier(
+        new URLSearchParams(window.location.search).get('tier'),
+      );
+
       const expiresAt = Date.now() + ACTIVATION_POLL_TIMEOUT_MS;
 
       while (Date.now() <= expiresAt) {
@@ -98,7 +112,7 @@ export default function BillingPage() {
 
           if (isCancelled()) return;
 
-          if (activeOrganization?.capabilities.keyword_research) {
+          if (isActivated(activeOrganization, purchasedTier)) {
             // The poll reads the API directly, so the cached org still carries
             // the pre-purchase capabilities — drop it before /home renders.
             await queryClient.invalidateQueries({
@@ -127,9 +141,9 @@ export default function BillingPage() {
     [goToLogin, queryClient, router],
   );
 
-  // The LemonSqueezy checkout redirect returns here with ?checkout=success; the
-  // plan flip happens via webhook, which can lag the redirect, so poll until the
-  // org's paid capability shows up (or give up after ~30s).
+  // The LemonSqueezy checkout redirect returns here with ?checkout=success&tier=…;
+  // the plan flip happens via webhook, which can lag the redirect, so poll until
+  // the org reaches the purchased tier (or give up after ~30s).
   useEffect(() => {
     if (!getToken()) {
       router.replace('/');
@@ -294,8 +308,12 @@ export default function BillingPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="font-semibold text-slate-950 text-xl">{t('title')}</h1>
-        <p className="mt-1 text-slate-600 text-sm">{t('description')}</p>
+        <h1 className="font-semibold text-slate-950 text-xl">
+          {isSubscribed ? t('subscribedTitle') : t('title')}
+        </h1>
+        <p className="mt-1 text-slate-600 text-sm">
+          {isSubscribed ? t('subscribedDescription') : t('description')}
+        </p>
       </div>
 
       {checkoutError ? (

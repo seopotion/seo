@@ -149,6 +149,8 @@
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again."
     },
+    "subscribedDescription": "Your plan and payment details.",
+    "subscribedTitle": "Billing",
     "tierState": {
       "current": "Current plan",
       "owned": "Included in your plan"

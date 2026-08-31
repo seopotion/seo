@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-31
 **Status:** Approved, ready for implementation
-**Issue:** none (ad-hoc UX cleanup)
+**Issue:** [#131 — [billing] Expose plan/tier so frontend can distinguish paid vs expert](https://github.com/seopotion/seo/issues/131)
 
 ## Problem
 
@@ -58,6 +58,17 @@ the existing `capabilities` block.
 Named `billing_tier` rather than `plan` so it does not read as the entitlement
 source of truth.
 
+**Alternative considered — `capabilities.expert`.** #131 offers a second option:
+a dedicated capability flag backed by `hasExpert(org)`, which already exists
+(unused) in `packages/shared/schemas/src/org.ts`. That is the right shape for
+*gating*, but nothing on this page gates — it labels the plan the org is on and
+ranks tiers against each other, which a boolean cannot express without one flag
+per tier. A display-only field matches a display-only need, and keeps
+`capabilities` meaning strictly "what this org may do". When a genuinely
+expert-only **feature** ships, it should add `capabilities.expert` as its
+entitlement seam rather than branch on `billing_tier`; the two are complementary,
+not competing.
+
 **Test** (`apps/api/tests/core.test.ts`): a `free` org and an `expert` org each
 round-trip the correct `billing_tier`, and the `capabilities` flags are
 unchanged.
@@ -91,8 +102,12 @@ Resulting UI per tier:
 | `billing_tier` | Paid card | Expert card |
 | --- | --- | --- |
 | `free` | upgrade CTA | upgrade CTA |
-| `paid` | "Current plan", button disabled | upgrade CTA |
-| `expert` | "Included", no button | "Current plan", button disabled |
+| `paid` | "Current plan", no button | upgrade CTA |
+| `expert` | "Included", no button | "Current plan", no button |
+
+Only an `upgrade` card renders a button at all — a non-upgrade card omits it
+rather than disabling it, so "no non-upgrade card can start a checkout" holds
+structurally rather than depending on a `disabled` prop staying correct.
 
 The `paid` row is the substantive gain: paid→expert becomes reachable in-app
 for the first time, and the backend already permits it.
@@ -154,3 +169,24 @@ The page keeps its own `<h1>` and description — `analytics` and
   read by `settings/page.tsx` and silently ignored when it matches no tab, so a
   stale bookmark lands on Settings' first tab rather than erroring. Both in-app
   links are repointed; no external links to that URL exist.
+
+## Post-review amendments
+
+Found by the whole-branch review after the five implementation commits, and
+fixed in the same PR:
+
+- **The activation poll needed the purchased tier.** It ended on
+  `capabilities.keyword_research`, which is *already true* for a `paid` org
+  buying `expert` — so that purchase redirected to `/home` instantly without
+  waiting on the webhook, and a lagging webhook then left a live "Upgrade to
+  Business" CTA that opened a second checkout. The provider's `redirectUrl`
+  config became `(tier: PaidTier) => string`, the API appends `&tier=<tier>`,
+  and the page polls `planRank(billing_tier) >= planRank(purchased)` via a pure
+  `isActivated` helper in `tiers.ts`. A missing or invalid `tier` param falls
+  back to the old capability check so in-flight checkout links still work.
+  `billing_tier` is used here to confirm *a purchase landed*, not to gate a
+  feature.
+- **The page heading assumed a prospect.** "Choose your plan" / "Unlock keyword
+  research…" rendered unconditionally, including for a Business customer who can
+  buy nothing. The heading now switches on `isSubscribed`
+  (`BillingPage.subscribedTitle` / `subscribedDescription`).

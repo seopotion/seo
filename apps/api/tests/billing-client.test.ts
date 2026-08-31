@@ -50,11 +50,12 @@ describe('getBillingProvider', () => {
       }),
     );
     const provider = await getBillingProvider();
-    await provider.createCheckout({ tier: 'paid', orgId: 'o1', userEmail: 'u@e.com' });
+    await provider.createCheckout({ tier: 'expert', orgId: 'o1', userEmail: 'u@e.com' });
     const [, init] = fetchMock.mock.calls[0]!;
     const sent = JSON.parse(String(init?.body));
+    // The tier rides along so the activation poll knows what to wait for.
     expect(sent.data.attributes.product_options.redirect_url).toBe(
-      'https://app.example.com/billing?checkout=success',
+      'https://app.example.com/billing?checkout=success&tier=expert',
     );
   });
 });

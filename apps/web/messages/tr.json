@@ -149,6 +149,8 @@
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
     },
+    "subscribedDescription": "Planınız ve ödeme bilgileriniz.",
+    "subscribedTitle": "Faturalandırma",
     "tierState": {
       "current": "Mevcut planınız",
       "owned": "Planınıza dahil"
