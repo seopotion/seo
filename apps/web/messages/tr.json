@@ -116,6 +116,12 @@
       "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
       "generic": "Ödeme başlatılamadı. Tekrar deneyin."
     },
+    "manage": {
+      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
+      "error": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
+      "open": "Faturalandırmayı yönet",
+      "opening": "Açılıyor..."
+    },
     "promo": {
       "apply": "Uygula",
       "applied": "{code} uygulandı — {discount}",
@@ -142,6 +148,10 @@
       "loading": "Organizasyonunuz yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+    },
+    "tierState": {
+      "current": "Mevcut planınız",
+      "owned": "Planınıza dahil"
     },
     "tiers": {
       "expert": {
@@ -817,14 +827,6 @@
       "manage": "Yönet",
       "save": "Kaydet",
       "saving": "Kaydediliyor..."
-    },
-    "billing": {
-      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
-      "freeDescription": "Anahtar kelime araştırması ve planlamasının kilidini açmak için yükseltin.",
-      "manage": "Faturalandırmayı yönet",
-      "manageError": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
-      "opening": "Açılıyor...",
-      "upgradeCta": "Planları görüntüle"
     },
     "googleSearchConsole": {
       "badges": {

@@ -116,6 +116,12 @@
       "already_subscribed": "You're already subscribed to this plan. Manage your billing from Settings instead.",
       "generic": "Could not start checkout. Try again."
     },
+    "manage": {
+      "description": "You have an active paid subscription. Manage your payment method or cancel from the billing portal.",
+      "error": "Could not open the billing portal. Try again.",
+      "open": "Manage billing",
+      "opening": "Opening..."
+    },
     "promo": {
       "apply": "Apply",
       "applied": "{code} applied — {discount}",
@@ -142,6 +148,10 @@
       "loading": "Loading your organization...",
       "noOrganization": "No completed organization was found for this workspace.",
       "organizationError": "Could not load your organization. Try again."
+    },
+    "tierState": {
+      "current": "Current plan",
+      "owned": "Included in your plan"
     },
     "tiers": {
       "expert": {
@@ -817,14 +827,6 @@
       "manage": "Manage",
       "save": "Save",
       "saving": "Saving..."
-    },
-    "billing": {
-      "description": "You have an active paid subscription. Manage your payment method or cancel from the billing portal.",
-      "freeDescription": "Upgrade to unlock keyword research and scheduling.",
-      "manage": "Manage billing",
-      "manageError": "Could not open the billing portal. Try again.",
-      "opening": "Opening...",
-      "upgradeCta": "View plans"
     },
     "googleSearchConsole": {
       "badges": {
