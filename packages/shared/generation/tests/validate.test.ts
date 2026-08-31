@@ -85,6 +85,20 @@ describe('validateArticle', () => {
     expect(codes).toEqual([]);
   });
 
+  test('up to 3 leading spaces still opens a heading, 4+ is indented code', () => {
+    // 3 spaces is a real heading per CommonMark, so this is the article's ONE H1
+    const threeSpace = `   # T\n\n${'intro words here. '.repeat(40)}\n\n   ## First\n\n${'Body words for the first section. '.repeat(80)}\n\n   ## Second\n\n${'Distinct body words for the second section. '.repeat(80)}\n`;
+    expect(
+      validateArticle({ ...goodArticle, content: threeSpace }, ctx).map((f) => f.code),
+    ).toEqual([]);
+  });
+
+  test('a 4-space indented heading is code, so it is not counted', () => {
+    const content = `${goodBody}\n\n## Deploying\n\n    # Indented sample, not an H1\n    npm run deploy\n`;
+    const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
+    expect(codes).not.toContain('h1_count');
+  });
+
   test('a section whose body is only a code block is not an empty section', () => {
     const content = `# T\n\n${'intro words here. '.repeat(40)}\n\n## Install\n\n\`\`\`bash\nnpm install piper\n\`\`\`\n\n## Notes\n\n${'Distinct trailing body words. '.repeat(150)}\n`;
     const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);

@@ -22,11 +22,11 @@ export function countWords(md: string): number {
  * `lines` so a section written entirely as a code sample still counts as body.
  */
 function introText(lines: string[], masked: string[]): string {
-  const firstH2 = masked.findIndex((l) => /^##\s+/.test(l));
+  const firstH2 = masked.findIndex((l) => /^ {0,3}##\s+/.test(l));
   const end = firstH2 === -1 ? lines.length : firstH2;
   return lines
     .slice(0, end)
-    .filter((_, i) => !/^#\s+/.test(masked[i] as string))
+    .filter((_, i) => !/^ {0,3}#\s+/.test(masked[i] as string))
     .join('\n')
     .trim();
 }
@@ -36,7 +36,7 @@ function sectionBodies(lines: string[], masked: string[]): string[] {
   const bodies: string[] = [];
   let current: string[] | null = null;
   for (let i = 0; i < lines.length; i++) {
-    if (/^##\s+/.test(masked[i] as string)) {
+    if (/^ {0,3}##\s+/.test(masked[i] as string)) {
       if (current) bodies.push(current.join('\n').trim());
       current = [];
     } else if (current) {
@@ -64,9 +64,13 @@ export function validateArticle(
   // lines to same-length spaces and inline spans cannot cross a newline, so the
   // two arrays stay index-aligned. Without this a `# comment` in a bash sample
   // reads as an H1 and fails the article outright.
+  //
+  // The 0-3 space bound is CommonMark's, and the same one `FENCE_RE` uses: a
+  // 4th space (or a tab) makes the line indented code, which is why indented
+  // blocks need no masking here to be excluded.
   const masked = maskCode(article.content).split('\n');
-  const h1Count = masked.filter((l) => /^#\s+/.test(l)).length;
-  const h2Count = masked.filter((l) => /^##\s+/.test(l)).length;
+  const h1Count = masked.filter((l) => /^ {0,3}#\s+/.test(l)).length;
+  const h2Count = masked.filter((l) => /^ {0,3}##\s+/.test(l)).length;
 
   if (countWords(article.content) < WORD_COUNT_FLOOR)
     failures.push({ code: 'word_count', message: `below ${WORD_COUNT_FLOOR} words` });
