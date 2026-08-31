@@ -4,7 +4,9 @@ import {
   buildImagePlanPrompt,
   extractH2s,
   injectImageAfterHeading,
+  NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  withNoTextDirective,
 } from '../src/images';
 
 const content = '# Title\n\nintro\n\n## First Section\n\nbody one\n\n## Second Section\n\nbody two';
@@ -67,6 +69,27 @@ describe('buildImagePlanPrompt', () => {
     expect(messages[0]!.content).toContain('English');
     expect(messages[1]!.content).toContain('First Section | Second Section');
     expect(messages[1]!.content).toContain('flat illustration');
+  });
+
+  test('bans text and logos in the planned scene', () => {
+    const messages = buildImagePlanPrompt({
+      businessName: 'Acme',
+      businessDescription: 'widgets',
+      language: 'English',
+      imageStyle: '',
+      articleTitle: 'T',
+      metaDescription: 'M',
+      headings,
+    });
+    expect(messages[0]!.content).toContain('NO text and NO logos');
+  });
+});
+
+describe('withNoTextDirective', () => {
+  test('appends the no-text ban to the planned prompt', () => {
+    const prompt = withNoTextDirective('  a hero scene  ');
+    expect(prompt.startsWith('a hero scene')).toBe(true);
+    expect(prompt).toContain(NO_TEXT_DIRECTIVE);
   });
 });
 

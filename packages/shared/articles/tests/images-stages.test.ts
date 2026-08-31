@@ -1,3 +1,4 @@
+import { NO_TEXT_DIRECTIVE } from '@shared/generation';
 import type { ArticleImage } from '@shared/schemas';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -248,6 +249,18 @@ describe('stageImagesRender', () => {
     await expect(stageImagesRender(run, { generate: imageGenerate })).rejects.toThrow(
       ArticleFatalError,
     );
+  });
+
+  test('sends the planned prompt with the no-text directive appended', async () => {
+    findArticleById
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+      .mockResolvedValue({ ...article, images: filledSlots() });
+
+    await stageImagesRender(run, { generate: imageGenerate });
+
+    for (const call of imageGenerate.mock.calls) {
+      expect((call[0] as { prompt: string }).prompt).toContain(NO_TEXT_DIRECTIVE);
+    }
   });
 
   test('short-circuits when images_status is already complete', async () => {

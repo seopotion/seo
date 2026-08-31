@@ -17,7 +17,9 @@ export {
   ImagePlanSchema,
   injectBlockAfterHeading,
   injectImageAfterHeading,
+  NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  withNoTextDirective,
 } from './images';
 export { parseJsonObject } from './json';
 export { verifyCandidates } from './link-verify';
