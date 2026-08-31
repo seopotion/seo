@@ -21,6 +21,12 @@ const gradeOf: Record<string, number | null> = {
   'rewrite-high-1': 12,
   'rewrite-high-2': 10,
   'rewrite-high-3': 11,
+  'Acme draft text': 13,
+  'stripped-pass': 6,
+  'stripped-pass-2': 5,
+  'stripped-pass-3': 4,
+  'Acme rewrite-pass': 6,
+  'Acme rewrite-high': 10,
 };
 
 function llmReplying(...texts: string[]): LlmClient {
@@ -138,6 +144,125 @@ describe('stageHumanize', () => {
         humanize_attempts: [...priorAttempts, { attempt: 3, grade: 11, content: 'rewrite-high-3' }],
       },
       output: { readability_ok: true },
+    });
+  });
+
+  describe('brand preservation (#266)', () => {
+    const brandDraft = { working: { draft: 'Acme draft text' } };
+
+    test('a rewrite that passes the grade but strips the business name loops', async () => {
+      const llm = llmReplying('stripped-pass');
+      const run = makeRun(brandDraft);
+
+      const result = await stageHumanize(run, llm);
+
+      expect(result).toEqual({
+        completed: false,
+        working: { humanize_attempts: [{ attempt: 1, grade: 6, content: 'stripped-pass' }] },
+        output: { readability_ok: false },
+      });
+    });
+
+    test('retry after a brand-stripping attempt rewrites the draft with brand feedback', async () => {
+      const priorAttempts = [{ attempt: 1, grade: 6, content: 'stripped-pass' }];
+      const llm = llmReplying('Acme rewrite-pass');
+      const run = makeRun({
+        working: { draft: 'Acme draft text', humanize_attempts: priorAttempts },
+      });
+
+      const result = await stageHumanize(run, llm);
+
+      const { messages } = vi.mocked(llm.complete).mock.calls[0]![0];
+      expect(messages[1]).toEqual({ role: 'user', content: 'Acme draft text' });
+      expect(messages[0]!.content).toContain('removed every mention of Acme');
+      expect(messages[0]!.content).not.toContain('scored Flesch-Kincaid');
+
+      expect(result).toEqual({
+        completed: true,
+        working: {
+          content: 'Acme rewrite-pass',
+          readability_grade: 6,
+          humanize_attempts: [
+            ...priorAttempts,
+            { attempt: 2, grade: 6, content: 'Acme rewrite-pass' },
+          ],
+        },
+        output: { readability_ok: true },
+      });
+    });
+
+    test('at the cap, a brand-keeping attempt wins over lower-grade stripped ones', async () => {
+      const priorAttempts = [
+        { attempt: 1, grade: 10, content: 'Acme rewrite-high' },
+        { attempt: 2, grade: 6, content: 'stripped-pass' },
+      ];
+      const llm = llmReplying('stripped-pass-2');
+      const run = makeRun({
+        working: { draft: 'Acme draft text', humanize_attempts: priorAttempts },
+      });
+
+      const result = await stageHumanize(run, llm);
+
+      expect(result).toEqual({
+        completed: true,
+        working: {
+          content: 'Acme rewrite-high',
+          readability_grade: 10,
+          humanize_attempts: [
+            ...priorAttempts,
+            { attempt: 3, grade: 5, content: 'stripped-pass-2' },
+          ],
+        },
+        output: { readability_ok: true },
+      });
+    });
+
+    test('at the cap with every attempt stripped, falls back to the draft', async () => {
+      const priorAttempts = [
+        { attempt: 1, grade: 6, content: 'stripped-pass' },
+        { attempt: 2, grade: 5, content: 'stripped-pass-2' },
+      ];
+      const llm = llmReplying('stripped-pass-3');
+      const run = makeRun({
+        working: { draft: 'Acme draft text', humanize_attempts: priorAttempts },
+      });
+
+      const result = await stageHumanize(run, llm);
+
+      expect(result).toEqual({
+        completed: true,
+        working: {
+          content: 'Acme draft text',
+          readability_grade: 13,
+          humanize_attempts: [
+            ...priorAttempts,
+            { attempt: 3, grade: 4, content: 'stripped-pass-3' },
+          ],
+        },
+        output: { readability_ok: true },
+      });
+    });
+
+    test('a draft that never mentioned the business is not held to the brand check', async () => {
+      const llm = llmReplying('rewrite-pass');
+      const run = makeRun({ working: { draft: 'draft text' } });
+
+      const result = await stageHumanize(run, llm);
+
+      expect(result.completed).toBe(true);
+      expect(result.working.content).toBe('rewrite-pass');
+    });
+
+    test('no CTA expected means no brand check', async () => {
+      const noCta = structuredClone(presets);
+      noCta.article_preferences.engagement.include_cta = false;
+      const llm = llmReplying('stripped-pass');
+      const run = makeRun({ working: { draft: 'Acme draft text' }, presets: noCta });
+
+      const result = await stageHumanize(run, llm);
+
+      expect(result.completed).toBe(true);
+      expect(result.working.content).toBe('stripped-pass');
     });
   });
 
