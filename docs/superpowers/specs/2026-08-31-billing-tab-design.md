@@ -144,6 +144,10 @@ The page keeps its own `<h1>` and description — `analytics` and
 
 ## Out of scope
 
+- Converting the page's hardcoded `slate-*` classes to the design-token layer.
+  The authenticated app bypasses its own tokens roughly 6:1; that is tracked in
+  [#273](https://github.com/seopotion/seo/issues/273) and deliberately kept out
+  of this PR.
 - Any change to how entitlement itself is computed or stored.
 - Surfacing renewal dates, invoices, or seat counts on the billing page.
 - Redirecting the legacy `/settings?tab=billing` URL. The `tab` query param is
