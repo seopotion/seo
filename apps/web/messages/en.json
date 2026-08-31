@@ -113,7 +113,7 @@
     },
     "description": "Unlock keyword research and scheduling by upgrading your plan.",
     "errors": {
-      "already_subscribed": "You're already subscribed to this plan. Manage your billing from Settings instead.",
+      "already_subscribed": "You're already subscribed to this plan. Use Manage billing to change your subscription.",
       "generic": "Could not start checkout. Try again."
     },
     "manage": {
@@ -897,7 +897,6 @@
     },
     "tabs": {
       "audienceCompetitors": "Audience & Competitors",
-      "billing": "Billing",
       "business": "Business",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",

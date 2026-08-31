@@ -1141,7 +1141,7 @@ function PublishingErrorActionLink({
       key: 'publishing.actions.articleSettings',
     },
     billing: {
-      href: '/settings?tab=billing',
+      href: '/billing',
       key: 'publishing.actions.billing',
     },
     integrations: {

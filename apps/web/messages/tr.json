@@ -113,7 +113,7 @@
     },
     "description": "Planınızı yükselterek anahtar kelime araştırması ve planlamasının kilidini açın.",
     "errors": {
-      "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
+      "already_subscribed": "Bu plana zaten abonesiniz. Aboneliğinizi değiştirmek için Faturalandırmayı yönet seçeneğini kullanın.",
       "generic": "Ödeme başlatılamadı. Tekrar deneyin."
     },
     "manage": {
@@ -897,7 +897,6 @@
     },
     "tabs": {
       "audienceCompetitors": "Hedef Kitle ve Rakipler",
-      "billing": "Faturalandırma",
       "business": "İşletme",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
