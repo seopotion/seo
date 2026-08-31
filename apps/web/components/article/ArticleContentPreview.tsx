@@ -1,153 +1,98 @@
 import Image from 'next/image';
-import type { ReactNode } from 'react';
+import Markdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
+/**
+ * The article body as it will publish. The generator writes GitHub-flavored
+ * Markdown (packages/shared/generation/src/article.ts) and the WordPress client
+ * publishes it through `marked` (apps/api/src/clients/wordpress.ts), so the
+ * preview parses the same dialect rather than a hand-rolled subset of it.
+ */
 export function ArticleContentPreview({ content }: { content: string }) {
-  const blocks = content
-    .trim()
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-
   return (
     <article className="grid gap-4 wrap-break-word text-slate-800">
-      {blocks.map((block, index) => {
-        const heading = getMarkdownHeading(block);
-        const key = `${index}-${block}`;
-
-        if (heading?.level === 1) {
-          return (
-            <h1 key={key} className="font-semibold text-2xl text-slate-950 leading-tight">
-              {heading.text}
-            </h1>
-          );
-        }
-
-        if (heading?.level === 2) {
-          return (
-            <h2 key={key} className="font-semibold text-lg text-slate-950 leading-snug">
-              {heading.text}
-            </h2>
-          );
-        }
-
-        if (heading?.level === 3) {
-          return (
-            <h3 key={key} className="font-semibold text-base text-slate-950 leading-snug">
-              {heading.text}
-            </h3>
-          );
-        }
-
-        return <ArticleContentBlock key={key} block={block} />;
-      })}
+      <Markdown remarkPlugins={[remarkGfm]} components={components}>
+        {content}
+      </Markdown>
     </article>
   );
 }
 
-/** A non-heading block: prose split around any inline `![alt](url)` images. */
-function ArticleContentBlock({ block }: { block: string }) {
-  return (
-    <>
-      {splitBlockIntoSegments(block).map((segment, index) => {
-        const key = `${index}-${segment.type === 'image' ? segment.url : segment.text}`;
-
-        return segment.type === 'image' ? (
-          <Image
-            key={key}
-            src={segment.url}
-            alt={segment.alt}
-            width={640}
-            height={360}
-            unoptimized
-            className="aspect-video w-full rounded-md border border-slate-200 object-cover"
-          />
-        ) : (
-          <p key={key} className="whitespace-pre-wrap text-sm leading-7">
-            {renderInlineMarkdown(segment.text)}
-          </p>
-        );
-      })}
-    </>
-  );
-}
-
-/** Render inline `**bold**` spans; everything else stays plain text. */
-function renderInlineMarkdown(text: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(/\*\*(.+?)\*\*/g)) {
-    const start = match.index;
-
-    if (start > lastIndex) {
-      nodes.push(text.slice(lastIndex, start));
-    }
-
-    nodes.push(
-      <strong key={start} className="font-semibold text-slate-950">
-        {match[1]}
-      </strong>,
-    );
-    lastIndex = start + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
-}
-
-type ArticleContentSegment =
-  | { type: 'image'; alt: string; url: string }
-  | { type: 'text'; text: string };
-
-/** Split a block's lines so inline images render as images and prose as paragraphs. */
-function splitBlockIntoSegments(block: string): ArticleContentSegment[] {
-  const segments: ArticleContentSegment[] = [];
-  let textLines: string[] = [];
-
-  const flushText = () => {
-    if (textLines.length) {
-      segments.push({ type: 'text', text: textLines.join('\n') });
-      textLines = [];
-    }
-  };
-
-  for (const line of block.split('\n')) {
-    const image = parseMarkdownImage(line.trim());
-
-    if (image) {
-      flushText();
-      segments.push({ type: 'image', alt: image.alt, url: image.url });
-    } else {
-      textLines.push(line);
-    }
-  }
-
-  flushText();
-  return segments;
-}
-
-function parseMarkdownImage(line: string) {
-  const match = /^!\[([^\]]*)\]\(([^)]+)\)$/.exec(line);
-
-  if (!match) {
-    return null;
-  }
-
-  return { alt: match[1].trim(), url: match[2].trim() };
-}
-
-function getMarkdownHeading(block: string) {
-  const match = /^(#{1,3})\s+(.+)$/.exec(block);
-
-  if (!match) {
-    return null;
-  }
-
-  return {
-    level: match[1].length,
-    text: match[2].trim(),
-  };
-}
+const components: Components = {
+  a: ({ children, href }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="font-medium text-sky-700 underline underline-offset-2 hover:text-sky-800"
+    >
+      {children}
+    </a>
+  ),
+  blockquote: ({ children }) => (
+    <blockquote className="grid gap-2 border-slate-300 border-l-4 pl-4 text-slate-600 italic">
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className }) => (
+    <code className={cn(className, 'rounded bg-slate-100 px-1 py-0.5 font-mono text-slate-900')}>
+      {children}
+    </code>
+  ),
+  del: ({ children }) => <del className="text-slate-500">{children}</del>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  h1: ({ children }) => (
+    <h1 className="font-semibold text-2xl text-slate-950 leading-tight">{children}</h1>
+  ),
+  h2: ({ children }) => (
+    <h2 className="font-semibold text-lg text-slate-950 leading-snug">{children}</h2>
+  ),
+  h3: ({ children }) => (
+    <h3 className="font-semibold text-base text-slate-950 leading-snug">{children}</h3>
+  ),
+  h4: ({ children }) => (
+    <h4 className="font-semibold text-slate-950 text-sm leading-snug">{children}</h4>
+  ),
+  hr: () => <hr className="border-slate-200" />,
+  img: ({ alt, src }) =>
+    typeof src === 'string' ? (
+      <Image
+        src={src}
+        alt={alt ?? ''}
+        width={640}
+        height={360}
+        unoptimized
+        className="aspect-video w-full rounded-md border border-slate-200 object-cover"
+      />
+    ) : null,
+  li: ({ children }) => <li className="text-sm leading-7">{children}</li>,
+  ol: ({ children }) => (
+    <ol className="grid list-decimal gap-1 pl-5 marker:text-slate-500">{children}</ol>
+  ),
+  p: ({ children }) => <p className="text-sm leading-7">{children}</p>,
+  // `[&_code]:` neutralizes the inline-code pill on the <code> inside a fence —
+  // react-markdown 10 dropped the `inline` prop, so the parent decides instead.
+  pre: ({ children }) => (
+    <pre className="overflow-x-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-slate-800 text-xs leading-6 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">
+      {children}
+    </pre>
+  ),
+  strong: ({ children }) => <strong className="font-semibold text-slate-950">{children}</strong>,
+  table: ({ children }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-left text-sm">{children}</table>
+    </div>
+  ),
+  td: ({ children }) => (
+    <td className="border-slate-200 border-b px-3 py-2 align-top">{children}</td>
+  ),
+  th: ({ children }) => (
+    <th className="border-slate-200 border-b bg-slate-50 px-3 py-2 font-semibold text-slate-950">
+      {children}
+    </th>
+  ),
+  ul: ({ children }) => (
+    <ul className="grid list-disc gap-1 pl-5 marker:text-slate-400">{children}</ul>
+  ),
+};
