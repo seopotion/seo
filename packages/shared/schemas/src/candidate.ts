@@ -44,6 +44,7 @@ export type TopicRole = (typeof TOPIC_ROLES)[number];
 /** Why a candidate was rejected by the pipeline (#54). */
 export const REJECTION_REASONS = [
   'brand_navigation',
+  'competitor_brand',
   'clustered_duplicate',
   'difficulty_ceiling',
   'relevance_floor',

@@ -23,10 +23,11 @@ const NAV_PHRASES = [
   'privacy policy',
 ];
 
-/** Registrable-ish domain label, e.g. https://sub.acme.io/x -> "acme". */
+/** Registrable-ish domain label, e.g. https://sub.acme.io/x -> "acme". Accepts bare domains. */
 function domainLabel(websiteUrl: string): string {
   try {
-    const host = new URL(websiteUrl).hostname.replace(/^www\./, '');
+    const url = websiteUrl.includes('://') ? websiteUrl : `https://${websiteUrl}`;
+    const host = new URL(url).hostname.replace(/^www\./, '');
     const parts = host.split('.');
     return (parts.length >= 2 ? parts[parts.length - 2]! : parts[0]!).toLowerCase();
   } catch {
@@ -46,7 +47,7 @@ function containsPhrase(normalized: string, phrase: string): boolean {
 
 export function brandNavFilter(
   candidates: WorkingCandidate[],
-  opts: { orgName: string; websiteUrl: string },
+  opts: { orgName: string; websiteUrl: string; competitors: string[] },
 ): { survivors: WorkingCandidate[]; rejected: WorkingCandidate[] } {
   const brand = new Set(
     opts.orgName
@@ -57,13 +58,19 @@ export function brandNavFilter(
   const label = domainLabel(opts.websiteUrl);
   if (label) brand.add(label);
 
+  // Competitor brands are as unusable as our own (#265): the semantic reviewer
+  // rejects any article that promotes a competitor, so these can never publish.
+  const competitorBrand = new Set(opts.competitors.map(domainLabel).filter(Boolean));
+
   const survivors: WorkingCandidate[] = [];
   const rejected: WorkingCandidate[] = [];
   for (const c of candidates) {
     const tokens = c.normalized.split(' ');
     const hitsBrand = tokens.some((t) => brand.has(t));
     const hitsNav = NAV_PHRASES.some((p) => containsPhrase(c.normalized, p));
+    const hitsCompetitor = tokens.some((t) => competitorBrand.has(t));
     if (hitsBrand || hitsNav) rejected.push(reject(c, 'brand_navigation'));
+    else if (hitsCompetitor) rejected.push(reject(c, 'competitor_brand'));
     else survivors.push(c);
   }
   return { survivors, rejected };

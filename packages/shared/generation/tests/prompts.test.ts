@@ -194,4 +194,33 @@ describe('article + humanize prompts', () => {
     const system = buildHumanizePrompt(ctx, '# Draft')[0]!.content;
     expect(system).not.toContain('previous attempt');
   });
+
+  test('humanize prompt protects every brand mention when a CTA is expected (#266)', () => {
+    const system = buildHumanizePrompt(ctx, '# Draft')[0]!.content;
+    expect(system).toContain('Keep every mention of Acme');
+
+    const withoutCta = buildHumanizePrompt({ ...ctx, includeCta: false }, '# Draft')[0]!.content;
+    expect(withoutCta).not.toContain('Keep every mention');
+  });
+
+  test('humanize retry feedback reports a dropped business name without a grade claim (#266)', () => {
+    const system = buildHumanizePrompt(ctx, '# Draft', {
+      attempt: 2,
+      droppedBusinessName: true,
+    })[0]!.content;
+    expect(system).toContain('attempt 2');
+    expect(system).toContain('removed every mention of Acme');
+    expect(system).not.toContain('scored Flesch-Kincaid');
+  });
+
+  test('humanize retry feedback can carry grade and brand loss together (#266)', () => {
+    const system = buildHumanizePrompt(ctx, '# Draft', {
+      attempt: 1,
+      grade: 11.2,
+      target: 8,
+      droppedBusinessName: true,
+    })[0]!.content;
+    expect(system).toContain('grade level 11.2');
+    expect(system).toContain('removed every mention of Acme');
+  });
 });
