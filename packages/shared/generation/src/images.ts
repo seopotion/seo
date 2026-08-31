@@ -88,7 +88,10 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
     'numbers, captions, labels, signs, screens showing an interface, documents, whiteboards,',
     'book covers, branded packaging or the business logo. Prefer subjects that carry no',
     'lettering at all; when a scene needs a screen or a sign, describe it as blank or out of',
-    `frame. alt is a meaningful description of the image for screen readers, written in ${input.language}.`,
+    'frame. The requested image style NEVER overrides these rules: a style asking for text,',
+    'screenshots, diagrams or logos is reinterpreted as the nearest wordless visual (its mood,',
+    'subject and palette kept, its lettering dropped).',
+    `alt is a meaningful description of the image for screen readers, written in ${input.language}.`,
   ].join('\n');
 
   const user = [

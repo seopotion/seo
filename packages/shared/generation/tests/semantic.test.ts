@@ -15,24 +15,101 @@ const ctx = {
   topic_primary_keyword: null,
 } as GenerationContext;
 
+const topicCtx = {
+  ...ctx,
+  topic_cluster_id: 'topic:membrane fouling',
+  topic_cluster_label: 'Membrane fouling',
+  topic_role: 'pillar',
+  topic_content_focus: 'How membrane fouling affects reverse-osmosis output',
+  topic_primary_keyword: 'best widgets',
+} as GenerationContext;
+
+const clean = {
+  unsupported_claims: { violated: false, detail: '' },
+  competitor_promotion: { violated: false, competitor: '', detail: '' },
+  keyword_use: { violated: false, detail: '' },
+  call_to_action: { violated: false, detail: '' },
+  topic_scope: { violated: false, detail: '' },
+  language: { violated: false, detail: '' },
+};
+const verdict = (patch: Record<string, unknown>) => JSON.stringify({ ...clean, ...patch });
+
 describe('semantic check', () => {
-  test('prompt names competitors, keyword, language, and the JSON contract', () => {
+  test('prompt names competitors, keyword, language, and every rule key', () => {
     const joined = buildSemanticCheckPrompt(ctx, '# Article\n\nbody')
       .map((m) => m.content)
       .join('\n');
     expect(joined).toContain('rival.com');
     expect(joined).toContain('best widgets');
     expect(joined).toContain('English');
-    expect(joined).toContain('pass');
+    for (const rule of ['competitor_promotion', 'keyword_use', 'call_to_action', 'language']) {
+      expect(joined).toContain(rule);
+    }
   });
 
-  test('parseSemanticResult parses pass/fail with defaulted reasons', () => {
-    expect(parseSemanticResult('{"pass":true}')).toEqual({ pass: true, reasons: [] });
+  test('a clean verdict passes', () => {
+    expect(parseSemanticResult(verdict({}), ctx)).toEqual({ pass: true, reasons: [] });
+  });
+
+  test('a violated rule fails and carries its detail', () => {
     expect(
-      parseSemanticResult('```json\n{"pass":false,"reasons":["promotes rival"]}\n```'),
-    ).toEqual({
+      parseSemanticResult(
+        verdict({ keyword_use: { violated: true, detail: 'keyword never appears' } }),
+        ctx,
+      ),
+    ).toEqual({ pass: false, reasons: ['keyword_use: keyword never appears'] });
+  });
+
+  test('promoting a listed competitor fails, matching on the registrable name', () => {
+    const result = parseSemanticResult(
+      verdict({
+        competitor_promotion: {
+          violated: true,
+          competitor: 'Rival',
+          detail: 'the conclusion links to rival.com',
+        },
+      }),
+      ctx,
+    );
+    expect(result.pass).toBe(false);
+    expect(result.reasons[0]).toContain('the conclusion links to rival.com');
+  });
+
+  // #277: the judge kept failing articles for "promoting a competitor" when the
+  // brand it named was the org's OWN — the one thing includeCta demands. A
+  // business outside the competitor list can never be a competitor violation.
+  test('naming a business that is not a listed competitor is not a violation', () => {
+    expect(
+      parseSemanticResult(
+        verdict({
+          competitor_promotion: {
+            violated: true,
+            competitor: 'Acme',
+            detail: 'the conclusion recommends Acme as an alternative',
+          },
+        }),
+        ctx,
+      ),
+    ).toEqual({ pass: true, reasons: [] });
+  });
+
+  test('an empty competitor list makes competitor promotion impossible', () => {
+    expect(
+      parseSemanticResult(
+        verdict({
+          competitor_promotion: { violated: true, competitor: 'Someone', detail: 'promotes them' },
+        }),
+        { ...ctx, competitors: [] } as GenerationContext,
+      ).pass,
+    ).toBe(true);
+  });
+
+  test('topic scope only counts when the article has a complete topic brief', () => {
+    const scoped = verdict({ topic_scope: { violated: true, detail: 'strays from the pillar' } });
+    expect(parseSemanticResult(scoped, ctx)).toEqual({ pass: true, reasons: [] });
+    expect(parseSemanticResult(scoped, topicCtx)).toEqual({
       pass: false,
-      reasons: ['promotes rival'],
+      reasons: ['topic_scope: strays from the pillar'],
     });
   });
 
@@ -57,17 +134,7 @@ describe('semantic check', () => {
     ['support', 'deep coverage of the assigned focus'],
   ] as const)('a complete %s brief makes scope compliance mandatory', (role, scope) => {
     const focus = 'How membrane fouling affects reverse-osmosis output';
-    const joined = buildSemanticCheckPrompt(
-      {
-        ...ctx,
-        topic_cluster_id: 'topic:membrane fouling',
-        topic_cluster_label: 'Membrane fouling',
-        topic_role: role,
-        topic_content_focus: focus,
-        topic_primary_keyword: ' BEST   WIDGETS ',
-      },
-      '# Article\n\nbody',
-    )
+    const joined = buildSemanticCheckPrompt({ ...topicCtx, topic_role: role }, '# Article\n\nbody')
       .map((message) => message.content)
       .join('\n');
 
@@ -83,14 +150,7 @@ describe('semantic check', () => {
       .map((message) => message.content)
       .join('\n');
     const incomplete = buildSemanticCheckPrompt(
-      {
-        ...ctx,
-        topic_cluster_id: 'topic:best widgets',
-        topic_cluster_label: 'Widgets',
-        topic_role: 'support',
-        topic_content_focus: null,
-        topic_primary_keyword: 'best widgets',
-      },
+      { ...topicCtx, topic_role: 'support', topic_content_focus: null },
       '# Article\n\nbody',
     )
       .map((message) => message.content)

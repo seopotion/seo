@@ -52,7 +52,18 @@ function llmReplying(...texts: string[]): LlmClient {
   return { complete };
 }
 
-const semanticPass = '{"pass":true,"reasons":[]}';
+/** Per-rule semantic verdict (#277); `pass` is derived, never sent by the judge. */
+const cleanVerdict = {
+  unsupported_claims: { violated: false, detail: '' },
+  competitor_promotion: { violated: false, competitor: '', detail: '' },
+  keyword_use: { violated: false, detail: '' },
+  call_to_action: { violated: false, detail: '' },
+  topic_scope: { violated: false, detail: '' },
+  language: { violated: false, detail: '' },
+};
+const verdict = (patch: Record<string, unknown> = {}) =>
+  JSON.stringify({ ...cleanVerdict, ...patch });
+const semanticPass = verdict();
 
 function youtubeThat(impl?: () => Promise<never>): YouTubeClient {
   return { searchVideos: vi.fn(impl ?? (async () => [])) };
@@ -112,7 +123,7 @@ describe('stageFinalize', () => {
   });
 
   test('semantic failure throws ArticleFatalError and creates no article', async () => {
-    const llm = llmReplying('{"pass":false,"reasons":["promotes rival"]}');
+    const llm = llmReplying(verdict({ keyword_use: { violated: true, detail: 'keyword absent' } }));
     const youtube = youtubeThat();
     const run = makeRun({
       working: { outline, content, readability_grade: 6 },
@@ -120,13 +131,42 @@ describe('stageFinalize', () => {
     });
 
     await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
-      new ArticleFatalError('validation: semantic: promotes rival'),
+      new ArticleFatalError('validation: semantic: keyword_use: keyword absent'),
     );
     expect(createArticle).not.toHaveBeenCalled();
   });
 
+  // #277: the judge naming the org's own brand as "a competitor" used to throw
+  // away the finished article. The org lists no competitors, so nothing it names
+  // can be one.
+  test('a competitor claim naming a business outside the org list does not fail the article', async () => {
+    const llm = llmReplying(
+      verdict({
+        competitor_promotion: {
+          violated: true,
+          competitor: 'Acme',
+          detail: 'the conclusion recommends Acme',
+        },
+      }),
+    );
+    const run = makeRun({
+      working: { outline, content, readability_grade: 6 },
+      presets: presetsNoVideo,
+    });
+
+    const result = await stageFinalize(run, { llm, youtube: youtubeThat() });
+
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ completed: true, working: { article_id: 'a1' } });
+  });
+
   test('the thrown message carries every failure reason, not just the codes', async () => {
-    const llm = llmReplying('{"pass":false,"reasons":["promotes rival","no CTA"]}');
+    const llm = llmReplying(
+      verdict({
+        keyword_use: { violated: true, detail: 'keyword absent' },
+        call_to_action: { violated: true, detail: 'no CTA' },
+      }),
+    );
     const youtube = youtubeThat();
     const run = makeRun({
       working: { outline, content: `${content}\n\n# Stray H1\n`, readability_grade: 6 },
@@ -135,7 +175,7 @@ describe('stageFinalize', () => {
 
     await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
       new ArticleFatalError(
-        'validation: h1_count: expected 1 H1, found 2 | semantic: promotes rival; no CTA',
+        'validation: h1_count: expected 1 H1, found 2 | semantic: keyword_use: keyword absent; call_to_action: no CTA',
       ),
     );
     expect(createArticle).not.toHaveBeenCalled();
