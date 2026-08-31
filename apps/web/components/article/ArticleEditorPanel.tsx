@@ -433,7 +433,7 @@ export function ArticleEditorStatusBadge({
         status === 'published'
           ? 'bg-emerald-100 text-emerald-700'
           : status === 'deleted'
-            ? 'bg-rose-100 text-rose-700'
+            ? 'bg-red-100 text-red-700'
             : 'bg-sky-100 text-sky-700',
       )}
     >
@@ -467,7 +467,7 @@ function ImageStatusBadge({
         status === 'complete'
           ? 'bg-emerald-100 text-emerald-700'
           : status === 'failed'
-            ? 'bg-rose-100 text-rose-700'
+            ? 'bg-red-100 text-red-700'
             : 'bg-amber-100 text-amber-700',
       )}
     >

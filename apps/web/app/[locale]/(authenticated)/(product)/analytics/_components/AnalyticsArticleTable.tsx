@@ -341,7 +341,7 @@ function Trend({ trend }: { trend: AnalyticsArticle['trend'] }) {
         normalizedTrend === 'up'
           ? 'text-emerald-700'
           : normalizedTrend === 'down'
-            ? 'text-rose-700'
+            ? 'text-red-700'
             : 'text-muted-foreground',
       )}
     >

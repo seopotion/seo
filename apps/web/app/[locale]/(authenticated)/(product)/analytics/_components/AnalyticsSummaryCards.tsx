@@ -56,7 +56,7 @@ function DeltaBadge({ metric, value }: { metric: AnalyticsMetric; value: number 
         sentiment === 'positive'
           ? 'bg-emerald-100 text-emerald-700'
           : sentiment === 'negative'
-            ? 'bg-rose-100 text-rose-700'
+            ? 'bg-red-100 text-red-700'
             : 'bg-muted text-muted-foreground',
       )}
     >

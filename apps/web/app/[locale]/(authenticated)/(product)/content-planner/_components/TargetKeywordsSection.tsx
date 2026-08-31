@@ -239,7 +239,7 @@ export function TargetKeywordsSection({
       {loadError ? (
         <div
           role="alert"
-          className="flex flex-col items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <span>{t('states.loadError')}</span>
           <Button type="button" variant="outline" size="sm" onClick={onRetry}>
@@ -508,7 +508,7 @@ function DeleteCandidateAction({
         variant={confirming ? 'outline' : 'ghost'}
         size={confirming ? 'sm' : 'icon'}
         className={cn(
-          confirming ? 'text-rose-700' : 'size-8 text-muted-foreground hover:text-rose-700',
+          confirming ? 'text-red-700' : 'size-8 text-muted-foreground hover:text-red-700',
         )}
         aria-label={t(confirming ? 'actions.confirmDelete' : 'actions.delete', { keyword })}
         disabled={pending}
@@ -522,7 +522,7 @@ function DeleteCandidateAction({
         {confirming && !pending ? t('actions.confirmDeleteLabel') : null}
       </Button>
       {error ? (
-        <p role="alert" className="max-w-44 text-rose-700 text-xs">
+        <p role="alert" className="max-w-44 text-red-700 text-xs">
           {t(`deleteErrors.${error}`)}
         </p>
       ) : null}
@@ -768,7 +768,7 @@ function TargetKeywordStatusBadge({
         status === 'scheduled' && 'bg-sky-100 text-sky-700',
         status === 'generating' && 'bg-amber-100 text-amber-700',
         status === 'generated' && 'bg-emerald-100 text-emerald-700',
-        status === 'failed' && 'bg-rose-100 text-rose-700',
+        status === 'failed' && 'bg-red-100 text-red-700',
       )}
     >
       {t(`statuses.${status}`)}

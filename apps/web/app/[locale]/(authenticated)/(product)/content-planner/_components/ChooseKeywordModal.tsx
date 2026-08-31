@@ -237,7 +237,7 @@ export function ChooseKeywordModal({
           {scheduleError ? (
             <div
               role="alert"
-              className="mb-3 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm"
+              className="mb-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm"
             >
               {t(`errors.${scheduleError}`)}
             </div>
@@ -246,7 +246,7 @@ export function ChooseKeywordModal({
           {loadError ? (
             <div
               role="alert"
-              className="mb-3 flex flex-col items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm sm:flex-row sm:items-center sm:justify-between"
+              className="mb-3 flex flex-col items-start gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
               <span>{t('states.loadError')}</span>
               <Button

@@ -559,12 +559,12 @@ function FailedStrategyPanel({
   return (
     <section
       role="alert"
-      className="flex h-30 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-12 text-center"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-6 py-12 text-center"
     >
       <div className="grid justify-items-center gap-2">
-        <AlertTriangle className="size-5 text-rose-600" aria-hidden="true" />
-        <h2 className="font-semibold text-base text-rose-950">{heading}</h2>
-        <p className="text-rose-800 text-sm">{supportingText}</p>
+        <AlertTriangle className="size-5 text-red-600" aria-hidden="true" />
+        <h2 className="font-semibold text-base text-red-950">{heading}</h2>
+        <p className="text-red-800 text-sm">{supportingText}</p>
       </div>
     </section>
   );
