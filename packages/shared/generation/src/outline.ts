@@ -32,7 +32,7 @@ export function buildOutlinePrompt(ctx: GenerationContext): LlmMessage[] {
     'Rules: h1 must NOT be identical to the keyword; meta_title <= 60 chars;',
     'meta_description between 120 and 160 chars; slug is kebab-case; at least 3 sections.',
     ctx.includeCta
-      ? 'Set "cta" to one concise, relevant next step for the reader. Do not invent business claims.'
+      ? `Set "cta" to one concise, relevant next step for the reader that names ${ctx.businessName} explicitly. Do not invent capabilities the business description does not support.`
       : 'Set "cta" to an empty string. Do not include a call to action.',
     '"internal_links" may contain ONLY URLs copied verbatim from the candidate list.',
     'Never invent, shorten, or modify a URL, and never use a placeholder such as "#".',
@@ -117,6 +117,17 @@ export function parseOutline(text: string, ctx: GenerationContext): Outline {
   const parsed = OutlineSchema.parse(parseJsonObject(text));
   const cta = parsed.cta.trim();
   if (ctx.includeCta && cta.length === 0) throw new Error('outline CTA is required');
+  // A brand-less CTA reads as "no CTA" to the semantic reviewer and would only
+  // fail at finalize, after draft + humanize spend (#262). Fail here instead —
+  // this classifies as retryable, so only the outline stage re-runs.
+  const businessName = ctx.businessName.trim();
+  if (
+    ctx.includeCta &&
+    businessName.length > 0 &&
+    !cta.toLowerCase().includes(businessName.toLowerCase())
+  ) {
+    throw new Error('outline CTA must name the business');
+  }
   const approved = new Map(ctx.linkCandidates.map((c) => [normalizeUrl(c.url), c.url]));
   const internal_links: string[] = [];
   for (const selected of parsed.internal_links) {
