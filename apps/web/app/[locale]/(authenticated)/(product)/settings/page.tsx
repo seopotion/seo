@@ -32,7 +32,6 @@ import { TextEntryList } from '../../onboarding/components/TextEntryList';
 import { countries, languages, MAX_TARGET_AUDIENCES } from '../../onboarding/constants';
 import type { TextEntry } from '../../onboarding/types';
 import { createEntryId, stringsToTextEntries, textEntriesToStrings } from '../../onboarding/utils';
-import { BillingPanel } from './_components/BillingPanel';
 import { GoogleSearchConsolePanel } from './_components/GoogleSearchConsolePanel';
 import { IntegrationsPanel } from './_components/IntegrationsPanel';
 
@@ -41,7 +40,6 @@ const settingsTabs = [
   'audienceCompetitors',
   'integrations',
   'googleSearchConsole',
-  'billing',
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number];
@@ -534,15 +532,6 @@ export default function SettingsPage() {
         hidden={activeTab !== 'googleSearchConsole'}
       >
         <GoogleSearchConsolePanel organization={organization} onUnauthorized={handleUnauthorized} />
-      </div>
-
-      <div
-        id="settings-panel-billing"
-        role="tabpanel"
-        aria-labelledby="settings-tab-billing"
-        hidden={activeTab !== 'billing'}
-      >
-        <BillingPanel onUnauthorized={handleUnauthorized} organization={organization} />
       </div>
 
       {SAVEABLE_TABS.has(activeTab) ? (

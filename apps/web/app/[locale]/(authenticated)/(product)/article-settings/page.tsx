@@ -276,9 +276,7 @@ export default function ArticleSettingsPage() {
                     : 'fields.autoPublish.requirements.entitlement',
                 )}
               </span>{' '}
-              <SettingsLink href="/settings?tab=billing">
-                {t('fields.autoPublish.links.billing')}
-              </SettingsLink>
+              <SettingsLink href="/billing">{t('fields.autoPublish.links.billing')}</SettingsLink>
             </AutoPublishNotice>
           ) : null}
 

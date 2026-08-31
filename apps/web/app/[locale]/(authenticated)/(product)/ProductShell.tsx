@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
   BarChart3,
+  CreditCard,
   FileSliders,
   Home,
   LayoutList,
@@ -60,6 +61,11 @@ const navItems = [
     href: '/analytics',
     key: 'analytics',
     icon: BarChart3,
+  },
+  {
+    href: '/billing',
+    key: 'billing',
+    icon: CreditCard,
   },
   {
     href: '/settings',

@@ -16,13 +16,19 @@ import {
 } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { ManageSubscriptionCard } from './_components/ManageSubscriptionCard';
+import {
+  hasPurchasableTier,
+  isActivated,
+  parsePurchasedTier,
+  TIERS,
+  type Tier,
+  tierState,
+} from './tiers';
 
 // Mirrors the onboarding scan-status poll (apps/web/app/[locale]/(authenticated)/onboarding/api.ts).
 const ACTIVATION_POLL_INTERVAL_MS = 2000;
 const ACTIVATION_POLL_TIMEOUT_MS = 30_000;
-
-const TIERS = ['paid', 'expert'] as const;
-type Tier = (typeof TIERS)[number];
 
 type ActivationState = 'checking' | 'error' | 'idle' | 'timeout';
 type CheckoutError = 'already_subscribed' | 'generic';
@@ -89,6 +95,13 @@ export default function BillingPage() {
     async (isCancelled: () => boolean = () => false) => {
       setActivationState('checking');
 
+      // Which tier the provider says was bought. Read here rather than passed in
+      // so the retry button polls for the same thing the redirect did — the
+      // param stays on the URL until we navigate away.
+      const purchasedTier = parsePurchasedTier(
+        new URLSearchParams(window.location.search).get('tier'),
+      );
+
       const expiresAt = Date.now() + ACTIVATION_POLL_TIMEOUT_MS;
 
       while (Date.now() <= expiresAt) {
@@ -99,7 +112,7 @@ export default function BillingPage() {
 
           if (isCancelled()) return;
 
-          if (activeOrganization?.capabilities.keyword_research) {
+          if (isActivated(activeOrganization, purchasedTier)) {
             // The poll reads the API directly, so the cached org still carries
             // the pre-purchase capabilities — drop it before /home renders.
             await queryClient.invalidateQueries({
@@ -128,9 +141,9 @@ export default function BillingPage() {
     [goToLogin, queryClient, router],
   );
 
-  // The LemonSqueezy checkout redirect returns here with ?checkout=success; the
-  // plan flip happens via webhook, which can lag the redirect, so poll until the
-  // org's paid capability shows up (or give up after ~30s).
+  // The LemonSqueezy checkout redirect returns here with ?checkout=success&tier=…;
+  // the plan flip happens via webhook, which can lag the redirect, so poll until
+  // the org reaches the purchased tier (or give up after ~30s).
   useEffect(() => {
     if (!getToken()) {
       router.replace('/');
@@ -251,6 +264,9 @@ export default function BillingPage() {
     checkoutMutation.mutate(tier);
   }
 
+  const currentTier = organization?.billing_tier ?? 'free';
+  const isSubscribed = Boolean(organization?.capabilities.keyword_research);
+
   if (activationState === 'checking') {
     return <StatusPanel>{t('activating.message')}</StatusPanel>;
   }
@@ -292,85 +308,108 @@ export default function BillingPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="font-semibold text-slate-950 text-xl">{t('title')}</h1>
-        <p className="mt-1 text-slate-600 text-sm">{t('description')}</p>
+        <h1 className="font-semibold text-slate-950 text-xl">
+          {isSubscribed ? t('subscribedTitle') : t('title')}
+        </h1>
+        <p className="mt-1 text-slate-600 text-sm">
+          {isSubscribed ? t('subscribedDescription') : t('description')}
+        </p>
       </div>
 
       {checkoutError ? (
         <StatusPanel tone="error">{t(`errors.${checkoutError}`)}</StatusPanel>
       ) : null}
 
+      {isSubscribed ? (
+        <ManageSubscriptionCard onUnauthorized={goToLogin} organization={organization} />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
-        {TIERS.map((tier) => (
-          <Card key={tier} className="border-slate-200 shadow-none">
-            <CardHeader>
-              <CardTitle>{t(`tiers.${tier}.name`)}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <p className="text-slate-600 text-sm">{t(`tiers.${tier}.description`)}</p>
-              <Button
-                disabled={!organization || checkoutMutation.isPending}
-                onClick={() => startCheckout(tier)}
-              >
-                {checkoutMutation.isPending && checkoutMutation.variables === tier
-                  ? t('redirecting')
-                  : t(`tiers.${tier}.cta`)}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+        {TIERS.map((tier) => {
+          const state = tierState(currentTier, tier);
+
+          return (
+            <Card key={tier} className="border-slate-200 shadow-none">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between gap-2">
+                  {t(`tiers.${tier}.name`)}
+                  {state === 'upgrade' ? null : (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 text-xs">
+                      {t(`tierState.${state}`)}
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <p className="text-slate-600 text-sm">{t(`tiers.${tier}.description`)}</p>
+                {state === 'upgrade' ? (
+                  <Button
+                    disabled={!organization || checkoutMutation.isPending}
+                    onClick={() => startCheckout(tier)}
+                  >
+                    {checkoutMutation.isPending && checkoutMutation.variables === tier
+                      ? t('redirecting')
+                      : t(`tiers.${tier}.cta`)}
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <Card className="border-slate-200 shadow-none">
-        <CardContent className="grid gap-2 pt-6">
-          <p className="font-medium text-slate-950 text-sm">{t('promo.title')}</p>
-          {appliedPromo ? (
-            <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
-              <span>
-                {t('promo.applied', {
-                  code: appliedPromo.code,
-                  discount: discountLabel(appliedPromo),
-                })}
-              </span>
-              <Button
-                onClick={() => {
-                  setAppliedPromo(null);
-                  setPromoError(null);
+      {hasPurchasableTier(currentTier) ? (
+        <Card className="border-slate-200 shadow-none">
+          <CardContent className="grid gap-2 pt-6">
+            <p className="font-medium text-slate-950 text-sm">{t('promo.title')}</p>
+            {appliedPromo ? (
+              <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
+                <span>
+                  {t('promo.applied', {
+                    code: appliedPromo.code,
+                    discount: discountLabel(appliedPromo),
+                  })}
+                </span>
+                <Button
+                  onClick={() => {
+                    setAppliedPromo(null);
+                    setPromoError(null);
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  {t('promo.remove')}
+                </Button>
+              </div>
+            ) : (
+              <form
+                className="flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (promoInput.trim() !== '') promoMutation.mutate(promoInput);
                 }}
-                size="sm"
-                variant="ghost"
               >
-                {t('promo.remove')}
-              </Button>
-            </div>
-          ) : (
-            <form
-              className="flex gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (promoInput.trim() !== '') promoMutation.mutate(promoInput);
-              }}
-            >
-              <input
-                className="w-48 rounded-md border border-slate-200 px-3 py-1.5 text-sm uppercase"
-                onChange={(event) => setPromoInput(event.target.value)}
-                placeholder={t('promo.placeholder')}
-                value={promoInput}
-              />
-              <Button
-                disabled={promoMutation.isPending || promoInput.trim() === ''}
-                type="submit"
-                variant="outline"
-              >
-                {promoMutation.isPending ? t('promo.applying') : t('promo.apply')}
-              </Button>
-            </form>
-          )}
-          {promoError ? (
-            <p className="text-red-600 text-sm">{t(`promo.errors.${promoError}`)}</p>
-          ) : null}
-        </CardContent>
-      </Card>
+                <input
+                  className="w-48 rounded-md border border-slate-200 px-3 py-1.5 text-sm uppercase"
+                  onChange={(event) => setPromoInput(event.target.value)}
+                  placeholder={t('promo.placeholder')}
+                  value={promoInput}
+                />
+                <Button
+                  disabled={promoMutation.isPending || promoInput.trim() === ''}
+                  type="submit"
+                  variant="outline"
+                >
+                  {promoMutation.isPending ? t('promo.applying') : t('promo.apply')}
+                </Button>
+              </form>
+            )}
+            {promoError ? (
+              <p className="text-red-600 text-sm">{t(`promo.errors.${promoError}`)}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

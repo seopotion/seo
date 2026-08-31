@@ -113,8 +113,14 @@
     },
     "description": "Planınızı yükselterek anahtar kelime araştırması ve planlamasının kilidini açın.",
     "errors": {
-      "already_subscribed": "Bu plana zaten abonesiniz. Faturalandırmanızı Ayarlar bölümünden yönetin.",
+      "already_subscribed": "Bu plana zaten abonesiniz. Aboneliğinizi değiştirmek için Faturalandırmayı yönet seçeneğini kullanın.",
       "generic": "Ödeme başlatılamadı. Tekrar deneyin."
+    },
+    "manage": {
+      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
+      "error": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
+      "open": "Faturalandırmayı yönet",
+      "opening": "Açılıyor..."
     },
     "promo": {
       "apply": "Uygula",
@@ -142,6 +148,12 @@
       "loading": "Organizasyonunuz yükleniyor...",
       "noOrganization": "Bu çalışma alanı için tamamlanmış organizasyon bulunamadı.",
       "organizationError": "Organizasyonunuz yüklenemedi. Tekrar deneyin."
+    },
+    "subscribedDescription": "Planınız ve ödeme bilgileriniz.",
+    "subscribedTitle": "Faturalandırma",
+    "tierState": {
+      "current": "Mevcut planınız",
+      "owned": "Planınıza dahil"
     },
     "tiers": {
       "expert": {
@@ -818,14 +830,6 @@
       "save": "Kaydet",
       "saving": "Kaydediliyor..."
     },
-    "billing": {
-      "description": "Aktif bir ücretli aboneliğiniz var. Ödeme yönteminizi faturalandırma portalından yönetin veya iptal edin.",
-      "freeDescription": "Anahtar kelime araştırması ve planlamasının kilidini açmak için yükseltin.",
-      "manage": "Faturalandırmayı yönet",
-      "manageError": "Faturalandırma portalı açılamadı. Tekrar deneyin.",
-      "opening": "Açılıyor...",
-      "upgradeCta": "Planları görüntüle"
-    },
     "googleSearchConsole": {
       "badges": {
         "connected": "Bağlı",
@@ -895,7 +899,6 @@
     },
     "tabs": {
       "audienceCompetitors": "Hedef Kitle ve Rakipler",
-      "billing": "Faturalandırma",
       "business": "İşletme",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
@@ -1443,6 +1446,10 @@
       "articleSettings": {
         "description": "Gelecekteki tüm makaleler için tercihlerinizi belirleyin.",
         "label": "Makale Ayarları"
+      },
+      "billing": {
+        "description": "Planınızı inceleyin, yükseltin ve ödeme bilgilerinizi yönetin.",
+        "label": "Faturalandırma"
       },
       "contentPlanner": {
         "description": "Konuları, anahtar kelimeleri, yayın temposunu ve içerik önceliklerini planlayın.",

@@ -152,7 +152,7 @@ comes from the account boundary, not the path.
    ```
 
    The post-checkout redirect URL needs no store-level configuration: the API
-   sets it per checkout to `<WEB_ORIGIN>/billing?checkout=success`, so it is
+   sets it per checkout to `<WEB_ORIGIN>/billing?checkout=success&tier=<tier>`, so it is
    stage-aware automatically.
 
 4. **GitHub OIDC provider + deploy role**, per account — see [GitHub OIDC deploy

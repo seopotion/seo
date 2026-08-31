@@ -481,7 +481,7 @@ async function cancelActiveSubscriptions(
     webhookSecret: '',
     storeId: '',
     variantByTier: { paid: '', expert: '' },
-    redirectUrl: '',
+    redirectUrl: () => '',
   });
   for (const sub of active) {
     await provider.cancelSubscription(sub.provider_subscription_id);

@@ -5,21 +5,21 @@ import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Button } from '@/components/ui';
-import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import type { ProductOrganization } from '@/lib/organizations';
 import { cn } from '@/lib/utils';
 
-export function BillingPanel({
+/** Portal entry point for an org that already has a subscription. The page
+ * renders this only when `capabilities.keyword_research` is true. */
+export function ManageSubscriptionCard({
   onUnauthorized,
   organization,
 }: {
   onUnauthorized: () => void;
   organization: ProductOrganization | null;
 }) {
-  const t = useTranslations('SettingsPage.billing');
+  const t = useTranslations('BillingPage.manage');
   const [portalError, setPortalError] = useState(false);
-  const isPaid = Boolean(organization?.capabilities.keyword_research);
 
   const portalMutation = useMutation({
     mutationFn: async () => {
@@ -53,20 +53,9 @@ export function BillingPanel({
     portalMutation.mutate();
   }
 
-  if (!isPaid) {
-    return (
-      <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-        <p className="text-slate-600 text-sm">{t('freeDescription')}</p>
-        <Button asChild className="w-fit" size="sm" variant="outline">
-          <Link href="/billing">{t('upgradeCta')}</Link>
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
-      {portalError ? <StatusPanel tone="error">{t('manageError')}</StatusPanel> : null}
+      {portalError ? <StatusPanel tone="error">{t('error')}</StatusPanel> : null}
       <p className="text-slate-600 text-sm">{t('description')}</p>
       <Button
         className="w-fit"
@@ -74,7 +63,7 @@ export function BillingPanel({
         onClick={openPortal}
         size="sm"
       >
-        {portalMutation.isPending ? t('opening') : t('manage')}
+        {portalMutation.isPending ? t('opening') : t('open')}
       </Button>
     </div>
   );
