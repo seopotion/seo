@@ -53,7 +53,7 @@ export const outlineJson = JSON.stringify({
     { heading: 'One', intent: 'i' },
     { heading: 'Two', intent: 'i' },
   ],
-  cta: 'Compare the best option for your needs.',
+  cta: 'Compare the best Acme option for your needs.',
 });
 
 /** Builds a fully-parsed ArticleRun, using `presets`/`keyword` as the launch snapshot. */
