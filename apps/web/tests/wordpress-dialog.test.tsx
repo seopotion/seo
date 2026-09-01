@@ -75,13 +75,19 @@ beforeEach(() => {
 });
 
 describe('setup steps', () => {
-  test('focuses the token field, which carries the modal initial-focus marker', async () => {
+  test('opens with the token field focused, not the first control in the dialog', async () => {
     renderDialog();
 
     await waitFor(() => {
       expect(document.activeElement).toBe(tokenInput());
     });
-    expect(tokenInput().hasAttribute('data-modal-initial-focus')).toBe(true);
+    // The header close button sits before the token field, so Radix's default
+    // "focus the first tabbable" would have landed there. Focus being on the
+    // token field is the dialog aiming it deliberately.
+    const close = within(dialog()).getByRole('button', { name: 'Close dialog' });
+    const tokenFollowsClose =
+      close.compareDocumentPosition(tokenInput()) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(tokenFollowsClose).toBeTruthy();
   });
 
   test('renders the three setup steps', () => {

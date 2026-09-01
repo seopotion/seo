@@ -2,6 +2,7 @@ export { Alert, AlertDescription, AlertTitle } from './alert';
 export { Badge, badgeVariants } from './badge';
 export { Button, buttonVariants } from './button';
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card';
+export { Dialog, DialogContent, DialogTitle } from './dialog';
 export { EmptyState } from './empty-state';
 export { Input } from './input';
 export { Label } from './label';
