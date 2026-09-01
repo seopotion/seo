@@ -139,13 +139,14 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
     // worse image than a good prompt and a far better one than a diagram.
     console.warn('image plan still asks for lettering, using wordless prompts', { risks });
     const risky = new Set(risks.map((r) => r.slot));
+    const about = article.meta_description;
     plan = {
       cover: risky.has('cover')
-        ? { ...plan.cover, prompt: wordlessPrompt(article.title) }
+        ? { ...plan.cover, prompt: wordlessPrompt(article.title, about) }
         : plan.cover,
       inline: plan.inline.map((img) =>
         risky.has(img.section_heading)
-          ? { ...img, prompt: wordlessPrompt(img.section_heading) }
+          ? { ...img, prompt: wordlessPrompt(img.section_heading, about) }
           : img,
       ),
     };

@@ -271,6 +271,7 @@ describe('stageImagesPlan', () => {
     expect(llmComplete).toHaveBeenCalledTimes(3); // two retries, then give up on the planner
     const slots = setImagePlan.mock.calls[0]![1] as ArticleImage[];
     expect(slots[0]!.prompt).toContain(article.title);
+    expect(slots[0]!.prompt).toContain(article.meta_description);
     expect(slots[0]!.prompt).toContain('No text');
     // The clean slot keeps the planner's own prompt; only risky ones are replaced.
     expect(slots[1]!.prompt).toBe('A calm photo of a server rack');

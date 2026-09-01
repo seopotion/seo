@@ -140,9 +140,19 @@ export function buildImagePlanRetryPrompt(risks: { slot: string; term: string }[
  * Last resort when the planner will not stop asking for lettering: a plain
  * wordless scene for the slot's subject. Worse than a good planned prompt,
  * far better than a published diagram of garbled text.
+ *
+ * `context` grounds the scene in what the article is actually about — a bare
+ * heading gave fal too little to work with and produced generic stock (the
+ * first fallback cover was a laptop with a blank screen). It is dropped when
+ * it names a banned subject itself, so the fallback can never smuggle back in
+ * what the gate just rejected.
  */
-export function wordlessPrompt(subject: string): string {
-  return `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field. No text, lettering, signage or logos anywhere in the frame.`;
+export function wordlessPrompt(subject: string, context?: string): string {
+  const grounding =
+    context && context.trim() !== '' && findTextRisk(context) === null
+      ? ` It illustrates an article about ${context.trim().replace(/\s+/g, ' ')}`
+      : '';
+  return `A photographic scene evoking ${subject}.${grounding} Shot with natural light and shallow depth of field. No text, lettering, signage or logos anywhere in the frame.`;
 }
 
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {

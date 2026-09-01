@@ -238,4 +238,30 @@ describe('image plan text gate', () => {
     expect(prompt).toContain('Setting Up Your Home Server');
     expect(findTextRisk(prompt)).toBeNull();
   });
+
+  test('the fallback is grounded in what the article is about', () => {
+    const prompt = wordlessPrompt(
+      'Deployment Automation',
+      'How to ship releases to your own hardware without downtime.',
+    );
+    expect(prompt).toContain('Deployment Automation');
+    expect(prompt).toContain('ship releases to your own hardware');
+    expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  // The grounding text is article prose, so it can name the very thing the
+  // gate just rejected; dropping it keeps the fallback unconditionally safe.
+  test('grounding that names a banned subject is dropped, not smuggled in', () => {
+    const prompt = wordlessPrompt(
+      'Release Pipelines',
+      'Read your deployment dashboard at a glance.',
+    );
+    expect(prompt).not.toContain('dashboard');
+    expect(prompt).toContain('Release Pipelines');
+    expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  test('blank or whitespace grounding is ignored', () => {
+    expect(wordlessPrompt('A Subject', '   ')).toBe(wordlessPrompt('A Subject'));
+  });
 });
