@@ -248,6 +248,85 @@ describe('closing', () => {
   });
 });
 
+describe('dialog wiring', () => {
+  test('marks itself as a modal dialog labelled by the given id', () => {
+    render(
+      <Modal {...MODAL_PROPS} open onClose={vi.fn()}>
+        <DialogBody />
+      </Modal>,
+    );
+
+    const el = dialog();
+    expect(el.getAttribute('aria-modal')).toBe('true');
+    expect(el.getAttribute('aria-labelledby')).toBe('dialog-title');
+    expect(screen.getByRole('dialog', { name: 'Title' })).toBe(el);
+  });
+
+  test('the backdrop close control is outside the dialog, not a focus stop', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal {...MODAL_PROPS} open onClose={vi.fn()}>
+        <DialogBody />
+      </Modal>,
+    );
+    const backdrop = screen.getByRole('button', { name: 'Close' });
+    expect(dialog().contains(backdrop)).toBe(false);
+
+    screen.getByRole('button', { name: 'third' }).focus();
+    await user.tab();
+
+    expect(document.activeElement).not.toBe(backdrop);
+  });
+
+  /**
+   * Load-bearing: call sites render a desktop and a mobile layout side by side
+   * and hide one with `hidden md:block` / `md:hidden`, so at any viewport half
+   * the buttons in the dialog are display:none. They must not take focus.
+   * (Tailwind classes don't apply under jsdom, hence the inline style — see the
+   * getClientRects note in tests/setup-dom.ts.)
+   */
+  test('skips focusable elements inside a display:none subtree', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal {...MODAL_PROPS} open onClose={vi.fn()}>
+        <h2 id="dialog-title">Title</h2>
+        <div style={{ display: 'none' }}>
+          <button type="button">mobile only</button>
+        </div>
+        <button type="button">desktop first</button>
+        <button type="button">desktop last</button>
+      </Modal>,
+    );
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'desktop first' }));
+    });
+
+    // The hidden button is also skipped by the wrap, not just by initial focus.
+    screen.getByRole('button', { name: 'desktop last' }).focus();
+    await user.tab();
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'desktop first' }));
+  });
+
+  test('skips an aria-hidden element when choosing initial focus', async () => {
+    render(
+      <Modal {...MODAL_PROPS} open onClose={vi.fn()}>
+        <h2 id="dialog-title">Title</h2>
+        {/* biome-ignore lint/a11y/noAriaHiddenOnFocusable: deliberately bad markup — the point is that Modal refuses to focus it */}
+        <button type="button" aria-hidden="true">
+          hidden
+        </button>
+        <button type="button">real</button>
+      </Modal>,
+    );
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'real' }));
+    });
+  });
+});
+
 describe('background scroll lock', () => {
   test('locks body scroll while open and restores it on close', () => {
     const { rerender } = render(
