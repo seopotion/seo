@@ -49,6 +49,18 @@ function dialog() {
   return screen.getByRole('dialog');
 }
 
+/**
+ * Modal moves focus into itself inside a requestAnimationFrame. Any test that
+ * drives focus itself has to wait for that to land first — otherwise the rAF can
+ * fire *after* the test's own `.focus()` and silently reset it. That race was
+ * green locally and red in CI.
+ */
+async function waitForInitialFocus() {
+  await waitFor(() => {
+    expect(dialog().contains(document.activeElement)).toBe(true);
+  });
+}
+
 beforeEach(() => {
   document.body.style.overflow = '';
 });
@@ -116,6 +128,7 @@ describe('focus trap', () => {
         <DialogBody />
       </Modal>,
     );
+    await waitForInitialFocus();
     screen.getByRole('button', { name: 'third' }).focus();
 
     await user.tab();
@@ -130,6 +143,7 @@ describe('focus trap', () => {
         <DialogBody />
       </Modal>,
     );
+    await waitForInitialFocus();
     screen.getByRole('button', { name: 'first' }).focus();
 
     await user.tab({ shift: true });
@@ -144,6 +158,7 @@ describe('focus trap', () => {
         <DialogBody />
       </Modal>,
     );
+    await waitForInitialFocus();
     screen.getByRole('button', { name: 'first' }).focus();
 
     await user.tab();
@@ -161,6 +176,7 @@ describe('focus trap', () => {
         </Modal>
       </>,
     );
+    await waitForInitialFocus();
     screen.getByRole('button', { name: 'outside' }).focus();
 
     await user.tab();
@@ -179,6 +195,7 @@ describe('focus trap', () => {
         </Modal>
       </>,
     );
+    await waitForInitialFocus();
     screen.getByRole('button', { name: 'outside' }).focus();
 
     await user.tab();
