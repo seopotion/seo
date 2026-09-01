@@ -95,8 +95,8 @@ const TEXT_RISK =
  * written: "no words, letters, captions or logos".
  */
 const BANNED_NOUN =
-  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing)';
-const QUALIFIER = '(?:(?:any|all|visible|readable|other)\\s+)*';
+  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing|documents?|pages?|posters?|banners?|slides?|screens?|monitors?|interfaces?|dashboards?|whiteboards?)';
+const QUALIFIER = '(?:(?:a|an|the|any|all|visible|readable|other)\\s+)*';
 const NEGATED = new RegExp(
   `\\b(?:no|not|non|without|free of|devoid of|avoid(?:ing)?|omit(?:ting)?|exclude|excluding|never)\\s+${QUALIFIER}${BANNED_NOUN}(?:\\s*(?:,|,?\\s*(?:or|and|nor))\\s*${QUALIFIER}${BANNED_NOUN})*`,
   'gi',
@@ -137,12 +137,67 @@ export function buildImagePlanRetryPrompt(risks: { slot: string; term: string }[
 }
 
 /**
- * Last resort when the planner will not stop asking for lettering: a plain
- * wordless scene for the slot's subject. Worse than a good planned prompt,
- * far better than a published diagram of garbled text.
+ * A photographic scene is only as good as how concrete its subject is: fal
+ * rendered "objects involved in reverse osmosis water filters" as a clean
+ * product shot, and "objects involved in deployment automation" as blank
+ * stationery. So the objects are asked for rather than assumed.
  */
-export function wordlessPrompt(subject: string): string {
-  return `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field. No text, lettering, signage or logos anywhere in the frame.`;
+export const WordlessSubjectsSchema = z.object({ objects: z.array(z.string()) });
+
+export const WORDLESS_SUBJECTS_RESPONSE_SCHEMA = toStrictJsonSchema(
+  WordlessSubjectsSchema,
+  'wordless_subjects',
+);
+
+export function buildWordlessSubjectsPrompt(subject: string, business: string): LlmMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'Name the physical objects a photographer would put in frame to illustrate a subject.',
+        'Answer with 2 to 4 tangible objects, each a plain noun with at most one adjective.',
+        'Never name anything that carries writing in real life: no documents, screens, phones,',
+        'laptops, keyboards, signs, labels, badges, plaques, stickers, certificates, awards,',
+        'mugs, shirts, books, packaging, bottles or boxes. No abstractions, no activities,',
+        'no people, no places — only objects whose surfaces are bare.',
+      ].join('\n'),
+    },
+    { role: 'user', content: `Subject: ${subject}\nBusiness context: ${business}` },
+  ];
+}
+
+/**
+ * Objects that carry writing in the real world, so fal letters them however
+ * the prompt is phrased — a returned "deployment badge" came back stamped
+ * "NRLUMA B OLOPYMENT". Separate from TEXT_RISK, which is about the kind of
+ * image being asked for rather than the props inside it.
+ */
+const OBJECT_TEXT_RISK =
+  /\b(?:badges?|plaques?|stickers?|decals?|certificates?|awards?|trophies|mugs?|t-?shirts?|jerseys?|caps?|books?|magazines?|newspapers?|manuals?|brochures?|leaflets?|notebooks?|notepads?|calendars?|clocks?|watches|phones?|tablets?|laptops?|keyboards?|bottles?|cans?|jars?|boxes|cartons?|packaging|envelopes?|tickets?|receipts?|cards?|number plates?|license plates?)\b/i;
+
+/** The usable objects from a reply: risky ones are dropped, not repaired. */
+export function parseWordlessSubjects(text: string): string[] {
+  return WordlessSubjectsSchema.parse(parseJsonObject(text))
+    .objects.map((object) => object.trim().replace(/\s+/g, ' '))
+    .filter(
+      (object) => object !== '' && findTextRisk(object) === null && !OBJECT_TEXT_RISK.test(object),
+    )
+    .slice(0, 4);
+}
+
+/**
+ * Last resort when the planner will not stop asking for lettering. With
+ * objects it is a still life of real things; without them it falls back to the
+ * subject itself, which is safe but generic. The "not a document" clause is
+ * load-bearing: given prose and no such clause, fal renders the prompt as a
+ * page of garbled text (measured — see #286).
+ */
+export function wordlessPrompt(subject: string, objects: string[] = []): string {
+  const scene =
+    objects.length > 0
+      ? `A photograph of ${objects.join(', ')}, arranged on a surface in natural light, shallow depth of field.`
+      : `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field.`;
+  return `${scene} A real physical scene, not a document, page, poster, slide or screen. No text, lettering, signage or logos anywhere in the frame.`;
 }
 
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
