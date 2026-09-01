@@ -36,7 +36,7 @@ export default function AnalyticsChart({
 
   if (series.length === 0) {
     return (
-      <div className="grid h-80 place-items-center rounded-md bg-slate-50 px-4 text-center text-slate-600 text-sm">
+      <div className="grid h-80 place-items-center rounded-md bg-muted/50 px-4 text-center text-muted-foreground text-sm">
         {t('chart.empty')}
       </div>
     );
@@ -45,7 +45,7 @@ export default function AnalyticsChart({
   return (
     <div className="grid gap-4">
       {allowMetricToggle ? (
-        <div className="flex w-fit rounded-md border border-slate-200 bg-slate-50 p-1">
+        <div className="flex w-fit rounded-md border border-border bg-muted/50 p-1">
           {(['traffic', 'searchMetrics'] as const).map((option) => (
             <Button
               key={option}

@@ -2,9 +2,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import { Button, Card, CardContent, CardHeader, CardTitle, StatusPanel } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
@@ -15,7 +14,6 @@ import {
   useActiveOrganization,
 } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
-import { cn } from '@/lib/utils';
 import { ManageSubscriptionCard } from './_components/ManageSubscriptionCard';
 import {
   hasPurchasableTier,
@@ -308,10 +306,10 @@ export default function BillingPage() {
   return (
     <div className="grid gap-4">
       <div>
-        <h1 className="font-semibold text-slate-950 text-xl">
+        <h1 className="font-semibold text-foreground text-xl">
           {isSubscribed ? t('subscribedTitle') : t('title')}
         </h1>
-        <p className="mt-1 text-slate-600 text-sm">
+        <p className="mt-1 text-muted-foreground text-sm">
           {isSubscribed ? t('subscribedDescription') : t('description')}
         </p>
       </div>
@@ -329,19 +327,19 @@ export default function BillingPage() {
           const state = tierState(currentTier, tier);
 
           return (
-            <Card key={tier} className="border-slate-200 shadow-none">
+            <Card key={tier} className="border-border shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                   {t(`tiers.${tier}.name`)}
                   {state === 'upgrade' ? null : (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700 text-xs">
+                    <span className="rounded-full bg-success-muted px-2 py-0.5 font-medium text-success text-xs">
                       {t(`tierState.${state}`)}
                     </span>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <p className="text-slate-600 text-sm">{t(`tiers.${tier}.description`)}</p>
+                <p className="text-muted-foreground text-sm">{t(`tiers.${tier}.description`)}</p>
                 {state === 'upgrade' ? (
                   <Button
                     disabled={!organization || checkoutMutation.isPending}
@@ -359,11 +357,11 @@ export default function BillingPage() {
       </div>
 
       {hasPurchasableTier(currentTier) ? (
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardContent className="grid gap-2 pt-6">
-            <p className="font-medium text-slate-950 text-sm">{t('promo.title')}</p>
+            <p className="font-medium text-foreground text-sm">{t('promo.title')}</p>
             {appliedPromo ? (
-              <div className="flex items-center justify-between rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 text-sm">
+              <div className="flex items-center justify-between rounded-md border border-success-border bg-success-subtle px-3 py-2 text-success text-sm">
                 <span>
                   {t('promo.applied', {
                     code: appliedPromo.code,
@@ -390,7 +388,7 @@ export default function BillingPage() {
                 }}
               >
                 <input
-                  className="w-48 rounded-md border border-slate-200 px-3 py-1.5 text-sm uppercase"
+                  className="w-48 rounded-md border border-border px-3 py-1.5 text-sm uppercase"
                   onChange={(event) => setPromoInput(event.target.value)}
                   placeholder={t('promo.placeholder')}
                   value={promoInput}
@@ -405,32 +403,11 @@ export default function BillingPage() {
               </form>
             )}
             {promoError ? (
-              <p className="text-red-600 text-sm">{t(`promo.errors.${promoError}`)}</p>
+              <p className="text-error text-sm">{t(`promo.errors.${promoError}`)}</p>
             ) : null}
           </CardContent>
         </Card>
       ) : null}
-    </div>
-  );
-}
-
-function StatusPanel({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'error' | 'neutral';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-slate-200 bg-white text-slate-600',
-      )}
-    >
-      {children}
     </div>
   );
 }

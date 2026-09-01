@@ -3,9 +3,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, LoaderCircle, Search, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Input, Label, Modal } from '@/components/ui';
+import {
+  Button,
+  Input,
+  Label,
+  Modal,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -240,12 +251,12 @@ export function ResearchKeywordsModal({
 
   return (
     <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
-      <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-slate-950">
+          <h2 id={titleId} className="font-semibold text-lg text-foreground">
             {t('title')}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">{t('description')}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
         </div>
         <Button
           type="button"
@@ -261,9 +272,9 @@ export function ResearchKeywordsModal({
 
       {!canResearch || upgradeRequired ? (
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-          <div className="max-w-md rounded-lg border border-amber-200 bg-amber-50 px-5 py-6 text-center">
-            <h3 className="font-semibold text-amber-950">{t('upgrade.title')}</h3>
-            <p className="mt-2 text-amber-800 text-sm">{t('upgrade.description')}</p>
+          <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
+            <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
+            <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
             <Button asChild className="mt-4" size="sm">
               <Link href="/billing">{t('upgrade.cta')}</Link>
             </Button>
@@ -272,7 +283,7 @@ export function ResearchKeywordsModal({
       ) : (
         <>
           <form
-            className="grid shrink-0 gap-2 border-slate-200 border-b px-4 py-4 sm:px-6"
+            className="grid shrink-0 gap-2 border-border border-b px-4 py-4 sm:px-6"
             onSubmit={(event) => void handleSearch(event)}
           >
             <Label htmlFor="research-keyword-seed">{t('form.label')}</Label>
@@ -303,10 +314,10 @@ export function ResearchKeywordsModal({
             <div className="flex min-h-5 items-start justify-between gap-3">
               <div id="research-keyword-error" role={searchError ? 'alert' : undefined}>
                 {searchError ? (
-                  <p className="text-red-600 text-xs">{t(`errors.${searchError}`)}</p>
+                  <p className="text-error text-xs">{t(`errors.${searchError}`)}</p>
                 ) : null}
               </div>
-              <span className="shrink-0 text-slate-500 text-xs">
+              <span className="shrink-0 text-muted-foreground text-xs">
                 {t('form.characterCount', {
                   count: seedInput.length,
                   max: RESEARCH_SEED_MAX_LENGTH,
@@ -319,8 +330,8 @@ export function ResearchKeywordsModal({
             {results ? (
               <div className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-semibold text-slate-950 text-sm">{t('results.title')}</h3>
-                  <span className="text-slate-500 text-xs">
+                  <h3 className="font-semibold text-foreground text-sm">{t('results.title')}</h3>
+                  <span className="text-muted-foreground text-xs">
                     {t('results.count', { count: resultCount })}
                   </span>
                 </div>
@@ -369,43 +380,40 @@ function ResearchResults({
 }) {
   return (
     <>
-      <div className="hidden overflow-hidden rounded-lg border border-slate-200 md:block">
-        <table
-          aria-label={t('results.tableLabel')}
-          className="w-full table-fixed text-left text-sm"
-        >
-          <thead className="border-slate-200 border-b bg-slate-50 text-slate-600">
-            <tr>
-              <TableHeading className="w-[38%]">{t('columns.keyword')}</TableHeading>
-              <TableHeading>{t('columns.difficulty')}</TableHeading>
-              <TableHeading>{t('columns.volume')}</TableHeading>
-              <TableHeading>{t('columns.intent')}</TableHeading>
-              <TableHeading className="w-36">
+      <div className="hidden overflow-hidden rounded-lg border border-border md:block">
+        <Table aria-label={t('results.tableLabel')} className="table-fixed">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[38%]">{t('columns.keyword')}</TableHead>
+              <TableHead>{t('columns.difficulty')}</TableHead>
+              <TableHead>{t('columns.volume')}</TableHead>
+              <TableHead>{t('columns.intent')}</TableHead>
+              <TableHead className="w-36">
                 <span className="sr-only">{t('columns.action')}</span>
-              </TableHeading>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {results.map((metric) => {
               const keywordKey = getKeywordKey(metric);
 
               return (
-                <tr key={keywordKey}>
-                  <td className="wrap-break-words px-4 py-3 font-medium text-slate-950">
+                <TableRow key={keywordKey}>
+                  <TableCell className="wrap-break-words font-medium text-foreground">
                     {metric.keyword.trim()}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatMetric(metric.difficulty, locale, targetKeywordsT)}
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatMetric(metric.search_volume, locale, targetKeywordsT)}
-                  </td>
-                  <td className="truncate px-4 py-3 text-slate-600">
+                  </TableCell>
+                  <TableCell className="truncate text-muted-foreground">
                     {metric.intent
                       ? targetKeywordsT(`intents.${metric.intent}`)
                       : targetKeywordsT('notAvailable')}
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell>
                     <AddKeywordAction
                       error={addErrors[keywordKey]}
                       onAdd={() => onAdd(metric)}
@@ -413,12 +421,12 @@ function ResearchResults({
                       state={addStates[keywordKey]}
                       t={t}
                     />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <ul aria-label={t('results.listLabel')} className="grid list-none gap-2 md:hidden">
@@ -426,11 +434,8 @@ function ResearchResults({
           const keywordKey = getKeywordKey(metric);
 
           return (
-            <li
-              key={keywordKey}
-              className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
-            >
-              <h4 className="wrap-break-words font-semibold text-slate-950 text-sm">
+            <li key={keywordKey} className="grid gap-3 rounded-lg border border-border bg-card p-3">
+              <h4 className="wrap-break-words font-semibold text-foreground text-sm">
                 {metric.keyword.trim()}
               </h4>
               <dl className="grid grid-cols-3 gap-3">
@@ -497,7 +502,7 @@ function AddKeywordAction({
         {pending ? t('actions.adding') : state ? t(`actions.${state}`) : t('actions.add')}
       </Button>
       {error ? (
-        <p role="alert" className="text-red-600 text-xs">
+        <p role="alert" className="text-error text-xs">
           {t(`addErrors.${error}`)}
         </p>
       ) : null}
@@ -505,19 +510,11 @@ function AddKeywordAction({
   );
 }
 
-function TableHeading({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <th scope="col" className={cn('px-4 py-2 font-semibold text-xs', className)}>
-      {children}
-    </th>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 truncate font-medium text-slate-800 text-sm">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 truncate font-medium text-foreground text-sm">{value}</dd>
     </div>
   );
 }
@@ -528,11 +525,11 @@ function ResearchState({ loading = false, message }: { loading?: boolean; messag
       role={loading ? 'status' : undefined}
       className="flex min-h-40 items-center justify-center text-center"
     >
-      <div className="grid max-w-md justify-items-center gap-2 text-slate-600 text-sm">
+      <div className="grid max-w-md justify-items-center gap-2 text-muted-foreground text-sm">
         {loading ? (
-          <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
         ) : (
-          <Search className="size-5 text-slate-400" aria-hidden="true" />
+          <Search className="size-5 text-muted-foreground" aria-hidden="true" />
         )}
         <p>{message}</p>
       </div>

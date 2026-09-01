@@ -4,11 +4,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, ExternalLink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
-import { Button, Input, Label, Modal } from '@/components/ui';
+import { Button, Input, Label, Modal, StatusPanel } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
-import { StatusPanel } from './StatusPanel';
 
 type WordPressErrorKey = 'connectFailed' | 'invalidToken' | 'pluginNotConfigured' | 'requestFailed';
 type FailedStep = 1 | 2 | null;
@@ -137,12 +136,12 @@ export function WordPressDialog({
       onClose={handleClose}
       open={open}
     >
-      <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
+      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
         <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-slate-950">
+          <h2 id={titleId} className="font-semibold text-lg text-foreground">
             {t('setupTitle')}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">
+          <p className="mt-1 text-muted-foreground text-sm">
             {isConnected ? t('replaceNote') : t('dialogDescription')}
           </p>
         </div>
@@ -167,7 +166,7 @@ export function WordPressDialog({
         <ol className="grid gap-4">
           <li className="grid gap-2">
             <StepHeading failed={connectError?.step === 1} index={1} title={t('step1Title')} />
-            <p className="pl-9 text-slate-500 text-sm">{t('step1Body')}</p>
+            <p className="pl-9 text-muted-foreground text-sm">{t('step1Body')}</p>
             <div className="flex flex-wrap items-center gap-2 pl-9">
               <Button asChild size="sm">
                 <a download href="/downloads/seo-potion.zip">
@@ -199,7 +198,7 @@ export function WordPressDialog({
           />
           <li className="grid gap-2">
             <StepHeading failed={false} index={3} title={t('step3Title')} />
-            <p className="pl-9 text-slate-500 text-sm">{t('step3Body')}</p>
+            <p className="pl-9 text-muted-foreground text-sm">{t('step3Body')}</p>
             <div className="grid gap-2 pl-9 sm:max-w-sm">
               <Label htmlFor="wordpress-token">{t('token')}</Label>
               <Input
@@ -226,7 +225,7 @@ export function WordPressDialog({
         </ol>
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-slate-200 border-t px-4 py-4 sm:px-6">
+      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-border border-t px-4 py-4 sm:px-6">
         <Button
           disabled={!organizationId || !token.trim() || connectMutation.isPending}
           onClick={handleConnect}
@@ -265,7 +264,7 @@ function SetupStep({
   return (
     <li className="grid gap-2">
       <StepHeading failed={failed} index={index} title={title} />
-      <p className="pl-9 text-slate-500 text-sm">{body}</p>
+      <p className="pl-9 text-muted-foreground text-sm">{body}</p>
       <Button asChild className="ml-9 w-fit" size="sm" variant="outline">
         <a href={actionHref} rel="noopener noreferrer" target="_blank">
           <ExternalLink aria-hidden="true" className="size-4" />
@@ -281,13 +280,13 @@ function StepHeading({ failed, index, title }: { failed: boolean; index: number;
     <div className="flex items-center gap-3">
       <span
         className={cn(
-          'flex size-6 items-center justify-center rounded-full text-white text-xs',
-          failed ? 'bg-red-600' : 'bg-slate-900',
+          'flex size-6 items-center justify-center rounded-full text-background text-xs',
+          failed ? 'bg-destructive' : 'bg-foreground',
         )}
       >
         {index}
       </span>
-      <p className={cn('font-medium text-sm', failed ? 'text-red-700' : 'text-slate-950')}>
+      <p className={cn('font-medium text-sm', failed ? 'text-error' : 'text-foreground')}>
         {title}
       </p>
     </div>

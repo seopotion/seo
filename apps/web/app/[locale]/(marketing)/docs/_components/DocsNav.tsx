@@ -20,7 +20,7 @@ export function DocsNav({ label, sections }: { label: string; sections: DocsNavS
     <nav aria-label={label} className="space-y-6">
       {sections.map((section) => (
         <div key={section.title}>
-          <p className="mb-2 font-semibold text-gray-400 text-xs uppercase tracking-wide">
+          <p className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
             {section.title}
           </p>
           <ul className="space-y-0.5">
@@ -35,7 +35,7 @@ export function DocsNav({ label, sections }: { label: string; sections: DocsNavS
                       'block rounded-md border-l-2 px-3 py-1.5 text-sm no-underline transition-colors',
                       active
                         ? 'border-amber-500 bg-amber-50 font-medium text-amber-700'
-                        : 'border-transparent text-gray-600 hover:text-gray-900',
+                        : 'border-transparent text-muted-foreground hover:text-foreground',
                     )}
                     href={item.href}
                   >

@@ -6,7 +6,16 @@ import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  PageDescription,
+  PageTitle,
+} from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
@@ -96,17 +105,17 @@ export default function ArticleAnalyticsPage() {
     <div className="grid gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Button asChild variant="link" className="mb-2 text-slate-600">
+          <Button asChild variant="link" className="mb-2 text-muted-foreground">
             <Link href="/analytics">
               <ArrowLeft className="size-4" aria-hidden="true" />
               {t('detail.back')}
             </Link>
           </Button>
-          <h1 className="font-semibold text-lg text-slate-950">{t('detail.title')}</h1>
-          <p className="mt-1 max-w-2xl text-slate-600 text-sm">{t('detail.description')}</p>
+          <PageTitle>{t('detail.title')}</PageTitle>
+          <PageDescription>{t('detail.description')}</PageDescription>
         </div>
         {data.days_live !== null ? (
-          <Badge variant="secondary" className="w-fit bg-slate-200 text-slate-700">
+          <Badge variant="secondary" className="w-fit bg-muted text-foreground">
             <CalendarDays className="size-3.5" aria-hidden="true" />
             {t('detail.daysLive', { count: data.days_live })}
           </Badge>
@@ -122,10 +131,10 @@ export default function ArticleAnalyticsPage() {
       ) : data.days_live !== null && data.days_live < 14 ? (
         <DetailState title={t('detail.gatheringTitle')} message={t('detail.stillGathering')} />
       ) : (
-        <Card className="border-slate-200 shadow-none">
+        <Card className="border-border shadow-none">
           <CardHeader>
             <CardTitle>{t('detail.chartTitle')}</CardTitle>
-            <p className="text-slate-600 text-sm">{t('detail.chartDescription')}</p>
+            <p className="text-muted-foreground text-sm">{t('detail.chartDescription')}</p>
           </CardHeader>
           <CardContent>
             <AnalyticsChart series={data.series} />
@@ -138,11 +147,11 @@ export default function ArticleAnalyticsPage() {
 
 function DetailState({ message, title }: { message: string; title: string }) {
   return (
-    <Card className="border-slate-200 shadow-none">
+    <Card className="border-border shadow-none">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="text-slate-600 text-sm">{message}</CardContent>
+      <CardContent className="text-muted-foreground text-sm">{message}</CardContent>
     </Card>
   );
 }

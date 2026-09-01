@@ -69,7 +69,7 @@ export const initialForm: OnboardingForm = {
   referralSource: '',
 };
 
-export const errorClass = 'mt-1 text-red-600 text-sm';
+export const errorClass = 'mt-1 text-error text-sm';
 
 export const blogPostFields = [
   { id: 'blogPost0', index: 0, labelKey: 'post1' },

@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -19,6 +17,22 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+  --color-error: var(--error);
+  --color-error-muted: var(--error-muted);
+  --color-error-subtle: var(--error-subtle);
+  --color-error-border: var(--error-border);
+  --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-border: var(--info-border);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -45,6 +59,28 @@
   --accent: oklch(0.967 0.003 264.542);
   --accent-foreground: oklch(0.21 0.034 264.665);
   --destructive: oklch(0.577 0.245 27.325);
+
+  /* Status tones. Each tone is a *soft* surface, so it takes four values, the
+   * same way a card does (fill + text + edge): the bare token is text/icons,
+   * `-muted` fills a badge, `-subtle` fills a panel, `-border` is the edge.
+   * This is deliberately a different shape from `--destructive` above, which is
+   * a *solid* fill carrying white text (the destructive button and badge). */
+  --success: oklch(50.8% 0.118 165.612);
+  --success-muted: oklch(95% 0.052 163.051);
+  --success-subtle: oklch(97.9% 0.021 166.113);
+  --success-border: oklch(90.5% 0.093 164.15);
+  --warning: oklch(47.3% 0.137 46.201);
+  --warning-muted: oklch(96.2% 0.059 95.617);
+  --warning-subtle: oklch(98.7% 0.022 95.277);
+  --warning-border: oklch(92.4% 0.12 95.746);
+  --error: oklch(50.5% 0.213 27.518);
+  --error-muted: oklch(93.6% 0.032 17.717);
+  --error-subtle: oklch(97.1% 0.013 17.38);
+  --error-border: oklch(88.5% 0.062 18.334);
+  --info: oklch(50% 0.134 242.749);
+  --info-muted: oklch(95.1% 0.026 236.824);
+  --info-subtle: oklch(97.7% 0.013 236.62);
+  --info-border: oklch(90.1% 0.058 230.902);
   --border: oklch(0.928 0.006 264.531);
   --input: oklch(0.928 0.006 264.531);
   --ring: oklch(0.704 0.04 256.788);

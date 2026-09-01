@@ -195,7 +195,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
       />
       <main className="min-h-screen">
         <section className="relative isolate overflow-hidden px-6 pt-32 pb-20 sm:pt-48">
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96 rotate-180 text-gray-500/30 opacity-60 mask-[linear-gradient(to_bottom,transparent,white)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-96 rotate-180 text-muted-foreground/30 opacity-60 mask-[linear-gradient(to_bottom,transparent,white)]">
             <svg
               aria-hidden="true"
               className="absolute inset-0 h-full w-full"
@@ -218,13 +218,15 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
             </svg>
           </div>
           <div className="relative z-10 mx-auto max-w-4xl text-center">
-            <h1 className="mb-6 font-bold text-4xl text-gray-800 leading-tight tracking-tight md:text-5xl">
+            <h1 className="mb-6 font-bold text-4xl text-foreground leading-tight tracking-tight md:text-5xl">
               {t('hero.titleLine1')} <br /> {t('hero.titleLine2')}
             </h1>
-            <h2 className="mx-auto mb-8 max-w-2xl text-gray-600 text-lg">{t('hero.subtitle')}</h2>
+            <h2 className="mx-auto mb-8 max-w-2xl text-muted-foreground text-lg">
+              {t('hero.subtitle')}
+            </h2>
             <Link
               href="/pricing"
-              className="inline-flex rounded-lg bg-orange-400 px-5 py-3 font-medium text-sm text-white transition-colors hover:bg-orange-500"
+              className="inline-flex rounded-lg bg-orange-400 px-5 py-3 font-medium text-sm text-background transition-colors hover:bg-orange-500"
             >
               {t('hero.cta')}
             </Link>
@@ -251,7 +253,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-400 shadow-lg">
                     <svg
                       aria-hidden="true"
-                      className="h-10 w-10 text-white"
+                      className="h-10 w-10 text-background"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -282,16 +284,16 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
           </div>
         </section>
 
-        <section className="border-gray-100 border-y bg-gray-50 px-6 py-12">
+        <section className="border-border border-y bg-muted/50 px-6 py-12">
           <div className="mx-auto max-w-7xl">
-            <p className="mb-6 text-center text-gray-500">{t('useCasesTitle')}</p>
+            <p className="mb-6 text-center text-muted-foreground">{t('useCasesTitle')}</p>
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8">
               {useCaseCards.map((useCase) => (
                 <div
                   key={useCase.name}
-                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm border border-gray-200"
+                  className="flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm border border-border"
                 >
-                  <span className="font-medium text-gray-700">{useCase.name}</span>
+                  <span className="font-medium text-foreground">{useCase.name}</span>
                 </div>
               ))}
             </div>
@@ -301,22 +303,24 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
         <section id="features" className="scroll-mt-24 px-6 py-20">
           <div className="mx-auto max-w-6xl">
             <div className="mb-16 text-center">
-              <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
+              <h2 className="mb-4 font-bold text-3xl text-foreground md:text-4xl">
                 {t('featuresTitle')}
               </h2>
-              <p className="mx-auto max-w-5xl text-gray-600 text-lg">{t('featuresDescription')}</p>
+              <p className="mx-auto max-w-5xl text-muted-foreground text-lg">
+                {t('featuresDescription')}
+              </p>
             </div>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {featureCards.map((feature, index) => (
                 <div
                   key={feature.title}
-                  className="rounded-2xl bg-gray-50 p-6 transition-shadow hover:shadow-lg"
+                  className="rounded-2xl bg-muted/50 p-6 transition-shadow hover:shadow-lg"
                 >
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
                     {features[index % features.length]?.icon}
                   </div>
-                  <h3 className="mb-2 font-semibold text-gray-900 text-xl">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
+                  <h3 className="mb-2 font-semibold text-foreground text-xl">{feature.title}</h3>
+                  <p className="text-muted-foreground">{feature.description}</p>
                 </div>
               ))}
             </div>
@@ -475,19 +479,16 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
         <section className="px-6 py-20">
           <div className="mx-auto max-w-6xl">
             <div className="mb-16 text-center">
-              <h2 className="mb-4 font-bold text-3xl text-gray-900 md:text-4xl">
+              <h2 className="mb-4 font-bold text-3xl text-foreground md:text-4xl">
                 {t('controls.title')}
               </h2>
-              <p className="text-gray-600 text-lg">{t('controls.description')}</p>
+              <p className="text-muted-foreground text-lg">{t('controls.description')}</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">
               {controlCards.map((control) => (
-                <div
-                  key={control.title}
-                  className="rounded-2xl border border-gray-100 bg-white p-6"
-                >
-                  <h3 className="font-semibold text-gray-900 text-xl">{control.title}</h3>
-                  <p className="mt-3 text-gray-600">{control.description}</p>
+                <div key={control.title} className="rounded-2xl border border-border bg-white p-6">
+                  <h3 className="font-semibold text-foreground text-xl">{control.title}</h3>
+                  <p className="mt-3 text-muted-foreground">{control.description}</p>
                 </div>
               ))}
             </div>
@@ -496,7 +497,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
 
         <section className="px-6 py-20">
           <div className="mx-auto max-w-4xl">
-            <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-gray-700 md:p-12">
+            <div className="rounded-2xl bg-linear-to-br from-blue-200 to-purple-200 p-8 text-center text-foreground md:p-12">
               <h2 className="mb-4 font-bold text-3xl md:text-4xl">{t('finalCta.title')}</h2>
               <p className="mx-auto max-w-2xl text-xl">{t('finalCta.description')}</p>
             </div>

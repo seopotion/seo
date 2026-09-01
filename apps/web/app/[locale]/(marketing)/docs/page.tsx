@@ -51,15 +51,15 @@ export default async function DocsIndexPage({ params }: { params: Promise<{ loca
 
   return (
     <div className="max-w-3xl">
-      <header className="border-gray-100 border-b pb-8">
+      <header className="border-border border-b pb-8">
         <p className="mb-2 font-semibold text-amber-600 text-sm">{t('index.eyebrow')}</p>
-        <h1 className="font-bold text-3xl text-gray-900 md:text-4xl">{t('index.title')}</h1>
-        <p className="mt-3 text-gray-600 text-lg">{t('index.subtitle')}</p>
+        <h1 className="font-bold text-3xl text-foreground md:text-4xl">{t('index.title')}</h1>
+        <p className="mt-3 text-muted-foreground text-lg">{t('index.subtitle')}</p>
       </header>
 
       {sections.map((section, sectionIndex) => (
         <section className="mt-10" key={section.group}>
-          <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wide">
+          <h2 className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
             {t(`groups.${section.group}`)}
           </h2>
           <ul className="mt-3 grid gap-3">
@@ -69,11 +69,11 @@ export default async function DocsIndexPage({ params }: { params: Promise<{ loca
               return (
                 <li key={entry.slug}>
                   <Link
-                    className="block rounded-xl border border-gray-200 p-5 no-underline transition-colors hover:border-amber-300 hover:bg-amber-50/40"
+                    className="block rounded-xl border border-border p-5 no-underline transition-colors hover:border-amber-300 hover:bg-amber-50/40"
                     href={docPath(entry.slug)}
                   >
-                    <span className="block font-semibold text-gray-900">{meta?.title}</span>
-                    <span className="mt-1 block text-gray-600 text-sm leading-relaxed">
+                    <span className="block font-semibold text-foreground">{meta?.title}</span>
+                    <span className="mt-1 block text-muted-foreground text-sm leading-relaxed">
                       {meta?.description}
                     </span>
                   </Link>
