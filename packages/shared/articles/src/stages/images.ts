@@ -2,11 +2,14 @@ import { ArticleRepo } from '@shared/db';
 import {
   buildImagePlanPrompt,
   buildImagePlanRetryPrompt,
+  buildWordlessSubjectsPrompt,
   extractH2s,
   findImagePlanTextRisks,
   IMAGE_PLAN_RESPONSE_SCHEMA,
   injectImageAfterHeading,
   parseImagePlan,
+  parseWordlessSubjects,
+  WORDLESS_SUBJECTS_RESPONSE_SCHEMA,
   withNoTextDirective,
   wordlessPrompt,
 } from '@shared/generation';
@@ -139,16 +142,33 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
     // worse image than a good prompt and a far better one than a diagram.
     console.warn('image plan still asks for lettering, using wordless prompts', { risks });
     const risky = new Set(risks.map((r) => r.slot));
-    plan = {
-      cover: risky.has('cover')
-        ? { ...plan.cover, prompt: wordlessPrompt(article.title) }
-        : plan.cover,
-      inline: plan.inline.map((img) =>
+    // A template is only as good as how concrete its subject is, so the objects
+    // to photograph are asked for. Best-effort: any failure leaves the plainer
+    // subject-only prompt rather than costing the article its images.
+    const business = presets.business.description;
+    const fallbackFor = async (subject: string): Promise<string> => {
+      try {
+        const res = await llm.complete({
+          messages: buildWordlessSubjectsPrompt(subject, business),
+          responseSchema: WORDLESS_SUBJECTS_RESPONSE_SCHEMA,
+        });
+        return wordlessPrompt(subject, parseWordlessSubjects(res.text));
+      } catch (err) {
+        console.warn('wordless subject lookup failed', { subject, err });
+        return wordlessPrompt(subject);
+      }
+    };
+    const cover = risky.has('cover')
+      ? { ...plan.cover, prompt: await fallbackFor(article.title) }
+      : plan.cover;
+    const inline = await Promise.all(
+      plan.inline.map(async (img) =>
         risky.has(img.section_heading)
-          ? { ...img, prompt: wordlessPrompt(img.section_heading) }
+          ? { ...img, prompt: await fallbackFor(img.section_heading) }
           : img,
       ),
-    };
+    );
+    plan = { cover, inline };
   }
   const empty = {
     url: '',
