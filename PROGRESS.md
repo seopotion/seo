@@ -65,7 +65,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ Whole app is statically prerendered — root layout moved into `app/[locale]/layout.tsx` so `<html lang>` comes from the segment instead of a request-time `getLocale()`, which had forced every route to render on demand. Only `/content-history/[articleId]` and the two OAuth/install callbacks (GSC, GitHub) stay dynamic, all by nature
 - 🟡 JWT in localStorage; no refresh/expiry — [#18](https://github.com/seopotion/seo/issues/18)
 - ✅ `NEXT_PUBLIC_API_URL` + `NEXT_PUBLIC_GOOGLE_CLIENT_ID` per-env wiring documented/plumbed — [#21](https://github.com/seopotion/seo/issues/21); both stages now deployed on AWS — [#35](https://github.com/seopotion/seo/issues/35)
-- 🟡 Component/DOM tests — jsdom + Testing Library run as a `web-dom` Vitest project (`.test.tsx` → jsdom, `.test.ts` → node); `Modal` (focus trap, Escape, scroll lock, chained-dialog focus return) and `StatusPanel` are covered, the rest of the UI is not retrofitted
+- 🟡 Component/DOM tests — jsdom + Testing Library run as a `web-dom` Vitest project (`.test.tsx` → jsdom, `.test.ts` → node). Covered: `Modal` + all four of its call sites, `ArticleEditorModal` (which carries its own duplicate focus trap), the content planner page (modal wiring + data layer), `StatusPanel`. Other screens and most `components/ui` primitives are not retrofitted
 
 ## Admin panel (wizard-of-oz operations)
 
