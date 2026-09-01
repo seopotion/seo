@@ -75,6 +75,7 @@ export default function ContentPlannerPage() {
   const canScheduleKeywords = organization?.capabilities?.keyword_scheduling ?? false;
   const queryClient = useQueryClient();
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const organizationIdRef = useRef(organization?.id);
   const observedStrategyRef = useRef<{
     organizationId: string;
@@ -105,16 +106,37 @@ export default function ContentPlannerPage() {
   const handleCloseChooser = useCallback(() => {
     setChooserDateKey(null);
   }, []);
+  /**
+   * Radix returns focus to whatever was focused when *that* dialog opened. That
+   * is wrong for a chain: the chooser hands off to research while closing, so
+   * research's idea of "before" is a control inside the chooser that is being
+   * torn down — and the page is still inert, so the restore lands on <body>.
+   *
+   * The page owns the chain, so it remembers the control that started it. Only
+   * the first dialog records one; the rest of the chain inherits it.
+   */
+  const rememberReturnFocus = useCallback(() => {
+    if (modalReturnFocusRef.current?.isConnected) {
+      return;
+    }
+
+    modalReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, []);
   const handleOpenResearch = useCallback(() => {
     setSelectedArticle(null);
     setChooserDateKey(null);
     setResearchModalOpen(true);
   }, []);
-  const handleChooseDate = useCallback((dateKey: string) => {
-    setSelectedArticle(null);
-    setResearchModalOpen(false);
-    setChooserDateKey(dateKey);
-  }, []);
+  const handleChooseDate = useCallback(
+    (dateKey: string) => {
+      rememberReturnFocus();
+      setSelectedArticle(null);
+      setResearchModalOpen(false);
+      setChooserDateKey(dateKey);
+    },
+    [rememberReturnFocus],
+  );
   const handlePreviousMonth = useCallback(() => {
     setVisibleMonth((month) => addMonths(month, -1));
   }, []);
@@ -124,11 +146,30 @@ export default function ContentPlannerPage() {
   const handleToday = useCallback(() => {
     setVisibleMonth(startOfMonth(startOfToday()));
   }, []);
-  const handleSelectArticle = useCallback((article: PlannerArticle) => {
-    setChooserDateKey(null);
-    setResearchModalOpen(false);
-    setSelectedArticle(article);
-  }, []);
+  const handleSelectArticle = useCallback(
+    (article: PlannerArticle) => {
+      rememberReturnFocus();
+      setChooserDateKey(null);
+      setResearchModalOpen(false);
+      setSelectedArticle(article);
+    },
+    [rememberReturnFocus],
+  );
+
+  // Put focus back once the last dialog in a chain closes. This runs after the
+  // inert attributes come off, so the target can actually take focus.
+  useEffect(() => {
+    if (modalOpen) {
+      return;
+    }
+
+    const trigger = modalReturnFocusRef.current;
+    modalReturnFocusRef.current = null;
+
+    if (trigger?.isConnected) {
+      trigger.focus({ preventScroll: true });
+    }
+  }, [modalOpen]);
 
   useEffect(() => {
     if (organizationIdRef.current === organization?.id) {

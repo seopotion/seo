@@ -7,9 +7,11 @@ import type { FormEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Input,
   Label,
-  Modal,
   Table,
   TableBody,
   TableCell,
@@ -79,6 +81,7 @@ export function ResearchKeywordsModal({
   const [addStates, setAddStates] = useState<Record<string, AddState>>({});
   const [addErrors, setAddErrors] = useState<Record<string, AddError>>({});
   const sessionRef = useRef(0);
+  const seedRef = useRef<HTMLInputElement>(null);
 
   useEffect(
     () => () => {
@@ -247,115 +250,132 @@ export function ResearchKeywordsModal({
   };
 
   const resultCount = results?.length ?? 0;
-  const titleId = 'research-keywords-dialog-title';
 
   return (
-    <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
-      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
-        <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-foreground">
-            {t('title')}
-          </h2>
-          <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={t('actions.close')}
-          className="size-9"
-          onClick={handleClose}
-        >
-          <X className="size-4" aria-hidden="true" />
-        </Button>
-      </header>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) handleClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          // The seed field is the point of the dialog, but it is absent
+          // entirely on the upgrade panel — fall back to Radix's default there.
+          const target = seedRef.current;
 
-      {!canResearch || upgradeRequired ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-          <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
-            <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
-            <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
-            <Button asChild className="mt-4" size="sm">
-              <Link href="/billing">{t('upgrade.cta')}</Link>
-            </Button>
+          if (!target) {
+            return;
+          }
+
+          event.preventDefault();
+          target.focus();
+        }}
+      >
+        <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <DialogTitle>{t('title')}</DialogTitle>
+            <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
           </div>
-        </div>
-      ) : (
-        <>
-          <form
-            className="grid shrink-0 gap-2 border-border border-b px-4 py-4 sm:px-6"
-            onSubmit={(event) => void handleSearch(event)}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t('actions.close')}
+            className="size-9"
+            onClick={handleClose}
           >
-            <Label htmlFor="research-keyword-seed">{t('form.label')}</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="research-keyword-seed"
-                data-modal-initial-focus
-                value={seedInput}
-                maxLength={RESEARCH_SEED_MAX_LENGTH}
-                placeholder={t('form.placeholder')}
-                aria-describedby={searchError ? 'research-keyword-error' : undefined}
-                aria-invalid={Boolean(searchError)}
-                disabled={researchMutation.isPending}
-                onChange={(event) => {
-                  setSeedInput(event.target.value);
-                  setSearchError(null);
-                }}
-              />
-              <Button type="submit" disabled={researchMutation.isPending}>
-                {researchMutation.isPending ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Search className="size-4" aria-hidden="true" />
-                )}
-                {researchMutation.isPending ? t('actions.searching') : t('actions.search')}
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </header>
+
+        {!canResearch || upgradeRequired ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
+            <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
+              <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
+              <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
+              <Button asChild className="mt-4" size="sm">
+                <Link href="/billing">{t('upgrade.cta')}</Link>
               </Button>
             </div>
-            <div className="flex min-h-5 items-start justify-between gap-3">
-              <div id="research-keyword-error" role={searchError ? 'alert' : undefined}>
-                {searchError ? (
-                  <p className="text-error text-xs">{t(`errors.${searchError}`)}</p>
-                ) : null}
-              </div>
-              <span className="shrink-0 text-muted-foreground text-xs">
-                {t('form.characterCount', {
-                  count: seedInput.length,
-                  max: RESEARCH_SEED_MAX_LENGTH,
-                })}
-              </span>
-            </div>
-          </form>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-            {results ? (
-              <div className="grid gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-semibold text-foreground text-sm">{t('results.title')}</h3>
-                  <span className="text-muted-foreground text-xs">
-                    {t('results.count', { count: resultCount })}
-                  </span>
-                </div>
-
-                <ResearchResults
-                  addErrors={addErrors}
-                  addStates={addStates}
-                  locale={locale}
-                  onAdd={(metric) => void handleAdd(metric)}
-                  pendingAdds={pendingAdds}
-                  results={results}
-                  t={t}
-                  targetKeywordsT={targetKeywordsT}
-                />
-              </div>
-            ) : researchMutation.isPending ? (
-              <ResearchState loading message={t('states.loading')} />
-            ) : (
-              <ResearchState message={t('states.empty')} />
-            )}
           </div>
-        </>
-      )}
-    </Modal>
+        ) : (
+          <>
+            <form
+              className="grid shrink-0 gap-2 border-border border-b px-4 py-4 sm:px-6"
+              onSubmit={(event) => void handleSearch(event)}
+            >
+              <Label htmlFor="research-keyword-seed">{t('form.label')}</Label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  id="research-keyword-seed"
+                  ref={seedRef}
+                  value={seedInput}
+                  maxLength={RESEARCH_SEED_MAX_LENGTH}
+                  placeholder={t('form.placeholder')}
+                  aria-describedby={searchError ? 'research-keyword-error' : undefined}
+                  aria-invalid={Boolean(searchError)}
+                  disabled={researchMutation.isPending}
+                  onChange={(event) => {
+                    setSeedInput(event.target.value);
+                    setSearchError(null);
+                  }}
+                />
+                <Button type="submit" disabled={researchMutation.isPending}>
+                  {researchMutation.isPending ? (
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Search className="size-4" aria-hidden="true" />
+                  )}
+                  {researchMutation.isPending ? t('actions.searching') : t('actions.search')}
+                </Button>
+              </div>
+              <div className="flex min-h-5 items-start justify-between gap-3">
+                <div id="research-keyword-error" role={searchError ? 'alert' : undefined}>
+                  {searchError ? (
+                    <p className="text-error text-xs">{t(`errors.${searchError}`)}</p>
+                  ) : null}
+                </div>
+                <span className="shrink-0 text-muted-foreground text-xs">
+                  {t('form.characterCount', {
+                    count: seedInput.length,
+                    max: RESEARCH_SEED_MAX_LENGTH,
+                  })}
+                </span>
+              </div>
+            </form>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              {results ? (
+                <div className="grid gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-foreground text-sm">{t('results.title')}</h3>
+                    <span className="text-muted-foreground text-xs">
+                      {t('results.count', { count: resultCount })}
+                    </span>
+                  </div>
+
+                  <ResearchResults
+                    addErrors={addErrors}
+                    addStates={addStates}
+                    locale={locale}
+                    onAdd={(metric) => void handleAdd(metric)}
+                    pendingAdds={pendingAdds}
+                    results={results}
+                    t={t}
+                    targetKeywordsT={targetKeywordsT}
+                  />
+                </div>
+              ) : researchMutation.isPending ? (
+                <ResearchState loading message={t('states.loading')} />
+              ) : (
+                <ResearchState message={t('states.empty')} />
+              )}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

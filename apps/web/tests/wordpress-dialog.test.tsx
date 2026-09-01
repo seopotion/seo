@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import messages from '../messages/en.json';
 
 /**
- * A `Modal` call site outside the content planner, so #283 has cover here too.
+ * A dialog outside the content planner, so #283 has cover here too.
  * Real component, real `en.json`, real QueryClient; only `@/lib/api` is stubbed.
  */
 

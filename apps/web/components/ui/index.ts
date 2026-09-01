@@ -6,7 +6,6 @@ export { Dialog, DialogContent, DialogTitle } from './dialog';
 export { EmptyState } from './empty-state';
 export { Input } from './input';
 export { Label } from './label';
-export { Modal } from './modal';
 export { PageDescription, PageTitle } from './page-header';
 export { Progress } from './progress';
 export {

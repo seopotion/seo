@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { StatusPanel } from '../components/ui/status-panel';
 
 /**
- * A second suite, mostly to prove the jsdom setup generalises past `Modal`. The
+ * A second suite, mostly to prove the jsdom setup generalises past dialogs. The
  * behaviour worth pinning is the announcement role: an error panel is an
  * assertive `alert`, every other tone is a polite `status`.
  */
