@@ -3,12 +3,14 @@ import { INLINE_IMAGE_COUNT } from '../src/config';
 import {
   buildImagePlanPrompt,
   buildImagePlanRetryPrompt,
+  buildWordlessSubjectsPrompt,
   extractH2s,
   findImagePlanTextRisks,
   findTextRisk,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  parseWordlessSubjects,
   withNoTextDirective,
   wordlessPrompt,
 } from '../src/images';
@@ -237,5 +239,62 @@ describe('image plan text gate', () => {
     const prompt = wordlessPrompt('Setting Up Your Home Server');
     expect(prompt).toContain('Setting Up Your Home Server');
     expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  test('with objects it photographs them instead of the abstract subject', () => {
+    const prompt = wordlessPrompt('deployment automation', [
+      'server rack',
+      'network cable',
+      'gear',
+    ]);
+    expect(prompt).toContain('server rack, network cable, gear');
+    expect(prompt).not.toContain('evoking deployment automation');
+    expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  // Measured: given prose and no such clause, fal renders the prompt itself as
+  // a page of garbled text (#286).
+  test('every fallback disclaims being a document', () => {
+    for (const prompt of [wordlessPrompt('a subject'), wordlessPrompt('a subject', ['a stone'])]) {
+      expect(prompt).toContain('not a document, page, poster, slide or screen');
+    }
+  });
+});
+
+describe('parseWordlessSubjects', () => {
+  const reply = (objects: string[]) => JSON.stringify({ objects });
+
+  test('keeps concrete objects, tidied', () => {
+    expect(parseWordlessSubjects(reply(['  server   rack ', 'network cable']))).toEqual([
+      'server rack',
+      'network cable',
+    ]);
+  });
+
+  // A returned "deployment badge" came back stamped "NRLUMA B OLOPYMENT".
+  test('drops objects that carry writing in real life', () => {
+    expect(
+      parseWordlessSubjects(
+        reply(['server rack', 'deployment badge', 'laptop', 'certificate', 'gear']),
+      ),
+    ).toEqual(['server rack', 'gear']);
+  });
+
+  test('drops objects that name a banned subject outright', () => {
+    expect(parseWordlessSubjects(reply(['architecture diagram', 'coiled cable']))).toEqual([
+      'coiled cable',
+    ]);
+  });
+
+  test('caps the list and tolerates an empty answer', () => {
+    expect(parseWordlessSubjects(reply(['a', 'b', 'c', 'd', 'e']))).toHaveLength(4);
+    expect(parseWordlessSubjects(reply([]))).toEqual([]);
+  });
+
+  test('the prompt asks for bare-surfaced objects and carries the business context', () => {
+    const messages = buildWordlessSubjectsPrompt('reverse osmosis', 'Clewas sells water filters.');
+    expect(messages[0]!.content).toContain('carries writing');
+    expect(messages[1]!.content).toContain('reverse osmosis');
+    expect(messages[1]!.content).toContain('Clewas sells water filters.');
   });
 });

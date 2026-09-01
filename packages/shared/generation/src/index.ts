@@ -13,6 +13,7 @@ export type { ImagePlan, ImagePlanInput } from './images';
 export {
   buildImagePlanPrompt,
   buildImagePlanRetryPrompt,
+  buildWordlessSubjectsPrompt,
   extractH2s,
   findImagePlanTextRisks,
   findTextRisk,
@@ -22,6 +23,8 @@ export {
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  parseWordlessSubjects,
+  WORDLESS_SUBJECTS_RESPONSE_SCHEMA,
   withNoTextDirective,
   wordlessPrompt,
 } from './images';
