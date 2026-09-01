@@ -1,17 +1,12 @@
 import { ArticleRepo } from '@shared/db';
 import {
   buildImagePlanPrompt,
-  buildImagePlanRetryPrompt,
-  buildWordlessSubjectsPrompt,
   extractH2s,
-  findImagePlanTextRisks,
   IMAGE_PLAN_RESPONSE_SCHEMA,
   injectImageAfterHeading,
   parseImagePlan,
-  parseWordlessSubjects,
-  WORDLESS_SUBJECTS_RESPONSE_SCHEMA,
+  photoPrompt,
   withNoTextDirective,
-  wordlessPrompt,
 } from '@shared/generation';
 import type { ImageResult, LlmClient } from '@shared/providers';
 import type { ArticleImage, ArticleRun } from '@shared/schemas';
@@ -22,14 +17,6 @@ import type { StageOutcome } from './types';
 
 /** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
 const IMAGE_MODEL = 'fal-ai/flux-2';
-
-/**
- * Plan attempts before the risky slots fall back to a wordless scene (#280).
- * Measured against the real planner: every first attempt asked for a diagram
- * or an interface, one retry cleaned two thirds of them, so the third attempt
- * is what keeps a written prompt instead of the generic fallback.
- */
-const PLAN_ATTEMPTS = 3;
 
 /**
  * Exact pixels per role. The cover is the OG large-card size; inline is the same
@@ -107,69 +94,27 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
 
   const presets = run.input.presets;
   const headings = extractH2s(article.content);
-  const messages = buildImagePlanPrompt({
-    businessName: presets.business.name,
-    businessDescription: presets.business.description,
-    language: presets.business.language,
-    imageStyle: presets.article_preferences.engagement.image_style,
-    articleTitle: article.title,
-    metaDescription: article.meta_description,
-    headings,
+  const res = await llm.complete({
+    messages: buildImagePlanPrompt({
+      businessName: presets.business.name,
+      businessDescription: presets.business.description,
+      language: presets.business.language,
+      imageStyle: presets.article_preferences.engagement.image_style,
+      articleTitle: article.title,
+      metaDescription: article.meta_description,
+      headings,
+    }),
+    responseSchema: IMAGE_PLAN_RESPONSE_SCHEMA,
   });
-
-  // Telling the planner not to ask for lettering does not stop it: a staging
-  // run with the ban in the prompt still asked for "a split-screen technical
-  // visualization" and published garbled headings. So the plan is checked, and
-  // one correction is offered before the risky slots are replaced (#280).
   let plan: ReturnType<typeof parseImagePlan>;
-  let risks: ReturnType<typeof findImagePlanTextRisks>;
-  for (let attempt = 1; ; attempt++) {
-    const res = await llm.complete({ messages, responseSchema: IMAGE_PLAN_RESPONSE_SCHEMA });
-    try {
-      plan = parseImagePlan(res.text, headings);
-    } catch (err) {
-      // Bad plan: mark failed (ops-visible) and rethrow; a redrive re-plans.
-      await ArticleRepo.failImages(article.id).catch(() => {});
-      throw err;
-    }
-    risks = findImagePlanTextRisks(plan);
-    if (risks.length === 0 || attempt === PLAN_ATTEMPTS) break;
-    console.warn('image plan asks for lettering, replanning', { risks });
-    messages.push(buildImagePlanRetryPrompt(risks));
+  try {
+    plan = parseImagePlan(res.text, headings);
+  } catch (err) {
+    // Bad plan: mark failed (ops-visible) and rethrow; a redrive re-plans.
+    await ArticleRepo.failImages(article.id).catch(() => {});
+    throw err;
   }
-  if (risks.length > 0) {
-    // Two planners in a row wanted lettering. A generic wordless scene is a
-    // worse image than a good prompt and a far better one than a diagram.
-    console.warn('image plan still asks for lettering, using wordless prompts', { risks });
-    const risky = new Set(risks.map((r) => r.slot));
-    // A template is only as good as how concrete its subject is, so the objects
-    // to photograph are asked for. Best-effort: any failure leaves the plainer
-    // subject-only prompt rather than costing the article its images.
-    const business = presets.business.description;
-    const fallbackFor = async (subject: string): Promise<string> => {
-      try {
-        const res = await llm.complete({
-          messages: buildWordlessSubjectsPrompt(subject, business),
-          responseSchema: WORDLESS_SUBJECTS_RESPONSE_SCHEMA,
-        });
-        return wordlessPrompt(subject, parseWordlessSubjects(res.text));
-      } catch (err) {
-        console.warn('wordless subject lookup failed', { subject, err });
-        return wordlessPrompt(subject);
-      }
-    };
-    const cover = risky.has('cover')
-      ? { ...plan.cover, prompt: await fallbackFor(article.title) }
-      : plan.cover;
-    const inline = await Promise.all(
-      plan.inline.map(async (img) =>
-        risky.has(img.section_heading)
-          ? { ...img, prompt: await fallbackFor(img.section_heading) }
-          : img,
-      ),
-    );
-    plan = { cover, inline };
-  }
+
   const empty = {
     url: '',
     model: null,
@@ -179,8 +124,22 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
     height: null,
   };
   const slots: ArticleImage[] = [
-    { role: 'cover', section_heading: null, ...plan.cover, ...empty },
-    ...plan.inline.map((img): ArticleImage => ({ role: 'inline', ...img, ...empty })),
+    {
+      role: 'cover',
+      section_heading: null,
+      prompt: photoPrompt(plan.cover.subject, plan.cover.objects),
+      alt: plan.cover.alt,
+      ...empty,
+    },
+    ...plan.inline.map(
+      (img): ArticleImage => ({
+        role: 'inline',
+        section_heading: img.section_heading,
+        prompt: photoPrompt(img.subject, img.objects),
+        alt: img.alt,
+        ...empty,
+      }),
+    ),
   ];
   await ArticleRepo.setImagePlan(article.id, slots); // false = raced; the next stage reloads
 
