@@ -19,13 +19,20 @@ function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>)
 function DialogContent({
   children,
   className,
+  overlayClassName,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  /** For dialogs that are a small centred card rather than a full-bleed panel. */
+  overlayClassName?: string;
+}) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
         data-slot="dialog-overlay"
-        className="fixed inset-0 z-50 grid place-items-stretch bg-foreground/40 sm:place-items-center sm:p-4"
+        className={cn(
+          'fixed inset-0 z-50 grid place-items-stretch bg-foreground/40 sm:place-items-center sm:p-4',
+          overlayClassName,
+        )}
       >
         <DialogPrimitive.Content
           data-slot="dialog-content"

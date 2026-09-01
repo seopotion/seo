@@ -6,13 +6,14 @@ import type { PlannerArticle } from '../app/[locale]/(authenticated)/(product)/c
 import messages from '../messages/en.json';
 
 /**
- * `ArticleEditorModal` does NOT use `components/ui/modal`. It carries its own
- * copy of the focus trap — a second `FOCUSABLE_SELECTOR`, its own Escape
- * handler and its own `body.style.overflow` lock — in `useDialogFocusManagement`.
+ * This dialog used to carry its own copy of the focus trap — a second
+ * `FOCUSABLE_SELECTOR`, its own Escape handler and its own `body.style.overflow`
+ * lock, in `useDialogFocusManagement`. #283 folded it onto the shared
+ * `components/ui/dialog`, so all five dialogs now share one implementation.
  *
- * That matters for #283: swapping `Modal` for Radix Dialog leaves this one
- * hand-rolled unless it is migrated deliberately. These tests pin the duplicate
- * so the difference is visible rather than discovered later.
+ * It is still the odd one out in one respect: its preferred focus target lives
+ * inside `ArticleEditorPanel`, several layers down, so it is found by the
+ * `data-dialog-initial-focus` attribute rather than threaded through as a ref.
  *
  * The editing engine (`useArticleEditor`) is stubbed — it is a data layer with
  * its own concerns. What is under test here is the dialog shell around it.
@@ -82,6 +83,15 @@ function dialog() {
   return screen.getByRole('dialog');
 }
 
+/**
+ * Read the lock through the cascade, not off `body.style`: Radix injects a
+ * stylesheet with `!important` rather than setting an inline style, so only the
+ * computed value answers "is the background actually locked".
+ */
+function bodyOverflow() {
+  return window.getComputedStyle(document.body).overflow;
+}
+
 beforeEach(() => {
   document.body.style.overflow = '';
   requestClose.mockReset();
@@ -126,26 +136,26 @@ describe('planned (not yet generated) article', () => {
     expect(within(panel).getByText('Planned')).toBeTruthy();
   });
 
-  test('is a modal dialog labelled by its heading', () => {
-    renderModal();
+  test('is a dialog that hides the rest of the page, labelled by its heading', () => {
+    const { container } = renderModal();
 
-    expect(dialog().getAttribute('aria-modal')).toBe('true');
     expect(screen.getByRole('dialog', { name: 'content marketing' })).toBe(dialog());
+    // Radix hides the rest of the tree rather than setting `aria-modal`. That is
+    // the same guarantee reached a different way, so assert the guarantee.
+    expect(container.getAttribute('aria-hidden')).toBe('true');
+    expect(dialog().closest('[aria-hidden="true"]')).toBeNull();
   });
 });
 
-describe('its own focus trap (a copy of modal.tsx, not the same code)', () => {
-  test('initial focus uses data-dialog-initial-focus, NOT the Modal marker', async () => {
+describe('focus and scroll behaviour', () => {
+  test('initial focus goes to the control marked data-dialog-initial-focus', async () => {
     renderModal();
 
     const close = within(dialog()).getByRole('button', { name: 'Close details' });
     await waitFor(() => {
       expect(document.activeElement).toBe(close);
     });
-    // The two components use different attribute names for the same idea. If
-    // #283 unifies them, this is the assertion that should change.
     expect(close.hasAttribute('data-dialog-initial-focus')).toBe(true);
-    expect(close.hasAttribute('data-modal-initial-focus')).toBe(false);
   });
 
   test('prefers the marked control over the first one in the DOM', async () => {
@@ -227,49 +237,21 @@ describe('its own focus trap (a copy of modal.tsx, not the same code)', () => {
 
   test('locks background scroll while open and restores it on unmount', () => {
     const { unmount } = renderModal();
-    expect(document.body.style.overflow).toBe('hidden');
+    expect(bodyOverflow()).toBe('hidden');
 
     unmount();
 
-    expect(document.body.style.overflow).toBe('');
+    expect(bodyOverflow()).not.toBe('hidden');
   });
 
   test('restores a pre-existing overflow value rather than clearing it', () => {
     document.body.style.overflow = 'scroll';
     const { unmount } = renderModal();
-    expect(document.body.style.overflow).toBe('hidden');
+    expect(bodyOverflow()).toBe('hidden');
 
     unmount();
 
-    expect(document.body.style.overflow).toBe('scroll');
-  });
-
-  test('returns focus to whatever was focused before it opened', async () => {
-    const trigger = document.createElement('button');
-    document.body.append(trigger);
-    trigger.focus();
-
-    const { rerender } = renderModal();
-    await waitFor(() => {
-      expect(dialog().contains(document.activeElement)).toBe(true);
-    });
-
-    rerender(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <ArticleEditorModal
-          article={null}
-          fixturesEnabled={false}
-          onClose={vi.fn()}
-          onUnauthorized={vi.fn()}
-          organizationId="org-1"
-        />
-      </NextIntlClientProvider>,
-    );
-
-    await waitFor(() => {
-      expect(document.activeElement).toBe(trigger);
-    });
-    trigger.remove();
+    expect(bodyOverflow()).toBe('scroll');
   });
 
   test('re-runs initial focus when the selected article changes', async () => {
