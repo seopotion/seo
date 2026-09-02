@@ -22,6 +22,10 @@ export const EngagementPrefsPatchSchema = z.object(EngagementPrefsFields).partia
 /** Distinct audience segments a preset may hold (design note). */
 export const AUDIENCE_TARGET_MAX = 7;
 
+/** Highest acceptable Flesch–Kincaid grade for English articles when an org has
+ * no preset of its own (#313). The scan assigns 8 / 10 / 12 by audience. */
+export const READABILITY_GRADE_MAX_DEFAULT = 8;
+
 export const SetupPresetsSchema = z.object({
   business: z.object({
     name: z.string(),
@@ -52,6 +56,10 @@ export const SetupPresetsSchema = z.object({
       // pre-#73 internal_links boolean.
       internal_links_count: z.number().int().min(0).max(3).default(1),
       table_of_contents: z.boolean().default(true),
+      // Highest acceptable Flesch–Kincaid grade (#313). Scan-assigned by
+      // audience (8 general public / 10 professional / 12 technical), user-
+      // editable. The default keeps pre-#313 docs and run snapshots parsing.
+      readability_grade_max: z.number().int().min(6).max(14).default(READABILITY_GRADE_MAX_DEFAULT),
       llm_instructions: z.string(),
     }),
     engagement: z.object({

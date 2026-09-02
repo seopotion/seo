@@ -14,6 +14,7 @@ const base = {
       article_style: 'Formal',
       internal_links_count: 0,
       table_of_contents: true,
+      readability_grade_max: 8,
       llm_instructions: 'old',
     },
     engagement: { image_style: 'Minimal', include_cta: true, youtube_videos: true },
