@@ -30,6 +30,8 @@ import {
 } from '@/lib/article-editor';
 import { clearToken } from '@/lib/auth';
 import {
+  ATTEMPT_BADGE_VARIANTS,
+  AUTO_PUBLISH_BADGE_VARIANTS,
   type AutoPublishAggregateStatus,
   type AutoPublishAttempt,
   type AutoPublishAttemptStatus,
@@ -900,23 +902,7 @@ function AutoPublishAggregateBadge({
   status: AutoPublishAggregateStatus;
 }) {
   return (
-    <Badge
-      variant="secondary"
-      className={cn(
-        'w-fit border-transparent',
-        status === 'needs_attention'
-          ? 'bg-error-muted text-error'
-          : status === 'retrying'
-            ? 'bg-warning-muted text-warning'
-            : status === 'publishing'
-              ? 'bg-violet-100 text-violet-700'
-              : status === 'queued'
-                ? 'bg-info-muted text-info'
-                : status === 'published'
-                  ? 'bg-success-muted text-success'
-                  : 'bg-muted text-muted-foreground',
-      )}
-    >
+    <Badge variant={AUTO_PUBLISH_BADGE_VARIANTS[status]} className="w-fit">
       {label}
     </Badge>
   );
@@ -1040,21 +1026,10 @@ function AttemptStatusBadge({
 
   return (
     <Badge
-      variant="secondary"
-      className={cn(
-        'w-fit border-transparent',
-        attempt?.status === 'failed' || attempt?.status === 'cancelled'
-          ? 'bg-error-muted text-error'
-          : attempt?.status === 'retrying'
-            ? 'bg-warning-muted text-warning'
-            : attempt?.status === 'publishing'
-              ? 'bg-violet-100 text-violet-700'
-              : attempt?.status === 'queued'
-                ? 'bg-info-muted text-info'
-                : attempt?.status === 'published' || hasPublication
-                  ? 'bg-success-muted text-success'
-                  : 'bg-muted text-muted-foreground',
-      )}
+      variant={
+        attempt ? ATTEMPT_BADGE_VARIANTS[attempt.status] : hasPublication ? 'success' : 'neutral'
+      }
+      className="w-fit"
     >
       {label}
     </Badge>

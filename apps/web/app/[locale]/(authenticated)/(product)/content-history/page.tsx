@@ -19,6 +19,7 @@ import { api } from '@/lib/api';
 import { clearToken } from '@/lib/auth';
 import {
   type ArticlePublishingState,
+  AUTO_PUBLISH_BADGE_VARIANTS,
   type AutoPublishAggregateStatus,
   getAutoPublishAggregateState,
   hasActiveAutoPublishAttempts,
@@ -417,22 +418,9 @@ function AutoPublishStatusIndicator({
   return (
     <span className="grid w-fit gap-0.5">
       <Badge
-        variant="secondary"
+        variant={AUTO_PUBLISH_BADGE_VARIANTS[aggregate.status]}
         aria-label={t('autoPublishing.label', { status })}
-        className={cn(
-          'h-auto w-fit max-w-full whitespace-normal border-transparent px-2 py-0.5 text-left text-xs',
-          aggregate.status === 'needs_attention'
-            ? 'bg-error-muted text-error'
-            : aggregate.status === 'retrying'
-              ? 'bg-warning-muted text-warning'
-              : aggregate.status === 'publishing'
-                ? 'bg-violet-100 text-violet-700'
-                : aggregate.status === 'queued'
-                  ? 'bg-info-muted text-info'
-                  : aggregate.status === 'published'
-                    ? 'bg-success-muted text-success'
-                    : 'bg-muted text-muted-foreground',
-        )}
+        className="h-auto w-fit max-w-full whitespace-normal px-2 py-0.5 text-left text-xs"
       >
         {t('autoPublishing.shortLabel', { status })}
       </Badge>

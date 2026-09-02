@@ -185,9 +185,9 @@ describe('handleOpenResearch', () => {
 
     await user.keyboard('{Escape}');
 
-    // This is the whole point of modal.tsx's module-level chainedDialogReturnFocus,
-    // exercised through the real page rather than a harness: focus lands back on
-    // the calendar button, not somewhere inside the dismissed chooser.
+    // The page owns the chain's return focus (`modalReturnFocusRef` in page.tsx):
+    // Radix would restore to a control inside the torn-down chooser, so the page
+    // remembers the calendar button that started the chain and restores to it.
     await waitFor(() => {
       expect(openDialogs()).toHaveLength(0);
     });
