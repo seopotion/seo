@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  ContentSeoPatchSchema,
   EngagementPrefsPatchSchema,
   READABILITY_GRADE_MAX_DEFAULT,
   SetupPresetsSchema,
@@ -138,5 +139,21 @@ describe('SetupPresetsSchema content_seo.readability_grade_max', () => {
         },
       }),
     ).toThrow();
+  });
+});
+
+describe('ContentSeoPatchSchema', () => {
+  test('does not materialize defaults for omitted fields', () => {
+    expect(ContentSeoPatchSchema.parse({ article_style: 'x' })).toEqual({ article_style: 'x' });
+  });
+
+  test('rejects an out-of-range readability_grade_max', () => {
+    expect(() => ContentSeoPatchSchema.parse({ readability_grade_max: 20 })).toThrow();
+  });
+
+  test('keeps an explicit readability_grade_max', () => {
+    expect(ContentSeoPatchSchema.parse({ readability_grade_max: 12 })).toEqual({
+      readability_grade_max: 12,
+    });
   });
 });

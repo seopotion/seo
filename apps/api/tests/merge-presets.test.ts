@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { mergePresets } from '../src/lib/merge-presets';
+import { SetupPresetsPatchSchema } from '../src/schemas/setup';
 
 const base = {
   business: { name: 'Old Co', language: 'English', country: 'US', description: 'Old.' },
@@ -59,5 +60,29 @@ describe('mergePresets', () => {
     const snapshot = structuredClone(base);
     mergePresets(base, { business: { name: 'New Co' } });
     expect(base).toEqual(snapshot);
+  });
+});
+
+describe('mergePresets through SetupPresetsPatchSchema', () => {
+  const stored = {
+    ...base,
+    article_preferences: {
+      ...base.article_preferences,
+      content_seo: {
+        ...base.article_preferences.content_seo,
+        table_of_contents: false,
+        readability_grade_max: 12,
+      },
+    },
+  };
+
+  test('a partial content_seo patch keeps stored values for omitted defaulted fields', () => {
+    const patch = SetupPresetsPatchSchema.parse({
+      article_preferences: { content_seo: { article_style: 'Technical' } },
+    });
+    const result = mergePresets(stored, patch);
+    expect(result.article_preferences.content_seo.article_style).toBe('Technical');
+    expect(result.article_preferences.content_seo.readability_grade_max).toBe(12);
+    expect(result.article_preferences.content_seo.table_of_contents).toBe(false);
   });
 });

@@ -19,6 +19,28 @@ const EngagementPrefsFields = {
 
 export const EngagementPrefsPatchSchema = z.object(EngagementPrefsFields).partial();
 
+const ContentSeoFields = {
+  article_style: z.string(),
+  // 0–3 internal links per article (frontend dropdown). Replaces the
+  // pre-#73 internal_links boolean.
+  internal_links_count: z.number().int().min(0).max(3),
+  table_of_contents: z.boolean(),
+  // Highest acceptable Flesch–Kincaid grade (#313). Scan-assigned by
+  // audience (8 general public / 10 professional / 12 technical), user-
+  // editable.
+  readability_grade_max: z.number().int().min(6).max(14),
+  llm_instructions: z.string(),
+};
+
+/**
+ * Patch shape for the API's partial content_seo PATCH bodies. Built from the
+ * fields *without* their `.default(...)` wrappers: `.partial()` only makes a key
+ * optional, so a defaulted key still materializes its default when absent, and
+ * the merge would then clobber the stored value (e.g. reset a scan-assigned
+ * readability_grade_max back to 8, #313).
+ */
+export const ContentSeoPatchSchema = z.object(ContentSeoFields).partial();
+
 /** Distinct audience segments a preset may hold (design note). */
 export const AUDIENCE_TARGET_MAX = 7;
 
@@ -51,16 +73,13 @@ export const SetupPresetsSchema = z.object({
   }),
   article_preferences: z.object({
     content_seo: z.object({
-      article_style: z.string(),
-      // 0–3 internal links per article (frontend dropdown). Replaces the
-      // pre-#73 internal_links boolean.
-      internal_links_count: z.number().int().min(0).max(3).default(1),
-      table_of_contents: z.boolean().default(true),
-      // Highest acceptable Flesch–Kincaid grade (#313). Scan-assigned by
-      // audience (8 general public / 10 professional / 12 technical), user-
-      // editable. The default keeps pre-#313 docs and run snapshots parsing.
-      readability_grade_max: z.number().int().min(6).max(14).default(READABILITY_GRADE_MAX_DEFAULT),
-      llm_instructions: z.string(),
+      ...ContentSeoFields,
+      internal_links_count: ContentSeoFields.internal_links_count.default(1),
+      table_of_contents: ContentSeoFields.table_of_contents.default(true),
+      // The readability default keeps pre-#313 docs and run snapshots parsing.
+      readability_grade_max: ContentSeoFields.readability_grade_max.default(
+        READABILITY_GRADE_MAX_DEFAULT,
+      ),
     }),
     engagement: z.object({
       ...EngagementPrefsFields,
