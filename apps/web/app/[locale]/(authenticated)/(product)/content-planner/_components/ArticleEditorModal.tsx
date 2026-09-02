@@ -12,7 +12,12 @@ import {
 import { Badge, Button, Dialog, DialogContent, Separator } from '@/components/ui';
 import { useArticleEditor } from '@/lib/article-editor';
 import { cn } from '@/lib/utils';
-import { formatDateFromKey, formatDateTime, formatNumber } from '../planner-utils';
+import {
+  formatDateFromKey,
+  formatDateTime,
+  formatNullableNumber,
+  formatNumber,
+} from '../planner-utils';
 import type { PlannerArticle, PlannerArticleStatus } from '../types';
 
 type ContentPlannerTranslations = ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
@@ -115,7 +120,7 @@ export function ArticleEditorModal({
                 />
                 <ArticleEditorDetailItem
                   label={t('metrics.difficulty')}
-                  value={formatNumber(article.difficulty, locale)}
+                  value={formatNullableNumber(article.difficulty, locale)}
                 />
               </dl>
             }
@@ -198,7 +203,7 @@ function PlannedArticleDetails({
         />
         <ArticleEditorDetailItem
           label={t('metrics.difficulty')}
-          value={formatNumber(article.difficulty, locale)}
+          value={formatNullableNumber(article.difficulty, locale)}
         />
         <ArticleEditorDetailItem
           label={t('modal.scheduledDate')}

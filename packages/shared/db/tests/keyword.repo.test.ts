@@ -54,4 +54,26 @@ describe('KeywordRepo.createFromCandidate', () => {
       topic_primary_keyword: source.topic_primary_keyword,
     });
   });
+
+  test('copies an unknown difficulty as null (#304)', async () => {
+    const source = { ...candidate('niche term', false), difficulty: null };
+    vi.spyOn(KeywordRepo, 'create').mockImplementation(async (input) =>
+      KeywordSchema.parse({ id: 'keyword-2', ...input, created_at: new Date() }),
+    );
+
+    const stored = await KeywordRepo.createFromCandidate(source, '2026-09-01');
+
+    expect(stored.difficulty).toBeNull();
+    expect(stored.search_volume).toBe(100);
+  });
+
+  test('still refuses a candidate without search volume', async () => {
+    const source = { ...candidate('no volume', false), search_volume: null };
+    const create = vi.spyOn(KeywordRepo, 'create');
+
+    await expect(KeywordRepo.createFromCandidate(source, '2026-09-01')).rejects.toThrow(
+      /search volume/,
+    );
+    expect(create).not.toHaveBeenCalled();
+  });
 });

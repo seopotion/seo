@@ -345,6 +345,11 @@ export function formatNumber(value: number, locale: string) {
   return new Intl.NumberFormat(locale).format(value);
 }
 
+/** A metric the provider did not report (#304) renders as the planner's `notAvailable` dash. */
+export function formatNullableNumber(value: number | null, locale: string) {
+  return value === null ? '—' : formatNumber(value, locale);
+}
+
 export function slugifyArticleTitle(value: string) {
   const slug = value
     .toLowerCase()

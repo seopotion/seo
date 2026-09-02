@@ -309,8 +309,12 @@ describe('GET /candidates', () => {
   test('returns the mapped pool with schedulable flags and pagination echo', async () => {
     loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg); // read needs no paid plan
     CandidateRepo.listByOrg.mockResolvedValueOnce({
-      candidates: [candidate, { ...candidate, id: 'c2', search_volume: null }],
-      total: 2,
+      candidates: [
+        candidate,
+        { ...candidate, id: 'c2', search_volume: null },
+        { ...candidate, id: 'c3', difficulty: null },
+      ],
+      total: 3,
     });
 
     const res = await testClient(app).candidates.$get({
@@ -324,7 +328,7 @@ describe('GET /candidates', () => {
       limit: 10,
       offset: 0,
     });
-    expect(body.total).toBe(2);
+    expect(body.total).toBe(3);
     expect(body.limit).toBe(10);
     expect(body.offset).toBe(0);
     expect(body.candidates[0]).toMatchObject({
@@ -332,7 +336,8 @@ describe('GET /candidates', () => {
       schedulable: true,
       created_at: '2026-07-15T10:00:00.000Z',
     });
-    expect(body.candidates[1]!.schedulable).toBe(false); // missing metrics
+    expect(body.candidates[1]!.schedulable).toBe(false); // missing search volume
+    expect(body.candidates[2]).toMatchObject({ difficulty: null, schedulable: true }); // #304
   });
 
   test('empty pool returns [] and total 0', async () => {

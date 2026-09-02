@@ -351,7 +351,7 @@ export function renderStrategyAudit(d: StrategyAuditData): string {
           r.scheduled_date,
           r.keyword,
           String(r.search_volume),
-          String(r.difficulty),
+          r.difficulty === null ? '—' : String(r.difficulty),
           num(r.opportunity_score),
           r.article_type ?? '—',
           num(r.relevance_score),

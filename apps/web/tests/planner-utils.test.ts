@@ -4,6 +4,7 @@ import {
   buildMonthWeeks,
   combineResearchResults,
   combineTargetKeywords,
+  formatNullableNumber,
   getCandidateAddApiError,
   getCandidateScheduleError,
   getKeywordResearchApiError,
@@ -180,6 +181,19 @@ describe('planner keyword mapping', () => {
     const [article] = mapPlannerKeywords([plannerKeyword({ opportunity_score: 0 })]);
 
     expect(article?.opportunityScore).toBe(0);
+  });
+
+  test('carries an unknown difficulty through to the target keyword row (#304)', () => {
+    const plannerArticles = mapPlannerKeywords([plannerKeyword({ difficulty: null })]);
+    const [target] = combineTargetKeywords([], plannerArticles);
+
+    expect(plannerArticles[0]?.difficulty).toBeNull();
+    expect(target).toMatchObject({ difficulty: null, source: 'planner' });
+  });
+
+  test('formatNullableNumber renders an unknown metric as the planner dash', () => {
+    expect(formatNullableNumber(null, 'en')).toBe('—');
+    expect(formatNullableNumber(1200, 'en')).toBe('1,200');
   });
 
   test.each<{

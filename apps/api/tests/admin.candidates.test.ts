@@ -154,6 +154,26 @@ describe('GET /admin/v0/orgs/{org_id}/candidates', () => {
     });
     expect(json.candidates[0]?.serp_competitors?.[0]?.domain).toBe('big.com');
   });
+
+  test('a pooled candidate with volume but no difficulty is schedulable (#304)', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.CandidateRepo.listByOrg.mockResolvedValueOnce({
+      candidates: [
+        { ...rejectedCandidate, status: 'candidate', rejection_reason: null, difficulty: null },
+        { ...rejectedCandidate, status: 'candidate', rejection_reason: null, search_volume: null },
+      ],
+      total: 2,
+    });
+
+    const res = await client.admin.v0.orgs[':org_id'].candidates.$get(
+      { param: { org_id: org.id }, query: {} },
+      await authed(),
+    );
+    if (res.status !== 200) throw new Error('expected 200');
+    const json = await res.json();
+    expect(json.candidates[0]).toMatchObject({ difficulty: null, schedulable: true });
+    expect(json.candidates[1]).toMatchObject({ search_volume: null, schedulable: false });
+  });
 });
 
 describe('POST /admin/v0/orgs/{org_id}/candidates', () => {

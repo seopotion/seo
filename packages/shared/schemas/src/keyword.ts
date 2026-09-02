@@ -24,7 +24,8 @@ export const KeywordSchema = z.object({
   // Date-only (yyyy-mm-dd) the article is scheduled to generate/publish.
   scheduled_date: z.string(),
   search_volume: z.number().int(),
-  difficulty: z.number().int(),
+  // null when the provider returned no KD (#304); search_volume stays required.
+  difficulty: z.number().int().nullable(),
   // null until article generation links an article back to the keyword.
   article_id: z.string().nullable(),
   // Planner brief (populated by the #47 strategy job; null for older/manual entries).

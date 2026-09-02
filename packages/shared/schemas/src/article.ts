@@ -137,7 +137,8 @@ export const ArticleSchema = z.object({
   meta_description: z.string(),
   featured_image_url: z.string(),
   content: z.string(),
-  difficulty: z.number().int(),
+  // null when the provider returned no KD (#304); search_volume stays required.
+  difficulty: z.number().int().nullable(),
   search_volume: z.number().int(),
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),

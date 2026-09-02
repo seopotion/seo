@@ -212,7 +212,7 @@ export function PoolTab() {
                         title={
                           candidate.schedulable
                             ? undefined
-                            : 'Missing the volume/difficulty metrics scheduling requires.'
+                            : 'Missing the search volume scheduling requires.'
                         }
                         onClick={() => setScheduling(candidate.id)}
                         className="rounded border border-neutral-700 px-2 py-1 text-xs hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
