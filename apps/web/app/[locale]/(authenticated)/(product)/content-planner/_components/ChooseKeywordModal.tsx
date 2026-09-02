@@ -6,7 +6,9 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import {
   Button,
-  Modal,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Table,
   TableBody,
   TableCell,
@@ -196,108 +198,112 @@ export function ChooseKeywordModal({
     onOpenResearch();
   };
 
-  const titleId = 'choose-keyword-dialog-title';
   const formattedDate = dateKey ? formatDateFromKey(dateKey, locale) : '';
   const showUpgrade = !canSchedule || upgradeRequired;
 
   return (
-    <Modal closeLabel={t('actions.close')} labelledBy={titleId} onClose={handleClose} open={open}>
-      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
-        <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-foreground">
-            {t('title', { date: formattedDate })}
-          </h2>
-          <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={t('actions.close')}
-          className="size-9"
-          disabled={scheduleMutation.isPending}
-          onClick={handleClose}
-        >
-          <X className="size-4" aria-hidden="true" />
-        </Button>
-      </header>
-
-      {showUpgrade ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
-          <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
-            <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
-            <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
-            <Button asChild className="mt-4" size="sm">
-              <Link href="/billing">{t('upgrade.cta')}</Link>
-            </Button>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) handleClose();
+      }}
+    >
+      <DialogContent>
+        <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <DialogTitle>{t('title', { date: formattedDate })}</DialogTitle>
+            <p className="mt-1 text-muted-foreground text-sm">{t('description')}</p>
           </div>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-          {scheduleError ? (
-            <div
-              role="alert"
-              className="mb-3 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm"
-            >
-              {t(`errors.${scheduleError}`)}
-            </div>
-          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={t('actions.close')}
+            className="size-9"
+            disabled={scheduleMutation.isPending}
+            onClick={handleClose}
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </header>
 
-          {loadError ? (
-            <div
-              role="alert"
-              className="mb-3 flex flex-col items-start gap-2 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span>{t('states.loadError')}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={scheduleMutation.isPending}
-                onClick={onRetry}
-              >
-                {t('actions.retry')}
+        {showUpgrade ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
+            <div className="max-w-md rounded-lg border border-warning-border bg-warning-subtle px-5 py-6 text-center">
+              <h3 className="font-semibold text-warning">{t('upgrade.title')}</h3>
+              <p className="mt-2 text-warning text-sm">{t('upgrade.description')}</p>
+              <Button asChild className="mt-4" size="sm">
+                <Link href="/billing">{t('upgrade.cta')}</Link>
               </Button>
             </div>
-          ) : null}
-
-          {candidates.length > 0 ? (
-            <CandidateList
-              candidates={candidates}
-              locale={locale}
-              onSchedule={(candidate) => void handleSchedule(candidate)}
-              pendingCandidateId={
-                scheduleMutation.isPending ? scheduleMutation.variables?.candidateId : undefined
-              }
-              schedulingPending={scheduleMutation.isPending}
-              t={t}
-              targetKeywordsT={targetKeywordsT}
-            />
-          ) : loading ? (
-            <ChooserState loading message={t('states.loading')} />
-          ) : loadError ? null : (
-            <ChooserEmptyState onResearch={handleOpenResearch} t={t} />
-          )}
-
-          {hasMore && candidates.length > 0 ? (
-            <div className="mt-3 flex justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={loadingMore || scheduleMutation.isPending}
-                onClick={onLoadMore}
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+            {scheduleError ? (
+              <div
+                role="alert"
+                className="mb-3 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm"
               >
-                {loadingMore ? (
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-                ) : null}
-                {loadingMore ? t('actions.loadingMore') : t('actions.loadMore')}
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </Modal>
+                {t(`errors.${scheduleError}`)}
+              </div>
+            ) : null}
+
+            {loadError ? (
+              <div
+                role="alert"
+                className="mb-3 flex flex-col items-start gap-2 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span>{t('states.loadError')}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={scheduleMutation.isPending}
+                  onClick={onRetry}
+                >
+                  {t('actions.retry')}
+                </Button>
+              </div>
+            ) : null}
+
+            {candidates.length > 0 ? (
+              <CandidateList
+                candidates={candidates}
+                locale={locale}
+                onSchedule={(candidate) => void handleSchedule(candidate)}
+                pendingCandidateId={
+                  scheduleMutation.isPending ? scheduleMutation.variables?.candidateId : undefined
+                }
+                schedulingPending={scheduleMutation.isPending}
+                t={t}
+                targetKeywordsT={targetKeywordsT}
+              />
+            ) : loading ? (
+              <ChooserState loading message={t('states.loading')} />
+            ) : loadError ? null : (
+              <ChooserEmptyState onResearch={handleOpenResearch} t={t} />
+            )}
+
+            {hasMore && candidates.length > 0 ? (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingMore || scheduleMutation.isPending}
+                  onClick={onLoadMore}
+                >
+                  {loadingMore ? (
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  {loadingMore ? t('actions.loadingMore') : t('actions.loadMore')}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

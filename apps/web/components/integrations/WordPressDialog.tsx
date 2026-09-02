@@ -3,8 +3,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, ExternalLink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useId, useState } from 'react';
-import { Button, Input, Label, Modal, StatusPanel } from '@/components/ui';
+import { useRef, useState } from 'react';
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Input,
+  Label,
+  StatusPanel,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
@@ -53,7 +61,7 @@ export function WordPressDialog({
   const t = useTranslations('SettingsPage.wordpress');
   const actionsT = useTranslations('SettingsPage.actions');
   const queryClient = useQueryClient();
-  const titleId = useId();
+  const tokenRef = useRef<HTMLInputElement>(null);
   const [token, setToken] = useState('');
   const [connectError, setConnectError] = useState<ConnectError | null>(null);
 
@@ -129,120 +137,127 @@ export function WordPressDialog({
   }
 
   return (
-    <Modal
-      className="sm:h-auto sm:max-w-lg"
-      closeLabel={actionsT('closeDialog')}
-      labelledBy={titleId}
-      onClose={handleClose}
+    <Dialog
       open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) handleClose();
+      }}
     >
-      <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
-        <div className="min-w-0">
-          <h2 id={titleId} className="font-semibold text-lg text-foreground">
-            {t('setupTitle')}
-          </h2>
-          <p className="mt-1 text-muted-foreground text-sm">
-            {isConnected ? t('replaceNote') : t('dialogDescription')}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={actionsT('closeDialog')}
-          className="size-9"
-          disabled={connectMutation.isPending}
-          onClick={handleClose}
-        >
-          <X className="size-4" aria-hidden="true" />
-        </Button>
-      </header>
+      <DialogContent
+        className="sm:h-auto sm:max-w-lg"
+        onOpenAutoFocus={(event) => {
+          // Radix would focus the header's close button; the token field is the
+          // point of this dialog.
+          event.preventDefault();
+          tokenRef.current?.focus();
+        }}
+      >
+        <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <DialogTitle>{t('setupTitle')}</DialogTitle>
+            <p className="mt-1 text-muted-foreground text-sm">
+              {isConnected ? t('replaceNote') : t('dialogDescription')}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={actionsT('closeDialog')}
+            className="size-9"
+            disabled={connectMutation.isPending}
+            onClick={handleClose}
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6">
-        {connectError ? (
-          <StatusPanel tone="error">{t(`errors.${connectError.key}`)}</StatusPanel>
-        ) : null}
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 py-4 sm:px-6">
+          {connectError ? (
+            <StatusPanel tone="error">{t(`errors.${connectError.key}`)}</StatusPanel>
+          ) : null}
 
-        <ol className="grid gap-4">
-          <li className="grid gap-2">
-            <StepHeading failed={connectError?.step === 1} index={1} title={t('step1Title')} />
-            <p className="pl-9 text-muted-foreground text-sm">{t('step1Body')}</p>
-            <div className="flex flex-wrap items-center gap-2 pl-9">
-              <Button asChild size="sm">
-                <a download href="/downloads/seo-potion.zip">
-                  <Download aria-hidden="true" className="size-4" />
-                  {t('downloadPlugin')}
-                </a>
-              </Button>
-              {/* Once the plugin ships on the WordPress.org directory, this can point at the
+          <ol className="grid gap-4">
+            <li className="grid gap-2">
+              <StepHeading failed={connectError?.step === 1} index={1} title={t('step1Title')} />
+              <p className="pl-9 text-muted-foreground text-sm">{t('step1Body')}</p>
+              <div className="flex flex-wrap items-center gap-2 pl-9">
+                <Button asChild size="sm">
+                  <a download href="/downloads/seo-potion.zip">
+                    <Download aria-hidden="true" className="size-4" />
+                    {t('downloadPlugin')}
+                  </a>
+                </Button>
+                {/* Once the plugin ships on the WordPress.org directory, this can point at the
                   directory-search page and the self-hosted zip becomes a fallback. */}
-              <Button asChild size="sm" variant="outline">
-                <a
-                  href={`${normalizedSiteUrl}/wp-admin/plugin-install.php?tab=upload`}
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  <ExternalLink aria-hidden="true" className="size-4" />
-                  {t('step1Action')}
-                </a>
-              </Button>
-            </div>
-          </li>
-          <SetupStep
-            actionHref={`${normalizedSiteUrl}/wp-admin/admin.php?page=seo-potion-manage`}
-            actionLabel={t('step2Action')}
-            body={t('step2Body')}
-            failed={connectError?.step === 2}
-            index={2}
-            title={t('step2Title')}
-          />
-          <li className="grid gap-2">
-            <StepHeading failed={false} index={3} title={t('step3Title')} />
-            <p className="pl-9 text-muted-foreground text-sm">{t('step3Body')}</p>
-            <div className="grid gap-2 pl-9 sm:max-w-sm">
-              <Label htmlFor="wordpress-token">{t('token')}</Label>
-              <Input
-                autoComplete="off"
-                data-modal-initial-focus
-                id="wordpress-token"
-                onChange={(event) => {
-                  setToken(event.target.value);
-                  setConnectError(null);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={`${normalizedSiteUrl}/wp-admin/plugin-install.php?tab=upload`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <ExternalLink aria-hidden="true" className="size-4" />
+                    {t('step1Action')}
+                  </a>
+                </Button>
+              </div>
+            </li>
+            <SetupStep
+              actionHref={`${normalizedSiteUrl}/wp-admin/admin.php?page=seo-potion-manage`}
+              actionLabel={t('step2Action')}
+              body={t('step2Body')}
+              failed={connectError?.step === 2}
+              index={2}
+              title={t('step2Title')}
+            />
+            <li className="grid gap-2">
+              <StepHeading failed={false} index={3} title={t('step3Title')} />
+              <p className="pl-9 text-muted-foreground text-sm">{t('step3Body')}</p>
+              <div className="grid gap-2 pl-9 sm:max-w-sm">
+                <Label htmlFor="wordpress-token">{t('token')}</Label>
+                <Input
+                  autoComplete="off"
+                  ref={tokenRef}
+                  id="wordpress-token"
+                  onChange={(event) => {
+                    setToken(event.target.value);
+                    setConnectError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
 
-                  event.preventDefault();
-                  handleConnect();
-                }}
-                placeholder={t('tokenPlaceholder')}
-                spellCheck={false}
-                type="password"
-                value={token}
-              />
-            </div>
-          </li>
-        </ol>
-      </div>
+                    event.preventDefault();
+                    handleConnect();
+                  }}
+                  placeholder={t('tokenPlaceholder')}
+                  spellCheck={false}
+                  type="password"
+                  value={token}
+                />
+              </div>
+            </li>
+          </ol>
+        </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-border border-t px-4 py-4 sm:px-6">
-        <Button
-          disabled={!organizationId || !token.trim() || connectMutation.isPending}
-          onClick={handleConnect}
-          type="button"
-        >
-          {connectMutation.isPending ? t('connecting') : t('connectAndTest')}
-        </Button>
-        <Button
-          disabled={connectMutation.isPending}
-          onClick={handleClose}
-          type="button"
-          variant="ghost"
-        >
-          {actionsT('close')}
-        </Button>
-      </footer>
-    </Modal>
+        <footer className="flex shrink-0 flex-wrap items-center gap-2 border-border border-t px-4 py-4 sm:px-6">
+          <Button
+            disabled={!organizationId || !token.trim() || connectMutation.isPending}
+            onClick={handleConnect}
+            type="button"
+          >
+            {connectMutation.isPending ? t('connecting') : t('connectAndTest')}
+          </Button>
+          <Button
+            disabled={connectMutation.isPending}
+            onClick={handleClose}
+            type="button"
+            variant="ghost"
+          >
+            {actionsT('close')}
+          </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
   );
 }
 

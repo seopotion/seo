@@ -130,15 +130,30 @@ beforeEach(() => {
 });
 
 describe('initial render', () => {
-  test('focuses the seed input, which carries the modal initial-focus marker', async () => {
+  test('opens with the seed input focused, not the first control', async () => {
     renderModal();
 
-    // Integration proof of the `data-modal-initial-focus` contract that
-    // modal.test.tsx pins in isolation.
     await waitFor(() => {
       expect(document.activeElement).toBe(seedInput());
     });
-    expect(seedInput().hasAttribute('data-modal-initial-focus')).toBe(true);
+    // The header close button precedes the seed field, so the dialog's default
+    // "focus the first tabbable" would land there. This is deliberate aim.
+    const close = within(dialog()).getByRole('button', { name: 'Close keyword research' });
+    const seedFollowsClose =
+      close.compareDocumentPosition(seedInput()) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(seedFollowsClose).toBeTruthy();
+  });
+
+  test('still focuses inside the dialog when there is no seed input to aim at', async () => {
+    // The upgrade panel replaces the whole form, so the preferred target does
+    // not exist. Focus has to land somewhere inside the dialog anyway, or the
+    // trap has nothing to trap.
+    renderModal({ canResearch: false });
+
+    expect(screen.queryByLabelText('Seed keyword')).toBeNull();
+    await waitFor(() => {
+      expect(dialog().contains(document.activeElement)).toBe(true);
+    });
   });
 
   test('titles the dialog and prompts for a search', () => {

@@ -347,6 +347,35 @@ describe('calendar construction', () => {
   });
 });
 
+describe('returning focus after a dialog closes', () => {
+  /**
+   * Radix restores focus to whatever was focused when *that* dialog opened,
+   * which is wrong for a chain and unobservable under jsdom anyway. The page
+   * owns the restore instead, so this is where it has to be proven — for the
+   * article editor as well as the keyword chooser.
+   */
+  test('focus goes back to the calendar entry that opened the article editor', async () => {
+    plannerGet.mockResolvedValue(
+      apiResponse(200, plannerBody([plannerKeyword({ scheduled_date: '2026-09-20' })])),
+    );
+    const { user } = renderPage();
+
+    const entries = await screen.findAllByRole('button', { name: /^Open .* details$/ });
+    const trigger = entries[0] as HTMLElement;
+    await user.click(trigger);
+    await screen.findByRole('dialog');
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(trigger);
+    });
+  });
+});
+
 describe('month navigation', () => {
   test('starts on the current month with Today disabled', async () => {
     renderPage();

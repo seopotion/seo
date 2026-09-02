@@ -106,6 +106,15 @@ function openDialogs() {
   return screen.queryAllByRole('dialog');
 }
 
+/**
+ * Read the lock through the cascade, not off `body.style`: the hand-rolled Modal
+ * set an inline style, Radix injects a stylesheet, and only the computed value
+ * answers "is the background actually locked" for both.
+ */
+function backgroundScrollLocked() {
+  return window.getComputedStyle(document.body).overflow === 'hidden';
+}
+
 /** The page marks its content inert while any modal is open. */
 function pageContent() {
   const content = document.querySelector('[inert]');
@@ -191,18 +200,18 @@ describe('handleOpenResearch', () => {
     const { user } = renderPage();
     await user.click(await firstChooserButton());
     await screen.findByRole('dialog', { name: /^Choose a keyword for/ });
-    expect(document.body.style.overflow).toBe('hidden');
+    expect(backgroundScrollLocked()).toBe(true);
 
     await user.click(screen.getByRole('button', { name: 'Research Keywords' }));
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: 'Research Keywords' })).toBeTruthy();
     });
-    expect(document.body.style.overflow).toBe('hidden');
+    expect(backgroundScrollLocked()).toBe(true);
 
     await user.keyboard('{Escape}');
 
     await waitFor(() => {
-      expect(document.body.style.overflow).toBe('');
+      expect(backgroundScrollLocked()).toBe(false);
     });
   });
 });

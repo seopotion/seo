@@ -8,7 +8,7 @@ import type { ConnectedIntegration } from '../lib/integrations';
 import messages from '../messages/en.json';
 
 /**
- * The second `Modal` call site outside the content planner. This one hands off
+ * The second dialog outside the content planner. This one hands off
  * to github.com with a full-page navigation, which jsdom cannot perform — so
  * `window.location` is replaced with a plain object for the duration.
  */
@@ -113,14 +113,31 @@ afterEach(() => {
 });
 
 describe('disconnected state', () => {
-  test('focuses the connect button, which carries the modal initial-focus marker', async () => {
+  test('opens with the connect button focused, not the first control', async () => {
     renderDialog();
 
     const connect = screen.getByRole('button', { name: 'Connect repository' });
     await waitFor(() => {
       expect(document.activeElement).toBe(connect);
     });
-    expect(connect.hasAttribute('data-modal-initial-focus')).toBe(true);
+    // The header close button comes first, so Radix's default "focus the first
+    // tabbable" would land there instead. Focus on connect is deliberate aim.
+    const close = within(dialog()).getByRole('button', { name: 'Close dialog' });
+    expect(close.compareDocumentPosition(connect) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('falls back to the first control when the connect button is disabled', async () => {
+    // Without an organization the preferred target cannot take focus. The old
+    // hand-rolled Modal checked this before aiming; the replacement has to too,
+    // or focus lands nowhere and the trap has nothing to trap.
+    renderDialog({ organization: null });
+
+    const connect = screen.getByRole('button', { name: 'Connect repository' });
+    expect(isDisabled(connect)).toBe(true);
+    await waitFor(() => {
+      expect(dialog().contains(document.activeElement)).toBe(true);
+    });
+    expect(document.activeElement).not.toBe(connect);
   });
 
   test('explains the GitHub hand-off before it happens', () => {
