@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
@@ -8,6 +9,12 @@ import { routing } from '@/i18n/routing';
 import { languageAlternates } from '@/i18n/urls';
 import { SITE_NAME, SITE_URL, SOCIAL_IMAGE } from '@/lib/seo';
 import '../globals.css';
+
+/**
+ * Self-hosted by next/font at build time; exposed as `--font-inter` so
+ * globals.css can put it first in the sans stack (and Tailwind's `font-sans`).
+ */
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 /**
  * This is the app's root layout — it owns `<html>`/`<body>`. It lives inside
@@ -90,7 +97,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   );
 
   return (
-    <html lang={locale} data-scroll-behavior="smooth">
+    <html lang={locale} data-scroll-behavior="smooth" className={inter.variable}>
       <body>
         <NextIntlClientProvider messages={clientMessages}>{children}</NextIntlClientProvider>
       </body>
