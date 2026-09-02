@@ -16,38 +16,63 @@ export interface ImagePlanInput {
   headings: string[];
 }
 
+export const IMAGE_MEDIA = [
+  'photograph',
+  'flat_illustration',
+  'three_d_render',
+  'watercolor',
+  'line_art',
+  'isometric',
+] as const;
+/** Also the order a duplicate composition is reassigned in (`parseImagePlan`). */
+export const IMAGE_COMPOSITIONS = [
+  'still_life',
+  'environment',
+  'abstract',
+  'macro',
+  'top_down',
+  'silhouette',
+] as const;
+export const IMAGE_LIGHTING = [
+  'natural_daylight',
+  'golden_hour',
+  'soft_studio',
+  'dramatic_low_key',
+  'cool_ambient',
+] as const;
+export type ImageMedium = (typeof IMAGE_MEDIA)[number];
+export type ImageComposition = (typeof IMAGE_COMPOSITIONS)[number];
+export type ImageLighting = (typeof IMAGE_LIGHTING)[number];
+
 /**
- * The planner names WHAT TO PHOTOGRAPH; the prompt itself is assembled here.
+ * The planner names WHAT each picture shows and, through enums, what KIND of
+ * picture it is; the prompt itself is assembled in `imagePrompt`.
  *
  * It used to return the prompt as free prose, and no amount of instruction
  * stopped it asking for lettering — banning "diagram" got "split-screen", and
  * banning that got "technical visualization", each one published as garbled
  * headings. A deny list cannot cover a synonym space, so prose no longer
- * reaches the image model at all (#289).
+ * reaches the image model at all (#289). The single fixed template that
+ * replaced it made every image the same still life and ignored the org's
+ * style; enums are how variety and style come back without prose (#309).
  */
 const ImageSlotSchema = z.object({
   subject: z.string().min(1),
+  composition: z.enum(IMAGE_COMPOSITIONS),
+  lighting: z.enum(IMAGE_LIGHTING),
+  palette: z.string(),
   objects: z.array(z.string()),
   alt: z.string().min(1),
 });
+export type ImageSlot = z.infer<typeof ImageSlotSchema>;
 
 export const ImagePlanSchema = z.object({
+  medium: z.enum(IMAGE_MEDIA),
   cover: ImageSlotSchema,
   inline: z.array(ImageSlotSchema.extend({ section_heading: z.string().min(1) })),
 });
 export type ImagePlan = z.infer<typeof ImagePlanSchema>;
 
-const TolerantImagePlanSchema = z.object({
-  cover: ImagePlanSchema.shape.cover,
-  inline: z.array(
-    ImagePlanSchema.shape.inline.element.extend({
-      section_heading: z.string().min(1).optional(),
-    }),
-  ),
-});
-
-// The STRICT plan is the wire contract: section_heading is required, which is
-// exactly the field TolerantImagePlanSchema was written to survive without.
 export const IMAGE_PLAN_RESPONSE_SCHEMA = toStrictJsonSchema(ImagePlanSchema, 'image_plan');
 
 /**
@@ -104,7 +129,7 @@ const TEXT_RISK =
  * written: "no words, letters, captions or logos".
  */
 const BANNED_NOUN =
-  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing|documents?|pages?|posters?|banners?|slides?|screens?|monitors?|interfaces?|dashboards?|whiteboards?)';
+  '(?:diagrams?|charts?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing|documents?|pages?|posters?|banners?|slides?|screens?|monitors?|interfaces?|dashboards?|whiteboards?)';
 const QUALIFIER = '(?:(?:a|an|the|any|all|visible|readable|other)\\s+)*';
 const NEGATED = new RegExp(
   `\\b(?:no|not|non|without|free of|devoid of|avoid(?:ing)?|omit(?:ting)?|exclude|excluding|never)\\s+${QUALIFIER}${BANNED_NOUN}(?:\\s*(?:,|,?\\s*(?:or|and|nor))\\s*${QUALIFIER}${BANNED_NOUN})*`,
@@ -140,33 +165,112 @@ export function usableObjects(objects: string[]): string[] {
     .slice(0, 4);
 }
 
+const MEDIUM_CLAUSE: Record<ImageMedium, string> = {
+  photograph: 'A photograph',
+  flat_illustration: 'A flat vector illustration',
+  three_d_render: 'A 3D rendered scene',
+  watercolor: 'A watercolor painting',
+  line_art: 'A minimal line-art illustration',
+  isometric: 'An isometric illustration',
+};
+
+const LIGHTING_CLAUSE: Record<ImageLighting, string> = {
+  natural_daylight: 'Soft natural daylight.',
+  golden_hour: 'Warm golden-hour light with long shadows.',
+  soft_studio: 'Even, soft studio lighting.',
+  dramatic_low_key: 'Dramatic low-key lighting with deep shadows.',
+  cool_ambient: 'Cool, ambient blue-toned light.',
+};
+
+/** Compositions that are nothing without something to photograph. */
+const NEEDS_OBJECTS: ReadonlySet<ImageComposition> = new Set([
+  'still_life',
+  'macro',
+  'silhouette',
+  'top_down',
+]);
+
+/** First sentence: medium + composition, filled with the subject and objects. */
+function scene(
+  medium: ImageMedium,
+  composition: ImageComposition,
+  subject: string,
+  objects: string[],
+): string {
+  const lead = MEDIUM_CLAUSE[medium];
+  const list = objects.join(', ');
+  switch (composition) {
+    case 'still_life':
+      return `${lead} of ${list}, arranged on a plain surface.`;
+    case 'macro':
+      return `${lead}: an extreme close-up of ${objects[0]}, showing its texture and detail.`;
+    case 'environment':
+      return `${lead}: a wide scene evoking ${subject}${
+        objects.length > 0 ? `, with ${list} in their natural setting` : ''
+      }.`;
+    case 'abstract':
+      // "Light and texture" alone rendered as an out-of-focus blur; asking for
+      // sharp, textured surfaces keeps it abstract without turning to mush.
+      return `${lead}: an abstract composition of geometric shapes, textured surfaces and light evoking ${subject}, sharp and detailed, with no recognisable objects.`;
+    case 'silhouette':
+      return `${lead} of ${list} in silhouette against a bright, plain background.`;
+    case 'top_down':
+      return `${lead} of ${list} seen from directly above, laid out on a plain surface.`;
+  }
+}
+
 /**
  * The prompt sent to the image model, assembled from the planner's structured
  * answer. This is the only way a prompt is built — the model never writes the
- * string, so it cannot ask for a diagram however it phrases things.
+ * string, so it cannot ask for a diagram however it phrases things. Enums map
+ * to fixed clauses; the only free text is the subject, the filtered objects
+ * and a palette phrase that is dropped when it trips the text-risk check.
  *
- * The "not a document" clause is load-bearing: given prose and no such clause,
- * fal rendered the prompt itself as a page of garbled text (measured, #286).
- * With no usable objects it falls back to the subject alone, which is safe if
- * generic.
+ * A composition that needs objects downgrades to `abstract` when none survive
+ * the filter — that is what an abstract topic gets instead of blank
+ * stationery. The "not a document" clause is load-bearing: given prose and no
+ * such clause, fal rendered the prompt itself as a page of garbled text
+ * (measured, #286).
  */
-export function photoPrompt(subject: string, objects: string[]): string {
-  const usable = usableObjects(objects);
-  const scene =
-    usable.length > 0
-      ? `A photograph of ${usable.join(', ')}, arranged on a surface in natural light, shallow depth of field.`
-      : `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field.`;
-  return `${scene} A real physical scene, not a document, page, poster, slide or screen. No text, lettering, signage or logos anywhere in the frame.`;
+export function imagePrompt(medium: ImageMedium, slot: Omit<ImageSlot, 'alt'>): string {
+  const objects = usableObjects(slot.objects);
+  const composition =
+    objects.length === 0 && NEEDS_OBJECTS.has(slot.composition) ? 'abstract' : slot.composition;
+  const palette = slot.palette.trim();
+  return [
+    scene(medium, composition, slot.subject, objects),
+    LIGHTING_CLAUSE[slot.lighting],
+    palette !== '' && findTextRisk(palette) === null ? `Palette: ${palette}.` : '',
+    medium === 'photograph'
+      ? 'A real physical scene, not a document, page, poster, slide or screen.'
+      : 'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
+    'No text, lettering, signage or logos anywhere in the frame.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
-    'You are an art director choosing what to photograph for one blog article.',
-    `Return exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
-    'EXACTLY from the provided section list, each from a DIFFERENT section.',
+    'You are an art director deciding what each image of one blog article shows.',
+    `Return medium once, a cover entry, and exactly ${INLINE_IMAGE_COUNT} inline entries; each`,
+    'section_heading MUST be copied EXACTLY from the provided section list, each from a',
+    'DIFFERENT section.',
+    `- medium: ${IMAGE_MEDIA.join(' | ')}. Read it off the preferred image style. Use`,
+    '  photograph when the style is empty or asks for screenshots, diagrams, interfaces,',
+    '  charts or anything else that carries text.',
     'For every entry:',
-    '- subject: the idea the picture stands for, a short phrase.',
-    '- objects: 2 to 4 tangible things a photographer could put on a table, each a plain noun',
+    '- subject: the idea the picture stands for, a short phrase. Never a screen, diagram,',
+    '  chart, document, sign or interface.',
+    `- composition: ${IMAGE_COMPOSITIONS.join(' | ')}. still_life is objects on a surface,`,
+    '  environment a wide scene, abstract is light, shape and texture with no objects, macro',
+    '  an extreme close-up of one object, top_down objects seen from above.',
+    '  Use a DIFFERENT composition for each of the three images. Abstract ideas (strategy,',
+    '  automation, pricing) suit abstract or environment.',
+    `- lighting: ${IMAGE_LIGHTING.join(' | ')}.`,
+    '- palette: at most 6 words naming the colours, e.g. "warm amber and slate", or "" for',
+    '  no preference.',
+    '- objects: 0 to 4 tangible things a photographer could put on a table, each a plain noun',
     '  with at most one adjective. Real objects only — no concepts, activities, people or places.',
     '  Never name anything that carries writing in real life: no documents, screens, phones,',
     '  laptops, keyboards, signs, labels, badges, plaques, stickers, certificates, mugs, shirts,',
@@ -180,7 +284,7 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
 
   const user = [
     `Business: ${input.businessName} — ${input.businessDescription}`,
-    input.imageStyle ? `Preferred subject matter: ${input.imageStyle}` : '',
+    input.imageStyle ? `Preferred image style: ${input.imageStyle}` : '',
     `Article title: ${input.articleTitle}`,
     `Article summary: ${input.metaDescription}`,
     `Sections: ${input.headings.join(' | ')}`,
@@ -194,31 +298,36 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   ];
 }
 
-/** Parse + validate a plan; throws on wrong count, unknown or duplicate headings. */
+/**
+ * Parse + validate a plan; throws on wrong count, unknown or duplicate
+ * headings. Compositions are made pairwise distinct here rather than trusted:
+ * a duplicate takes the first unused value in `IMAGE_COMPOSITIONS` order. This
+ * runs before the objects filter in `imagePrompt`, so two slots can still both
+ * end up abstract when neither had a usable object — accepted, since a still
+ * life with nothing to photograph is the worse outcome.
+ */
 export function parseImagePlan(text: string, headings: string[]): ImagePlan {
-  const parsed = TolerantImagePlanSchema.parse(parseJsonObject(text));
-  const specified = parsed.inline.flatMap((img) =>
-    img.section_heading === undefined ? [] : [img.section_heading],
-  );
-  const available = headings.filter((heading) => !specified.includes(heading));
-  const plan = ImagePlanSchema.parse({
-    ...parsed,
-    inline: parsed.inline.map((img) => ({
-      ...img,
-      section_heading: img.section_heading ?? available.shift(),
-    })),
-  });
-  if (plan.inline.length !== INLINE_IMAGE_COUNT)
+  const parsed = ImagePlanSchema.parse(parseJsonObject(text));
+  if (parsed.inline.length !== INLINE_IMAGE_COUNT)
     throw new Error(`image plan needs exactly ${INLINE_IMAGE_COUNT} inline images`);
   const seen = new Set<string>();
-  for (const img of plan.inline) {
+  for (const img of parsed.inline) {
     if (!headings.includes(img.section_heading))
       throw new Error(`image plan references unknown heading: ${img.section_heading}`);
     if (seen.has(img.section_heading))
       throw new Error(`image plan reuses heading: ${img.section_heading}`);
     seen.add(img.section_heading);
   }
-  return plan;
+
+  const used = new Set<ImageComposition>();
+  const distinct = <T extends ImageSlot>(slot: T): T => {
+    const composition = used.has(slot.composition)
+      ? (IMAGE_COMPOSITIONS.find((c) => !used.has(c)) ?? slot.composition)
+      : slot.composition;
+    used.add(composition);
+    return { ...slot, composition };
+  };
+  return { ...parsed, cover: distinct(parsed.cover), inline: parsed.inline.map(distinct) };
 }
 
 /**
