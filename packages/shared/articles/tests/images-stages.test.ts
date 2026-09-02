@@ -121,10 +121,34 @@ const article = {
 const usageStub = { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0 };
 
 const planJson = JSON.stringify({
-  cover: { subject: 'the cover idea', objects: ['brass gear'], alt: 'cover alt' },
+  medium: 'flat_illustration',
+  cover: {
+    subject: 'the cover idea',
+    composition: 'still_life',
+    lighting: 'soft_studio',
+    palette: 'teal and sand',
+    objects: ['brass gear'],
+    alt: 'cover alt',
+  },
   inline: [
-    { subject: 's1', objects: ['coiled cable'], alt: 'alt one', section_heading: 'First Section' },
-    { subject: 's2', objects: ['stone tile'], alt: 'alt two', section_heading: 'Second Section' },
+    {
+      subject: 's1',
+      composition: 'macro',
+      lighting: 'natural_daylight',
+      palette: '',
+      objects: ['coiled cable'],
+      alt: 'alt one',
+      section_heading: 'First Section',
+    },
+    {
+      subject: 's2',
+      composition: 'abstract',
+      lighting: 'cool_ambient',
+      palette: '',
+      objects: [],
+      alt: 'alt two',
+      section_heading: 'Second Section',
+    },
   ],
 });
 
@@ -226,11 +250,10 @@ describe('stageImagesPlan', () => {
     expect(result).toEqual({ completed: true, working: {} });
   });
 
-  // #280: telling the planner not to ask for lettering does not stop it, so a
-  // risky plan is sent back once and only then replaced.
   // #289: the planner names objects and the prompt is assembled here, so a
   // request for a diagram cannot reach the image model however it is phrased.
-  test('builds the prompt from the planned objects, never from planner prose', async () => {
+  // #309: the org's style and the planned composition shape that prompt.
+  test('builds each prompt from the medium, composition and objects, never from planner prose', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({ text: planJson, model: 'm', usage: usageStub });
 
@@ -238,24 +261,48 @@ describe('stageImagesPlan', () => {
 
     expect(llmComplete).toHaveBeenCalledTimes(1);
     const slots = setImagePlan.mock.calls[0]![1] as ArticleImage[];
-    expect(slots[0]!.prompt).toContain('A photograph of brass gear');
-    expect(slots[0]!.prompt).toContain('not a document, page, poster, slide or screen');
+    expect(slots[0]!.prompt).toContain(
+      'A flat vector illustration of brass gear, arranged on a plain surface.',
+    );
+    expect(slots[0]!.prompt).toContain('Palette: teal and sand.');
+    expect(slots[0]!.prompt).toContain('not a document, page, poster, slide, chart or screen');
     expect(slots[0]!.alt).toBe('cover alt');
-    expect(slots[1]!.prompt).toContain('coiled cable');
+    expect(slots[1]!.prompt).toContain('an extreme close-up of coiled cable');
+    expect(slots[2]!.prompt).toContain('abstract shapes, light and texture evoking s2');
   });
 
-  test('objects that carry writing are dropped, leaving a safe subject prompt', async () => {
+  test('objects that carry writing are dropped, downgrading the slot to abstract', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({
       text: JSON.stringify({
+        medium: 'photograph',
         cover: {
           subject: 'release pipelines',
+          composition: 'still_life',
+          lighting: 'natural_daylight',
+          palette: '',
           objects: ['architecture diagram', 'deployment badge'],
           alt: 'cover alt',
         },
         inline: [
-          { subject: 's1', objects: ['coiled cable'], alt: 'a1', section_heading: 'First Section' },
-          { subject: 's2', objects: ['stone tile'], alt: 'a2', section_heading: 'Second Section' },
+          {
+            subject: 's1',
+            composition: 'macro',
+            lighting: 'natural_daylight',
+            palette: '',
+            objects: ['coiled cable'],
+            alt: 'a1',
+            section_heading: 'First Section',
+          },
+          {
+            subject: 's2',
+            composition: 'environment',
+            lighting: 'natural_daylight',
+            palette: '',
+            objects: ['stone tile'],
+            alt: 'a2',
+            section_heading: 'Second Section',
+          },
         ],
       }),
       model: 'm',
@@ -273,7 +320,18 @@ describe('stageImagesPlan', () => {
   test('invalid plan marks images failed and rethrows', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({
-      text: JSON.stringify({ cover: { subject: 's', objects: [], alt: 'a' }, inline: [] }),
+      text: JSON.stringify({
+        medium: 'photograph',
+        cover: {
+          subject: 's',
+          composition: 'abstract',
+          lighting: 'natural_daylight',
+          palette: '',
+          objects: [],
+          alt: 'a',
+        },
+        inline: [],
+      }),
       model: 'm',
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0 },
     });

@@ -9,18 +9,28 @@ export {
 export { buildContext } from './context';
 export type { HumanizeFeedback } from './humanize';
 export { buildHumanizePrompt } from './humanize';
-export type { ImagePlan, ImagePlanInput } from './images';
+export type {
+  ImageComposition,
+  ImageLighting,
+  ImageMedium,
+  ImagePlan,
+  ImagePlanInput,
+  ImageSlot,
+} from './images';
 export {
   buildImagePlanPrompt,
   extractH2s,
   findTextRisk,
+  IMAGE_COMPOSITIONS,
+  IMAGE_LIGHTING,
+  IMAGE_MEDIA,
   IMAGE_PLAN_RESPONSE_SCHEMA,
   ImagePlanSchema,
+  imagePrompt,
   injectBlockAfterHeading,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
-  photoPrompt,
   usableObjects,
   withNoTextDirective,
 } from './images';

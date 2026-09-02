@@ -1,13 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import { INLINE_IMAGE_COUNT } from '../src/config';
+import type { ImageSlot } from '../src/images';
 import {
   buildImagePlanPrompt,
   extractH2s,
   findTextRisk,
+  IMAGE_COMPOSITIONS,
+  IMAGE_LIGHTING,
+  IMAGE_MEDIA,
+  imagePrompt,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
-  photoPrompt,
   usableObjects,
   withNoTextDirective,
 } from '../src/images';
@@ -16,10 +20,34 @@ const content = '# Title\n\nintro\n\n## First Section\n\nbody one\n\n## Second S
 const headings = ['First Section', 'Second Section'];
 
 const validPlan = {
-  cover: { subject: 'a hero idea', objects: ['brass gear'], alt: 'a hero image' },
+  medium: 'photograph',
+  cover: {
+    subject: 'a hero idea',
+    composition: 'still_life',
+    lighting: 'natural_daylight',
+    palette: 'warm amber and slate',
+    objects: ['brass gear'],
+    alt: 'a hero image',
+  },
   inline: [
-    { subject: 's1', objects: ['stone'], alt: 'alt one', section_heading: 'First Section' },
-    { subject: 's2', objects: ['rope'], alt: 'alt two', section_heading: 'Second Section' },
+    {
+      subject: 's1',
+      composition: 'macro',
+      lighting: 'soft_studio',
+      palette: '',
+      objects: ['stone'],
+      alt: 'alt one',
+      section_heading: 'First Section',
+    },
+    {
+      subject: 's2',
+      composition: 'abstract',
+      lighting: 'cool_ambient',
+      palette: '',
+      objects: [],
+      alt: 'alt two',
+      section_heading: 'Second Section',
+    },
   ],
 };
 
@@ -77,13 +105,18 @@ describe('buildImagePlanPrompt', () => {
   });
 
   // #289: the planner used to write the prompt, and no wording stopped it
-  // asking for lettering. It now names objects and never sees a prompt.
-  test('asks for objects and says its answer is not the prompt', () => {
-    const system = String(buildImagePlanPrompt(input).at(0)!.content);
-    expect(system).toContain('objects');
+  // asking for lettering. It names objects and enums (#309) and never sees a prompt.
+  test('asks for enums and objects and says its answer is not the prompt', () => {
+    const [system, user] = buildImagePlanPrompt(input).map((m) => String(m.content));
+    for (const value of [...IMAGE_MEDIA, ...IMAGE_COMPOSITIONS, ...IMAGE_LIGHTING]) {
+      expect(system).toContain(value);
+    }
+    expect(system).toContain('DIFFERENT composition');
+    expect(system).toContain('palette');
     expect(system).toContain('carries writing');
     expect(system).toContain('You are NOT writing the image prompt');
     expect(system).toContain('not "Raspberry Pi"');
+    expect(user).toContain('Preferred image style: flat illustration');
   });
 });
 
@@ -108,25 +141,24 @@ describe('parseImagePlan', () => {
     expect(() => parseImagePlan(JSON.stringify(bad), headings)).toThrow(/exactly/);
   });
 
-  test('fills omitted section headings from unused article headings in order', () => {
-    const omitted = {
-      ...validPlan,
-      inline: [
-        { subject: 's1', objects: ['stone'], alt: 'alt one' },
-        { subject: 's2', objects: ['rope'], alt: 'alt two', section_heading: 'Second Section' },
-      ],
-    };
+  test('rejects an inline entry without a section heading', () => {
+    const { section_heading: _dropped, ...bare } = validPlan.inline[0]!;
+    const omitted = { ...validPlan, inline: [bare, validPlan.inline[1]!] };
+    expect(() => parseImagePlan(JSON.stringify(omitted), headings)).toThrow();
+  });
 
-    expect(parseImagePlan(JSON.stringify(omitted), headings)).toEqual(validPlan);
+  test('rejects an unknown medium or composition', () => {
+    expect(() =>
+      parseImagePlan(JSON.stringify({ ...validPlan, medium: 'oil' }), headings),
+    ).toThrow();
+    const bad = { ...validPlan, cover: { ...validPlan.cover, composition: 'collage' } };
+    expect(() => parseImagePlan(JSON.stringify(bad), headings)).toThrow();
   });
 
   test('rejects unknown and duplicate headings, and empty alt', () => {
     const unknown = {
       ...validPlan,
-      inline: [
-        validPlan.inline[0]!,
-        { subject: 's', objects: [], alt: 'a', section_heading: 'Nope' },
-      ],
+      inline: [validPlan.inline[0]!, { ...validPlan.inline[1]!, section_heading: 'Nope' }],
     };
     expect(() => parseImagePlan(JSON.stringify(unknown), headings)).toThrow(/unknown heading/);
 
@@ -136,8 +168,36 @@ describe('parseImagePlan', () => {
     };
     expect(() => parseImagePlan(JSON.stringify(dup), headings)).toThrow(/reuses heading/);
 
-    const emptyAlt = { ...validPlan, cover: { subject: 's', objects: [], alt: '' } };
+    const emptyAlt = { ...validPlan, cover: { ...validPlan.cover, alt: '' } };
     expect(() => parseImagePlan(JSON.stringify(emptyAlt), headings)).toThrow();
+  });
+
+  // #309: variety is enforced, not requested. A duplicate takes the first
+  // unused composition in IMAGE_COMPOSITIONS order.
+  test('reassigns duplicate compositions so the three slots differ', () => {
+    const same = {
+      ...validPlan,
+      cover: { ...validPlan.cover, composition: 'macro' },
+      inline: [
+        { ...validPlan.inline[0]!, composition: 'macro' },
+        { ...validPlan.inline[1]!, composition: 'macro' },
+      ],
+    };
+    const plan = parseImagePlan(JSON.stringify(same), headings);
+    expect([plan.cover.composition, ...plan.inline.map((i) => i.composition)]).toEqual([
+      'macro',
+      'still_life',
+      'environment',
+    ]);
+  });
+
+  test('leaves already-distinct compositions alone', () => {
+    const plan = parseImagePlan(JSON.stringify(validPlan), headings);
+    expect([plan.cover.composition, ...plan.inline.map((i) => i.composition)]).toEqual([
+      'still_life',
+      'macro',
+      'abstract',
+    ]);
   });
 });
 
@@ -201,25 +261,102 @@ describe('findTextRisk', () => {
   // meant to survive this check.
 });
 
-describe('photoPrompt', () => {
-  test('photographs the objects when there are any', () => {
-    const prompt = photoPrompt('deployment automation', ['server rack', 'coiled cable']);
-    expect(prompt).toContain('server rack, coiled cable');
-    expect(prompt).not.toContain('evoking deployment automation');
-    expect(findTextRisk(prompt)).toBeNull();
+describe('imagePrompt', () => {
+  const slot = (patch: Partial<Omit<ImageSlot, 'alt'>>): Omit<ImageSlot, 'alt'> => ({
+    subject: 'deployment automation',
+    composition: 'still_life',
+    lighting: 'natural_daylight',
+    palette: '',
+    objects: ['server rack', 'coiled cable'],
+    ...patch,
   });
 
-  test('falls back to the subject when nothing usable survives', () => {
-    const prompt = photoPrompt('deployment automation', ['architecture diagram', 'laptop']);
-    expect(prompt).toContain('evoking deployment automation');
-    expect(findTextRisk(prompt)).toBeNull();
+  test.each([
+    ['photograph', 'A photograph of server rack, coiled cable, arranged on a plain surface.'],
+    [
+      'flat_illustration',
+      'A flat vector illustration of server rack, coiled cable, arranged on a plain surface.',
+    ],
+    [
+      'three_d_render',
+      'A 3D rendered scene of server rack, coiled cable, arranged on a plain surface.',
+    ],
+    [
+      'watercolor',
+      'A watercolor painting of server rack, coiled cable, arranged on a plain surface.',
+    ],
+    [
+      'line_art',
+      'A minimal line-art illustration of server rack, coiled cable, arranged on a plain surface.',
+    ],
+    [
+      'isometric',
+      'An isometric illustration of server rack, coiled cable, arranged on a plain surface.',
+    ],
+  ] as const)('opens with the %s medium clause', (medium, opening) => {
+    expect(imagePrompt(medium, slot({})).startsWith(opening)).toBe(true);
+  });
+
+  test.each([
+    ['macro', 'an extreme close-up of server rack, showing its texture and detail'],
+    [
+      'environment',
+      'a wide scene evoking deployment automation, with server rack, coiled cable in their natural setting',
+    ],
+    [
+      'abstract',
+      'abstract shapes, light and texture evoking deployment automation, with no recognisable objects',
+    ],
+    ['silhouette', 'server rack, coiled cable in silhouette against a bright, plain background'],
+    ['top_down', 'server rack, coiled cable seen from directly above, laid out on a plain surface'],
+  ] as const)('renders the %s composition', (composition, clause) => {
+    expect(imagePrompt('photograph', slot({ composition }))).toContain(clause);
+  });
+
+  test('environment without objects omits the setting clause', () => {
+    const prompt = imagePrompt('photograph', slot({ composition: 'environment', objects: [] }));
+    expect(prompt).toContain('a wide scene evoking deployment automation.');
+    expect(prompt).not.toContain('natural setting');
+  });
+
+  // An abstract topic gets an evocative scene instead of blank stationery (#309).
+  test('compositions that need objects downgrade to abstract when none survive', () => {
+    for (const composition of ['still_life', 'macro', 'silhouette', 'top_down'] as const) {
+      const prompt = imagePrompt(
+        'photograph',
+        slot({ composition, objects: ['architecture diagram', 'laptop'] }),
+      );
+      expect(prompt).toContain('abstract shapes, light and texture evoking deployment automation');
+      expect(prompt).not.toContain('diagram');
+    }
+  });
+
+  test('carries lighting and a safe palette, drops a risky or empty one', () => {
+    const lit = imagePrompt(
+      'photograph',
+      slot({ lighting: 'golden_hour', palette: 'warm amber and slate' }),
+    );
+    expect(lit).toContain('Warm golden-hour light with long shadows.');
+    expect(lit).toContain('Palette: warm amber and slate.');
+    expect(imagePrompt('photograph', slot({ palette: 'neon signage colours' }))).not.toContain(
+      'Palette:',
+    );
+    expect(imagePrompt('photograph', slot({ palette: '  ' }))).not.toContain('Palette:');
   });
 
   // Measured: given prose and no such clause, fal renders the prompt itself as
   // a page of garbled text (#286).
-  test('always disclaims being a document', () => {
-    for (const prompt of [photoPrompt('a subject', []), photoPrompt('a subject', ['a stone'])]) {
-      expect(prompt).toContain('not a document, page, poster, slide or screen');
+  test('always disclaims being a document, worded per medium', () => {
+    expect(imagePrompt('photograph', slot({}))).toContain(
+      'A real physical scene, not a document, page, poster, slide or screen.',
+    );
+    expect(imagePrompt('line_art', slot({}))).toContain(
+      'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
+    );
+    for (const medium of IMAGE_MEDIA) {
+      const prompt = imagePrompt(medium, slot({}));
+      expect(prompt).toContain('No text, lettering, signage or logos anywhere in the frame.');
+      expect(findTextRisk(prompt)).toBeNull();
     }
   });
 });

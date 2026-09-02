@@ -3,9 +3,9 @@ import {
   buildImagePlanPrompt,
   extractH2s,
   IMAGE_PLAN_RESPONSE_SCHEMA,
+  imagePrompt,
   injectImageAfterHeading,
   parseImagePlan,
-  photoPrompt,
   withNoTextDirective,
 } from '@shared/generation';
 import type { ImageResult, LlmClient } from '@shared/providers';
@@ -127,7 +127,7 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
     {
       role: 'cover',
       section_heading: null,
-      prompt: photoPrompt(plan.cover.subject, plan.cover.objects),
+      prompt: imagePrompt(plan.medium, plan.cover),
       alt: plan.cover.alt,
       ...empty,
     },
@@ -135,7 +135,7 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
       (img): ArticleImage => ({
         role: 'inline',
         section_heading: img.section_heading,
-        prompt: photoPrompt(img.subject, img.objects),
+        prompt: imagePrompt(plan.medium, img),
         alt: img.alt,
         ...empty,
       }),
