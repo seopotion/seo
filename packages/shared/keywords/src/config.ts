@@ -4,12 +4,13 @@ import type { PipelineConfig, ResolvedConfig } from './types';
 /** Defaults for everything except location/language, which come from presets. */
 export const DEFAULT_CONFIG: Omit<ResolvedConfig, 'locationName' | 'languageName'> = {
   difficultyCeiling: 45,
-  // Relevance is scale-compressed on the current model — genuinely good keywords
-  // land at 0.50-0.60 and every accepted candidate is >= 0.10 — so anything
-  // above 0 risks emptying the plan. 0 rejects only the exact zeros, which is
-  // the model explicitly seeing no connection at all. Tune against the
-  // distribution `db strategy-dryrun` prints.
-  relevanceFloor: 0,
+  // A `<=` cut. On the current model on-topic terms land 0.5–0.95, and the
+  // off-topic tail a generic seed drags in ("virtual try-on" → eyewear, makeup,
+  // rings for a clothing product) lands 0.08–0.25; 0.25 removes that tail while
+  // the lowest entry on a healthy plan (piperbox, 0.3) survives (#293). A null
+  // score (never judged) is exempt — see stageTriage. Tune against the
+  // histogram `db strategy-audit` / `db strategy-dryrun` print.
+  relevanceFloor: 0.25,
   // Validate essentially the whole post-floor pool rather than an arbitrary
   // slice of it: at 40 the head terms crowded out exactly the low-volume
   // technical queries a niche B2B can actually win, and a third of the survivors

@@ -55,6 +55,12 @@ describe('resolveConfig', () => {
     expect('duplicateSerpOverlap' in DEFAULT_CONFIG).toBe(false);
   });
 
+  it('rejects the off-topic tail by default (#293)', () => {
+    // unmarble: junk scored 0.08–0.25, on-topic 0.75–0.95; piperbox's lowest
+    // scheduled entry is 0.3 and must survive (the floor is a `<=` cut).
+    expect(DEFAULT_CONFIG.relevanceFloor).toBe(0.25);
+  });
+
   it('caller overrides win and merge deeply', () => {
     const c = resolveConfig(presets, { serpTopN: 5, weights: { volume: 0.9 } as never });
     expect(c.serpTopN).toBe(5);

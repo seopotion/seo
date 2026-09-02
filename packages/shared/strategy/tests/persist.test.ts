@@ -223,7 +223,7 @@ describe('stagePersistSchedule', () => {
     findById.mockResolvedValue(org);
     listByOrg.mockResolvedValue([]);
     // The pillar itself gets filtered out of the semantic target pool (null
-    // difficulty fails semanticTargetPool's metric check), but its same-cluster
+    // search_volume fails semanticTargetPool's metric check), but its same-cluster
     // support survives the pool filter — this used to make selectionClusters
     // throw TopicClusterValidationError, retry-forever at the last stage.
     const orphanedPillar: WorkingCandidate = {
@@ -231,7 +231,7 @@ describe('stagePersistSchedule', () => {
         topic_cluster_id: 'topic:orphan',
         topic_cluster_label: 'Orphan',
       }),
-      difficulty: null,
+      search_volume: null,
     };
     const orphanedSupport = candidate('Orphan support', 90, {
       topic_cluster_id: 'topic:orphan',
@@ -260,6 +260,21 @@ describe('stagePersistSchedule', () => {
       'Healthy support',
     ]);
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
+  });
+
+  test('a null-difficulty target is still schedulable — unknown KD is not unwinnable (#294)', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    const noKd: WorkingCandidate = {
+      ...candidate('outfit combination generator', 95),
+      difficulty: null,
+    };
+
+    await stagePersistSchedule(state([noKd, candidate('other', 50)]), { orgId: 'o1' });
+
+    expect(scheduleCandidate.mock.calls.map(([row]) => row.keyword)).toContain(
+      'outfit combination generator',
+    );
   });
 
   test('under-fills the plan rather than padding it, logs the shortfall, and still completes', async () => {

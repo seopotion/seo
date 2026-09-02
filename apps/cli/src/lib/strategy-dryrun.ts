@@ -76,12 +76,10 @@ export function splitSections(candidates: EnrichedCandidate[]): StrategyDryRunDa
  * rather than padding when fewer than PLAN_DAYS candidates qualify.
  */
 export function simulatePlan(candidates: EnrichedCandidate[], startDate: Date): DryRunPlanRow[] {
+  // Mirrors persist.ts's semanticTargetPool: unknown difficulty stays
+  // plannable (#294).
   const selectable = candidates.filter(
-    (c) =>
-      c.serp_validated &&
-      c.rejection_reason === null &&
-      c.search_volume !== null &&
-      c.difficulty !== null,
+    (c) => c.serp_validated && c.rejection_reason === null && c.search_volume !== null,
   ) as Array<EnrichedCandidate & TopicCandidateTarget>;
   const selected = selectTopicCandidateTargets(selectable, PLAN_DAYS);
   return stampScheduledDates(selected, startDate, PLAN_DAYS).map(({ item, scheduled_date }) => ({

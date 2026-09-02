@@ -221,6 +221,11 @@ export interface AuditDiagnostics {
   backfill_fraction: number;
   relevance_exact_zero: { scored: number; exact_zero: number; fraction: number };
   kd_zero_scheduled: number;
+  /**
+   * Plan-stage target split from the latest strategy run; 0 supports = the
+   * judge collapsed every cluster to one article (#294). Null without a run.
+   */
+  plan_targets: { pillars: number; supports: number } | null;
   scheduled_by_source: Record<string, number>;
   pool_source_share: Record<string, number>;
   scheduled_source_share: Record<string, number>;

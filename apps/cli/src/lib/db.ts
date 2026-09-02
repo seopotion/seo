@@ -183,8 +183,9 @@ export async function strategyAudit(input: {
 
     const { candidates } = await CandidateRepo.listByOrg(org.id);
     const keywords = await KeywordRepo.listByOrg(org.id);
+    const run = await StrategyRunRepo.latestByOrg(org.id);
 
-    return ok(buildStrategyAudit({ org, candidates, keywords, needles: input.keywords }));
+    return ok(buildStrategyAudit({ org, candidates, keywords, needles: input.keywords, run }));
   } finally {
     await closeDb();
   }

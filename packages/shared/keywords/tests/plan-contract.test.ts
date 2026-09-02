@@ -114,6 +114,10 @@ describe('buildPlanPrompt', () => {
     expect(system).toContain('standalone'); // omission = standalone article, not discard
     expect(system).toContain('intent_ok');
     expect(system).toContain('is_pillar');
+    // #294: tool landing pages in the business's own category are winnable, and
+    // distinct sub-intents inside a cluster become support targets.
+    expect(system).toContain('own category');
+    expect(system).toContain('support target');
     expect(user).toContain('0. ro membrane fouling');
     expect(user).toContain('Fouling guide');
   });
