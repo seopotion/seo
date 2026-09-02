@@ -54,9 +54,10 @@ returns `null` otherwise, unchanged).
 ### 2. The scan assigns it
 
 `ScanOutputSchema.article_preferences.content_seo` (apps/worker/src/scanner.ts)
-gains `readability_grade_max: z.union([z.literal(8), z.literal(10), z.literal(12)])`.
-Three literals keep the model on a reviewable menu; the preset's 6–14 range is
-for manual edits.
+gains `readability_grade_max: z.literal([8, 10, 12])` (zod 4 multi-value literal,
+which `toStrictJsonSchema` emits as `enum`; a `z.union` of literals would lose
+its `const` keywords on the wire). Three values keep the model on a reviewable
+menu; the preset's 6–14 range is for manual edits.
 
 `buildScanPrompt` gains one system line:
 
