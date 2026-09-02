@@ -226,6 +226,29 @@ describe('buildStrategyAudit', () => {
     });
   });
 
+  test("surfaces the latest run's pillar/support split so a pillar-only plan is visible (#294)", () => {
+    const run = { stats: { plan: { pillars: 8, supports: 0 } } };
+    const report = buildStrategyAudit({
+      org: org([]),
+      candidates: [],
+      keywords: [],
+      needles: [],
+      run,
+    });
+    expect(report.diagnostics.plan_targets).toEqual({ pillars: 8, supports: 0 });
+
+    const none = buildStrategyAudit({ org: org([]), candidates: [], keywords: [], needles: [] });
+    expect(none.diagnostics.plan_targets).toBeNull();
+    const noPlanStats = buildStrategyAudit({
+      org: org([]),
+      candidates: [],
+      keywords: [],
+      needles: [],
+      run: { stats: {} },
+    });
+    expect(noPlanStats.diagnostics.plan_targets).toBeNull();
+  });
+
   test('joins the plan to its candidate and derives the diagnostics', () => {
     const candidates = [
       candidate({ id: 'c1' }),

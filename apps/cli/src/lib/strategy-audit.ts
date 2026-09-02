@@ -168,14 +168,21 @@ export function buildStrategyAudit(input: {
   candidates: Candidate[];
   keywords: Keyword[];
   needles: string[];
+  /** Latest `strategy_runs` doc, for the plan-stage stats it carries. */
+  run?: { stats?: Record<string, unknown> } | null;
 }): StrategyAuditData {
-  const { org, candidates, keywords, needles } = input;
+  const { org, candidates, keywords, needles, run } = input;
   const pool = buildPool(candidates);
   const plan = buildPlan(keywords, candidates);
 
   const scored = candidates.filter((c) => c.relevance_score !== null).length;
   const backfill = plan.filter((r) => !r.serp_validated).length;
   const scheduledBySource = countBy(plan, (r) => r.source ?? NONE);
+  const planStats = run?.stats?.plan as { pillars?: unknown; supports?: unknown } | undefined;
+  const planTargets =
+    typeof planStats?.pillars === 'number' && typeof planStats?.supports === 'number'
+      ? { pillars: planStats.pillars, supports: planStats.supports }
+      : null;
 
   const diagnostics: AuditDiagnostics = {
     backfill_count: backfill,
@@ -186,6 +193,7 @@ export function buildStrategyAudit(input: {
       fraction: scored === 0 ? 0 : pool.relevance_score.exact_zero / scored,
     },
     kd_zero_scheduled: plan.filter((r) => r.difficulty === 0).length,
+    plan_targets: planTargets,
     scheduled_by_source: scheduledBySource,
     pool_source_share: shares(pool.by_source),
     scheduled_source_share: shares(scheduledBySource),
@@ -372,6 +380,18 @@ export function renderStrategyAudit(d: StrategyAuditData): string {
     '      → parseRelevance seeds every keyword to 0 and only overwrites on an EXACT string match of the keyword the LLM echoes back, so a high fraction points at a truncated or re-cased LLM response rather than genuinely irrelevant keywords.',
   );
   out.push(`  kd_zero_scheduled              ${g.kd_zero_scheduled} of ${d.plan.length}`);
+  out.push(
+    `  plan_targets                   ${
+      g.plan_targets
+        ? `${g.plan_targets.pillars} pillars / ${g.plan_targets.supports} supports`
+        : '(no strategy run)'
+    }`,
+  );
+  if (g.plan_targets && g.plan_targets.supports === 0 && g.plan_targets.pillars > 0) {
+    out.push(
+      '      → 0 supports: the plan judge collapsed every cluster to a single article (#294).',
+    );
+  }
   out.push('  source distribution (pool vs scheduled plan)');
   const sources = [
     ...new Set([...Object.keys(g.pool_source_share), ...Object.keys(g.scheduled_source_share)]),
