@@ -16,15 +16,24 @@ export interface ImagePlanInput {
   headings: string[];
 }
 
+/**
+ * The planner names WHAT TO PHOTOGRAPH; the prompt itself is assembled here.
+ *
+ * It used to return the prompt as free prose, and no amount of instruction
+ * stopped it asking for lettering — banning "diagram" got "split-screen", and
+ * banning that got "technical visualization", each one published as garbled
+ * headings. A deny list cannot cover a synonym space, so prose no longer
+ * reaches the image model at all (#289).
+ */
+const ImageSlotSchema = z.object({
+  subject: z.string().min(1),
+  objects: z.array(z.string()),
+  alt: z.string().min(1),
+});
+
 export const ImagePlanSchema = z.object({
-  cover: z.object({ prompt: z.string().min(1), alt: z.string().min(1) }),
-  inline: z.array(
-    z.object({
-      prompt: z.string().min(1),
-      alt: z.string().min(1),
-      section_heading: z.string().min(1),
-    }),
-  ),
+  cover: ImageSlotSchema,
+  inline: z.array(ImageSlotSchema.extend({ section_heading: z.string().min(1) })),
 });
 export type ImagePlan = z.infer<typeof ImagePlanSchema>;
 
@@ -95,8 +104,8 @@ const TEXT_RISK =
  * written: "no words, letters, captions or logos".
  */
 const BANNED_NOUN =
-  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing)';
-const QUALIFIER = '(?:(?:any|all|visible|readable|other)\\s+)*';
+  '(?:diagrams?|screenshots?|signage|signs?|labels?|captions?|logos?|brand marks?|watermarks?|texts?|words?|lettering|letters?|numbers?|headings?|titles?|typography|fonts?|writing|documents?|pages?|posters?|banners?|slides?|screens?|monitors?|interfaces?|dashboards?|whiteboards?)';
+const QUALIFIER = '(?:(?:a|an|the|any|all|visible|readable|other)\\s+)*';
 const NEGATED = new RegExp(
   `\\b(?:no|not|non|without|free of|devoid of|avoid(?:ing)?|omit(?:ting)?|exclude|excluding|never)\\s+${QUALIFIER}${BANNED_NOUN}(?:\\s*(?:,|,?\\s*(?:or|and|nor))\\s*${QUALIFIER}${BANNED_NOUN})*`,
   'gi',
@@ -112,57 +121,66 @@ export function findTextRisk(prompt: string): string | null {
   return match ? (match[0] as string).toLowerCase() : null;
 }
 
-/** Every slot whose prompt asks for a banned subject, labelled for feedback. */
-export function findImagePlanTextRisks(plan: ImagePlan): { slot: string; term: string }[] {
-  return [
-    { slot: 'cover', prompt: plan.cover.prompt },
-    ...plan.inline.map((img) => ({ slot: img.section_heading, prompt: img.prompt })),
-  ].flatMap(({ slot, prompt }) => {
-    const term = findTextRisk(prompt);
-    return term ? [{ slot, term }] : [];
-  });
-}
+/**
+ * Objects that carry writing in the real world, so fal letters them however
+ * the prompt is phrased — a returned "deployment badge" came back stamped
+ * "NRLUMA B OLOPYMENT". Separate from TEXT_RISK, which is about the kind of
+ * image being asked for rather than the props inside it.
+ */
+const OBJECT_TEXT_RISK =
+  /\b(?:badges?|plaques?|stickers?|decals?|certificates?|awards?|trophies|mugs?|t-?shirts?|jerseys?|caps?|books?|magazines?|newspapers?|manuals?|brochures?|leaflets?|notebooks?|notepads?|calendars?|clocks?|watches|phones?|tablets?|laptops?|keyboards?|bottles?|cans?|jars?|boxes|cartons?|packaging|envelopes?|tickets?|receipts?|cards?|number plates?|license plates?)\b/i;
 
-/** The correction handed back to the planner for one more attempt. */
-export function buildImagePlanRetryPrompt(risks: { slot: string; term: string }[]): LlmMessage {
-  return {
-    role: 'user',
-    content: [
-      `Rejected: ${risks.map((r) => `"${r.slot}" asks for ${r.term}`).join('; ')}.`,
-      'Those subjects always render as unreadable lettering. Replan EVERY entry as a scene a',
-      'photographer could shoot — people, hardware, places, materials, or abstract light and',
-      'texture — with no surface that would carry writing. Keep the same sections.',
-    ].join(' '),
-  };
+/** The objects worth photographing: risky ones are dropped, not repaired. */
+export function usableObjects(objects: string[]): string[] {
+  return objects
+    .map((object) => object.trim().replace(/\s+/g, ' '))
+    .filter(
+      (object) => object !== '' && findTextRisk(object) === null && !OBJECT_TEXT_RISK.test(object),
+    )
+    .slice(0, 4);
 }
 
 /**
- * Last resort when the planner will not stop asking for lettering: a plain
- * wordless scene for the slot's subject. Worse than a good planned prompt,
- * far better than a published diagram of garbled text.
+ * The prompt sent to the image model, assembled from the planner's structured
+ * answer. This is the only way a prompt is built — the model never writes the
+ * string, so it cannot ask for a diagram however it phrases things.
+ *
+ * The "not a document" clause is load-bearing: given prose and no such clause,
+ * fal rendered the prompt itself as a page of garbled text (measured, #286).
+ * With no usable objects it falls back to the subject alone, which is safe if
+ * generic.
  */
-export function wordlessPrompt(subject: string): string {
-  return `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field. No text, lettering, signage or logos anywhere in the frame.`;
+export function photoPrompt(subject: string, objects: string[]): string {
+  const usable = usableObjects(objects);
+  const scene =
+    usable.length > 0
+      ? `A photograph of ${usable.join(', ')}, arranged on a surface in natural light, shallow depth of field.`
+      : `A photographic scene evoking ${subject}, shot with natural light and shallow depth of field.`;
+  return `${scene} A real physical scene, not a document, page, poster, slide or screen. No text, lettering, signage or logos anywhere in the frame.`;
 }
 
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
-    'You are an art director planning images for one blog article.',
-    `Rules: exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
-    'EXACTLY from the provided section list, each from a DIFFERENT section. Prompts describe',
-    'a single visual scene that contains NO text and NO logos: never ask for words, letters,',
-    'numbers, captions, labels, signs, screens showing an interface, documents, whiteboards,',
-    'book covers, branded packaging or the business logo. Prefer subjects that carry no',
-    'lettering at all; when a scene needs a screen or a sign, describe it as blank or out of',
-    'frame. The requested image style NEVER overrides these rules: a style asking for text,',
-    'screenshots, diagrams or logos is reinterpreted as the nearest wordless visual (its mood,',
-    'subject and palette kept, its lettering dropped).',
-    `alt is a meaningful description of the image for screen readers, written in ${input.language}.`,
+    'You are an art director choosing what to photograph for one blog article.',
+    `Return exactly ${INLINE_IMAGE_COUNT} inline entries; each section_heading MUST be copied`,
+    'EXACTLY from the provided section list, each from a DIFFERENT section.',
+    'For every entry:',
+    '- subject: the idea the picture stands for, a short phrase.',
+    '- objects: 2 to 4 tangible things a photographer could put on a table, each a plain noun',
+    '  with at most one adjective. Real objects only — no concepts, activities, people or places.',
+    '  Never name anything that carries writing in real life: no documents, screens, phones,',
+    '  laptops, keyboards, signs, labels, badges, plaques, stickers, certificates, mugs, shirts,',
+    '  books, packaging, bottles or boxes. Never name a brand or a branded product: say',
+    '  "single-board computer", not "Raspberry Pi". Prefer bare surfaces: hardware, tools,',
+    '  materials, components, natural objects.',
+    `- alt: a meaningful description of the image for screen readers, written in ${input.language}.`,
+    'You are NOT writing the image prompt. Nothing you return is passed to the image model',
+    'verbatim, so do not describe a scene, a composition, a style or a diagram.',
   ].join('\n');
 
   const user = [
     `Business: ${input.businessName} — ${input.businessDescription}`,
-    input.imageStyle ? `Image style: ${input.imageStyle}` : '',
+    input.imageStyle ? `Preferred subject matter: ${input.imageStyle}` : '',
     `Article title: ${input.articleTitle}`,
     `Article summary: ${input.metaDescription}`,
     `Sections: ${input.headings.join(' | ')}`,

@@ -121,10 +121,10 @@ const article = {
 const usageStub = { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0 };
 
 const planJson = JSON.stringify({
-  cover: { prompt: 'cover scene', alt: 'cover alt' },
+  cover: { subject: 'the cover idea', objects: ['brass gear'], alt: 'cover alt' },
   inline: [
-    { prompt: 'p1', alt: 'alt one', section_heading: 'First Section' },
-    { prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' },
+    { subject: 's1', objects: ['coiled cable'], alt: 'alt one', section_heading: 'First Section' },
+    { subject: 's2', objects: ['stone tile'], alt: 'alt two', section_heading: 'Second Section' },
   ],
 });
 
@@ -228,59 +228,52 @@ describe('stageImagesPlan', () => {
 
   // #280: telling the planner not to ask for lettering does not stop it, so a
   // risky plan is sent back once and only then replaced.
-  test('a plan asking for a diagram is replanned once, and the clean retry is kept', async () => {
+  // #289: the planner names objects and the prompt is assembled here, so a
+  // request for a diagram cannot reach the image model however it is phrased.
+  test('builds the prompt from the planned objects, never from planner prose', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
-    const risky = JSON.stringify({
-      cover: { prompt: 'A split-screen diagram of the deploy flow', alt: 'cover alt' },
-      inline: [
-        { prompt: 'p1', alt: 'alt one', section_heading: 'First Section' },
-        { prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' },
-      ],
-    });
-    llmComplete
-      .mockResolvedValueOnce({ text: risky, model: 'm', usage: usageStub })
-      .mockResolvedValueOnce({ text: planJson, model: 'm', usage: usageStub });
+    llmComplete.mockResolvedValue({ text: planJson, model: 'm', usage: usageStub });
 
     await stageImagesPlan(run, { complete: llmComplete });
 
-    expect(llmComplete).toHaveBeenCalledTimes(2);
-    // The correction names the offending slot, and rides on the same thread.
-    const retry = llmComplete.mock.calls[1]![0].messages.at(-1);
-    expect(retry.content).toContain('"cover" asks for split-screen');
+    expect(llmComplete).toHaveBeenCalledTimes(1);
     const slots = setImagePlan.mock.calls[0]![1] as ArticleImage[];
-    expect(slots[0]).toMatchObject({ role: 'cover', prompt: 'cover scene' });
+    expect(slots[0]!.prompt).toContain('A photograph of brass gear');
+    expect(slots[0]!.prompt).toContain('not a document, page, poster, slide or screen');
+    expect(slots[0]!.alt).toBe('cover alt');
+    expect(slots[1]!.prompt).toContain('coiled cable');
   });
 
-  test('a planner that will not stop asking for lettering falls back to wordless prompts', async () => {
+  test('objects that carry writing are dropped, leaving a safe subject prompt', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
-    const risky = JSON.stringify({
-      cover: { prompt: 'An infographic of the deploy flow', alt: 'cover alt' },
-      inline: [
-        {
-          prompt: 'A calm photo of a server rack',
-          alt: 'alt one',
-          section_heading: 'First Section',
+    llmComplete.mockResolvedValue({
+      text: JSON.stringify({
+        cover: {
+          subject: 'release pipelines',
+          objects: ['architecture diagram', 'deployment badge'],
+          alt: 'cover alt',
         },
-        { prompt: 'A whiteboard of notes', alt: 'alt two', section_heading: 'Second Section' },
-      ],
+        inline: [
+          { subject: 's1', objects: ['coiled cable'], alt: 'a1', section_heading: 'First Section' },
+          { subject: 's2', objects: ['stone tile'], alt: 'a2', section_heading: 'Second Section' },
+        ],
+      }),
+      model: 'm',
+      usage: usageStub,
     });
-    llmComplete.mockResolvedValue({ text: risky, model: 'm', usage: usageStub });
 
     await stageImagesPlan(run, { complete: llmComplete });
 
-    expect(llmComplete).toHaveBeenCalledTimes(3); // two retries, then give up on the planner
     const slots = setImagePlan.mock.calls[0]![1] as ArticleImage[];
-    expect(slots[0]!.prompt).toContain(article.title);
-    expect(slots[0]!.prompt).toContain('No text');
-    // The clean slot keeps the planner's own prompt; only risky ones are replaced.
-    expect(slots[1]!.prompt).toBe('A calm photo of a server rack');
-    expect(slots[2]!.prompt).toContain('Second Section');
+    expect(slots[0]!.prompt).toContain('evoking release pipelines');
+    expect(slots[0]!.prompt).not.toContain('diagram');
+    expect(slots[0]!.prompt).not.toContain('badge');
   });
 
   test('invalid plan marks images failed and rethrows', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({
-      text: JSON.stringify({ cover: { prompt: 'p', alt: 'a' }, inline: [] }),
+      text: JSON.stringify({ cover: { subject: 's', objects: [], alt: 'a' }, inline: [] }),
       model: 'm',
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2, costUsd: 0 },
     });

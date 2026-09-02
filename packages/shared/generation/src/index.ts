@@ -12,9 +12,7 @@ export { buildHumanizePrompt } from './humanize';
 export type { ImagePlan, ImagePlanInput } from './images';
 export {
   buildImagePlanPrompt,
-  buildImagePlanRetryPrompt,
   extractH2s,
-  findImagePlanTextRisks,
   findTextRisk,
   IMAGE_PLAN_RESPONSE_SCHEMA,
   ImagePlanSchema,
@@ -22,8 +20,9 @@ export {
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  photoPrompt,
+  usableObjects,
   withNoTextDirective,
-  wordlessPrompt,
 } from './images';
 export { parseJsonObject } from './json';
 export { verifyCandidates } from './link-verify';

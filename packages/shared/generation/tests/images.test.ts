@@ -2,25 +2,24 @@ import { describe, expect, test } from 'vitest';
 import { INLINE_IMAGE_COUNT } from '../src/config';
 import {
   buildImagePlanPrompt,
-  buildImagePlanRetryPrompt,
   extractH2s,
-  findImagePlanTextRisks,
   findTextRisk,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
+  photoPrompt,
+  usableObjects,
   withNoTextDirective,
-  wordlessPrompt,
 } from '../src/images';
 
 const content = '# Title\n\nintro\n\n## First Section\n\nbody one\n\n## Second Section\n\nbody two';
 const headings = ['First Section', 'Second Section'];
 
 const validPlan = {
-  cover: { prompt: 'a hero scene', alt: 'a hero image' },
+  cover: { subject: 'a hero idea', objects: ['brass gear'], alt: 'a hero image' },
   inline: [
-    { prompt: 'p1', alt: 'alt one', section_heading: 'First Section' },
-    { prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' },
+    { subject: 's1', objects: ['stone'], alt: 'alt one', section_heading: 'First Section' },
+    { subject: 's2', objects: ['rope'], alt: 'alt two', section_heading: 'Second Section' },
   ],
 };
 
@@ -58,16 +57,18 @@ describe('extractH2s', () => {
 });
 
 describe('buildImagePlanPrompt', () => {
+  const input = {
+    businessName: 'Acme',
+    businessDescription: 'widgets',
+    language: 'English',
+    imageStyle: 'flat illustration',
+    articleTitle: 'T',
+    metaDescription: 'M',
+    headings,
+  };
+
   test('carries headings, style, language, and the inline count', () => {
-    const messages = buildImagePlanPrompt({
-      businessName: 'Acme',
-      businessDescription: 'widgets',
-      language: 'English',
-      imageStyle: 'flat illustration',
-      articleTitle: 'T',
-      metaDescription: 'M',
-      headings,
-    });
+    const messages = buildImagePlanPrompt(input);
     expect(messages[0]!.role).toBe('system');
     expect(messages[0]!.content).toContain(`exactly ${INLINE_IMAGE_COUNT}`);
     expect(messages[0]!.content).toContain('English');
@@ -75,19 +76,14 @@ describe('buildImagePlanPrompt', () => {
     expect(messages[1]!.content).toContain('flat illustration');
   });
 
-  test('bans text and logos in the planned scene', () => {
-    const messages = buildImagePlanPrompt({
-      businessName: 'Acme',
-      businessDescription: 'widgets',
-      language: 'English',
-      imageStyle: '',
-      articleTitle: 'T',
-      metaDescription: 'M',
-      headings,
-    });
-    expect(messages[0]!.content).toContain('NO text and NO logos');
-    // An org whose image_style asks for screenshots must not win over the ban.
-    expect(messages[0]!.content).toContain('image style NEVER overrides these rules');
+  // #289: the planner used to write the prompt, and no wording stopped it
+  // asking for lettering. It now names objects and never sees a prompt.
+  test('asks for objects and says its answer is not the prompt', () => {
+    const system = String(buildImagePlanPrompt(input).at(0)!.content);
+    expect(system).toContain('objects');
+    expect(system).toContain('carries writing');
+    expect(system).toContain('You are NOT writing the image prompt');
+    expect(system).toContain('not "Raspberry Pi"');
   });
 });
 
@@ -116,8 +112,8 @@ describe('parseImagePlan', () => {
     const omitted = {
       ...validPlan,
       inline: [
-        { prompt: 'p1', alt: 'alt one' },
-        { prompt: 'p2', alt: 'alt two', section_heading: 'Second Section' },
+        { subject: 's1', objects: ['stone'], alt: 'alt one' },
+        { subject: 's2', objects: ['rope'], alt: 'alt two', section_heading: 'Second Section' },
       ],
     };
 
@@ -127,7 +123,10 @@ describe('parseImagePlan', () => {
   test('rejects unknown and duplicate headings, and empty alt', () => {
     const unknown = {
       ...validPlan,
-      inline: [validPlan.inline[0]!, { prompt: 'p', alt: 'a', section_heading: 'Nope' }],
+      inline: [
+        validPlan.inline[0]!,
+        { subject: 's', objects: [], alt: 'a', section_heading: 'Nope' },
+      ],
     };
     expect(() => parseImagePlan(JSON.stringify(unknown), headings)).toThrow(/unknown heading/);
 
@@ -137,7 +136,7 @@ describe('parseImagePlan', () => {
     };
     expect(() => parseImagePlan(JSON.stringify(dup), headings)).toThrow(/reuses heading/);
 
-    const emptyAlt = { ...validPlan, cover: { prompt: 'p', alt: '' } };
+    const emptyAlt = { ...validPlan, cover: { subject: 's', objects: [], alt: '' } };
     expect(() => parseImagePlan(JSON.stringify(emptyAlt), headings)).toThrow();
   });
 });
@@ -202,40 +201,50 @@ describe('findTextRisk', () => {
   // meant to survive this check.
 });
 
-describe('image plan text gate', () => {
-  const risky = {
-    cover: { prompt: 'An infographic of the deployment flow', alt: 'a' },
-    inline: [
-      { prompt: 'A calm photo of a server rack', alt: 'b', section_heading: 'First Section' },
-      {
-        prompt: 'A whiteboard covered in architecture notes',
-        alt: 'c',
-        section_heading: 'Second Section',
-      },
-    ],
-  };
+describe('photoPrompt', () => {
+  test('photographs the objects when there are any', () => {
+    const prompt = photoPrompt('deployment automation', ['server rack', 'coiled cable']);
+    expect(prompt).toContain('server rack, coiled cable');
+    expect(prompt).not.toContain('evoking deployment automation');
+    expect(findTextRisk(prompt)).toBeNull();
+  });
 
-  test('reports every offending slot with the term it asked for', () => {
-    expect(findImagePlanTextRisks(risky)).toEqual([
-      { slot: 'cover', term: 'infographic' },
-      { slot: 'Second Section', term: 'whiteboard' },
+  test('falls back to the subject when nothing usable survives', () => {
+    const prompt = photoPrompt('deployment automation', ['architecture diagram', 'laptop']);
+    expect(prompt).toContain('evoking deployment automation');
+    expect(findTextRisk(prompt)).toBeNull();
+  });
+
+  // Measured: given prose and no such clause, fal renders the prompt itself as
+  // a page of garbled text (#286).
+  test('always disclaims being a document', () => {
+    for (const prompt of [photoPrompt('a subject', []), photoPrompt('a subject', ['a stone'])]) {
+      expect(prompt).toContain('not a document, page, poster, slide or screen');
+    }
+  });
+});
+
+describe('usableObjects', () => {
+  test('keeps concrete objects, tidied', () => {
+    expect(usableObjects(['  server   rack ', 'network cable'])).toEqual([
+      'server rack',
+      'network cable',
     ]);
   });
 
-  test('a clean plan has no risks', () => {
-    expect(findImagePlanTextRisks(validPlan)).toEqual([]);
+  // A returned "deployment badge" came back stamped "NRLUMA B OLOPYMENT".
+  test('drops objects that carry writing in real life', () => {
+    expect(
+      usableObjects(['server rack', 'deployment badge', 'laptop', 'certificate', 'gear']),
+    ).toEqual(['server rack', 'gear']);
   });
 
-  test('the retry names each rejected slot and its term', () => {
-    const retry = buildImagePlanRetryPrompt(findImagePlanTextRisks(risky));
-    expect(retry.role).toBe('user');
-    expect(retry.content).toContain('"cover" asks for infographic');
-    expect(retry.content).toContain('"Second Section" asks for whiteboard');
+  test('drops objects that name a banned subject outright', () => {
+    expect(usableObjects(['architecture diagram', 'coiled cable'])).toEqual(['coiled cable']);
   });
 
-  test('the wordless fallback names the subject and is itself safe', () => {
-    const prompt = wordlessPrompt('Setting Up Your Home Server');
-    expect(prompt).toContain('Setting Up Your Home Server');
-    expect(findTextRisk(prompt)).toBeNull();
+  test('caps the list and tolerates an empty answer', () => {
+    expect(usableObjects(['a', 'b', 'c', 'd', 'e'])).toHaveLength(4);
+    expect(usableObjects([])).toEqual([]);
   });
 });
