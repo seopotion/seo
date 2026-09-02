@@ -21,6 +21,7 @@ const LLM_JSON = JSON.stringify({
   article_preferences: {
     content_seo: {
       article_style: 'Practical',
+      readability_grade_max: 10,
       llm_instructions: 'Be clear.',
     },
     engagement: { image_style: 'Clean, minimal' },
@@ -118,6 +119,41 @@ describe('scanWebsite', () => {
 
     await expect(
       scanWebsite('https://clewas.com', { llm: llmReturning('not json') }),
+    ).rejects.toThrow();
+  });
+
+  test('asks for a readability tier and lands it in presets (#313)', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    const presets = await scanWebsite('https://clewas.com', { llm });
+
+    const system = llm.complete.mock.calls[0]![0].messages[0]!.content;
+    expect(system).toContain('readability_grade_max');
+    expect(system).toContain('8 for general-public');
+    expect(system).toContain('12 for developers');
+    expect(presets.article_preferences.content_seo.readability_grade_max).toBe(10);
+
+    // The constraint must reach the provider, not just the post-parse (#313).
+    const { responseSchema } = llm.complete.mock.calls[0]![0];
+    const contentSeo = (
+      (
+        responseSchema?.schema.properties as Record<
+          string,
+          { properties?: Record<string, unknown> }
+        >
+      ).article_preferences?.properties as Record<string, { properties?: Record<string, unknown> }>
+    ).content_seo?.properties as Record<string, unknown>;
+    expect(contentSeo.readability_grade_max).toEqual({ type: 'number', enum: [8, 10, 12] });
+  });
+
+  test('rejects a readability tier outside 8 / 10 / 12 (#313)', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const off = JSON.parse(LLM_JSON);
+    off.article_preferences.content_seo.readability_grade_max = 9;
+
+    await expect(
+      scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(off)) }),
     ).rejects.toThrow();
   });
 });

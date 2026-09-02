@@ -23,7 +23,12 @@ const ScanOutputSchema = z.object({
   business: SetupPresetsSchema.shape.business,
   audience: z.object({ target: z.array(z.string()) }),
   article_preferences: z.object({
-    content_seo: z.object({ article_style: z.string(), llm_instructions: z.string() }),
+    content_seo: z.object({
+      article_style: z.string(),
+      llm_instructions: z.string(),
+      // Three reviewable tiers (#313); the preset itself allows 6–14 for edits.
+      readability_grade_max: z.literal([8, 10, 12]),
+    }),
     engagement: z.object({ image_style: z.string() }),
   }),
 });
@@ -53,6 +58,9 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'description is 2-4 sentences summarizing the business.',
     'target is an array of 3-7 short, distinct audience segments (one segment per entry —',
     'never a single comma-separated sentence). article_style / image_style are short phrases.',
+    'readability_grade_max is the highest acceptable Flesch-Kincaid grade for articles: 8 for general-public',
+    'or consumer audiences, 10 for business and professional audiences, 12 for developers, engineers,',
+    'scientists and other specialists.',
   ].join('\n');
 
   const user = pageText
