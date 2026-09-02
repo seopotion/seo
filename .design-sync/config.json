@@ -1,0 +1,111 @@
+{
+  "projectId": "cb0a9723-6c9b-470e-8d98-0c3bd1b30c3d",
+  "shape": "package",
+  "pkg": "@seopotion/web-ui",
+  "globalName": "SeoPotionUI",
+  "buildCmd": "node .design-sync/build.mjs",
+  "entry": ".design-sync/pkg/dist/index.js",
+  "srcDir": "../../apps/web/components/ui",
+  "tsconfig": "../../apps/web/tsconfig.json",
+  "cssEntry": "dist/styles.css",
+  "dtsPropsFor": {
+    "Button": "/** Visual style. `destructive` is a solid red fill with white text; `link` renders as inline text. */\nvariant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';\nsize?: 'default' | 'sm' | 'lg' | 'icon';\n/** Render the child element (e.g. an <a>) with button styling instead of a <button>. */\nasChild?: boolean;\n/** Defaults to \"button\" so a button inside a form never submits by accident. */\ntype?: 'button' | 'submit' | 'reset';\ndisabled?: boolean;\nonClick?: React.MouseEventHandler<HTMLButtonElement>;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;\nchildren?: React.ReactNode;",
+    "Input": "type?: 'text' | 'email' | 'password' | 'url' | 'number' | 'search' | 'tel' | 'date' | 'file';\nplaceholder?: string;\nvalue?: string | number;\ndefaultValue?: string | number;\ndisabled?: boolean;\nreadOnly?: boolean;\nrequired?: boolean;\nname?: string;\n/** Set to true to show the error border and ring. */\n'aria-invalid'?: boolean | 'true' | 'false';\nonChange?: React.ChangeEventHandler<HTMLInputElement>;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;",
+    "Textarea": "placeholder?: string;\nvalue?: string;\ndefaultValue?: string;\nrows?: number;\ndisabled?: boolean;\nreadOnly?: boolean;\nrequired?: boolean;\nname?: string;\n/** Set to true to show the error border and ring. */\n'aria-invalid'?: boolean | 'true' | 'false';\nonChange?: React.ChangeEventHandler<HTMLTextAreaElement>;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;",
+    "Label": "/** id of the control this label describes. */\nhtmlFor?: string;\nasChild?: boolean;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;\nchildren?: React.ReactNode;",
+    "Switch": "checked?: boolean;\ndefaultChecked?: boolean;\nonCheckedChange?: (checked: boolean) => void;\ndisabled?: boolean;\nrequired?: boolean;\nname?: string;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;",
+    "Select": "value?: string;\ndefaultValue?: string;\nonValueChange?: (value: string) => void;\nopen?: boolean;\ndefaultOpen?: boolean;\nonOpenChange?: (open: boolean) => void;\ndisabled?: boolean;\nrequired?: boolean;\nname?: string;\ndir?: 'ltr' | 'rtl';\n/** Compose: <SelectTrigger><SelectValue placeholder=… /></SelectTrigger> then <SelectContent> with <SelectItem>s. */\nchildren?: React.ReactNode;",
+    "Dialog": "open?: boolean;\ndefaultOpen?: boolean;\nonOpenChange?: (open: boolean) => void;\nmodal?: boolean;\n/** A <DialogContent> holding a <DialogTitle> and the body. */\nchildren?: React.ReactNode;",
+    "TableCell": "colSpan?: number;\nrowSpan?: number;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;\nchildren?: React.ReactNode;",
+    "TableHead": "colSpan?: number;\nrowSpan?: number;\nclassName?: string;\nid?: string;\nstyle?: React.CSSProperties;\nchildren?: React.ReactNode;"
+  },
+  "docsDir": "../docs",
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "960x640"
+    },
+    "DialogContent": {
+      "cardMode": "single",
+      "viewport": "960x640"
+    },
+    "DialogTitle": {
+      "cardMode": "single",
+      "viewport": "960x640"
+    },
+    "SelectContent": {
+      "cardMode": "single",
+      "viewport": "640x420"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "TableHeader": {
+      "cardMode": "column"
+    },
+    "TableBody": {
+      "cardMode": "column"
+    },
+    "TableRow": {
+      "cardMode": "column"
+    },
+    "TableHead": {
+      "cardMode": "column"
+    },
+    "TableCell": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "Select": {
+      "cardMode": "single",
+      "primaryStory": "Open",
+      "viewport": "640x420"
+    },
+    "SelectGroup": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    },
+    "SelectItem": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    },
+    "SelectLabel": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    },
+    "SelectScrollDownButton": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x600"
+    },
+    "SelectScrollUpButton": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x600"
+    },
+    "SelectSeparator": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    },
+    "SelectTrigger": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    },
+    "SelectValue": {
+      "cardMode": "single",
+      "primaryStory": "InSelect",
+      "viewport": "640x420"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraFonts": [
+    "../fonts.css"
+  ]
+}
