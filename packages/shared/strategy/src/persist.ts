@@ -113,8 +113,13 @@ export async function stagePersistSchedule(
     }
   }
 
+  // Start tomorrow (UTC): the generation cron runs at 07:00 UTC, so a plan
+  // stamped "today" for an org finalized after that hour has a day-1 slot
+  // already in the past, and listDueForGeneration catches days 1 and 2 up
+  // together the next morning (#292). Offset further by what a redelivered
+  // partial run already scheduled.
   const startDay = new Date();
-  startDay.setUTCDate(startDay.getUTCDate() + alreadyScheduled);
+  startDay.setUTCDate(startDay.getUTCDate() + 1 + alreadyScheduled);
   const occupied = new Set(scheduled.map((k) => k.scheduled_date));
   let qualifiedCount = 0;
   let scheduledCount = 0;

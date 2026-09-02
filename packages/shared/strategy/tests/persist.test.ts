@@ -322,4 +322,53 @@ describe('stagePersistSchedule', () => {
     expect(calls).toContain('persist');
     expect(calls).toContain('schedule');
   });
+
+  test('starts the plan on the next UTC day so day 1 is never behind the 07:00 UTC cron (#292)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-01T14:08:00.000Z'));
+    try {
+      findById.mockResolvedValue(org);
+      listByOrg.mockResolvedValue([]);
+      const candidates = [candidate('first', 90), candidate('second', 80)];
+
+      await stagePersistSchedule(state(candidates), { orgId: 'o1' });
+
+      expect(scheduleCandidate.mock.calls.map(([, date]) => date)).toEqual([
+        '2026-09-02',
+        '2026-09-03',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a top-up still offsets by the entries already scheduled, counted from tomorrow', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-01T23:59:00.000Z'));
+    try {
+      findById.mockResolvedValue(org);
+      listByOrg.mockResolvedValue([
+        {
+          keyword: 'old a',
+          opportunity_score: 50,
+          scheduled_date: '2026-09-10',
+          topic_role: 'pillar',
+          topic_cluster_id: 'topic:old a',
+        },
+        {
+          keyword: 'old b',
+          opportunity_score: 40,
+          scheduled_date: '2026-09-11',
+          topic_role: 'pillar',
+          topic_cluster_id: 'topic:old b',
+        },
+      ] as never);
+
+      await stagePersistSchedule(state([candidate('new', 90)]), { orgId: 'o1' });
+
+      expect(scheduleCandidate.mock.calls[0]![1]).toBe('2026-09-04');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
