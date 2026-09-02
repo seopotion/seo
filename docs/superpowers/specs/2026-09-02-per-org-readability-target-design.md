@@ -139,4 +139,7 @@ tier lands in presets and is editable afterwards from the settings page.
 
 Ships with the normal dev → staging flow. Staging: set piperbox to 12 from the
 settings page (or rescan) and confirm the next article passes humanize in one
-pass with `target_met: true`. Unmarble stays at 8.
+pass with `target_met: true`. Unmarble stays at 8. Also walk a full onboarding on a
+technical site and confirm the settings page shows "Technical" afterwards — the
+wizard's partial presets PATCH must not reset the scan-assigned tier (the
+`.partial()`-keeps-`.default()` trap fixed in `ContentSeoPatchSchema`).
