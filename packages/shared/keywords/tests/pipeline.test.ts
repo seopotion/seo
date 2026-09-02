@@ -584,10 +584,10 @@ describe('runKeywordPipeline', () => {
         config: relevanceFloor === undefined ? {} : { relevanceFloor },
       });
 
-    it('rejects exactly 0 and keeps 0.01 at the default floor', async () => {
+    it('rejects at or below the default floor and keeps just above it', async () => {
       const { candidates, stats } = await run({
-        'cheap dog food': 0.01,
-        'dog food delivery': 0,
+        'cheap dog food': 0.3,
+        'dog food delivery': 0.25,
       });
       const byKeyword = new Map(candidates.map((c) => [c.keyword, c]));
       expect(byKeyword.get('dog food delivery')!.rejection_reason).toBe('relevance_floor');
