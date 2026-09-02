@@ -168,19 +168,14 @@ describe('persistStrategyCandidates (integration)', () => {
     });
   });
 
-  test('preserves selected and rejected lifecycle while refreshing topic metadata', async () => {
+  test('preserves operator decisions (selected, admin-rejected) while refreshing topic metadata', async () => {
     const [selected] = await CandidateRepo.insertMany(ORG, [
       { org_id: ORG, keyword: 'Selected topic', source: 'manual' },
     ]);
     await CandidateRepo.claimForScheduling(selected!.id);
-    const [rejected] = await CandidateRepo.insertMany(ORG, [
-      {
-        org_id: ORG,
-        keyword: 'Rejected topic',
-        source: 'manual',
-        status: 'rejected',
-        rejection_reason: 'relevance_floor',
-      },
+    // An admin reject carries no rejection_reason (CandidateRepo.rejectIfCandidate).
+    const [adminRejected] = await CandidateRepo.insertMany(ORG, [
+      { org_id: ORG, keyword: 'Admin rejected topic', source: 'manual', status: 'rejected' },
     ]);
 
     const persisted = await persistStrategyCandidates(ORG, [
@@ -189,7 +184,7 @@ describe('persistStrategyCandidates (integration)', () => {
         status: 'rejected',
         rejection_reason: 'topic_duplicate',
       }),
-      strategyCandidate('rejected topic', { topic_cluster_id: 'topic:current rejected' }),
+      strategyCandidate('admin rejected topic', { topic_cluster_id: 'topic:current rejected' }),
     ]);
 
     expect(persisted[0]).toMatchObject({
@@ -200,11 +195,44 @@ describe('persistStrategyCandidates (integration)', () => {
       opportunity_score: 0.84,
     });
     expect(persisted[1]).toMatchObject({
-      id: rejected!.id,
+      id: adminRejected!.id,
       status: 'rejected',
-      rejection_reason: 'relevance_floor',
+      rejection_reason: null,
       topic_cluster_id: 'topic:current rejected',
       opportunity_score: 0.84,
+    });
+  });
+
+  test("a rerun refreshes an earlier run's rejection so the keyword can be scheduled (#301)", async () => {
+    const [first] = await persistStrategyCandidates(ORG, [
+      strategyCandidate('virtual fitting room', {
+        status: 'rejected',
+        rejection_reason: 'serp_intent',
+      }),
+    ]);
+    expect(first).toMatchObject({ status: 'rejected', rejection_reason: 'serp_intent' });
+
+    const [second] = await persistStrategyCandidates(ORG, [
+      strategyCandidate('virtual fitting room', { topic_cluster_id: 'topic:rerun' }),
+    ]);
+    expect(second).toMatchObject({
+      id: first!.id,
+      status: 'candidate',
+      rejection_reason: null,
+      topic_cluster_id: 'topic:rerun',
+    });
+
+    // A rerun that rejects again records the new reason, not the old one.
+    const [third] = await persistStrategyCandidates(ORG, [
+      strategyCandidate('virtual fitting room', {
+        status: 'rejected',
+        rejection_reason: 'topic_duplicate',
+      }),
+    ]);
+    expect(third).toMatchObject({
+      id: first!.id,
+      status: 'rejected',
+      rejection_reason: 'topic_duplicate',
     });
   });
 
