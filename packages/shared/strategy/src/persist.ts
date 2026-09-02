@@ -30,13 +30,14 @@ function nextFreeDate(from: string, occupied: Set<string>): string {
 
 type SemanticPipelineTarget = EnrichedCandidate & TopicCandidateTarget;
 
+// difficulty null = unknown KD, scored as neutral ease (score.ts) — still
+// schedulable; it dropped the product's own core term on unmarble (#294).
 function semanticTargetPool(candidates: readonly EnrichedCandidate[]): SemanticPipelineTarget[] {
   return candidates.filter(
     (candidate) =>
       candidate.serp_validated &&
       candidate.rejection_reason === null &&
-      candidate.search_volume !== null &&
-      candidate.difficulty !== null,
+      candidate.search_volume !== null,
   ) as SemanticPipelineTarget[];
 }
 
@@ -52,8 +53,7 @@ function isEligibleStoredCandidate(candidate: Candidate): boolean {
     (candidate.status === 'candidate' || candidate.status === 'selected') &&
     candidate.rejection_reason === null &&
     candidate.serp_validated &&
-    candidate.search_volume !== null &&
-    candidate.difficulty !== null
+    candidate.search_volume !== null
   );
 }
 
