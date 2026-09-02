@@ -351,14 +351,14 @@ describe('stagePersistSchedule', () => {
         {
           keyword: 'old a',
           opportunity_score: 50,
-          scheduled_date: '2026-09-02',
+          scheduled_date: '2026-09-10',
           topic_role: 'pillar',
           topic_cluster_id: 'topic:old a',
         },
         {
           keyword: 'old b',
           opportunity_score: 40,
-          scheduled_date: '2026-09-03',
+          scheduled_date: '2026-09-11',
           topic_role: 'pillar',
           topic_cluster_id: 'topic:old b',
         },
