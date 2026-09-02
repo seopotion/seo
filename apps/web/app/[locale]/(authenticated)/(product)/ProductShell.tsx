@@ -103,8 +103,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 md:flex" style={productShellStyle}>
-      <aside className="border-slate-200 border-b bg-white md:fixed md:inset-y-0 md:left-0 md:w-(--product-sidebar-width) md:border-r md:border-b-0">
+    <div className="min-h-screen bg-muted/50 text-foreground md:flex" style={productShellStyle}>
+      <aside className="border-border border-b bg-card md:fixed md:inset-y-0 md:left-0 md:w-(--product-sidebar-width) md:border-r md:border-b-0">
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center gap-3 px-5">
             <Image src="/android-chrome-192x192.png" alt={t('logoAlt')} width={36} height={36} />
@@ -125,8 +125,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
                   className={cn(
                     'flex h-10 items-center gap-3 px-3 font-medium text-sm transition-colors',
                     active
-                      ? 'bg-slate-200'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+                      ? 'bg-muted'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                 >
                   <Icon className="size-4" aria-hidden="true" />
@@ -139,10 +139,10 @@ export function ProductShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col md:pl-(--product-sidebar-width)">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-slate-200 border-b bg-white/95 px-4 backdrop-blur sm:px-6">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-border border-b bg-card/95 px-4 backdrop-blur sm:px-6">
           <div>
-            <p className="font-semibold text-slate-950 text-sm">{topbarTitle}</p>
-            <p className="text-slate-500 text-xs">{topbarDescription}</p>
+            <p className="font-semibold text-foreground text-sm">{topbarTitle}</p>
+            <p className="text-muted-foreground text-xs">{topbarDescription}</p>
           </div>
           <div className="flex items-center gap-2">
             <LocaleSwitcher />

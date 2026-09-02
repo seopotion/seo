@@ -31,8 +31,8 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 
   if (guardState !== 'authorized') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <p className="font-medium text-slate-600 text-sm">{t('checkingSession')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-muted/50 px-4">
+        <p className="font-medium text-muted-foreground text-sm">{t('checkingSession')}</p>
       </main>
     );
   }

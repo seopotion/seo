@@ -53,7 +53,7 @@ function CellValue({
     return (
       <svg
         aria-label={includedLabel}
-        className="mx-auto h-5 w-5 text-green-500"
+        className="mx-auto h-5 w-5 text-success"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -67,7 +67,7 @@ function CellValue({
     return (
       <svg
         aria-label={notIncludedLabel}
-        className="mx-auto h-5 w-5 text-gray-300"
+        className="mx-auto h-5 w-5 text-muted-foreground/40"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -116,19 +116,21 @@ export default function PricingPage() {
       />
       <div className="mx-auto max-w-6xl px-6 pt-20 pb-24">
         <div className="mb-12 text-center">
-          <h1 className="mb-4 font-bold text-4xl text-gray-900 md:text-5xl">{t('title')}</h1>
-          <p className="mx-auto max-w-2xl text-gray-600 text-lg">{t('description')}</p>
+          <h1 className="mb-4 font-bold text-4xl text-foreground md:text-5xl">{t('title')}</h1>
+          <p className="mx-auto max-w-2xl text-muted-foreground text-lg">{t('description')}</p>
         </div>
 
         <div className="mb-10 flex items-center justify-center gap-3">
-          <span className={`font-medium text-sm ${annual ? 'text-gray-500' : 'text-gray-900'}`}>
+          <span
+            className={`font-medium text-sm ${annual ? 'text-muted-foreground' : 'text-foreground'}`}
+          >
             {t('monthly')}
           </span>
           <button
             type="button"
             onClick={() => setAnnual((value) => !value)}
             className={`relative h-6 w-11 rounded-full transition-colors ${
-              annual ? 'bg-amber-500' : 'bg-gray-300'
+              annual ? 'bg-amber-500' : 'bg-input'
             }`}
             aria-label={t('toggleAnnualBilling')}
             aria-pressed={annual}
@@ -139,9 +141,11 @@ export default function PricingPage() {
               }`}
             />
           </button>
-          <span className={`font-medium text-sm ${annual ? 'text-gray-900' : 'text-gray-500'}`}>
+          <span
+            className={`font-medium text-sm ${annual ? 'text-foreground' : 'text-muted-foreground'}`}
+          >
             {t('annual')}
-            <span className="ml-1 font-semibold text-green-600 text-xs">{t('save')}</span>
+            <span className="ml-1 font-semibold text-success text-xs">{t('save')}</span>
           </span>
         </div>
 
@@ -152,33 +156,33 @@ export default function PricingPage() {
               className={`mx-auto flex w-full max-w-90 flex-col rounded-2xl border p-6 ${
                 card.highlight
                   ? 'border-amber-400 bg-amber-50/50 shadow-amber-100 shadow-lg'
-                  : 'border-gray-200'
+                  : 'border-border'
               }`}
             >
               {card.highlight && (
-                <span className="mb-3 self-start rounded-full bg-amber-400 px-2.5 py-0.5 font-semibold text-white text-xs">
+                <span className="mb-3 self-start rounded-full bg-amber-400 px-2.5 py-0.5 font-semibold text-background text-xs">
                   {t('mostPopular')}
                 </span>
               )}
 
-              <h2 className="font-bold text-gray-900 text-xl">{card.name}</h2>
-              <p className="mt-1 mb-4 text-gray-500 text-sm">{card.description}</p>
+              <h2 className="font-bold text-foreground text-xl">{card.name}</h2>
+              <p className="mt-1 mb-4 text-muted-foreground text-sm">{card.description}</p>
               {card.clarification ? (
-                <p className="-mt-2 mb-4 text-gray-500 text-xs">{card.clarification}</p>
+                <p className="-mt-2 mb-4 text-muted-foreground text-xs">{card.clarification}</p>
               ) : null}
 
               <div className="mb-6">
                 {card.monthlyPrice !== null ? (
                   <>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="font-bold text-3xl text-gray-900">
+                      <span className="font-bold text-3xl text-foreground">
                         ${annual ? Math.round(card.annualPrice / 12) : card.monthlyPrice}
                       </span>
-                      <span className="text-gray-500 text-sm">/{t('monthShort')}</span>
+                      <span className="text-muted-foreground text-sm">/{t('monthShort')}</span>
                     </div>
                     <p
                       aria-hidden={!annual}
-                      className={`mt-1 h-4 text-gray-500 text-xs ${annual ? '' : 'invisible'}`}
+                      className={`mt-1 h-4 text-muted-foreground text-xs ${annual ? '' : 'invisible'}`}
                     >
                       {t('annualTotal', {
                         price: card.annualPrice.toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US'),
@@ -186,16 +190,16 @@ export default function PricingPage() {
                     </p>
                   </>
                 ) : (
-                  <span className="font-bold text-3xl text-gray-900">{t('free')}</span>
+                  <span className="font-bold text-3xl text-foreground">{t('free')}</span>
                 )}
               </div>
 
               <ul className="mb-6 flex-1 space-y-2">
                 {card.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-gray-700 text-sm">
+                  <li key={feature} className="flex items-start gap-2 text-foreground text-sm">
                     <svg
                       aria-hidden="true"
-                      className="mt-0.5 h-4 w-4 shrink-0 text-green-500"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-success"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -212,15 +216,13 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <p className="mb-3 text-center font-medium text-green-700 text-xs">
-                {t('guarantee')}
-              </p>
+              <p className="mb-3 text-center font-medium text-success text-xs">{t('guarantee')}</p>
               <Link
                 href="/"
                 className={`block w-full rounded-lg px-4 py-2.5 text-center font-medium text-sm transition-colors ${
                   card.highlight
-                    ? 'bg-gray-900 text-white hover:bg-gray-800'
-                    : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-foreground text-background hover:bg-foreground/90'
+                    : 'border border-border text-foreground hover:bg-muted/50'
                 }`}
               >
                 {card.cta}
@@ -230,35 +232,35 @@ export default function PricingPage() {
         </div>
 
         <section className="mb-16">
-          <h2 className="mb-8 text-center font-bold text-2xl text-gray-900">
+          <h2 className="mb-8 text-center font-bold text-2xl text-foreground">
             {t('comparison.title')}
           </h2>
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-gray-200 border-b">
-                  <th className="w-1/3 px-4 py-3 text-left font-medium text-gray-500">
+                <tr className="border-border border-b">
+                  <th className="w-1/3 px-4 py-3 text-left font-medium text-muted-foreground">
                     {t('comparison.feature')}
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-amber-600">Growth</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-500">
+                  <th className="px-4 py-3 text-center font-medium text-muted-foreground">
                     {t('comparison.business')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {comparisonRows.map((row) => (
-                  <tr key={row.label} className="border-gray-100 border-b">
-                    <td className="px-4 py-3 text-gray-700">{row.label}</td>
-                    <td className="px-4 py-3 text-center text-gray-600">
+                  <tr key={row.label} className="border-border border-b">
+                    <td className="px-4 py-3 text-foreground">{row.label}</td>
+                    <td className="px-4 py-3 text-center text-muted-foreground">
                       <CellValue
                         includedLabel={t('included')}
                         notIncludedLabel={t('notIncluded')}
                         value={row.growth}
                       />
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-center text-foreground">
                       <CellValue
                         includedLabel={t('included')}
                         notIncludedLabel={t('notIncluded')}
@@ -272,33 +274,33 @@ export default function PricingPage() {
           </div>
 
           <details className="md:hidden">
-            <summary className="cursor-pointer py-3 text-center font-medium text-gray-700 text-sm hover:text-gray-900">
+            <summary className="cursor-pointer py-3 text-center font-medium text-foreground text-sm hover:text-foreground">
               {t('comparison.expand')}
             </summary>
             <table className="mt-2 w-full border-collapse text-sm">
               <thead>
-                <tr className="border-gray-200 border-b">
-                  <th className="w-1/3 px-4 py-3 text-left font-medium text-gray-500">
+                <tr className="border-border border-b">
+                  <th className="w-1/3 px-4 py-3 text-left font-medium text-muted-foreground">
                     {t('comparison.feature')}
                   </th>
                   <th className="px-4 py-3 text-center font-medium text-amber-600">Growth</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-500">
+                  <th className="px-4 py-3 text-center font-medium text-muted-foreground">
                     {t('comparison.business')}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {comparisonRows.map((row) => (
-                  <tr key={row.label} className="border-gray-100 border-b">
-                    <td className="px-4 py-3 text-gray-700">{row.label}</td>
-                    <td className="px-4 py-3 text-center text-gray-600">
+                  <tr key={row.label} className="border-border border-b">
+                    <td className="px-4 py-3 text-foreground">{row.label}</td>
+                    <td className="px-4 py-3 text-center text-muted-foreground">
                       <CellValue
                         includedLabel={t('included')}
                         notIncludedLabel={t('notIncluded')}
                         value={row.growth}
                       />
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-center text-foreground">
                       <CellValue
                         includedLabel={t('included')}
                         notIncludedLabel={t('notIncluded')}
@@ -313,11 +315,11 @@ export default function PricingPage() {
         </section>
 
         <section className="mb-16">
-          <h2 className="mb-8 text-center font-bold text-2xl text-gray-900">{t('faqTitle')}</h2>
+          <h2 className="mb-8 text-center font-bold text-2xl text-foreground">{t('faqTitle')}</h2>
           <div className="mx-auto max-w-3xl space-y-4">
             {faq.map((item) => (
-              <details key={item.q} className="group rounded-lg border border-gray-200">
-                <summary className="flex cursor-pointer items-center justify-between px-5 py-4 font-medium text-gray-900 text-sm group-open:text-amber-600">
+              <details key={item.q} className="group rounded-lg border border-border">
+                <summary className="flex cursor-pointer items-center justify-between px-5 py-4 font-medium text-foreground text-sm group-open:text-amber-600">
                   {item.q}
                   <svg
                     aria-hidden="true"
@@ -334,13 +336,13 @@ export default function PricingPage() {
                     />
                   </svg>
                 </summary>
-                <p className="px-5 pb-4 text-gray-600 text-sm">{item.a}</p>
+                <p className="px-5 pb-4 text-muted-foreground text-sm">{item.a}</p>
               </details>
             ))}
           </div>
         </section>
 
-        <p className="text-center text-gray-500 text-sm">{t('footerNote')}</p>
+        <p className="text-center text-muted-foreground text-sm">{t('footerNote')}</p>
       </div>
     </main>
   );

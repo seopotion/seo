@@ -92,30 +92,30 @@ export default async function DocPage({
         type="application/ld+json"
       />
 
-      <nav aria-label={t('breadcrumbLabel')} className="text-gray-500 text-sm">
+      <nav aria-label={t('breadcrumbLabel')} className="text-muted-foreground text-sm">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link className="no-underline hover:text-gray-900" href="/docs">
+            <Link className="no-underline hover:text-foreground" href="/docs">
               {t('home')}
             </Link>
           </li>
           <li aria-hidden="true">/</li>
           <li>{groupLabel}</li>
           <li aria-hidden="true">/</li>
-          <li className="text-gray-900">{frontmatter.title}</li>
+          <li className="text-foreground">{frontmatter.title}</li>
         </ol>
       </nav>
 
-      <header className="mt-4 border-gray-100 border-b pb-8">
-        <h1 className="font-bold text-3xl text-gray-900 md:text-4xl">{frontmatter.title}</h1>
-        <p className="mt-3 text-gray-600 text-lg">{frontmatter.description}</p>
+      <header className="mt-4 border-border border-b pb-8">
+        <h1 className="font-bold text-3xl text-foreground md:text-4xl">{frontmatter.title}</h1>
+        <p className="mt-3 text-muted-foreground text-lg">{frontmatter.description}</p>
       </header>
 
       <div className="mt-10">
         <Body />
       </div>
 
-      <p className="mt-12 text-gray-500 text-sm">
+      <p className="mt-12 text-muted-foreground text-sm">
         {t('updated', {
           date: format.dateTime(new Date(frontmatter.updated), { dateStyle: 'long' }),
         })}
@@ -124,30 +124,30 @@ export default async function DocPage({
       {previous || next ? (
         <nav
           aria-label={t('pagerLabel')}
-          className="mt-6 grid gap-3 border-gray-100 border-t pt-6 sm:grid-cols-2"
+          className="mt-6 grid gap-3 border-border border-t pt-6 sm:grid-cols-2"
         >
           {previous && previousMeta ? (
             <Link
-              className="rounded-xl border border-gray-200 p-4 no-underline transition-colors hover:border-amber-300"
+              className="rounded-xl border border-border p-4 no-underline transition-colors hover:border-amber-300"
               href={docPath(previous.slug)}
             >
-              <span className="block text-gray-500 text-xs uppercase tracking-wide">
+              <span className="block text-muted-foreground text-xs uppercase tracking-wide">
                 {t('previous')}
               </span>
-              <span className="mt-1 block font-medium text-gray-900">{previousMeta.title}</span>
+              <span className="mt-1 block font-medium text-foreground">{previousMeta.title}</span>
             </Link>
           ) : (
             <span />
           )}
           {next && nextMeta ? (
             <Link
-              className="rounded-xl border border-gray-200 p-4 text-right no-underline transition-colors hover:border-amber-300 sm:col-start-2"
+              className="rounded-xl border border-border p-4 text-right no-underline transition-colors hover:border-amber-300 sm:col-start-2"
               href={docPath(next.slug)}
             >
-              <span className="block text-gray-500 text-xs uppercase tracking-wide">
+              <span className="block text-muted-foreground text-xs uppercase tracking-wide">
                 {t('next')}
               </span>
-              <span className="mt-1 block font-medium text-gray-900">{nextMeta.title}</span>
+              <span className="mt-1 block font-medium text-foreground">{nextMeta.title}</span>
             </Link>
           ) : null}
         </nav>

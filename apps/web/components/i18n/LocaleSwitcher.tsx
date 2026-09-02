@@ -14,7 +14,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     <nav
       aria-label={t('label')}
       className={cn(
-        'inline-flex h-9 shrink-0 items-center rounded-md border border-slate-200 bg-white p-0.5 text-xs shadow-xs',
+        'inline-flex h-9 shrink-0 items-center rounded-md border border-border bg-card p-0.5 text-xs shadow-xs',
         className,
       )}
     >
@@ -26,7 +26,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
             aria-current={active ? 'true' : undefined}
             className={cn(
               'flex h-7 min-w-9 items-center justify-center rounded-sm px-2 font-semibold transition-colors',
-              active ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100',
+              active ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted',
             )}
             href={pathname}
             key={locale}

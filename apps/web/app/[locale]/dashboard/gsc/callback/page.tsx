@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { hasLocale, useLocale, useTranslations } from 'next-intl';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, PageTitle, StatusPanel } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
 import { api } from '@/lib/api';
@@ -109,23 +109,21 @@ function CallbackInner() {
 
   return (
     <main className="mx-auto grid min-h-screen max-w-md content-start gap-4 px-4 py-16">
-      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="font-semibold text-lg text-slate-950">{t('title')}</h1>
+      <div className="grid gap-4 rounded-lg border border-border bg-card p-6 shadow-sm">
+        <PageTitle>{t('title')}</PageTitle>
 
         {errorKey ? (
           <>
-            <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
-              {t(`errors.${errorKey}`)}
-            </p>
+            <StatusPanel tone="error">{t(`errors.${errorKey}`)}</StatusPanel>
             <Button asChild variant="outline" className="w-fit">
               <Link href={SETTINGS_HREF}>{t('backToSettings')}</Link>
             </Button>
           </>
         ) : !sites ? (
-          <p className="text-slate-600 text-sm">{t('exchanging')}</p>
+          <p className="text-muted-foreground text-sm">{t('exchanging')}</p>
         ) : sites.length === 0 ? (
           <>
-            <p className="text-slate-600 text-sm">{t('noSites')}</p>
+            <p className="text-muted-foreground text-sm">{t('noSites')}</p>
             <div className="flex flex-wrap gap-2">
               <Button asChild className="w-fit">
                 <a href={GSC_CONSOLE_URL} rel="noopener noreferrer" target="_blank">
@@ -140,8 +138,8 @@ function CallbackInner() {
         ) : (
           <>
             <div>
-              <p className="font-medium text-slate-950 text-sm">{t('pickTitle')}</p>
-              <p className="mt-1 text-slate-500 text-sm">{t('pickBody')}</p>
+              <p className="font-medium text-foreground text-sm">{t('pickTitle')}</p>
+              <p className="mt-1 text-muted-foreground text-sm">{t('pickBody')}</p>
             </div>
             <fieldset className="grid gap-2">
               <legend className="sr-only">{t('pickTitle')}</legend>
@@ -153,8 +151,8 @@ function CallbackInner() {
                     className={cn(
                       'flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
                       isSelected
-                        ? 'border-slate-900 bg-slate-50'
-                        : 'border-slate-200 hover:border-slate-300',
+                        ? 'border-foreground bg-muted/50'
+                        : 'border-border hover:border-border',
                       saving && 'cursor-not-allowed opacity-60',
                     )}
                   >
@@ -168,19 +166,14 @@ function CallbackInner() {
                     />
                     <span className="grid min-w-0 gap-0.5">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="truncate font-medium text-slate-950 text-sm">
+                        <span className="truncate font-medium text-foreground text-sm">
                           {site.site_url}
                         </span>
                         {recommended === site.site_url ? (
-                          <Badge
-                            variant="secondary"
-                            className="border-transparent bg-emerald-100 text-emerald-700"
-                          >
-                            {t('recommended')}
-                          </Badge>
+                          <Badge variant="success">{t('recommended')}</Badge>
                         ) : null}
                       </span>
-                      <span className="text-slate-500 text-xs">{site.permission_level}</span>
+                      <span className="text-muted-foreground text-xs">{site.permission_level}</span>
                     </span>
                   </label>
                 );

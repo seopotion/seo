@@ -20,8 +20,8 @@ export function WebsiteScanStep({
 
   return (
     <div>
-      <h2 className="font-bold text-2xl text-gray-900">{t('title')}</h2>
-      <p className="mt-2 text-gray-600 text-sm">{t('description')}</p>
+      <h2 className="font-bold text-2xl text-foreground">{t('title')}</h2>
+      <p className="mt-2 text-muted-foreground text-sm">{t('description')}</p>
 
       <div className="mt-6">
         <Label htmlFor="websiteUrl">{t('websiteUrl')}</Label>
@@ -42,8 +42,8 @@ export function WebsiteScanStep({
           {scanState === 'scanning' ? t('scanningButton') : t('scanButton')}
         </Button>
         {scanState === 'complete' && (
-          <Alert className="border-emerald-200 bg-emerald-50 py-2 text-emerald-900 sm:flex-1">
-            <AlertDescription className="text-emerald-800">{t('completeMessage')}</AlertDescription>
+          <Alert className="border-success-border bg-success-subtle py-2 text-success sm:flex-1">
+            <AlertDescription className="text-success">{t('completeMessage')}</AlertDescription>
           </Alert>
         )}
         {scanState === 'scanning' && (

@@ -3,13 +3,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { Badge, Button } from '@/components/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { Badge, Button, StatusPanel } from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { GSC_RETURN_LOCALE_KEY, useGscStatus } from '@/lib/gsc';
 import type { ProductOrganization } from '@/lib/organizations';
-import { cn } from '@/lib/utils';
 
 /**
  * Settings → Google Search Console (#12). Drives the OAuth connect flow: the
@@ -125,33 +124,30 @@ export function GoogleSearchConsolePanel({
     <div className="grid gap-4">
       {justConnected ? <StatusPanel tone="success">{t('connectedSuccess')}</StatusPanel> : null}
 
-      <div className="grid gap-4 rounded-md border border-slate-200 bg-white p-4">
-        <p className="text-slate-500 text-sm">{t('description')}</p>
+      <div className="grid gap-4 rounded-md border border-border bg-card p-4">
+        <p className="text-muted-foreground text-sm">{t('description')}</p>
 
         {statusQuery.isPending ? (
-          <p className="text-slate-500 text-sm">{t('statusLoading')}</p>
+          <p className="text-muted-foreground text-sm">{t('statusLoading')}</p>
         ) : statusQuery.isError ? (
           <StatusPanel tone="error">{t('statusError')}</StatusPanel>
         ) : status?.connected ? (
           <div className="grid gap-3">
-            <Badge
-              variant="secondary"
-              className="w-fit border-transparent bg-emerald-100 text-emerald-700"
-            >
+            <Badge variant="success" className="w-fit">
               {t('badges.connected')}
             </Badge>
             <dl className="grid gap-2 text-sm">
               <div className="grid gap-0.5">
-                <dt className="text-slate-500 text-xs">{t('connectedAccount')}</dt>
-                <dd className="truncate text-slate-950">{status.google_email}</dd>
+                <dt className="text-muted-foreground text-xs">{t('connectedAccount')}</dt>
+                <dd className="truncate text-foreground">{status.google_email}</dd>
               </div>
               <div className="grid gap-0.5">
-                <dt className="text-slate-500 text-xs">{t('property')}</dt>
-                <dd className="truncate text-slate-950">{status.site_url}</dd>
+                <dt className="text-muted-foreground text-xs">{t('property')}</dt>
+                <dd className="truncate text-foreground">{status.site_url}</dd>
               </div>
             </dl>
             {status.connected_at ? (
-              <p className="text-slate-500 text-xs">
+              <p className="text-muted-foreground text-xs">
                 {t('connectedOn', { date: dateFormatter.format(new Date(status.connected_at)) })}
               </p>
             ) : null}
@@ -173,7 +169,7 @@ export function GoogleSearchConsolePanel({
               </Button>
               {confirmingDisconnect ? (
                 <>
-                  <span className="text-slate-600 text-sm">{t('disconnectConfirm')}</span>
+                  <span className="text-muted-foreground text-sm">{t('disconnectConfirm')}</span>
                   <Button
                     type="button"
                     variant="destructive"
@@ -198,7 +194,7 @@ export function GoogleSearchConsolePanel({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-fit text-red-600 hover:text-red-700"
+                  className="w-fit text-error hover:text-error"
                   onClick={() => setConfirmingDisconnect(true)}
                 >
                   {t('disconnect')}
@@ -220,17 +216,17 @@ export function GoogleSearchConsolePanel({
           </div>
         ) : (
           <div className="grid gap-4">
-            <ul className="grid gap-2 text-slate-600 text-sm">
+            <ul className="grid gap-2 text-muted-foreground text-sm">
               <li className="flex items-start gap-2">
-                <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
                 {t('benefit1')}
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-success" />
                 {t('benefit2')}
               </li>
             </ul>
-            <p className="text-slate-500 text-xs">{t('readOnlyNote')}</p>
+            <p className="text-muted-foreground text-xs">{t('readOnlyNote')}</p>
             <Button
               type="button"
               className="w-fit"
@@ -244,28 +240,6 @@ export function GoogleSearchConsolePanel({
 
         {connectError ? <StatusPanel tone="error">{t('connectError')}</StatusPanel> : null}
       </div>
-    </div>
-  );
-}
-
-function StatusPanel({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: 'error' | 'success' | 'warning';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
-      )}
-    >
-      {children}
     </div>
   );
 }

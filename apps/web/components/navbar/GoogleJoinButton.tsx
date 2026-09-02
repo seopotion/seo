@@ -159,7 +159,7 @@ export function GoogleJoinButton() {
         <div className="absolute inset-0 overflow-hidden opacity-0" ref={mobileContainerRef} />
       </div>
       {errorLabel ? (
-        <p className="max-w-44 text-right text-red-600 text-xs leading-snug">{errorLabel}</p>
+        <p className="max-w-44 text-right text-error text-xs leading-snug">{errorLabel}</p>
       ) : null}
     </div>
   );

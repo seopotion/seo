@@ -104,23 +104,23 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
         type="application/ld+json"
       />
 
-      <nav aria-label="Breadcrumb" className="text-gray-500 text-sm">
+      <nav aria-label="Breadcrumb" className="text-muted-foreground text-sm">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link className="no-underline hover:text-gray-900" href="/blog">
+            <Link className="no-underline hover:text-foreground" href="/blog">
               Blog
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li className="text-gray-900">{frontmatter.title}</li>
+          <li className="text-foreground">{frontmatter.title}</li>
         </ol>
       </nav>
 
-      <header className="mt-4 max-w-3xl border-gray-100 border-b pb-8">
-        <h1 className="font-bold text-3xl text-gray-900 md:text-4xl">{frontmatter.title}</h1>
-        <p className="mt-3 text-gray-600 text-lg">{frontmatter.description}</p>
-        <p className="mt-5 flex flex-wrap items-center gap-x-2 text-gray-500 text-sm">
-          <span className="font-medium text-gray-700">{frontmatter.author}</span>
+      <header className="mt-4 max-w-3xl border-border border-b pb-8">
+        <h1 className="font-bold text-3xl text-foreground md:text-4xl">{frontmatter.title}</h1>
+        <p className="mt-3 text-muted-foreground text-lg">{frontmatter.description}</p>
+        <p className="mt-5 flex flex-wrap items-center gap-x-2 text-muted-foreground text-sm">
+          <span className="font-medium text-foreground">{frontmatter.author}</span>
           <span aria-hidden="true">·</span>
           <time dateTime={frontmatter.date}>{formatPostDate(frontmatter.date)}</time>
           <span aria-hidden="true">·</span>
@@ -129,7 +129,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       </header>
 
       {frontmatter.cover ? (
-        <div className="relative mt-8 aspect-ratio overflow-hidden rounded-xl border border-gray-200">
+        <div className="relative mt-8 aspect-ratio overflow-hidden rounded-xl border border-border">
           <Image
             alt={frontmatter.coverAlt ?? ''}
             className="object-cover"
@@ -146,20 +146,22 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           <Body />
 
           {frontmatter.updated ? (
-            <p className="mt-12 text-gray-500 text-sm">
+            <p className="mt-12 text-muted-foreground text-sm">
               Last updated {formatPostDate(frontmatter.updated)}
             </p>
           ) : null}
 
           <aside className="mt-12 rounded-2xl border border-amber-200 bg-amber-50/60 p-6 sm:p-8">
-            <h2 className="font-bold text-gray-900 text-xl">Put a month of content on autopilot</h2>
-            <p className="mt-2 text-gray-600 leading-relaxed">
+            <h2 className="font-bold text-foreground text-xl">
+              Put a month of content on autopilot
+            </h2>
+            <p className="mt-2 text-muted-foreground leading-relaxed">
               Seopotion scans your site, researches your keywords, plans 30 days of articles, writes
               them, and publishes to WordPress or your own site — with you reviewing whatever you
               want to review.
             </p>
             <Link
-              className="mt-5 inline-flex rounded-lg bg-orange-400 px-5 py-3 font-medium text-sm text-white no-underline transition-colors hover:bg-orange-500"
+              className="mt-5 inline-flex rounded-lg bg-orange-400 px-5 py-3 font-medium text-sm text-background no-underline transition-colors hover:bg-orange-500"
               href="/pricing"
             >
               See plans
@@ -169,17 +171,17 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           {newer || older ? (
             <nav
               aria-label="More posts"
-              className="mt-12 grid gap-3 border-gray-100 border-t pt-6 sm:grid-cols-2"
+              className="mt-12 grid gap-3 border-border border-t pt-6 sm:grid-cols-2"
             >
               {newer ? (
                 <Link
-                  className="rounded-xl border border-gray-200 p-4 no-underline transition-colors hover:border-amber-300"
+                  className="rounded-xl border border-border p-4 no-underline transition-colors hover:border-amber-300"
                   href={blogPath(newer.slug)}
                 >
-                  <span className="block text-gray-500 text-xs uppercase tracking-wide">
+                  <span className="block text-muted-foreground text-xs uppercase tracking-wide">
                     Newer post
                   </span>
-                  <span className="mt-1 block font-medium text-gray-900">
+                  <span className="mt-1 block font-medium text-foreground">
                     {newer.frontmatter.title}
                   </span>
                 </Link>
@@ -188,13 +190,13 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
               )}
               {older ? (
                 <Link
-                  className="rounded-xl border border-gray-200 p-4 text-right no-underline transition-colors hover:border-amber-300 sm:col-start-2"
+                  className="rounded-xl border border-border p-4 text-right no-underline transition-colors hover:border-amber-300 sm:col-start-2"
                   href={blogPath(older.slug)}
                 >
-                  <span className="block text-gray-500 text-xs uppercase tracking-wide">
+                  <span className="block text-muted-foreground text-xs uppercase tracking-wide">
                     Older post
                   </span>
-                  <span className="mt-1 block font-medium text-gray-900">
+                  <span className="mt-1 block font-medium text-foreground">
                     {older.frontmatter.title}
                   </span>
                 </Link>

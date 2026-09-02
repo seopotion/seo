@@ -2,12 +2,10 @@
 
 import { useMutation } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button, StatusPanel } from '@/components/ui';
 import { api } from '@/lib/api';
 import type { ProductOrganization } from '@/lib/organizations';
-import { cn } from '@/lib/utils';
 
 /** Portal entry point for an org that already has a subscription. The page
  * renders this only when `capabilities.keyword_research` is true. */
@@ -54,9 +52,9 @@ export function ManageSubscriptionCard({
   }
 
   return (
-    <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-4">
+    <div className="grid gap-3 rounded-md border border-border bg-card p-4">
       {portalError ? <StatusPanel tone="error">{t('error')}</StatusPanel> : null}
-      <p className="text-slate-600 text-sm">{t('description')}</p>
+      <p className="text-muted-foreground text-sm">{t('description')}</p>
       <Button
         className="w-fit"
         disabled={!organization || portalMutation.isPending}
@@ -65,20 +63,6 @@ export function ManageSubscriptionCard({
       >
         {portalMutation.isPending ? t('opening') : t('open')}
       </Button>
-    </div>
-  );
-}
-
-function StatusPanel({ children, tone }: { children: ReactNode; tone: 'error' }) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-      )}
-    >
-      {children}
     </div>
   );
 }

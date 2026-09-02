@@ -12,12 +12,14 @@ export function TableOfContents({ headings }: { headings: Heading[] }) {
 
   return (
     <nav aria-label="On this page" className="text-sm">
-      <p className="font-semibold text-gray-400 text-xs uppercase tracking-wide">On this page</p>
-      <ol className="mt-3 grid gap-2 border-gray-100 border-l pl-4">
+      <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+        On this page
+      </p>
+      <ol className="mt-3 grid gap-2 border-border border-l pl-4">
         {headings.map((heading) => (
           <li className={heading.depth === 3 ? 'pl-3' : undefined} key={heading.id}>
             <a
-              className="text-gray-600 no-underline transition-colors hover:text-amber-700"
+              className="text-muted-foreground no-underline transition-colors hover:text-amber-700"
               href={`#${heading.id}`}
             >
               {heading.text}

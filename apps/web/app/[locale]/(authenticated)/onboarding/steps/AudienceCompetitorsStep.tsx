@@ -33,7 +33,7 @@ export function AudienceCompetitorsStep({
 
   return (
     <div>
-      <h2 className="font-bold text-2xl text-gray-900">{t('title')}</h2>
+      <h2 className="font-bold text-2xl text-foreground">{t('title')}</h2>
 
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <TextEntryList
@@ -63,7 +63,7 @@ export function AudienceCompetitorsStep({
             placeholder="competitor.com"
           />
 
-          <p className="mt-2 text-gray-500 text-sm">{t('competitorsHint')}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{t('competitorsHint')}</p>
         </div>
       </div>
     </div>

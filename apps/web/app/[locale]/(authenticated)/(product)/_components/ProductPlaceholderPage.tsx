@@ -6,10 +6,10 @@ export function ProductPlaceholderPage() {
 
   return (
     <div>
-      <Card className="max-w-3xl border-slate-200 shadow-none">
+      <Card className="max-w-3xl border-border shadow-none">
         <CardContent>
-          <p className="font-medium text-slate-900 text-sm">{t('title')}</p>
-          <p className="mt-2 text-slate-600 text-sm">{t('description')}</p>
+          <p className="font-medium text-foreground text-sm">{t('title')}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{t('description')}</p>
         </CardContent>
       </Card>
     </div>

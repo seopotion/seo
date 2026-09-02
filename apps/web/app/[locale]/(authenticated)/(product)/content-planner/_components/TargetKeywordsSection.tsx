@@ -13,10 +13,18 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Badge, Button } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { cn } from '@/lib/utils';
@@ -202,10 +210,10 @@ export function TargetKeywordsSection({
     <section aria-labelledby="target-keywords-heading" className="grid gap-3">
       <header className="flex min-h-10 flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="min-w-0">
-          <h2 id="target-keywords-heading" className="font-semibold text-base text-slate-950">
+          <h2 id="target-keywords-heading" className="font-semibold text-base text-foreground">
             {t('title')}
           </h2>
-          <p className="mt-0.5 text-slate-600 text-sm">{t('description')}</p>
+          <p className="mt-0.5 text-muted-foreground text-sm">{t('description')}</p>
         </div>
         <div className="grid shrink-0 gap-1 sm:justify-items-end">
           <Button
@@ -223,7 +231,7 @@ export function TargetKeywordsSection({
             {t('actions.research')}
           </Button>
           {researchAvailable && !canResearch ? (
-            <p className="text-amber-700 text-xs">{t('researchPaidFeature')}</p>
+            <p className="text-warning text-xs">{t('researchPaidFeature')}</p>
           ) : null}
         </div>
       </header>
@@ -231,7 +239,7 @@ export function TargetKeywordsSection({
       {loadError ? (
         <div
           role="alert"
-          className="flex flex-col items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-rose-700 text-sm sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col items-start gap-2 rounded-md border border-error-border bg-error-subtle px-4 py-3 text-error text-sm sm:flex-row sm:items-center sm:justify-between"
         >
           <span>{t('states.loadError')}</span>
           <Button type="button" variant="outline" size="sm" onClick={onRetry}>
@@ -242,30 +250,30 @@ export function TargetKeywordsSection({
 
       {hasRows ? (
         <>
-          <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block">
-            <table aria-label={t('tableLabel')} className="w-full table-fixed text-left text-sm">
-              <thead className="border-slate-200 border-b bg-slate-50 text-slate-600">
-                <tr>
-                  <TableHeading className="w-[30%]">{t('columns.keyword')}</TableHeading>
-                  <TableHeading>{t('columns.difficulty')}</TableHeading>
-                  <TableHeading ariaSort={sortKey === 'volume' ? 'descending' : 'none'}>
+          <div className="hidden overflow-hidden rounded-lg border border-border bg-card md:block">
+            <Table aria-label={t('tableLabel')} className="table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%]">{t('columns.keyword')}</TableHead>
+                  <TableHead>{t('columns.difficulty')}</TableHead>
+                  <TableHead aria-sort={sortKey === 'volume' ? 'descending' : 'none'}>
                     <SortHeaderButton
                       active={sortKey === 'volume'}
                       label={t('columns.volume')}
                       onSort={() => applySort('volume')}
                       sortLabel={t('sort.byDescending', { column: t('columns.volume') })}
                     />
-                  </TableHeading>
-                  <TableHeading>{t('columns.intent')}</TableHeading>
-                  <TableHeading ariaSort={sortKey === 'opportunityScore' ? 'descending' : 'none'}>
+                  </TableHead>
+                  <TableHead>{t('columns.intent')}</TableHead>
+                  <TableHead aria-sort={sortKey === 'opportunityScore' ? 'descending' : 'none'}>
                     <SortHeaderButton
                       active={sortKey === 'opportunityScore'}
                       label={t('columns.opportunityScore')}
                       onSort={() => applySort('opportunityScore')}
                       sortLabel={t('sort.byDescending', { column: t('columns.opportunityScore') })}
                     />
-                  </TableHeading>
-                  <TableHeading>
+                  </TableHead>
+                  <TableHead>
                     <StatusFilterHeader
                       label={t('columns.status')}
                       onClear={clearStatusFilter}
@@ -273,17 +281,17 @@ export function TargetKeywordsSection({
                       selected={statusFilter}
                       t={t}
                     />
-                  </TableHeading>
-                  <TableHeading className="w-32">
+                  </TableHead>
+                  <TableHead className="w-32">
                     <span className="sr-only">{t('columns.action')}</span>
-                  </TableHeading>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {visibleKeywords.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center">
-                      <div className="grid justify-items-center gap-2 text-slate-600 text-sm">
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center">
+                      <div className="grid justify-items-center gap-2 text-muted-foreground text-sm">
                         <span>{t('states.noFilterMatches')}</span>
                         <Button
                           type="button"
@@ -294,26 +302,26 @@ export function TargetKeywordsSection({
                           {t('filter.clear')}
                         </Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : null}
                 {visibleKeywords.map((targetKeyword) => (
-                  <tr key={`${targetKeyword.source}-${targetKeyword.id}`}>
-                    <td className="truncate px-4 py-3 font-medium text-slate-950">
+                  <TableRow key={`${targetKeyword.source}-${targetKeyword.id}`}>
+                    <TableCell className="truncate font-medium text-foreground">
                       {targetKeyword.keyword}
-                    </td>
+                    </TableCell>
                     <MetricCell value={targetKeyword.difficulty} locale={locale} t={t} />
                     <MetricCell value={targetKeyword.volume} locale={locale} t={t} />
-                    <td className="truncate px-4 py-3 text-slate-600">
+                    <TableCell className="truncate text-muted-foreground">
                       {targetKeyword.intent
                         ? t(`intents.${targetKeyword.intent}`)
                         : t('notAvailable')}
-                    </td>
+                    </TableCell>
                     <MetricCell value={targetKeyword.opportunityScore} locale={locale} t={t} />
-                    <td className="px-4 py-3">
+                    <TableCell>
                       <TargetKeywordStatusBadge status={targetKeyword.status} t={t} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       {targetKeyword.source === 'candidate' ? (
                         <DeleteCandidateAction
                           confirming={confirmingId === targetKeyword.id}
@@ -327,26 +335,26 @@ export function TargetKeywordsSection({
                           t={t}
                         />
                       ) : null}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           <ul aria-label={t('listLabel')} className="grid list-none gap-2 md:hidden">
             {visibleKeywords.length === 0 ? (
-              <li className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-slate-600 text-sm">
+              <li className="rounded-lg border border-border bg-card px-4 py-8 text-center text-muted-foreground text-sm">
                 {t('states.noFilterMatches')}
               </li>
             ) : null}
             {visibleKeywords.map((targetKeyword) => (
               <li
                 key={`${targetKeyword.source}-${targetKeyword.id}`}
-                className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3"
+                className="grid gap-3 rounded-lg border border-border bg-card p-3"
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                  <h3 className="min-w-0 wrap-break-words font-semibold text-slate-950 text-sm">
+                  <h3 className="min-w-0 wrap-break-words font-semibold text-foreground text-sm">
                     {targetKeyword.keyword}
                   </h3>
                   <TargetKeywordStatusBadge status={targetKeyword.status} t={t} />
@@ -398,7 +406,7 @@ export function TargetKeywordsSection({
       {hasRows && loading ? (
         <div
           role="status"
-          className="flex items-center justify-center gap-2 text-slate-600 text-sm"
+          className="flex items-center justify-center gap-2 text-muted-foreground text-sm"
         >
           <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
           <span>{t('states.loading')}</span>
@@ -438,11 +446,11 @@ function PaginationControls({
   return (
     <nav
       aria-label={t('pagination.label')}
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 rounded-lg border border-border bg-card px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="min-w-0">
-        <p className="truncate text-slate-700 text-sm">{rangeLabel}</p>
-        <p className="mt-0.5 truncate text-slate-500 text-xs">
+        <p className="truncate text-foreground text-sm">{rangeLabel}</p>
+        <p className="mt-0.5 truncate text-muted-foreground text-xs">
           {t('pagination.perPage', { count: KEYWORDS_PER_PAGE })}
         </p>
       </div>
@@ -459,7 +467,7 @@ function PaginationControls({
           <ChevronLeft className="size-4" aria-hidden="true" />
           {t('pagination.previous')}
         </Button>
-        <span className="min-w-20 text-center font-medium text-slate-600 text-sm">
+        <span className="min-w-20 text-center font-medium text-muted-foreground text-sm">
           {t('pagination.page', { page: currentPage, totalPages })}
         </span>
         <Button
@@ -499,7 +507,7 @@ function DeleteCandidateAction({
         type="button"
         variant={confirming ? 'outline' : 'ghost'}
         size={confirming ? 'sm' : 'icon'}
-        className={cn(confirming ? 'text-rose-700' : 'size-8 text-slate-500 hover:text-rose-700')}
+        className={cn(confirming ? 'text-error' : 'size-8 text-muted-foreground hover:text-error')}
         aria-label={t(confirming ? 'actions.confirmDelete' : 'actions.delete', { keyword })}
         disabled={pending}
         onClick={onDelete}
@@ -512,31 +520,11 @@ function DeleteCandidateAction({
         {confirming && !pending ? t('actions.confirmDeleteLabel') : null}
       </Button>
       {error ? (
-        <p role="alert" className="max-w-44 text-rose-700 text-xs">
+        <p role="alert" className="max-w-44 text-error text-xs">
           {t(`deleteErrors.${error}`)}
         </p>
       ) : null}
     </div>
-  );
-}
-
-function TableHeading({
-  ariaSort,
-  children,
-  className,
-}: {
-  ariaSort?: 'ascending' | 'descending' | 'none';
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <th
-      aria-sort={ariaSort}
-      scope="col"
-      className={cn('px-4 py-2 font-semibold text-xs', className)}
-    >
-      {children}
-    </th>
   );
 }
 
@@ -558,7 +546,7 @@ function SortHeaderButton({
       onClick={onSort}
       className={cn(
         'group -mx-1 flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        active ? 'text-slate-900' : 'text-slate-600 hover:text-slate-900',
+        active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <span>{label}</span>
@@ -566,7 +554,7 @@ function SortHeaderButton({
         aria-hidden="true"
         className={cn(
           'size-3.5 transition-opacity',
-          active ? 'text-sky-600 opacity-100' : 'opacity-40 group-hover:opacity-70',
+          active ? 'text-info opacity-100' : 'opacity-40 group-hover:opacity-70',
         )}
       />
     </button>
@@ -649,16 +637,16 @@ function StatusFilterHeader({
         onClick={() => setOpen((current) => !current)}
         className={cn(
           '-mx-1 flex items-center gap-1 rounded px-1 py-0.5 font-semibold text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          filtering ? 'text-sky-700' : 'text-slate-600 hover:text-slate-900',
+          filtering ? 'text-info' : 'text-muted-foreground hover:text-foreground',
         )}
       >
         <span>{label}</span>
         <ListFilter
           aria-hidden="true"
-          className={cn('size-3.5', filtering ? 'text-sky-600' : 'opacity-40')}
+          className={cn('size-3.5', filtering ? 'text-info' : 'opacity-40')}
         />
         {filtering ? (
-          <span className="flex min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 font-semibold text-[10px] text-white leading-4">
+          <span className="flex min-w-4 items-center justify-center rounded-full bg-info px-1 font-semibold text-[10px] text-white leading-4">
             {activeCount}
           </span>
         ) : null}
@@ -667,16 +655,18 @@ function StatusFilterHeader({
         ? createPortal(
             <div
               ref={panelRef}
-              className="z-50 w-56 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+              className="z-50 w-56 rounded-lg border border-border bg-card p-1 shadow-lg"
               style={{ left: coords.left, position: 'fixed', top: coords.top }}
             >
               <div className="flex items-center justify-between px-2 py-1.5">
-                <span className="font-medium text-slate-500 text-xs">{t('filter.heading')}</span>
+                <span className="font-medium text-muted-foreground text-xs">
+                  {t('filter.heading')}
+                </span>
                 <button
                   type="button"
                   disabled={!filtering}
                   onClick={onClear}
-                  className="rounded px-1 py-0.5 font-medium text-sky-700 text-xs transition-colors hover:text-sky-800 disabled:cursor-default disabled:text-slate-300"
+                  className="rounded px-1 py-0.5 font-medium text-info text-xs transition-colors hover:text-info disabled:cursor-default disabled:text-muted-foreground/50"
                 >
                   {t('filter.clear')}
                 </button>
@@ -691,12 +681,12 @@ function StatusFilterHeader({
                         type="button"
                         aria-pressed={checked}
                         onClick={() => onToggle(status)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         <span
                           className={cn(
                             'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
-                            checked ? 'border-sky-600 bg-sky-600 text-white' : 'border-slate-300',
+                            checked ? 'border-info-border bg-info text-white' : 'border-input',
                           )}
                         >
                           {checked ? <Check className="size-3" aria-hidden="true" /> : null}
@@ -748,14 +738,14 @@ function MetricCell({
   t: ReturnType<typeof useTranslations<'ContentPlannerPage.targetKeywords'>>;
   value: number | null;
 }) {
-  return <td className="px-4 py-3 text-slate-600">{formatMetric(value, locale, t)}</td>;
+  return <TableCell className="text-muted-foreground">{formatMetric(value, locale, t)}</TableCell>;
 }
 
 function MobileMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 truncate font-medium text-slate-800 text-sm">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 truncate font-medium text-foreground text-sm">{value}</dd>
     </div>
   );
 }
@@ -772,11 +762,11 @@ function TargetKeywordStatusBadge({
       variant="secondary"
       className={cn(
         'border-transparent',
-        status === 'available' && 'bg-slate-200 text-slate-700',
-        status === 'scheduled' && 'bg-sky-100 text-sky-700',
-        status === 'generating' && 'bg-amber-100 text-amber-700',
-        status === 'generated' && 'bg-emerald-100 text-emerald-700',
-        status === 'failed' && 'bg-rose-100 text-rose-700',
+        status === 'available' && 'bg-muted text-foreground',
+        status === 'scheduled' && 'bg-info-muted text-info',
+        status === 'generating' && 'bg-warning-muted text-warning',
+        status === 'generated' && 'bg-success-muted text-success',
+        status === 'failed' && 'bg-error-muted text-error',
       )}
     >
       {t(`statuses.${status}`)}
@@ -796,14 +786,14 @@ function TargetKeywordState({
   return (
     <div
       role={loading ? 'status' : undefined}
-      className="flex min-h-28 items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-8 text-center"
+      className="flex min-h-28 items-center justify-center rounded-lg border border-border bg-card px-6 py-8 text-center"
     >
       <div className="grid justify-items-center gap-1.5">
         {loading ? (
-          <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
+          <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
         ) : null}
-        {title ? <h3 className="font-semibold text-slate-950 text-sm">{title}</h3> : null}
-        <p className="text-slate-600 text-sm">{message}</p>
+        {title ? <h3 className="font-semibold text-foreground text-sm">{title}</h3> : null}
+        <p className="text-muted-foreground text-sm">{message}</p>
       </div>
     </div>
   );

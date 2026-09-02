@@ -37,7 +37,7 @@ export function TextEntryList({
   return (
     <div>
       <Label htmlFor={inputId}>{label}</Label>
-      {description && <p className="mt-1 text-gray-600 text-sm">{description}</p>}
+      {description && <p className="mt-1 text-muted-foreground text-sm">{description}</p>}
       <div className="mt-2 flex gap-2">
         <Input
           id={inputId}

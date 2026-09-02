@@ -79,38 +79,38 @@ export function ArticleEditorPanel({
 
   return (
     <>
-      <header className="flex shrink-0 flex-col gap-3 border-slate-200 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <header className="flex shrink-0 flex-col gap-3 border-border border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h2
               id={ARTICLE_EDITOR_TITLE_ID}
-              className="min-w-0 truncate font-semibold text-base text-slate-950"
+              className="min-w-0 truncate font-semibold text-base text-foreground"
             >
               {t('title')}
             </h2>
             <ArticleEditorStatusBadge status={draftArticle.status} t={t} />
           </div>
-          <p className="mt-1 truncate text-slate-600 text-sm">{draftArticle.title}</p>
+          <p className="mt-1 truncate text-muted-foreground text-sm">{draftArticle.title}</p>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
           {saving ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 font-medium text-slate-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 font-medium text-foreground text-xs">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
               {t('status.saving')}
             </span>
           ) : saveState === 'error' ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1 font-medium text-red-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-error-subtle px-2.5 py-1 font-medium text-error text-xs">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {t('status.saveFailed')}
             </span>
           ) : dirty ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 font-medium text-amber-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-warning-subtle px-2.5 py-1 font-medium text-warning text-xs">
               <AlertTriangle className="size-3.5" aria-hidden="true" />
               {t('status.unsavedChanges')}
             </span>
           ) : saveState === 'saved' ? (
-            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 text-xs">
+            <span className="inline-flex min-h-8 items-center gap-1.5 rounded-md bg-success-subtle px-2.5 py-1 font-medium text-success text-xs">
               <Check className="size-3.5" aria-hidden="true" />
               {t('actions.saved')}
             </span>
@@ -259,7 +259,7 @@ export function ArticleEditorPanel({
                 </div>
               </div>
 
-              <fieldset className="inline-flex w-fit rounded-md border border-slate-200 bg-slate-100 p-1">
+              <fieldset className="inline-flex w-fit rounded-md border border-border bg-muted p-1">
                 <legend className="sr-only">{t('tabs.label')}</legend>
                 <SegmentedButton
                   active={editorMode === 'editor'}
@@ -285,28 +285,28 @@ export function ArticleEditorPanel({
                 onChange={(event) => onUpdateDraftField('content', event.target.value)}
               />
             ) : (
-              <div className="min-h-90 rounded-md border border-slate-200 bg-white p-4 lg:min-h-107">
+              <div className="min-h-90 rounded-md border border-border bg-card p-4 lg:min-h-107">
                 {draftArticle.content.trim() ? (
                   <ArticleContentPreview content={draftArticle.content} />
                 ) : (
-                  <p className="text-slate-500">{t('preview.empty')}</p>
+                  <p className="text-muted-foreground">{t('preview.empty')}</p>
                 )}
               </div>
             )}
           </section>
         </main>
 
-        <aside className="grid content-start gap-5 border-slate-200 border-t bg-slate-50 p-4 sm:p-5 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l">
+        <aside className="grid content-start gap-5 border-border border-t bg-muted/50 p-4 sm:p-5 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           {context ? (
             <section className="grid gap-3">
-              <h3 className="font-semibold text-slate-950 text-sm">{t('sections.context')}</h3>
+              <h3 className="font-semibold text-foreground text-sm">{t('sections.context')}</h3>
               {context}
             </section>
           ) : null}
 
           <section className="grid gap-3">
             <div className="flex min-w-0 items-center justify-between gap-3">
-              <h3 className="truncate font-semibold text-slate-950 text-sm">
+              <h3 className="truncate font-semibold text-foreground text-sm">
                 {t('fields.featuredImage')}
               </h3>
               <ImageStatusBadge status={draftArticle.imagesStatus} t={t} />
@@ -319,12 +319,12 @@ export function ArticleEditorPanel({
                 width={640}
                 height={360}
                 unoptimized
-                className="aspect-video w-full rounded-md border border-slate-200 object-cover"
+                className="aspect-video w-full rounded-md border border-border object-cover"
               />
             ) : (
-              <div className="grid aspect-video place-items-center rounded-md border border-dashed border-slate-300 bg-white text-center text-slate-500 text-sm">
+              <div className="grid aspect-video place-items-center rounded-md border border-dashed border-border bg-card text-center text-muted-foreground text-sm">
                 <div className="grid justify-items-center gap-2 px-4">
-                  <ImageIcon className="size-6 text-slate-400" aria-hidden="true" />
+                  <ImageIcon className="size-6 text-muted-foreground" aria-hidden="true" />
                   <span>{t('fields.featuredImagePlaceholder')}</span>
                 </div>
               </div>
@@ -333,10 +333,10 @@ export function ArticleEditorPanel({
         </aside>
       </div>
 
-      <footer className="shrink-0 border-slate-200 border-t bg-white">
+      <footer className="shrink-0 border-border border-t bg-card">
         {saveError ? (
-          <div className="border-red-200 border-b bg-red-50 px-4 py-3 sm:px-5">
-            <p className="text-red-800 text-sm">
+          <div className="border-error-border border-b bg-error-subtle px-4 py-3 sm:px-5">
+            <p className="text-error text-sm">
               {saveError === 'invalid'
                 ? t('status.saveInvalid')
                 : saveError === 'not_found'
@@ -347,8 +347,8 @@ export function ArticleEditorPanel({
         ) : null}
 
         {showCloseConfirmation ? (
-          <div className="flex flex-col gap-3 border-amber-200 border-b bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <p className="text-amber-800 text-sm">{t('closeConfirmation.description')}</p>
+          <div className="flex flex-col gap-3 border-warning-border border-b bg-warning-subtle px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-warning text-sm">{t('closeConfirmation.description')}</p>
             <div className="flex flex-wrap gap-2">
               <Button type="button" size="sm" variant="outline" onClick={onDiscardAndClose}>
                 {t('actions.discard')}
@@ -360,7 +360,7 @@ export function ArticleEditorPanel({
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2 px-4 py-3 text-slate-500 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex flex-col gap-2 px-4 py-3 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <span className="truncate">{draftArticle.id}</span>
           <span className="truncate">{updatedAtLabel}</span>
         </div>
@@ -385,10 +385,10 @@ export function ArticleEditorMessage({
     <>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 id={ARTICLE_EDITOR_TITLE_ID} className="font-semibold text-base text-slate-950">
+          <h2 id={ARTICLE_EDITOR_TITLE_ID} className="font-semibold text-base text-foreground">
             {t('title')}
           </h2>
-          <p className="mt-2 text-slate-600 text-sm">{message}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{message}</p>
         </div>
         <Button
           type="button"
@@ -431,10 +431,10 @@ export function ArticleEditorStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'published'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'deleted'
-            ? 'bg-rose-100 text-rose-700'
-            : 'bg-sky-100 text-sky-700',
+            ? 'bg-error-muted text-error'
+            : 'bg-info-muted text-info',
       )}
     >
       {t(`articleStatuses.${status}`)}
@@ -446,8 +446,8 @@ export function ArticleEditorStatusBadge({
 export function ArticleEditorDetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="min-w-0 wrap-break-word font-medium text-slate-950">{value}</dd>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 wrap-break-word font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -465,10 +465,10 @@ function ImageStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'complete'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'failed'
-            ? 'bg-rose-100 text-rose-700'
-            : 'bg-amber-100 text-amber-700',
+            ? 'bg-error-muted text-error'
+            : 'bg-warning-muted text-warning',
       )}
     >
       {t(`imageStatuses.${status}`)}
@@ -496,7 +496,7 @@ function EditorField({
   return (
     <div className="grid content-start gap-2">
       <div className="flex min-w-0 items-center justify-between gap-3">
-        <Label htmlFor={id} className="min-w-0 truncate text-slate-700">
+        <Label htmlFor={id} className="min-w-0 truncate text-foreground">
           {label}
         </Label>
         {meta ? <div className="shrink-0">{meta}</div> : null}
@@ -507,7 +507,7 @@ function EditorField({
           {message ? (
             <FieldMessage tone={invalid ? 'error' : 'warning'}>{message}</FieldMessage>
           ) : null}
-          {hint ? <p className="text-slate-500 text-xs">{hint}</p> : null}
+          {hint ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
         </div>
       ) : null}
     </div>
@@ -516,12 +516,7 @@ function EditorField({
 
 function FieldMessage({ children, tone }: { children: ReactNode; tone: 'error' | 'warning' }) {
   return (
-    <p
-      className={cn(
-        'wrap-break-word text-xs',
-        tone === 'error' ? 'text-red-600' : 'text-amber-700',
-      )}
-    >
+    <p className={cn('wrap-break-word text-xs', tone === 'error' ? 'text-error' : 'text-warning')}>
       {children}
     </p>
   );
@@ -529,7 +524,7 @@ function FieldMessage({ children, tone }: { children: ReactNode; tone: 'error' |
 
 function Counter({ current, max, warning }: { current: number; max: number; warning: boolean }) {
   return (
-    <span className={cn('text-xs', warning ? 'text-amber-700' : 'text-slate-500')}>
+    <span className={cn('text-xs', warning ? 'text-warning' : 'text-muted-foreground')}>
       {current} / {max}
     </span>
   );
@@ -552,7 +547,9 @@ function SegmentedButton({
       aria-pressed={active}
       className={cn(
         'inline-flex min-h-8 items-center gap-1.5 rounded px-2.5 font-semibold text-xs transition-colors',
-        active ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950',
+        active
+          ? 'bg-card text-foreground shadow-xs'
+          : 'text-muted-foreground hover:text-foreground',
       )}
       onClick={onClick}
     >
