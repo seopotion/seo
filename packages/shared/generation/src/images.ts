@@ -209,7 +209,9 @@ function scene(
         objects.length > 0 ? `, with ${list} in their natural setting` : ''
       }.`;
     case 'abstract':
-      return `${lead}: abstract shapes, light and texture evoking ${subject}, with no recognisable objects.`;
+      // "Light and texture" alone rendered as an out-of-focus blur; asking for
+      // sharp, textured surfaces keeps it abstract without turning to mush.
+      return `${lead}: an abstract composition of geometric shapes, textured surfaces and light evoking ${subject}, sharp and detailed, with no recognisable objects.`;
     case 'silhouette':
       return `${lead} of ${list} in silhouette against a bright, plain background.`;
     case 'top_down':

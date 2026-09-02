@@ -305,7 +305,7 @@ describe('imagePrompt', () => {
     ],
     [
       'abstract',
-      'abstract shapes, light and texture evoking deployment automation, with no recognisable objects',
+      'an abstract composition of geometric shapes, textured surfaces and light evoking deployment automation, sharp and detailed, with no recognisable objects',
     ],
     ['silhouette', 'server rack, coiled cable in silhouette against a bright, plain background'],
     ['top_down', 'server rack, coiled cable seen from directly above, laid out on a plain surface'],
@@ -326,7 +326,7 @@ describe('imagePrompt', () => {
         'photograph',
         slot({ composition, objects: ['architecture diagram', 'laptop'] }),
       );
-      expect(prompt).toContain('abstract shapes, light and texture evoking deployment automation');
+      expect(prompt).toContain('textured surfaces and light evoking deployment automation');
       expect(prompt).not.toContain('diagram');
     }
   });

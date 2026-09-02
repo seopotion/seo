@@ -268,7 +268,7 @@ describe('stageImagesPlan', () => {
     expect(slots[0]!.prompt).toContain('not a document, page, poster, slide, chart or screen');
     expect(slots[0]!.alt).toBe('cover alt');
     expect(slots[1]!.prompt).toContain('an extreme close-up of coiled cable');
-    expect(slots[2]!.prompt).toContain('abstract shapes, light and texture evoking s2');
+    expect(slots[2]!.prompt).toContain('textured surfaces and light evoking s2');
   });
 
   test('objects that carry writing are dropped, downgrading the slot to abstract', async () => {
