@@ -95,6 +95,20 @@ export async function stagePersistSchedule(
   const storedByNormalized = new Map(persisted.map((c) => [c.normalized_keyword, c]));
 
   const scheduledSet = new Set(scheduled.map((k) => normalizeKeyword(k.keyword)));
+  // A target's members (its topic_duplicate variants) may already be on the
+  // planner under an earlier run's primary — "virtual try on" scheduled, then a
+  // rerun makes "virtual try-on" the primary. Dedupe on every member (#303).
+  const membersByPrimary = new Map<string, Set<string>>();
+  for (const c of allCandidates) {
+    if (!c.topic_primary_keyword) continue;
+    const primary = normalizeKeyword(c.topic_primary_keyword);
+    const members = membersByPrimary.get(primary) ?? new Set<string>();
+    members.add(normalizeKeyword(c.keyword));
+    membersByPrimary.set(primary, members);
+  }
+  const alreadyPlanned = (normalized: string): boolean =>
+    scheduledSet.has(normalized) ||
+    [...(membersByPrimary.get(normalized) ?? [])].some((m) => scheduledSet.has(m));
   // Strategy entries this job wrote carry a non-null opportunity_score; manual #50
   // selections go to the candidate pool (not KeywordRepo), so this proxy counts
   // only prior strategy output. Budget the remaining 30-day plan against them and
@@ -126,7 +140,7 @@ export async function stagePersistSchedule(
 
   for (const target of orderedTargets) {
     const normalized = normalizeKeyword(target.keyword);
-    if (scheduledSet.has(normalized)) {
+    if (alreadyPlanned(normalized)) {
       if (target.topic_role === 'pillar') confirmedTopicClusters.add(target.topic_cluster_id);
       continue;
     }
