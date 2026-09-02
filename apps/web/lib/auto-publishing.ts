@@ -18,6 +18,26 @@ export type AutoPublishAggregateStatus =
   | 'published'
   | 'not_queued';
 
+type StatusBadgeVariant = 'error' | 'info' | 'neutral' | 'progress' | 'success' | 'warning';
+
+export const AUTO_PUBLISH_BADGE_VARIANTS = {
+  needs_attention: 'error',
+  not_queued: 'neutral',
+  published: 'success',
+  publishing: 'progress',
+  queued: 'info',
+  retrying: 'warning',
+} as const satisfies Record<AutoPublishAggregateStatus, StatusBadgeVariant>;
+
+export const ATTEMPT_BADGE_VARIANTS = {
+  cancelled: 'error',
+  failed: 'error',
+  published: 'success',
+  publishing: 'progress',
+  queued: 'info',
+  retrying: 'warning',
+} as const satisfies Record<AutoPublishAttemptStatus, StatusBadgeVariant>;
+
 export type PublishingError = {
   code: string;
   kind: 'transient' | 'permanent';

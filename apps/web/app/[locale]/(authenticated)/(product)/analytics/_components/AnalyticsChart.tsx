@@ -63,13 +63,13 @@ export default function AnalyticsChart({
       <div className="h-80 w-full" role="img" aria-label={t('chart.label')}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={(value: string) => formatDate(value, dateFormatter)}
-              tick={{ fill: '#64748b', fontSize: 12 }}
+              tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
               tickLine={false}
-              axisLine={{ stroke: '#cbd5e1' }}
+              axisLine={{ stroke: 'var(--border)' }}
               minTickGap={24}
             />
             {mode === 'traffic' ? (
@@ -77,7 +77,7 @@ export default function AnalyticsChart({
                 <YAxis
                   yAxisId="clicks"
                   tickFormatter={(value: number) => formatCompact(value, locale)}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
                   width={46}
@@ -86,7 +86,7 @@ export default function AnalyticsChart({
                   yAxisId="impressions"
                   orientation="right"
                   tickFormatter={(value: number) => formatCompact(value, locale)}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
                   width={46}
@@ -96,9 +96,9 @@ export default function AnalyticsChart({
                   type="monotone"
                   dataKey="clicks"
                   name={t('summary.clicks')}
-                  stroke="#059669"
-                  fill="#a7f3d0"
-                  fillOpacity={0.45}
+                  stroke="var(--chart-1)"
+                  fill="var(--chart-1)"
+                  fillOpacity={0.15}
                   strokeWidth={2}
                 />
                 <Line
@@ -106,7 +106,7 @@ export default function AnalyticsChart({
                   type="monotone"
                   dataKey="impressions"
                   name={t('summary.impressions')}
-                  stroke="#2563eb"
+                  stroke="var(--chart-2)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -116,7 +116,7 @@ export default function AnalyticsChart({
                 <YAxis
                   yAxisId="ctr"
                   tickFormatter={(value: number) => formatCtr(value, locale)}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
                   width={54}
@@ -125,7 +125,7 @@ export default function AnalyticsChart({
                   yAxisId="position"
                   orientation="right"
                   tickFormatter={(value: number) => formatPosition(value, locale)}
-                  tick={{ fill: '#64748b', fontSize: 12 }}
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
                   tickLine={false}
                   axisLine={false}
                   width={46}
@@ -135,7 +135,7 @@ export default function AnalyticsChart({
                   type="monotone"
                   dataKey="ctr"
                   name={t('summary.ctr')}
-                  stroke="#059669"
+                  stroke="var(--chart-1)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -144,7 +144,7 @@ export default function AnalyticsChart({
                   type="monotone"
                   dataKey="position"
                   name={t('summary.position')}
-                  stroke="#7c3aed"
+                  stroke="var(--chart-3)"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -157,9 +157,11 @@ export default function AnalyticsChart({
                 name,
               ]}
               contentStyle={{
-                border: '1px solid #e2e8f0',
+                backgroundColor: 'var(--popover)',
+                border: '1px solid var(--border)',
                 borderRadius: '0.5rem',
-                boxShadow: '0 8px 24px rgb(15 23 42 / 0.08)',
+                boxShadow: '0 8px 24px oklch(0 0 0 / 0.16)',
+                color: 'var(--popover-foreground)',
               }}
             />
             <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
