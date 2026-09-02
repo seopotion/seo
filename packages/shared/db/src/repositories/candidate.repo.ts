@@ -150,10 +150,19 @@ export const CandidateRepo = {
       );
     }
 
+    // Refresh the pipeline's verdict on rows it owns: still-open candidates and
+    // rows an earlier run rejected (rejection_reason set). Operator decisions
+    // survive a rerun — an admin reject has no rejection_reason, and a
+    // scheduled row is `selected` — otherwise a forced rerun could never
+    // schedule a keyword the first run rejected (#301).
     await col.bulkWrite(
       prepared.map(({ data, normalized_keyword }) => ({
         updateOne: {
-          filter: { org_id: orgId, normalized_keyword, status: 'candidate' },
+          filter: {
+            org_id: orgId,
+            normalized_keyword,
+            $or: [{ status: 'candidate' }, { status: 'rejected', rejection_reason: { $ne: null } }],
+          },
           update: {
             $set: {
               status: data.status,

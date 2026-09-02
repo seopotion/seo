@@ -505,16 +505,16 @@ export default function OnboardingPage() {
 
   if (workspaceGate === 'checking') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <p className="font-medium text-gray-600 text-sm">{t('checkingWorkspace')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-muted/50 px-4">
+        <p className="font-medium text-muted-foreground text-sm">{t('checkingWorkspace')}</p>
       </main>
     );
   }
 
   if (workspaceGate === 'error') {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gray-50 px-4 text-center">
-        <p className="font-medium text-gray-600 text-sm">{t('errors.checkWorkspace')}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted/50 px-4 text-center">
+        <p className="font-medium text-muted-foreground text-sm">{t('errors.checkWorkspace')}</p>
         <Button onClick={() => void checkWorkspaceGate()} variant="outline">
           {t('actions.retry')}
         </Button>
@@ -523,12 +523,12 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-muted/50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <p className="font-semibold text-primary text-sm">{t('eyebrow')}</p>
-            <h1 className="mt-1 font-bold text-3xl text-gray-900">{t('title')}</h1>
+            <h1 className="mt-1 font-bold text-3xl text-foreground">{t('title')}</h1>
           </div>
           <LocaleSwitcher />
         </div>

@@ -25,6 +25,7 @@ import {
   formatDate,
   formatDayNumber,
   formatMonthYear,
+  formatNullableNumber,
   formatNumber,
   formatWeekday,
   isSameMonth,
@@ -75,6 +76,7 @@ export default function ContentPlannerPage() {
   const canScheduleKeywords = organization?.capabilities?.keyword_scheduling ?? false;
   const queryClient = useQueryClient();
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null);
   const organizationIdRef = useRef(organization?.id);
   const observedStrategyRef = useRef<{
     organizationId: string;
@@ -105,16 +107,37 @@ export default function ContentPlannerPage() {
   const handleCloseChooser = useCallback(() => {
     setChooserDateKey(null);
   }, []);
+  /**
+   * Radix returns focus to whatever was focused when *that* dialog opened. That
+   * is wrong for a chain: the chooser hands off to research while closing, so
+   * research's idea of "before" is a control inside the chooser that is being
+   * torn down — and the page is still inert, so the restore lands on <body>.
+   *
+   * The page owns the chain, so it remembers the control that started it. Only
+   * the first dialog records one; the rest of the chain inherits it.
+   */
+  const rememberReturnFocus = useCallback(() => {
+    if (modalReturnFocusRef.current?.isConnected) {
+      return;
+    }
+
+    modalReturnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, []);
   const handleOpenResearch = useCallback(() => {
     setSelectedArticle(null);
     setChooserDateKey(null);
     setResearchModalOpen(true);
   }, []);
-  const handleChooseDate = useCallback((dateKey: string) => {
-    setSelectedArticle(null);
-    setResearchModalOpen(false);
-    setChooserDateKey(dateKey);
-  }, []);
+  const handleChooseDate = useCallback(
+    (dateKey: string) => {
+      rememberReturnFocus();
+      setSelectedArticle(null);
+      setResearchModalOpen(false);
+      setChooserDateKey(dateKey);
+    },
+    [rememberReturnFocus],
+  );
   const handlePreviousMonth = useCallback(() => {
     setVisibleMonth((month) => addMonths(month, -1));
   }, []);
@@ -124,11 +147,30 @@ export default function ContentPlannerPage() {
   const handleToday = useCallback(() => {
     setVisibleMonth(startOfMonth(startOfToday()));
   }, []);
-  const handleSelectArticle = useCallback((article: PlannerArticle) => {
-    setChooserDateKey(null);
-    setResearchModalOpen(false);
-    setSelectedArticle(article);
-  }, []);
+  const handleSelectArticle = useCallback(
+    (article: PlannerArticle) => {
+      rememberReturnFocus();
+      setChooserDateKey(null);
+      setResearchModalOpen(false);
+      setSelectedArticle(article);
+    },
+    [rememberReturnFocus],
+  );
+
+  // Put focus back once the last dialog in a chain closes. This runs after the
+  // inert attributes come off, so the target can actually take focus.
+  useEffect(() => {
+    if (modalOpen) {
+      return;
+    }
+
+    const trigger = modalReturnFocusRef.current;
+    modalReturnFocusRef.current = null;
+
+    if (trigger?.isConnected) {
+      trigger.focus({ preventScroll: true });
+    }
+  }, [modalOpen]);
 
   useEffect(() => {
     if (organizationIdRef.current === organization?.id) {
@@ -355,7 +397,7 @@ export default function ContentPlannerPage() {
           <>
             <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <h2 className="font-semibold text-base text-slate-950">
+                <h2 className="font-semibold text-base text-foreground">
                   {t('contentCalendar.title')}
                 </h2>
                 <CalendarMonthNav
@@ -376,11 +418,14 @@ export default function ContentPlannerPage() {
 
             <section
               aria-label={t('calendarLabel')}
-              className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block"
+              className="hidden overflow-hidden rounded-lg border border-border bg-card md:block"
             >
-              <div className="grid grid-cols-7 border-slate-200 border-b bg-slate-50">
+              <div className="grid grid-cols-7 border-border border-b bg-muted/50">
                 {weekdayLabels.map((weekday) => (
-                  <div key={weekday} className="px-3 py-2 font-semibold text-slate-600 text-xs">
+                  <div
+                    key={weekday}
+                    className="px-3 py-2 font-semibold text-muted-foreground text-xs"
+                  >
                     {weekday}
                   </div>
                 ))}
@@ -497,7 +542,7 @@ function CalendarMonthNav({
         <ChevronLeft className="size-4" aria-hidden="true" />
       </Button>
       {/* Announced on change so the arrows are not silent for screen readers. */}
-      <p aria-live="polite" className="min-w-36 text-center font-medium text-slate-950 text-sm">
+      <p aria-live="polite" className="min-w-36 text-center font-medium text-foreground text-sm">
         {formatMonthYear(visibleMonth, locale)}
       </p>
       <Button
@@ -535,12 +580,12 @@ function PendingStrategyPanel({
     <section
       role="status"
       aria-live="polite"
-      className="flex h-30 w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-6 py-12 text-center"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-border bg-card px-6 py-12 text-center"
     >
       <div className="grid justify-items-center gap-2">
-        <LoaderCircle className="size-5 animate-spin text-slate-500" aria-hidden="true" />
-        <h2 className="font-semibold text-slate-950 text-base">{heading}</h2>
-        <p className="text-slate-600 text-sm">{supportingText}</p>
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+        <h2 className="font-semibold text-foreground text-base">{heading}</h2>
+        <p className="text-muted-foreground text-sm">{supportingText}</p>
       </div>
     </section>
   );
@@ -556,12 +601,12 @@ function FailedStrategyPanel({
   return (
     <section
       role="alert"
-      className="flex h-30 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-6 py-12 text-center"
+      className="flex h-30 w-full items-center justify-center rounded-lg border border-error-border bg-error-subtle px-6 py-12 text-center"
     >
       <div className="grid justify-items-center gap-2">
-        <AlertTriangle className="size-5 text-rose-600" aria-hidden="true" />
-        <h2 className="font-semibold text-base text-rose-950">{heading}</h2>
-        <p className="text-rose-800 text-sm">{supportingText}</p>
+        <AlertTriangle className="size-5 text-error" aria-hidden="true" />
+        <h2 className="font-semibold text-base text-error">{heading}</h2>
+        <p className="text-error text-sm">{supportingText}</p>
       </div>
     </section>
   );
@@ -585,8 +630,8 @@ function PlannerDayCell({
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
   const cellClassName = cn(
-    'flex h-32 min-w-0 flex-col border-slate-200 border-r border-b p-2 text-left',
-    day.inMonth ? 'bg-white' : 'bg-slate-50 text-slate-400',
+    'flex h-32 min-w-0 flex-col border-border border-r border-b p-2 text-left',
+    day.inMonth ? 'bg-card' : 'bg-muted/50 text-muted-foreground',
   );
 
   const content = (
@@ -594,7 +639,10 @@ function PlannerDayCell({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p
-            className={cn('font-semibold text-slate-950 text-sm', !day.inMonth && 'text-slate-400')}
+            className={cn(
+              'font-semibold text-foreground text-sm',
+              !day.inMonth && 'text-muted-foreground',
+            )}
           >
             {formatDayNumber(day.date, locale)}
           </p>
@@ -666,22 +714,22 @@ function PlannerAgendaRow({
   onSelectArticle: (article: PlannerArticle) => void;
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
-  const rowClassName = 'grid gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left';
+  const rowClassName = 'grid gap-3 rounded-lg border border-border bg-card p-3 text-left';
 
   const content = (
     <>
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-medium text-slate-600 text-sm">
+          <p className="truncate font-medium text-muted-foreground text-sm">
             {formatWeekday(day.date, locale, 'long')}
           </p>
-          <p className="truncate font-semibold text-slate-950 text-sm">
+          <p className="truncate font-semibold text-foreground text-sm">
             {formatDate(day.date, locale, 'long')}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {day.article && <PlannerStatusBadge article={day.article} t={t} />}
-          <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-semibold text-slate-700 text-xs">
+          <span className="shrink-0 rounded-md bg-muted px-2 py-1 font-semibold text-foreground text-xs">
             {formatDayNumber(day.date, locale)}
           </span>
         </div>
@@ -738,19 +786,11 @@ function PlannerStatusBadge({
   t: ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 }) {
   if (article.status === 'generated') {
-    return (
-      <Badge variant="secondary" className="border-transparent bg-emerald-100 text-emerald-700">
-        {t('statuses.generated')}
-      </Badge>
-    );
+    return <Badge variant="success">{t('statuses.generated')}</Badge>;
   }
 
   if (article.generationStatus === 'pending') {
-    return (
-      <Badge variant="secondary" className="border-transparent bg-sky-100 text-sky-700">
-        {t('targetKeywords.statuses.scheduled')}
-      </Badge>
-    );
+    return <Badge variant="info">{t('targetKeywords.statuses.scheduled')}</Badge>;
   }
 
   return null;
@@ -767,14 +807,14 @@ function ArticleSummary({
 }) {
   return (
     <div className="grid w-full min-w-0 gap-1">
-      <span className="line-clamp-2 font-medium text-slate-950 text-sm leading-snug">
+      <span className="line-clamp-2 font-medium text-foreground text-sm leading-snug">
         {article.keyword}
       </span>
-      <span className="truncate font-normal text-slate-600 text-xs">
+      <span className="truncate font-normal text-muted-foreground text-xs">
         {t('metrics.volume')}: {formatNumber(article.volume, locale)}
       </span>
-      <span className="truncate font-normal text-slate-600 text-xs">
-        {t('metrics.difficulty')}: {formatNumber(article.difficulty, locale)}
+      <span className="truncate font-normal text-muted-foreground text-xs">
+        {t('metrics.difficulty')}: {formatNullableNumber(article.difficulty, locale)}
       </span>
     </div>
   );
@@ -835,10 +875,10 @@ function getAncestorSiblings(element: HTMLElement) {
 
 function SummaryPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
       <div className="min-w-0">
-        <p className="truncate text-slate-500 text-xs">{label}</p>
-        <p className="truncate font-medium text-slate-950 text-sm">{value}</p>
+        <p className="truncate text-muted-foreground text-xs">{label}</p>
+        <p className="truncate font-medium text-foreground text-sm">{value}</p>
       </div>
     </div>
   );
@@ -846,7 +886,7 @@ function SummaryPill({ label, value }: { label: string; value: string }) {
 
 function StatusMessage({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-4 py-3 text-slate-600 text-sm">
+    <div className="rounded-md border border-border bg-card px-4 py-3 text-muted-foreground text-sm">
       {message}
     </div>
   );

@@ -23,14 +23,14 @@ export function AnalyticsSummaryCards({ summary }: { summary: AnalyticsSummary }
   return (
     <section aria-label={t('summary.label')} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => (
-        <Card key={metric} className="gap-4 border-slate-200 py-5 shadow-none">
+        <Card key={metric} className="gap-4 border-border py-5 shadow-none">
           <CardHeader className="px-5">
-            <CardTitle className="font-medium text-slate-600 text-sm">
+            <CardTitle className="font-medium text-muted-foreground text-sm">
               {t(`summary.${metric}`)}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex items-end justify-between gap-3 px-5">
-            <strong className="font-semibold text-3xl text-slate-950 tabular-nums">
+            <strong className="font-semibold text-3xl text-foreground tabular-nums">
               {formatMetric(metric, summary.totals[metric], locale)}
             </strong>
             <DeltaBadge metric={metric} value={summary.deltas[metric]} />
@@ -54,10 +54,10 @@ function DeltaBadge({ metric, value }: { metric: AnalyticsMetric; value: number 
       className={cn(
         'border-transparent tabular-nums',
         sentiment === 'positive'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : sentiment === 'negative'
-            ? 'bg-rose-100 text-rose-700'
-            : 'bg-slate-100 text-slate-600',
+            ? 'bg-error-muted text-error'
+            : 'bg-muted text-muted-foreground',
       )}
     >
       <Icon className="size-3" aria-hidden="true" />

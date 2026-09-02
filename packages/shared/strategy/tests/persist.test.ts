@@ -223,7 +223,7 @@ describe('stagePersistSchedule', () => {
     findById.mockResolvedValue(org);
     listByOrg.mockResolvedValue([]);
     // The pillar itself gets filtered out of the semantic target pool (null
-    // difficulty fails semanticTargetPool's metric check), but its same-cluster
+    // search_volume fails semanticTargetPool's metric check), but its same-cluster
     // support survives the pool filter — this used to make selectionClusters
     // throw TopicClusterValidationError, retry-forever at the last stage.
     const orphanedPillar: WorkingCandidate = {
@@ -231,7 +231,7 @@ describe('stagePersistSchedule', () => {
         topic_cluster_id: 'topic:orphan',
         topic_cluster_label: 'Orphan',
       }),
-      difficulty: null,
+      search_volume: null,
     };
     const orphanedSupport = candidate('Orphan support', 90, {
       topic_cluster_id: 'topic:orphan',
@@ -260,6 +260,61 @@ describe('stagePersistSchedule', () => {
       'Healthy support',
     ]);
     expect(setStrategyStatus).toHaveBeenCalledWith('o1', 'completed');
+  });
+
+  test('a null-difficulty target is still schedulable — unknown KD is not unwinnable (#294)', async () => {
+    findById.mockResolvedValue(org);
+    listByOrg.mockResolvedValue([]);
+    const noKd: WorkingCandidate = {
+      ...candidate('outfit combination generator', 95),
+      difficulty: null,
+    };
+
+    await stagePersistSchedule(state([noKd, candidate('other', 50)]), { orgId: 'o1' });
+
+    expect(scheduleCandidate.mock.calls.map(([row]) => row.keyword)).toContain(
+      'outfit combination generator',
+    );
+  });
+
+  test('skips a target whose non-primary member is already on the planner, still confirming its cluster (#303)', async () => {
+    findById.mockResolvedValue(org);
+    // Run 1 scheduled "virtual try on" (its own cluster id back then).
+    listByOrg.mockResolvedValue([
+      {
+        keyword: 'virtual try on',
+        opportunity_score: 85,
+        scheduled_date: '2026-09-01',
+        topic_role: 'pillar',
+        topic_cluster_id: 'topic:virtual try on',
+      },
+    ] as never);
+    // Run 2's judge grouped the hyphen variant with it and made the variant primary.
+    const pillar = candidate('virtual try-on', 85, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+    });
+    const member = candidate('virtual try on', 85, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+      topic_primary_keyword: 'virtual try-on',
+      status: 'rejected',
+      rejection_reason: 'topic_duplicate',
+    });
+    const support = candidate('virtual fitting room', 70, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+      topic_role: 'support',
+    });
+
+    await stagePersistSchedule(
+      { ...state([pillar, support]), rejected: [member] },
+      { orgId: 'o1' },
+    );
+
+    expect(scheduleCandidate.mock.calls.map(([row]) => row.keyword)).toEqual([
+      'virtual fitting room',
+    ]);
   });
 
   test('under-fills the plan rather than padding it, logs the shortfall, and still completes', async () => {
@@ -321,5 +376,54 @@ describe('stagePersistSchedule', () => {
     expect(calls[calls.length - 1]).toBe('status');
     expect(calls).toContain('persist');
     expect(calls).toContain('schedule');
+  });
+
+  test('starts the plan on the next UTC day so day 1 is never behind the 07:00 UTC cron (#292)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-01T14:08:00.000Z'));
+    try {
+      findById.mockResolvedValue(org);
+      listByOrg.mockResolvedValue([]);
+      const candidates = [candidate('first', 90), candidate('second', 80)];
+
+      await stagePersistSchedule(state(candidates), { orgId: 'o1' });
+
+      expect(scheduleCandidate.mock.calls.map(([, date]) => date)).toEqual([
+        '2026-09-02',
+        '2026-09-03',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('a top-up still offsets by the entries already scheduled, counted from tomorrow', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-01T23:59:00.000Z'));
+    try {
+      findById.mockResolvedValue(org);
+      listByOrg.mockResolvedValue([
+        {
+          keyword: 'old a',
+          opportunity_score: 50,
+          scheduled_date: '2026-09-10',
+          topic_role: 'pillar',
+          topic_cluster_id: 'topic:old a',
+        },
+        {
+          keyword: 'old b',
+          opportunity_score: 40,
+          scheduled_date: '2026-09-11',
+          topic_role: 'pillar',
+          topic_cluster_id: 'topic:old b',
+        },
+      ] as never);
+
+      await stagePersistSchedule(state([candidate('new', 90)]), { orgId: 'o1' });
+
+      expect(scheduleCandidate.mock.calls[0]![1]).toBe('2026-09-04');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

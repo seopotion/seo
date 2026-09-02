@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatusPanel,
   Textarea,
 } from '@/components/ui';
 import { useRouter } from '@/i18n/navigation';
@@ -378,7 +379,7 @@ export default function SettingsPage() {
       {saveState === 'saved' && <StatusPanel tone="success">{t('status.saved')}</StatusPanel>}
       {saveState === 'error' && <StatusPanel tone="error">{t('status.saveError')}</StatusPanel>}
 
-      <div className="overflow-x-auto border-slate-200 border-b">
+      <div className="overflow-x-auto border-border border-b">
         <div role="tablist" aria-label={t('tabs.label')} className="flex min-w-max gap-1">
           {settingsTabs.map((tab) => {
             const isActive = activeTab === tab;
@@ -394,8 +395,8 @@ export default function SettingsPage() {
                 className={cn(
                   'h-10 border-b-2 px-3 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/35',
                   isActive
-                    ? 'border-slate-950 text-slate-950'
-                    : 'border-transparent text-slate-500 hover:text-slate-950',
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
                 )}
                 onClick={() => setActiveTab(tab)}
               >
@@ -511,7 +512,7 @@ export default function SettingsPage() {
               onRemove={removeCompetitorEntry}
               placeholder={t('placeholders.competitorUrl')}
             />
-            <p className="mt-2 text-gray-500 text-sm">{audienceT('competitorsHint')}</p>
+            <p className="mt-2 text-muted-foreground text-sm">{audienceT('competitorsHint')}</p>
           </FieldPanel>
         </div>
       </div>
@@ -545,31 +546,9 @@ export default function SettingsPage() {
   );
 }
 
-function StatusPanel({
-  children,
-  tone = 'neutral',
-}: {
-  children: ReactNode;
-  tone?: 'error' | 'neutral' | 'success';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'neutral' && 'border-slate-200 bg-white text-slate-600',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 function FieldPanel({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('grid gap-2 rounded-md border border-slate-200 bg-white p-4', className)}>
+    <div className={cn('grid gap-2 rounded-md border border-border bg-card p-4', className)}>
       {children}
     </div>
   );

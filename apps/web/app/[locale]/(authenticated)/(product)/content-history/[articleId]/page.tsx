@@ -5,14 +5,22 @@ import { ArrowLeft, ExternalLink, Pencil, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArticleContentPreview } from '@/components/article/ArticleContentPreview';
 import {
   ARTICLE_EDITOR_TITLE_ID,
   ArticleEditorDetailItem,
   ArticleEditorPanel,
 } from '@/components/article/ArticleEditorPanel';
-import { Badge, Button, Separator } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  PageDescription,
+  PageTitle,
+  Separator,
+  StatusPanel,
+} from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import {
@@ -22,6 +30,8 @@ import {
 } from '@/lib/article-editor';
 import { clearToken } from '@/lib/auth';
 import {
+  ATTEMPT_BADGE_VARIANTS,
+  AUTO_PUBLISH_BADGE_VARIANTS,
   type AutoPublishAggregateStatus,
   type AutoPublishAttempt,
   type AutoPublishAttemptStatus,
@@ -493,7 +503,7 @@ export default function ArticleDetailPage() {
     <div className="grid gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Button asChild variant="link" className="mb-2 text-slate-600">
+          <Button asChild variant="link" className="mb-2 text-muted-foreground">
             <Link
               href="/content-history"
               // Leaving the route would drop the draft; the editor's own
@@ -508,9 +518,9 @@ export default function ArticleDetailPage() {
               {t('actions.back')}
             </Link>
           </Button>
-          <h1 className="font-semibold text-lg text-slate-950">{article?.title ?? t('title')}</h1>
+          <PageTitle>{article?.title ?? t('title')}</PageTitle>
           {article?.meta_description ? (
-            <p className="mt-1 max-w-3xl text-slate-600 text-sm">{article.meta_description}</p>
+            <PageDescription className="max-w-3xl">{article.meta_description}</PageDescription>
           ) : null}
         </div>
         {article ? (
@@ -581,10 +591,10 @@ export default function ArticleDetailPage() {
               ) : null}
             </div>
             {publishBlocked && (showSiteButton || showWordPressButton) ? (
-              <p className="text-slate-500 text-xs">{t('status.editingBlocksPublish')}</p>
+              <p className="text-muted-foreground text-xs">{t('status.editingBlocksPublish')}</p>
             ) : null}
             {!publishBlocked && showWordPressButton && wordpressConnected === false ? (
-              <p className="text-slate-500 text-xs">
+              <p className="text-muted-foreground text-xs">
                 {t.rich('wordpress.connectFirst', {
                   link: (chunks) => (
                     <Link className="underline" href="/settings?tab=integrations">
@@ -598,11 +608,7 @@ export default function ArticleDetailPage() {
         ) : null}
       </div>
 
-      {statusMessage ? (
-        <div className="rounded-lg border border-slate-200 bg-white px-4 py-12 text-center text-slate-600 text-sm">
-          {statusMessage}
-        </div>
-      ) : null}
+      {statusMessage ? <EmptyState framed>{statusMessage}</EmptyState> : null}
 
       {siteActionState === 'published' ? (
         <StatusPanel tone="success">
@@ -668,7 +674,7 @@ export default function ArticleDetailPage() {
       {editing && article && draftArticle ? (
         <section
           aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
-          className="overflow-hidden rounded-lg border border-slate-200 bg-white"
+          className="overflow-hidden rounded-lg border border-border bg-card"
         >
           <ArticleEditorPanel
             canSave={editor.canSave}
@@ -711,7 +717,7 @@ export default function ArticleDetailPage() {
           />
         </section>
       ) : article ? (
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
+        <section className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label={t('labels.slug')} value={article.slug} />
             <DetailItem label={t('labels.keywordId')} value={article.keyword_id} />
@@ -738,36 +744,13 @@ export default function ArticleDetailPage() {
               width={1280}
               height={720}
               unoptimized
-              className="aspect-video w-full rounded-md border border-slate-200 object-cover"
+              className="aspect-video w-full rounded-md border border-border object-cover"
             />
           ) : null}
 
           <ArticleContentPreview content={article.content} />
         </section>
       ) : null}
-    </div>
-  );
-}
-
-function StatusPanel({
-  children,
-  tone,
-}: {
-  children: ReactNode;
-  tone: 'error' | 'success' | 'warning';
-}) {
-  return (
-    <div
-      aria-live="polite"
-      role={tone === 'error' ? 'alert' : 'status'}
-      className={cn(
-        'rounded-md border px-4 py-3 text-sm',
-        tone === 'error' && 'border-red-200 bg-red-50 text-red-700',
-        tone === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        tone === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
-      )}
-    >
-      {children}
     </div>
   );
 }
@@ -801,14 +784,14 @@ function AutomaticPublishingPanel({
   return (
     <section
       aria-labelledby="automatic-publishing-title"
-      className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:p-6"
+      className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:p-6"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 id="automatic-publishing-title" className="font-semibold text-slate-950 text-base">
+          <h2 id="automatic-publishing-title" className="font-semibold text-foreground text-base">
             {t('publishing.title')}
           </h2>
-          <p className="mt-1 text-slate-600 text-sm">{t('publishing.description')}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t('publishing.description')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AutoPublishAggregateBadge status={aggregate.status} label={aggregateLabel} />
@@ -839,7 +822,7 @@ function AutomaticPublishingPanel({
       </div>
 
       {retryAvailable && publishBlocked ? (
-        <p id="automatic-publishing-retry-blocked" className="text-slate-600 text-sm">
+        <p id="automatic-publishing-retry-blocked" className="text-muted-foreground text-sm">
           {t('publishing.retry.editingBlocked')}
         </p>
       ) : null}
@@ -865,10 +848,7 @@ function AutomaticPublishingPanel({
       ) : null}
 
       {article.auto_publish_error ? (
-        <div
-          role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm"
-        >
+        <StatusPanel role="alert" tone="error">
           <h3 className="font-medium">{t('publishing.preflightError')}</h3>
           <div className="mt-1">
             <LocalizedPublishingError
@@ -876,12 +856,12 @@ function AutomaticPublishingPanel({
               t={t}
             />
           </div>
-          <p className="mt-1 text-red-700 text-xs">
+          <p className="mt-1 text-error text-xs">
             {t('publishing.errorAt', {
               date: formatDate(article.auto_publish_error.at, dateTimeFormatter),
             })}
           </p>
-        </div>
+        </StatusPanel>
       ) : null}
 
       {aggregate.partialSuccess ? (
@@ -900,11 +880,11 @@ function AutomaticPublishingPanel({
           ))}
         </div>
       ) : article.auto_publish_error ? null : (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-slate-600 text-sm">
+        <div className="rounded-md border border-border bg-muted/50 px-4 py-4 text-muted-foreground text-sm">
           <p>{t('publishing.empty')}</p>
           <Link
             href="/article-settings"
-            className="mt-2 inline-flex font-medium text-slate-950 underline underline-offset-2"
+            className="mt-2 inline-flex font-medium text-foreground underline underline-offset-2"
           >
             {t('publishing.settingsLink')}
           </Link>
@@ -922,23 +902,7 @@ function AutoPublishAggregateBadge({
   status: AutoPublishAggregateStatus;
 }) {
   return (
-    <Badge
-      variant="secondary"
-      className={cn(
-        'w-fit border-transparent',
-        status === 'needs_attention'
-          ? 'bg-red-100 text-red-700'
-          : status === 'retrying'
-            ? 'bg-amber-100 text-amber-800'
-            : status === 'publishing'
-              ? 'bg-violet-100 text-violet-700'
-              : status === 'queued'
-                ? 'bg-sky-100 text-sky-700'
-                : status === 'published'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-100 text-slate-600',
-      )}
-    >
+    <Badge variant={AUTO_PUBLISH_BADGE_VARIANTS[status]} className="w-fit">
       {label}
     </Badge>
   );
@@ -957,9 +921,9 @@ function ProviderPublishingCard({
   const remoteUrl = getSafePublicationUrl(publication?.remote_url ?? null);
 
   return (
-    <article className="grid min-w-0 gap-3 rounded-md border border-slate-200 p-4">
+    <article className="grid min-w-0 gap-3 rounded-md border border-border p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-medium text-slate-950">{t(`publishing.providers.${provider}`)}</h3>
+        <h3 className="font-medium text-foreground">{t(`publishing.providers.${provider}`)}</h3>
         <AttemptStatusBadge attempt={attempt} hasPublication={Boolean(publication)} t={t} />
       </header>
 
@@ -987,14 +951,14 @@ function ProviderPublishingCard({
       {attempt?.last_error ? (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-800 text-sm"
+          className="rounded-md border border-error-border bg-error-subtle px-3 py-2 text-error text-sm"
         >
           <p className="font-medium">{t('publishing.lastError')}</p>
           <LocalizedPublishingError
             error={getPublishingErrorPresentation(attempt.last_error.code)}
             t={t}
           />
-          <p className="mt-1 text-red-700 text-xs">
+          <p className="mt-1 text-error text-xs">
             {t('publishing.errorAt', {
               date: formatDate(attempt.last_error.at, dateTimeFormatter),
             })}
@@ -1003,7 +967,7 @@ function ProviderPublishingCard({
       ) : null}
 
       {publication ? (
-        <div className="grid gap-3 border-slate-200 border-t pt-3">
+        <div className="grid gap-3 border-border border-t pt-3">
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <PublishingDetail label={t('publishing.labels.slug')} value={publication.slug} />
             <PublishingDateDetail
@@ -1026,7 +990,7 @@ function ProviderPublishingCard({
           </dl>
           {remoteUrl ? (
             <a
-              className="inline-flex w-fit items-center gap-1.5 font-medium text-slate-950 text-sm underline underline-offset-2"
+              className="inline-flex w-fit items-center gap-1.5 font-medium text-foreground text-sm underline underline-offset-2"
               href={remoteUrl}
               rel="noopener noreferrer"
               target="_blank"
@@ -1062,21 +1026,10 @@ function AttemptStatusBadge({
 
   return (
     <Badge
-      variant="secondary"
-      className={cn(
-        'w-fit border-transparent',
-        attempt?.status === 'failed' || attempt?.status === 'cancelled'
-          ? 'bg-red-100 text-red-700'
-          : attempt?.status === 'retrying'
-            ? 'bg-amber-100 text-amber-800'
-            : attempt?.status === 'publishing'
-              ? 'bg-violet-100 text-violet-700'
-              : attempt?.status === 'queued'
-                ? 'bg-sky-100 text-sky-700'
-                : attempt?.status === 'published' || hasPublication
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-slate-100 text-slate-600',
-      )}
+      variant={
+        attempt ? ATTEMPT_BADGE_VARIANTS[attempt.status] : hasPublication ? 'success' : 'neutral'
+      }
+      className="w-fit"
     >
       {label}
     </Badge>
@@ -1086,8 +1039,8 @@ function AttemptStatusBadge({
 function PublishingDetail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 break-words font-medium text-slate-800">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 break-words font-medium text-foreground">{value}</dd>
     </div>
   );
 }
@@ -1103,8 +1056,8 @@ function PublishingDateDetail({
 }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-0.5 font-medium text-slate-800">
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-0.5 font-medium text-foreground">
         <time dateTime={dateTime}>{formatDate(dateTime, formatter)}</time>
       </dd>
     </div>
@@ -1188,10 +1141,10 @@ function ArticleStatusBadge({
       className={cn(
         'w-fit border-transparent',
         status === 'published'
-          ? 'bg-emerald-100 text-emerald-700'
+          ? 'bg-success-muted text-success'
           : status === 'generated'
-            ? 'bg-sky-100 text-sky-700'
-            : 'bg-slate-200 text-slate-700',
+            ? 'bg-info-muted text-info'
+            : 'bg-muted text-foreground',
       )}
     >
       {t(`statuses.${status}`)}
@@ -1202,8 +1155,8 @@ function ArticleStatusBadge({
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-slate-500 text-xs">{label}</dt>
-      <dd className="mt-1 truncate font-medium text-slate-950">{value}</dd>
+      <dt className="text-muted-foreground text-xs">{label}</dt>
+      <dd className="mt-1 truncate font-medium text-foreground">{value}</dd>
     </div>
   );
 }

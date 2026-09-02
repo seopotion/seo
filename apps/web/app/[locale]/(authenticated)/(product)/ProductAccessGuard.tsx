@@ -84,8 +84,8 @@ export function ProductAccessGuard({ children }: { children: ReactNode }) {
 
   if (guardState === 'error') {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4 text-center">
-        <p className="font-medium text-slate-600 text-sm">{t('workspaceError')}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-muted/50 px-4 text-center">
+        <p className="font-medium text-muted-foreground text-sm">{t('workspaceError')}</p>
         <Button onClick={() => void checkProductAccess()} variant="outline">
           {t('retry')}
         </Button>
@@ -95,8 +95,8 @@ export function ProductAccessGuard({ children }: { children: ReactNode }) {
 
   if (guardState !== 'authorized') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <p className="font-medium text-slate-600 text-sm">{t('checkingWorkspace')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-muted/50 px-4">
+        <p className="font-medium text-muted-foreground text-sm">{t('checkingWorkspace')}</p>
       </main>
     );
   }

@@ -19,8 +19,7 @@ const MESSAGES: Record<string, string> = {
   date_occupied: 'That day already has a planner entry — pick another date.',
   keyword_already_scheduled: 'This keyword is already on the planner for another date.',
   candidate_already_scheduled: 'This candidate is already scheduled.',
-  candidate_not_schedulable:
-    'This candidate is missing the volume/difficulty metrics scheduling requires.',
+  candidate_not_schedulable: 'This candidate is missing the search volume scheduling requires.',
   candidate_not_deletable: 'Only a pooled candidate can be rejected — this one moved on already.',
   generation_started: 'Generation already started — this entry can no longer be changed.',
   org_not_paid:

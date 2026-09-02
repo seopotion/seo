@@ -10,10 +10,18 @@ const badgeVariants = cva(
     },
     variants: {
       variant: {
+        error: 'border-transparent bg-error-muted text-error',
         default: 'border-transparent bg-primary text-primary-foreground',
+        // Solid fill with white text. For the soft red pill used to mark a
+        // failed state, reach for `error` instead.
         destructive: 'border-transparent bg-destructive text-white',
+        info: 'border-transparent bg-info-muted text-info',
+        neutral: 'border-transparent bg-muted text-muted-foreground',
         outline: 'text-foreground',
+        progress: 'border-transparent bg-progress-muted text-progress',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
+        success: 'border-transparent bg-success-muted text-success',
+        warning: 'border-transparent bg-warning-muted text-warning',
       },
     },
   },

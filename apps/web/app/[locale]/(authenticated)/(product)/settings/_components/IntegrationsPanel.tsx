@@ -5,9 +5,8 @@ import { GitBranch } from 'lucide-react';
 import Image from 'next/image';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { StatusPanel } from '@/components/integrations/StatusPanel';
 import { WordPressDialog } from '@/components/integrations/WordPressDialog';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, StatusPanel } from '@/components/ui';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { PUBLISH_ERROR_KEYS, RECONNECT_CODES, useConnectedIntegrations } from '@/lib/integrations';
 import type { ProductOrganization } from '@/lib/organizations';
@@ -85,29 +84,31 @@ export function IntegrationsPanel({
             name={t('providers.wordpress')}
           >
             {connectedQuery.isLoading ? (
-              <p className="text-slate-500 text-xs">{t('loading')}</p>
+              <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
-              <p className="text-red-600 text-xs">{t('loadError')}</p>
+              <p className="text-error text-xs">{t('loadError')}</p>
             ) : (
               <>
                 <Badge
                   variant="secondary"
                   className={cn(
                     'w-fit border-transparent',
-                    isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700',
+                    isConnected ? 'bg-success-muted text-success' : 'bg-muted text-foreground',
                   )}
                 >
                   {t(isConnected ? 'badges.connected' : 'badges.notConnected')}
                 </Badge>
                 {wordpressIntegration ? (
                   <>
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {t('connectedOn', {
                         date: dateFormatter.format(new Date(wordpressIntegration.connected_at)),
                       })}
                     </p>
                     {organization?.website_url ? (
-                      <p className="truncate text-slate-500 text-xs">{organization.website_url}</p>
+                      <p className="truncate text-muted-foreground text-xs">
+                        {organization.website_url}
+                      </p>
                     ) : null}
                   </>
                 ) : null}
@@ -125,13 +126,13 @@ export function IntegrationsPanel({
           </IntegrationCard>
 
           <IntegrationCard
-            logo={<GitBranch aria-hidden className="size-5 text-slate-700" />}
+            logo={<GitBranch aria-hidden className="size-5 text-foreground" />}
             name={staticSiteT('provider')}
           >
             {connectedQuery.isLoading ? (
-              <p className="text-slate-500 text-xs">{t('loading')}</p>
+              <p className="text-muted-foreground text-xs">{t('loading')}</p>
             ) : connectedQuery.isError ? (
-              <p className="text-red-600 text-xs">{t('loadError')}</p>
+              <p className="text-error text-xs">{t('loadError')}</p>
             ) : (
               <>
                 <Badge
@@ -139,10 +140,10 @@ export function IntegrationsPanel({
                   className={cn(
                     'w-fit border-transparent',
                     !staticSiteIntegration
-                      ? 'bg-slate-200 text-slate-700'
+                      ? 'bg-muted text-foreground'
                       : staticSiteError
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-700',
+                        ? 'bg-warning-muted text-warning'
+                        : 'bg-success-muted text-success',
                   )}
                 >
                   {staticSiteIntegration
@@ -154,17 +155,17 @@ export function IntegrationsPanel({
                 {staticSiteIntegration ? (
                   <>
                     {/* `owner/repo@branch`, built server-side. */}
-                    <p className="truncate font-medium text-slate-950 text-xs">
+                    <p className="truncate font-medium text-foreground text-xs">
                       {staticSiteIntegration.target}
                     </p>
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-muted-foreground text-xs">
                       {t('connectedOn', {
                         date: dateFormatter.format(new Date(staticSiteIntegration.connected_at)),
                       })}
                     </p>
                     {/* A dead connection has to be visible without opening anything. */}
                     {staticSiteError ? (
-                      <p className="text-amber-700 text-xs">
+                      <p className="text-warning text-xs">
                         {staticSiteT(
                           PUBLISH_ERROR_KEYS[staticSiteError.code] ?? 'publishErrors.unknown',
                         )}
@@ -258,10 +259,10 @@ function IntegrationCard({
   name: string;
 }) {
   return (
-    <div className="grid content-start gap-2 rounded-md border border-slate-200 bg-white p-4">
+    <div className="grid content-start gap-2 rounded-md border border-border bg-card p-4">
       <div className="flex items-center gap-3">
         <span className="flex size-9 items-center justify-center">{logo}</span>
-        <p className="font-semibold text-slate-950 text-sm">{name}</p>
+        <p className="font-semibold text-foreground text-sm">{name}</p>
       </div>
       {children}
     </div>

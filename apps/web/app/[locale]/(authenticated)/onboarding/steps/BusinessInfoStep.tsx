@@ -27,7 +27,7 @@ export function BusinessInfoStep({
 
   return (
     <div>
-      <h2 className="font-bold text-2xl text-gray-900">{t('title')}</h2>
+      <h2 className="font-bold text-2xl text-foreground">{t('title')}</h2>
 
       <div className="mt-6 grid gap-5 md:grid-cols-2">
         <div>

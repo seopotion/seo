@@ -2,19 +2,19 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { NavbarLogo } from '../navbar/NavbarLogo';
 
-const linkClassName = 'transition-colors hover:text-gray-900';
+const linkClassName = 'transition-colors hover:text-foreground';
 
 export function Footer() {
   const t = useTranslations('Footer');
 
   return (
-    <footer className="border-gray-100 border-t px-6 py-12">
+    <footer className="border-border border-t px-6 py-12">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
           <NavbarLogo />
           <nav
             aria-label={t('navigationLabel')}
-            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-gray-600"
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-muted-foreground"
           >
             <Link href="/#features" className={linkClassName}>
               {t('features')}
@@ -26,12 +26,12 @@ export function Footer() {
               {t('blog')}
             </Link>
           </nav>
-          <p className="text-gray-500 text-sm">{t('copyright')}</p>
+          <p className="text-muted-foreground text-sm">{t('copyright')}</p>
         </div>
 
         <nav
           aria-label={t('legalNavigationLabel')}
-          className="mt-8 flex flex-wrap items-center justify-center gap-2 border-gray-100 border-t pt-6 text-gray-500 text-sm"
+          className="mt-8 flex flex-wrap items-center justify-center gap-2 border-border border-t pt-6 text-muted-foreground text-sm"
         >
           <Link href="/terms" className={linkClassName}>
             {t('termsOfService')}

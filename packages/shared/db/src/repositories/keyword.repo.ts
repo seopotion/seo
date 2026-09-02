@@ -55,8 +55,8 @@ export const KeywordRepo = {
    * service to map into typed conflicts.
    */
   async createFromCandidate(candidate: Candidate, scheduledDate: string): Promise<Keyword> {
-    if (candidate.search_volume === null || candidate.difficulty === null) {
-      throw new Error(`candidate ${candidate.id} is missing metrics required by KeywordSchema`);
+    if (candidate.search_volume === null) {
+      throw new Error(`candidate ${candidate.id} has no search volume, required by KeywordSchema`);
     }
     return KeywordRepo.create({
       org_id: candidate.org_id,

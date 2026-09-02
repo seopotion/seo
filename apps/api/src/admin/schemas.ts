@@ -294,7 +294,7 @@ const AdminArticleListItem = z
     slug: z.string(),
     keyword: z.string(),
     status: z.enum(ARTICLE_STATUSES),
-    difficulty: z.number().int(),
+    difficulty: z.number().int().nullable(),
     search_volume: z.number().int(),
     featured_image_url: z.string(),
     created_at: z.string(),

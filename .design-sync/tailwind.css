@@ -1,0 +1,139 @@
+/* design-sync stylesheet input. globals.css is the app's real stylesheet (tokens,
+ * preflight, base layer); Tailwind auto-detects every class used under apps/web
+ * (base: apps/web in build.mjs), so the compiled output starts as exactly what the
+ * app ships. The @source inline() lines below safelist the generic utility
+ * vocabulary a design agent reaches for in its own layout glue - a static
+ * stylesheet can't compile classes on demand, so anything not listed here (and
+ * not used by the app) renders unstyled in claude.ai/design. Keep this in sync
+ * with the family table in .design-sync/conventions.md. */
+@import "../apps/web/app/globals.css";
+
+/* -- colour: every token in globals.css @theme, per family ------------------ */
+@source inline("{bg,text,border,ring,divide,fill,stroke,outline,placeholder}-{background,foreground,card,card-foreground,popover,popover-foreground,primary,primary-foreground,secondary,secondary-foreground,muted,muted-foreground,accent,accent-foreground,destructive,border,input,ring,success,success-muted,success-subtle,success-border,warning,warning-muted,warning-subtle,warning-border,error,error-muted,error-subtle,error-border,info,info-muted,info-subtle,info-border,progress,progress-muted,progress-subtle,progress-border,chart-1,chart-2,chart-3,white,black,transparent,current,inherit}");
+@source inline("{hover:,focus-visible:,}{bg,text,border}-{background,foreground,card,primary,primary-foreground,secondary,muted,muted-foreground,accent,accent-foreground,destructive,border,input,ring,success,warning,error,info,progress,white,transparent}");
+@source inline("{bg,text,border,ring}-{background,foreground,primary,secondary,muted,accent,destructive,border,ring,success,warning,error,info,progress,white,black}/{5,10,20,30,40,50,60,70,80,90}");
+@source inline("hover:bg-{primary,secondary,accent,destructive,muted,success,warning,error,info,progress}/{80,90}");
+@source inline("{from,via,to}-{background,card,primary,secondary,muted,accent,success,warning,error,info,progress,transparent,white}");
+@source inline("bg-{none,linear-to-r,linear-to-l,linear-to-t,linear-to-b,linear-to-br,linear-to-tr,radial,cover,contain,center,no-repeat,fixed,clip-text}");
+
+/* -- spacing ---------------------------------------------------------------- */
+@source inline("{p,px,py,pt,pr,pb,pl,ps,pe,m,mx,my,mt,mr,mb,ml,gap,gap-x,gap-y,space-x,space-y}-{0,px,0.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,20,24,28,32,36,40,48,56,64,72,80,96}");
+@source inline("{sm:,md:,lg:,xl:}{p,px,py,pt,pb,m,mx,my,mt,mb,gap,gap-x,gap-y}-{0,1,2,3,4,5,6,8,10,12,16,20,24,32}");
+@source inline("{m,mx,my,mt,mr,mb,ml}-auto");
+@source inline("-{m,mx,my,mt,mr,mb,ml,translate-x,translate-y,top,right,bottom,left,inset-x,inset-y}-{px,0.5,1,2,3,4,6,8,1/2,full}");
+
+/* -- sizing ----------------------------------------------------------------- */
+@source inline("{w,h,size,min-w,max-w,min-h,max-h}-{0,px,0.5,1,1.5,2,2.5,3,3.5,4,5,6,7,8,9,10,11,12,14,16,20,24,28,32,36,40,44,48,52,56,60,64,72,80,96,auto,full,screen,svh,dvh,lvh,min,max,fit,1/2,1/3,2/3,1/4,3/4,1/5,2/5,3/5,4/5,1/6,5/6,1/12,5/12,7/12,11/12}");
+@source inline("{sm:,md:,lg:,xl:}{w,h,max-w}-{0,4,8,10,12,16,20,24,32,40,48,56,64,72,80,96,auto,full,screen,fit,min,max,1/2,1/3,2/3,1/4,3/4,1/5,2/5,3/5,4/5}");
+@source inline("{sm:,md:,lg:,xl:,}{w,max-w,min-w}-{3xs,2xs,xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl}");
+@source inline("{sm:,md:,lg:,}max-w-{none,prose,screen-sm,screen-md,screen-lg,screen-xl,screen-2xl}");
+@source inline("{inset,inset-x,inset-y,top,right,bottom,left,start,end}-{0,px,0.5,1,2,3,4,6,8,10,12,16,auto,full,1/2}");
+@source inline("z-{0,10,20,30,40,50,auto}");
+
+/* -- layout ----------------------------------------------------------------- */
+@source inline("{sm:,md:,lg:,xl:,}{block,inline-block,inline,flex,inline-flex,grid,inline-grid,hidden,contents,table,table-row,table-cell,flow-root}");
+@source inline("{sm:,md:,lg:,}flex-{row,row-reverse,col,col-reverse,wrap,wrap-reverse,nowrap,1,auto,initial,none}");
+@source inline("{grow,grow-0,shrink,shrink-0}");
+@source inline("basis-{0,1/2,1/3,2/3,1/4,3/4,full,auto}");
+@source inline("{sm:,md:,lg:,xl:,}grid-cols-{1,2,3,4,5,6,7,8,9,10,11,12,none,subgrid}");
+@source inline("{sm:,md:,lg:,}grid-rows-{1,2,3,4,5,6,none}");
+@source inline("{sm:,md:,lg:,}col-span-{1,2,3,4,5,6,7,8,9,10,11,12,full}");
+@source inline("{sm:,md:,lg:,}row-span-{1,2,3,4,5,6,full}");
+@source inline("{col,row}-{start,end}-{1,2,3,4,5,6,7,8,9,10,11,12,13,auto}");
+@source inline("{auto-rows,auto-cols}-{auto,min,max,fr}");
+@source inline("grid-flow-{row,col,dense,row-dense,col-dense}");
+@source inline("{sm:,md:,lg:,}items-{start,end,center,baseline,stretch}");
+@source inline("{sm:,md:,lg:,}justify-{start,end,center,between,around,evenly,stretch}");
+@source inline("justify-items-{start,end,center,stretch}");
+@source inline("justify-self-{auto,start,end,center,stretch}");
+@source inline("self-{auto,start,end,center,stretch,baseline}");
+@source inline("content-{start,end,center,between,around,evenly,stretch}");
+@source inline("place-items-{start,end,center,stretch}");
+@source inline("place-content-{start,end,center,between,around,evenly,stretch}");
+@source inline("place-self-{auto,start,end,center,stretch}");
+@source inline("{sm:,md:,lg:,}order-{1,2,3,4,5,6,first,last,none}");
+@source inline("{static,fixed,absolute,relative,sticky}");
+@source inline("overflow-{auto,hidden,visible,scroll,clip}");
+@source inline("overflow-{x,y}-{auto,hidden,visible,scroll,clip}");
+@source inline("{container,isolate,isolation-auto}");
+@source inline("aspect-{auto,square,video,3/2,4/3,16/9}");
+@source inline("{sm:,md:,lg:,}columns-{1,2,3,4}");
+@source inline("{visible,invisible,collapse}");
+
+/* -- typography ------------------------------------------------------------- */
+@source inline("{sm:,md:,lg:,xl:,}text-{xs,sm,base,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl}");
+@source inline("font-{thin,extralight,light,normal,medium,semibold,bold,extrabold,black,sans,serif,mono}");
+@source inline("leading-{none,tight,snug,normal,relaxed,loose,3,4,5,6,7,8,9,10}");
+@source inline("tracking-{tighter,tight,normal,wide,wider,widest}");
+@source inline("{sm:,md:,}text-{left,center,right,justify,start,end}");
+@source inline("{uppercase,lowercase,capitalize,normal-case,italic,not-italic}");
+@source inline("{hover:,group-hover:,}{underline,overline,line-through,no-underline}");
+@source inline("underline-offset-{1,2,4,8}");
+@source inline("decoration-{1,2,dotted,dashed,solid}");
+@source inline("{truncate,text-ellipsis,text-clip}");
+@source inline("whitespace-{normal,nowrap,pre,pre-line,pre-wrap}");
+@source inline("break-{normal,words,all,keep}");
+@source inline("{wrap-break-word,wrap-anywhere,wrap-normal,text-wrap,text-nowrap,text-balance,text-pretty}");
+@source inline("line-clamp-{1,2,3,4,5,6,none}");
+@source inline("{tabular-nums,slashed-zero,ordinal,normal-nums,antialiased,subpixel-antialiased}");
+@source inline("align-{baseline,top,middle,bottom,text-top,text-bottom}");
+@source inline("list-{none,disc,decimal,inside,outside}");
+@source inline("indent-{2,4,8}");
+
+/* -- borders, rings, outlines ----------------------------------------------- */
+@source inline("border{,-0,-2,-4,-8}");
+@source inline("border-{t,r,b,l,x,y,s,e}{,-0,-2,-4}");
+@source inline("border-{solid,dashed,dotted,double,none}");
+@source inline("divide-{x,y}{,-0,-2,-4,-reverse}");
+@source inline("divide-{solid,dashed,dotted}");
+@source inline("rounded{,-none,-xs,-sm,-md,-lg,-xl,-2xl,-3xl,-4xl,-full}");
+@source inline("rounded-{t,r,b,l,tl,tr,br,bl,s,e}{,-none,-sm,-md,-lg,-xl,-2xl,-3xl,-full}");
+@source inline("{sm:,md:,}rounded-{none,md,lg,xl,2xl}");
+@source inline("ring{,-0,-1,-2,-3,-4,-8,-inset}");
+@source inline("ring-offset-{0,1,2,4}");
+@source inline("outline{,-0,-1,-2,-4,-none,-hidden,-offset-1,-offset-2,-dashed}");
+@source inline("{focus-visible:,focus:,focus-within:}{ring,ring-1,ring-2,ring-4,ring-offset-2,outline-none,outline-hidden,border-ring,ring-ring,ring-ring/50,ring-ring/35,ring-primary,border-primary}");
+
+/* -- effects, transitions, transforms --------------------------------------- */
+@source inline("shadow{,-2xs,-xs,-sm,-md,-lg,-xl,-2xl,-none,-inner}");
+@source inline("hover:shadow-{xs,sm,md,lg}");
+@source inline("opacity-{0,5,10,20,25,30,40,50,60,70,75,80,90,95,100}");
+@source inline("{hover:,disabled:,group-hover:}opacity-{0,40,50,60,70,80,90,100}");
+@source inline("blur{,-none,-xs,-sm,-md,-lg}");
+@source inline("backdrop-blur{,-xs,-sm,-md,-lg}");
+@source inline("drop-shadow{,-xs,-sm,-md,-lg,-none}");
+@source inline("brightness-{90,95,105,110}");
+@source inline("{grayscale,mix-blend-multiply,mix-blend-screen}");
+@source inline("transition{,-all,-colors,-opacity,-shadow,-transform,-none}");
+@source inline("duration-{75,100,150,200,300,500,700,1000}");
+@source inline("ease-{linear,in,out,in-out}");
+@source inline("delay-{75,100,150,200,300,500}");
+@source inline("animate-{none,spin,ping,pulse,bounce}");
+@source inline("scale-{0,50,75,90,95,100,105,110,125,150}");
+@source inline("{hover:,active:,group-hover:}scale-{95,100,105,110}");
+@source inline("{rotate,-rotate}-{0,1,2,3,6,12,45,90,180}");
+@source inline("translate-{x,y}-{0,px,0.5,1,2,4,1/2,full}");
+@source inline("{transform,transform-gpu,transform-none,origin-center,origin-top,origin-bottom,origin-left,origin-right,origin-top-left,origin-top-right}");
+
+/* -- interactivity ---------------------------------------------------------- */
+@source inline("cursor-{auto,default,pointer,wait,text,move,help,not-allowed,grab,grabbing,zoom-in}");
+@source inline("{disabled:,aria-disabled:}{cursor-not-allowed,pointer-events-none,opacity-50}");
+@source inline("pointer-events-{none,auto}");
+@source inline("select-{none,text,all,auto}");
+@source inline("resize{,-none,-x,-y}");
+@source inline("scroll-{smooth,auto}");
+@source inline("snap-{x,y,start,center,end,mandatory,proximity,none}");
+@source inline("touch-{auto,none,pan-x,pan-y,manipulation}");
+@source inline("{appearance-none,sr-only,not-sr-only,will-change-transform,accent-primary,caret-primary,field-sizing-content}");
+@source inline("scroll-{m,mx,my,mt,mb,p,px,py,pt,pb}-{2,4,6,8,16}");
+@source inline("object-{contain,cover,fill,none,scale-down,center,top,bottom,left,right}");
+@source inline("{group,peer}");
+@source inline("group-hover:{text-foreground,text-primary,bg-accent,visible,translate-x-1}");
+@source inline("{first:,last:,odd:,even:}{border-0,border-t-0,border-b-0,rounded-t-lg,rounded-b-lg,rounded-t-md,rounded-b-md,bg-muted/50,bg-muted/30,pt-0,pb-0,mt-0,mb-0,ml-0,mr-0}");
+@source inline("active:{scale-95,translate-y-px,bg-accent,bg-primary/90}");
+@source inline("{aria-selected:,aria-current:,aria-expanded:,data-[state=active]:,data-[state=open]:,data-[state=checked]:,data-[state=on]:,data-[selected=true]:,data-[highlighted]:}{bg-accent,bg-primary,bg-muted,bg-background,text-primary-foreground,text-foreground,text-primary,border-primary,border-b-2,font-semibold,shadow-xs,rotate-180,underline,opacity-100}");
+@source inline("{data-[state=open]:,data-[state=closed]:,}{animate-in,animate-out,fade-in,fade-in-0,fade-out,fade-out-0,zoom-in-95,zoom-out-95,zoom-in,zoom-out}");
+@source inline("{data-[state=open]:,data-[state=closed]:,}slide-{in-from,out-to}-{top,bottom,left,right}{,-1,-2,-4,-1/2,-full}");
+@source inline("peer-{checked:,disabled:,focus-visible:}{text-foreground,opacity-50,cursor-not-allowed,ring-2,ring-ring}");
+@source inline("motion-reduce:{transition-none,animate-none}");
+@source inline("print:hidden");

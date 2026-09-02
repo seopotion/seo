@@ -3,9 +3,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useId, useState } from 'react';
-import { StatusPanel } from '@/components/integrations/StatusPanel';
-import { Button, Modal } from '@/components/ui';
+import { useRef, useState } from 'react';
+import { Button, Dialog, DialogContent, DialogTitle, StatusPanel } from '@/components/ui';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
@@ -46,7 +45,7 @@ export function StaticSiteDialog({
   const actionsT = useTranslations('SettingsPage.actions');
   const locale = useLocale();
   const queryClient = useQueryClient();
-  const titleId = useId();
+  const connectRef = useRef<HTMLButtonElement>(null);
   const [installing, setInstalling] = useState(false);
   const [installErrorKey, setInstallErrorKey] = useState<InstallErrorKey | null>(null);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
@@ -128,126 +127,140 @@ export function StaticSiteDialog({
   }
 
   return (
-    <Modal
-      className="sm:h-auto sm:max-w-lg"
-      closeLabel={actionsT('closeDialog')}
-      labelledBy={titleId}
-      onClose={handleClose}
+    <Dialog
       open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) handleClose();
+      }}
     >
-      <header className="flex shrink-0 items-start justify-between gap-4 border-slate-200 border-b px-4 py-4 sm:px-6">
-        <h2 id={titleId} className="min-w-0 font-semibold text-lg text-slate-950">
-          {staticSiteT('provider')}
-        </h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={actionsT('closeDialog')}
-          className="size-9"
-          onClick={handleClose}
-        >
-          <X className="size-4" aria-hidden="true" />
-        </Button>
-      </header>
+      <DialogContent
+        className="sm:h-auto sm:max-w-lg"
+        onOpenAutoFocus={(event) => {
+          // The install button is the point of the dialog, but it is disabled
+          // without an organization — fall back to Radix's first-tabbable
+          // default rather than focusing nothing.
+          const target = connectRef.current;
 
-      <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 py-4 sm:px-6">
-        {integration ? (
-          <>
-            {/* `owner/repo@branch`, built server-side. */}
-            <p className="truncate font-medium text-slate-950 text-sm">{integration.target}</p>
-            <p className="text-slate-500 text-sm">
-              {t('connectedOn', {
-                date: dateFormatter.format(new Date(integration.connected_at)),
-              })}
-            </p>
-            {integration.last_error ? (
-              <StatusPanel tone="error">
-                {staticSiteT(
-                  PUBLISH_ERROR_KEYS[integration.last_error.code] ?? 'publishErrors.unknown',
-                )}
-              </StatusPanel>
-            ) : null}
-            {disconnectFailed ? (
-              <StatusPanel tone="error">{staticSiteT('disconnectError')}</StatusPanel>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <p className="text-slate-600 text-sm">{staticSiteT('description')}</p>
-            <p className="text-slate-500 text-sm">{staticSiteT('beforeRedirect')}</p>
-          </>
-        )}
-        {/* Connecting only gets the files into their repo — rendering them is
-            code they have to write, so the guide belongs in both states. */}
-        <p className="text-slate-500 text-sm">
-          <Link
-            className="font-medium text-amber-700 underline underline-offset-2 hover:text-amber-800"
-            href="/docs/custom-site"
-            target="_blank"
+          if (!target || target.hasAttribute('disabled')) {
+            return;
+          }
+
+          event.preventDefault();
+          target.focus();
+        }}
+      >
+        <header className="flex shrink-0 items-start justify-between gap-4 border-border border-b px-4 py-4 sm:px-6">
+          <DialogTitle className="min-w-0">{staticSiteT('provider')}</DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={actionsT('closeDialog')}
+            className="size-9"
+            onClick={handleClose}
           >
-            {staticSiteT('setupGuide')}
-          </Link>
-        </p>
-        {installErrorKey ? (
-          <StatusPanel tone="error">{staticSiteT(`errors.${installErrorKey}`)}</StatusPanel>
-        ) : null}
-      </div>
+            <X className="size-4" aria-hidden="true" />
+          </Button>
+        </header>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-2 border-slate-200 border-t px-4 py-4 sm:px-6">
-        {/* Same hand-off either way — only the label changes, because a dead
-            installation is not something the user should have to guess is fixable. */}
-        <Button
-          type="button"
-          data-modal-initial-focus
-          disabled={!organization || installing || disconnectMutation.isPending}
-          onClick={startInstall}
-        >
-          {installing
-            ? staticSiteT('connecting')
-            : !integration
-              ? staticSiteT('connect')
-              : needsReconnect
-                ? staticSiteT('reconnect')
-                : staticSiteT('changeRepository')}
-        </Button>
-        {integration ? (
-          confirmingDisconnect ? (
+        <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto px-4 py-4 sm:px-6">
+          {integration ? (
             <>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={disconnectMutation.isPending}
-                onClick={() => disconnectMutation.mutate()}
-              >
-                {staticSiteT('disconnectConfirmYes')}
-              </Button>
+              {/* `owner/repo@branch`, built server-side. */}
+              <p className="truncate font-medium text-foreground text-sm">{integration.target}</p>
+              <p className="text-muted-foreground text-sm">
+                {t('connectedOn', {
+                  date: dateFormatter.format(new Date(integration.connected_at)),
+                })}
+              </p>
+              {integration.last_error ? (
+                <StatusPanel tone="error">
+                  {staticSiteT(
+                    PUBLISH_ERROR_KEYS[integration.last_error.code] ?? 'publishErrors.unknown',
+                  )}
+                </StatusPanel>
+              ) : null}
+              {disconnectFailed ? (
+                <StatusPanel tone="error">{staticSiteT('disconnectError')}</StatusPanel>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground text-sm">{staticSiteT('description')}</p>
+              <p className="text-muted-foreground text-sm">{staticSiteT('beforeRedirect')}</p>
+            </>
+          )}
+          {/* Connecting only gets the files into their repo — rendering them is
+            code they have to write, so the guide belongs in both states. */}
+          <p className="text-muted-foreground text-sm">
+            <Link
+              className="font-medium text-warning underline underline-offset-2 hover:text-warning"
+              href="/docs/custom-site"
+              target="_blank"
+            >
+              {staticSiteT('setupGuide')}
+            </Link>
+          </p>
+          {installErrorKey ? (
+            <StatusPanel tone="error">{staticSiteT(`errors.${installErrorKey}`)}</StatusPanel>
+          ) : null}
+        </div>
+
+        <footer className="flex shrink-0 flex-wrap items-center gap-2 border-border border-t px-4 py-4 sm:px-6">
+          {/* Same hand-off either way — only the label changes, because a dead
+            installation is not something the user should have to guess is fixable. */}
+          <Button
+            type="button"
+            ref={connectRef}
+            disabled={!organization || installing || disconnectMutation.isPending}
+            onClick={startInstall}
+          >
+            {installing
+              ? staticSiteT('connecting')
+              : !integration
+                ? staticSiteT('connect')
+                : needsReconnect
+                  ? staticSiteT('reconnect')
+                  : staticSiteT('changeRepository')}
+          </Button>
+          {integration ? (
+            confirmingDisconnect ? (
+              <>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={disconnectMutation.isPending}
+                  onClick={() => disconnectMutation.mutate()}
+                >
+                  {staticSiteT('disconnectConfirmYes')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={disconnectMutation.isPending}
+                  onClick={() => setConfirmingDisconnect(false)}
+                >
+                  {staticSiteT('disconnectCancel')}
+                </Button>
+              </>
+            ) : (
               <Button
                 type="button"
                 variant="ghost"
-                disabled={disconnectMutation.isPending}
-                onClick={() => setConfirmingDisconnect(false)}
+                className="text-error hover:text-error"
+                onClick={() => setConfirmingDisconnect(true)}
               >
-                {staticSiteT('disconnectCancel')}
+                {staticSiteT('disconnect')}
               </Button>
-            </>
-          ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-red-600 hover:text-red-700"
-              onClick={() => setConfirmingDisconnect(true)}
-            >
-              {staticSiteT('disconnect')}
+            )
+          ) : null}
+          {confirmingDisconnect ? null : (
+            <Button type="button" variant="ghost" onClick={handleClose}>
+              {actionsT('close')}
             </Button>
-          )
-        ) : null}
-        {confirmingDisconnect ? null : (
-          <Button type="button" variant="ghost" onClick={handleClose}>
-            {actionsT('close')}
-          </Button>
-        )}
-      </footer>
-    </Modal>
+          )}
+        </footer>
+      </DialogContent>
+    </Dialog>
   );
 }

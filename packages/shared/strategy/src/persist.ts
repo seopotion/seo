@@ -30,13 +30,14 @@ function nextFreeDate(from: string, occupied: Set<string>): string {
 
 type SemanticPipelineTarget = EnrichedCandidate & TopicCandidateTarget;
 
+// difficulty null = unknown KD, scored as neutral ease (score.ts) — still
+// schedulable; it dropped the product's own core term on unmarble (#294).
 function semanticTargetPool(candidates: readonly EnrichedCandidate[]): SemanticPipelineTarget[] {
   return candidates.filter(
     (candidate) =>
       candidate.serp_validated &&
       candidate.rejection_reason === null &&
-      candidate.search_volume !== null &&
-      candidate.difficulty !== null,
+      candidate.search_volume !== null,
   ) as SemanticPipelineTarget[];
 }
 
@@ -52,8 +53,7 @@ function isEligibleStoredCandidate(candidate: Candidate): boolean {
     (candidate.status === 'candidate' || candidate.status === 'selected') &&
     candidate.rejection_reason === null &&
     candidate.serp_validated &&
-    candidate.search_volume !== null &&
-    candidate.difficulty !== null
+    candidate.search_volume !== null
   );
 }
 
@@ -95,6 +95,20 @@ export async function stagePersistSchedule(
   const storedByNormalized = new Map(persisted.map((c) => [c.normalized_keyword, c]));
 
   const scheduledSet = new Set(scheduled.map((k) => normalizeKeyword(k.keyword)));
+  // A target's members (its topic_duplicate variants) may already be on the
+  // planner under an earlier run's primary — "virtual try on" scheduled, then a
+  // rerun makes "virtual try-on" the primary. Dedupe on every member (#303).
+  const membersByPrimary = new Map<string, Set<string>>();
+  for (const c of allCandidates) {
+    if (!c.topic_primary_keyword) continue;
+    const primary = normalizeKeyword(c.topic_primary_keyword);
+    const members = membersByPrimary.get(primary) ?? new Set<string>();
+    members.add(normalizeKeyword(c.keyword));
+    membersByPrimary.set(primary, members);
+  }
+  const alreadyPlanned = (normalized: string): boolean =>
+    scheduledSet.has(normalized) ||
+    [...(membersByPrimary.get(normalized) ?? [])].some((m) => scheduledSet.has(m));
   // Strategy entries this job wrote carry a non-null opportunity_score; manual #50
   // selections go to the candidate pool (not KeywordRepo), so this proxy counts
   // only prior strategy output. Budget the remaining 30-day plan against them and
@@ -113,15 +127,20 @@ export async function stagePersistSchedule(
     }
   }
 
+  // Start tomorrow (UTC): the generation cron runs at 07:00 UTC, so a plan
+  // stamped "today" for an org finalized after that hour has a day-1 slot
+  // already in the past, and listDueForGeneration catches days 1 and 2 up
+  // together the next morning (#292). Offset further by what a redelivered
+  // partial run already scheduled.
   const startDay = new Date();
-  startDay.setUTCDate(startDay.getUTCDate() + alreadyScheduled);
+  startDay.setUTCDate(startDay.getUTCDate() + 1 + alreadyScheduled);
   const occupied = new Set(scheduled.map((k) => k.scheduled_date));
   let qualifiedCount = 0;
   let scheduledCount = 0;
 
   for (const target of orderedTargets) {
     const normalized = normalizeKeyword(target.keyword);
-    if (scheduledSet.has(normalized)) {
+    if (alreadyPlanned(normalized)) {
       if (target.topic_role === 'pillar') confirmedTopicClusters.add(target.topic_cluster_id);
       continue;
     }

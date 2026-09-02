@@ -2,30 +2,35 @@
 
 import { X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import type { ReactNode, RefObject } from 'react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import {
   ARTICLE_EDITOR_TITLE_ID,
   ArticleEditorDetailItem,
   ArticleEditorMessage,
   ArticleEditorPanel,
 } from '@/components/article/ArticleEditorPanel';
-import { Badge, Button, Separator } from '@/components/ui';
+import { Badge, Button, Dialog, DialogContent, Separator } from '@/components/ui';
 import { useArticleEditor } from '@/lib/article-editor';
 import { cn } from '@/lib/utils';
-import { formatDateFromKey, formatDateTime, formatNumber } from '../planner-utils';
+import {
+  formatDateFromKey,
+  formatDateTime,
+  formatNullableNumber,
+  formatNumber,
+} from '../planner-utils';
 import type { PlannerArticle, PlannerArticleStatus } from '../types';
 
 type ContentPlannerTranslations = ReturnType<typeof useTranslations<'ContentPlannerPage'>>;
 
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
+const PLANNED_ARTICLE_TITLE_ID = 'planner-article-detail-title';
+
+/**
+ * The card surfaces are a small centred panel rather than the full-bleed editor,
+ * so they undo `DialogContent`'s viewport-filling defaults. `cn` is tailwind-merge,
+ * so each utility here replaces the one it conflicts with.
+ */
+const CARD_CLASSNAME =
+  'block h-auto max-w-md rounded-lg border border-border p-5 sm:h-auto sm:max-w-md';
 
 export function ArticleEditorModal({
   article,
@@ -56,13 +61,6 @@ export function ArticleEditorModal({
   });
   const { draftArticle, requestClose } = editor;
 
-  useDialogFocusManagement({
-    active: Boolean(article),
-    dialogRef,
-    focusKey: `${articleKey ?? 'closed'}-${Boolean(draftArticle)}`,
-    onEscape: requestClose,
-  });
-
   if (!article) {
     return null;
   }
@@ -72,39 +70,41 @@ export function ArticleEditorModal({
   const showsFullEditor = isGeneratedArticle && Boolean(draftArticle);
 
   return (
-    <div
-      className={cn(
-        'fixed inset-0 z-50 grid bg-slate-950/40',
-        showsFullEditor
-          ? 'place-items-stretch p-0 sm:place-items-center sm:p-4'
-          : 'place-items-center p-4',
-      )}
-      role="presentation"
+    // The parent unmounts this component to close it, so it is only ever
+    // rendered open. Radix still reports close requests through onOpenChange.
+    <Dialog
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
     >
-      <button
-        type="button"
-        aria-label={t('actions.closeDetails')}
-        className="absolute inset-0 cursor-default"
-        onMouseDown={requestClose}
-      />
+      <DialogContent
+        // Remounting on either the article or the draft arriving is what re-aims
+        // initial focus, the job the old hook's `focusKey` did.
+        key={`${articleKey ?? 'closed'}-${Boolean(draftArticle)}`}
+        ref={dialogRef}
+        aria-labelledby={isGeneratedArticle ? ARTICLE_EDITOR_TITLE_ID : PLANNED_ARTICLE_TITLE_ID}
+        className={cn(showsFullEditor ? 'sm:h-[min(92dvh,900px)] sm:max-w-6xl' : CARD_CLASSNAME)}
+        overlayClassName={showsFullEditor ? undefined : 'place-items-center p-4'}
+        onOpenAutoFocus={(event) => {
+          // The preferred control lives inside ArticleEditorPanel, several
+          // layers down, so it is found by attribute rather than threaded
+          // through as a ref. Radix's first-tabbable default covers the rest.
+          const preferred = dialogRef.current?.querySelector<HTMLElement>(
+            '[data-dialog-initial-focus]',
+          );
 
-      {!isGeneratedArticle ? (
-        <PlannedArticleDetails
-          article={article}
-          dialogRef={dialogRef}
-          locale={locale}
-          onClose={requestClose}
-          t={t}
-        />
-      ) : draftArticle ? (
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
-          tabIndex={-1}
-          className="relative flex h-dvh w-full flex-col bg-white shadow-lg sm:h-[min(92dvh,900px)] sm:max-w-6xl sm:rounded-lg sm:border sm:border-slate-200"
-        >
+          if (!preferred || preferred.hasAttribute('disabled')) {
+            return;
+          }
+
+          event.preventDefault();
+          preferred.focus();
+        }}
+      >
+        {!isGeneratedArticle ? (
+          <PlannedArticleDetails article={article} locale={locale} onClose={requestClose} t={t} />
+        ) : draftArticle ? (
           <ArticleEditorPanel
             canSave={editor.canSave}
             context={
@@ -120,7 +120,7 @@ export function ArticleEditorModal({
                 />
                 <ArticleEditorDetailItem
                   label={t('metrics.difficulty')}
-                  value={formatNumber(article.difficulty, locale)}
+                  value={formatNullableNumber(article.difficulty, locale)}
                 />
               </dl>
             }
@@ -140,58 +140,45 @@ export function ArticleEditorModal({
             })}
             validation={editor.validation}
           />
-        </div>
-      ) : (
-        <ArticleEditorMessageCard dialogRef={dialogRef}>
-          {editor.isPending ? (
-            <ArticleEditorMessage message={editorT('status.loading')} onClose={requestClose} />
-          ) : editor.isError ? (
-            <ArticleEditorMessage
-              message={editorT('status.loadError')}
-              onClose={requestClose}
-              onRetry={editor.refetch}
-            />
-          ) : (
-            <ArticleEditorMessage message={editorT('status.notFound')} onClose={requestClose} />
-          )}
-        </ArticleEditorMessageCard>
-      )}
-    </div>
+        ) : editor.isPending ? (
+          <ArticleEditorMessage message={editorT('status.loading')} onClose={requestClose} />
+        ) : editor.isError ? (
+          <ArticleEditorMessage
+            message={editorT('status.loadError')}
+            onClose={requestClose}
+            onRetry={editor.refetch}
+          />
+        ) : (
+          <ArticleEditorMessage message={editorT('status.notFound')} onClose={requestClose} />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function PlannedArticleDetails({
   article,
-  dialogRef,
   locale,
   onClose,
   t,
 }: {
   article: PlannerArticle;
-  dialogRef: RefObject<HTMLDivElement | null>;
   locale: string;
   onClose: () => void;
   t: ContentPlannerTranslations;
 }) {
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="planner-article-detail-title"
-      tabIndex={-1}
-      className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
-    >
+    <>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-slate-500 text-sm">{t('modal.title')}</p>
+          <p className="text-muted-foreground text-sm">{t('modal.title')}</p>
           <h2
             id="planner-article-detail-title"
-            className="mt-1 line-clamp-3 font-semibold text-base text-slate-950"
+            className="mt-1 line-clamp-3 font-semibold text-base text-foreground"
           >
             {article.keyword}
           </h2>
-          <p className="mt-2 text-slate-600 text-sm">{t('modal.notGenerated')}</p>
+          <p className="mt-2 text-muted-foreground text-sm">{t('modal.notGenerated')}</p>
         </div>
         <Button
           type="button"
@@ -216,42 +203,20 @@ function PlannedArticleDetails({
         />
         <ArticleEditorDetailItem
           label={t('metrics.difficulty')}
-          value={formatNumber(article.difficulty, locale)}
+          value={formatNullableNumber(article.difficulty, locale)}
         />
         <ArticleEditorDetailItem
           label={t('modal.scheduledDate')}
           value={formatDateFromKey(article.scheduledDate, locale)}
         />
         <div className="grid gap-1">
-          <dt className="text-slate-500">{t('modal.status')}</dt>
+          <dt className="text-muted-foreground">{t('modal.status')}</dt>
           <dd>
             <StatusBadge status={article.status} t={t} />
           </dd>
         </div>
       </dl>
-    </div>
-  );
-}
-
-/** The dialog shell the loading / not-found / load-error panels sit in. */
-function ArticleEditorMessageCard({
-  children,
-  dialogRef,
-}: {
-  children: ReactNode;
-  dialogRef: RefObject<HTMLDivElement | null>;
-}) {
-  return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={ARTICLE_EDITOR_TITLE_ID}
-      tabIndex={-1}
-      className="relative w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
-    >
-      {children}
-    </div>
+    </>
   );
 }
 
@@ -267,132 +232,10 @@ function StatusBadge({
       variant="secondary"
       className={cn(
         'w-fit border-transparent',
-        status === 'generated' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700',
+        status === 'generated' ? 'bg-success-muted text-success' : 'bg-info-muted text-info',
       )}
     >
       {t(`statuses.${status}`)}
     </Badge>
-  );
-}
-
-function useDialogFocusManagement({
-  active,
-  dialogRef,
-  focusKey,
-  onEscape,
-}: {
-  active: boolean;
-  dialogRef: RefObject<HTMLDivElement | null>;
-  focusKey: string;
-  onEscape: () => void;
-}) {
-  useEffect(() => {
-    if (!active) {
-      return;
-    }
-
-    if (!focusKey) {
-      return;
-    }
-
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const originalBodyOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-
-    function focusInitialElement() {
-      const dialog = dialogRef.current;
-
-      if (!dialog) {
-        return;
-      }
-
-      const preferredElement = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]');
-      const focusTarget =
-        preferredElement && isElementFocusable(preferredElement)
-          ? preferredElement
-          : (getFocusableElements(dialog)[0] ?? dialog);
-
-      focusTarget.focus({ preventScroll: true });
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onEscape();
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const dialog = dialogRef.current;
-
-      if (!dialog) {
-        return;
-      }
-
-      const focusableElements = getFocusableElements(dialog);
-
-      if (focusableElements.length === 0) {
-        event.preventDefault();
-        dialog.focus({ preventScroll: true });
-        return;
-      }
-
-      const activeElement = document.activeElement;
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (!activeElement || !dialog.contains(activeElement)) {
-        event.preventDefault();
-        firstElement.focus({ preventScroll: true });
-        return;
-      }
-
-      if (event.shiftKey && activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus({ preventScroll: true });
-        return;
-      }
-
-      if (!event.shiftKey && activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus({ preventScroll: true });
-      }
-    }
-
-    const animationFrame = window.requestAnimationFrame(focusInitialElement);
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      document.body.style.overflow = originalBodyOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-
-      window.setTimeout(() => {
-        if (previouslyFocused?.isConnected) {
-          previouslyFocused.focus({ preventScroll: true });
-        }
-      }, 0);
-    };
-  }, [active, dialogRef, focusKey, onEscape]);
-}
-
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    isElementFocusable,
-  );
-}
-
-function isElementFocusable(element: HTMLElement) {
-  return (
-    !element.hasAttribute('disabled') &&
-    element.getAttribute('aria-hidden') !== 'true' &&
-    element.tabIndex !== -1 &&
-    element.getClientRects().length > 0
   );
 }

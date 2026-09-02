@@ -175,20 +175,29 @@ export function buildPlanPrompt(
       content:
         'You are building a content plan from validated keyword candidates. Do THREE things ' +
         'in one response.\n' +
-        '1) VERDICTS — for EVERY candidate index return one verdict. intent_ok=false if its ' +
-        'Google results are product/navigational pages a blog article cannot outrank. ' +
+        '1) VERDICTS — for EVERY candidate index return one verdict. intent_ok=false ONLY when ' +
+        'the results are retailer product listings, pages of one specific other brand, or ' +
+        'transactional pages an article cannot match. Tool or product landing pages in the ' +
+        "business's own category are winnable for a product company — those candidates are " +
+        'intent_ok=true. ' +
         'locality_ok=false if results are dominated by local businesses or directories for a ' +
         'location that does not match the business country. article_type is exactly one of: ' +
         `${ARTICLE_TYPES.map((t) => `"${t}"`).join(', ')} — copy the string verbatim.\n` +
         '2) TARGETS — group accepted candidates that should become ONE article page into a ' +
         'target: singular/plural/synonymous/wording variants belong together; meaningfully ' +
-        'distinct search intents stay separate targets. Give each target the broad topic ' +
-        'cluster it belongs to (cluster: a short subject-family label, reused verbatim across ' +
-        'targets of the same family) and a one-sentence content_focus. A candidate you leave ' +
-        'out of every target becomes its own standalone article — omission is allowed and ' +
-        'safe, never a discard. Never put one index in two targets.\n' +
-        '3) PILLARS — mark is_pillar=true on the one broad, useful pillar target of each ' +
-        'cluster.\n' +
+        'distinct search intents stay separate targets. Inside one cluster, different ' +
+        'sub-intents (buyer vs consumer, technology explainer vs app roundup vs cost or ' +
+        'comparison) are separate support targets — a cluster with several accepted ' +
+        'candidates should rarely collapse to a single target. Give each target the broad ' +
+        'topic cluster it belongs to and a one-sentence content_focus. The cluster is the ' +
+        "subject FAMILY shared by several targets, never the target's own name: expect a " +
+        'few clusters (typically 2–6), each label copied verbatim onto every target of that ' +
+        'family. A candidate you leave out of every target becomes its own standalone ' +
+        'article — omission is allowed and safe, never a discard. Never put one index in ' +
+        'two targets.\n' +
+        '3) PILLARS — mark is_pillar=true on exactly one broad, useful pillar target per ' +
+        'cluster; the other targets of that cluster are its supports (is_pillar=false) and ' +
+        'must carry the same cluster label.\n' +
         'Evidence rules: missing evidence is unknown, not disagreement; different provider ' +
         'core keywords do not prove different topics; zero measured SERP URL overlap does not ' +
         'by itself prove different topics; category evidence is supporting evidence only.\n' +

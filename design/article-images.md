@@ -65,6 +65,11 @@ images_status: z.enum(['pending', 'complete', 'failed']).default('pending'),
 
 ## Image plan (structured prompts + alt text)
 
+> The prompt contract has since changed: the planner returns a medium and,
+> per slot, a composition, lighting, palette and objects, and code assembles
+> the prompt — see [`article-image-prompts.md`](article-image-prompts.md)
+> (#289, #309). The placement and persistence below still hold.
+
 New module in `@shared/generation`. One LLM call (`responseFormat: 'json'`) takes the
 validated article (title, meta description, H2 headings extracted from `content`) plus
 org context, and returns:
