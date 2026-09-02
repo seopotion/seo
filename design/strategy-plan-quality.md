@@ -110,3 +110,35 @@ tests named per change: `persist.test.ts` (start day; null-KD eligibility),
 Two PRs into `dev`: #292 alone (persist start day only), and #293 + #294
 together (same files, same snapshot, one acceptance replay). Staging
 verification is the next real org's plan after `dev` → `master`.
+
+## Follow-ups found by the first live rerun (2026-09-02)
+
+The forced rerun on unmarble after the changes above surfaced three more
+gaps. #301 (a rerun never refreshed an earlier run's rejection) shipped the
+same day. The other two:
+
+### #303 — top-up dedupes only a target's primary keyword
+
+The plan judge correctly put `virtual try-on` and `virtual try on` in one
+target, but the primary came out as the unscheduled variant and
+`stagePersistSchedule` only checks `scheduledSet.has(target.keyword)`, so the
+top-up scheduled a second article on the same topic. Fix, in `persist.ts`
+only: build a member map from the run's candidates (every candidate carrying a
+`topic_primary_keyword`, grouped under that primary — the primary plus its
+`topic_duplicate` members), and skip a target when **any** member is already
+on the planner; a skipped pillar still confirms its cluster so its supports can
+schedule. `normalizeKeyword` is left alone — the judge already groups hyphen
+variants, and the unique index depends on it.
+
+### #304 — null difficulty is unschedulable below target selection
+
+#294's persist change reached only target selection: `scheduleCandidate`,
+`KeywordRepo.createFromCandidate`, both `schedulable` flags (dashboard and
+admin) and, structurally, `KeywordSchema.difficulty: z.number().int()` all
+require a KD. On unmarble the 7 targets that did not schedule were exactly the
+null-KD ones, including the product's core term. Fix: `difficulty` becomes
+`int().nullable()` on `KeywordSchema` **and** `ArticleSchema` (finalize copies
+the keyword's value into the article), the three gates drop their difficulty
+condition (`search_volume` stays required), the API/admin response schemas
+follow, and the web/admin surfaces render null as the existing "—" (the
+planner's null-aware `formatMetric`; admin's `orEmpty`). Two PRs, #303 first.

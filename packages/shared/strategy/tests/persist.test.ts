@@ -277,6 +277,46 @@ describe('stagePersistSchedule', () => {
     );
   });
 
+  test('skips a target whose non-primary member is already on the planner, still confirming its cluster (#303)', async () => {
+    findById.mockResolvedValue(org);
+    // Run 1 scheduled "virtual try on" (its own cluster id back then).
+    listByOrg.mockResolvedValue([
+      {
+        keyword: 'virtual try on',
+        opportunity_score: 85,
+        scheduled_date: '2026-09-01',
+        topic_role: 'pillar',
+        topic_cluster_id: 'topic:virtual try on',
+      },
+    ] as never);
+    // Run 2's judge grouped the hyphen variant with it and made the variant primary.
+    const pillar = candidate('virtual try-on', 85, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+    });
+    const member = candidate('virtual try on', 85, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+      topic_primary_keyword: 'virtual try-on',
+      status: 'rejected',
+      rejection_reason: 'topic_duplicate',
+    });
+    const support = candidate('virtual fitting room', 70, {
+      topic_cluster_id: 'topic:virtual try-on',
+      topic_cluster_label: 'Virtual Try-On Fundamentals',
+      topic_role: 'support',
+    });
+
+    await stagePersistSchedule(
+      { ...state([pillar, support]), rejected: [member] },
+      { orgId: 'o1' },
+    );
+
+    expect(scheduleCandidate.mock.calls.map(([row]) => row.keyword)).toEqual([
+      'virtual fitting room',
+    ]);
+  });
+
   test('under-fills the plan rather than padding it, logs the shortfall, and still completes', async () => {
     findById.mockResolvedValue(org);
     listByOrg.mockResolvedValue([]);
