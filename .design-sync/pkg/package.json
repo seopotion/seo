@@ -1,0 +1,9 @@
+{
+  "name": "@seopotion/web-ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "design-sync scratch package: apps/web/components/ui built into dist/ (see .design-sync/build.mjs)",
+  "module": "dist/index.js",
+  "types": "dist/components/ui/index.d.ts"
+}
