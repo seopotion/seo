@@ -10,7 +10,6 @@ vi.mock('@shared/generation', async (importOriginal) => ({
   fleschKincaidGrade,
 }));
 
-import { FLESCH_KINCAID_TARGET } from '@shared/generation';
 import { ArticleFatalError } from '../src/errors';
 import { READABILITY_MAX_PASSES, stageHumanize } from '../src/stages/humanize';
 import { makeRun, presets } from './fixtures';
@@ -112,7 +111,7 @@ describe('stageHumanize', () => {
     expect(messages[1]).toEqual({ role: 'user', content: 'rewrite-high-1' });
     expect(messages[0]!.content).toContain('attempt 1');
     expect(messages[0]!.content).toContain('grade level 12');
-    expect(messages[0]!.content).toContain(`grade level ${FLESCH_KINCAID_TARGET}`);
+    expect(messages[0]!.content).toContain('target of grade level 8');
 
     expect(result).toEqual({
       completed: true,
@@ -283,5 +282,52 @@ describe('stageHumanize', () => {
       },
       output: { readability_ok: true },
     });
+  });
+
+  test('a grade above 8 but at the org target passes in one pass (#313)', async () => {
+    // gradeOf['rewrite-high-2'] is 10; the org allows 12.
+    const llm = llmReplying('rewrite-high-2');
+    const technical = {
+      ...presets,
+      article_preferences: {
+        ...presets.article_preferences,
+        content_seo: { ...presets.article_preferences.content_seo, readability_grade_max: 12 },
+      },
+    };
+    const run = makeRun({ working: { draft: 'draft text' }, presets: technical });
+
+    const result = await stageHumanize(run, llm);
+
+    expect(result).toEqual({
+      completed: true,
+      working: {
+        content: 'rewrite-high-2',
+        readability_grade: 10,
+        humanize_attempts: [{ attempt: 1, grade: 10, content: 'rewrite-high-2' }],
+      },
+      output: { readability_ok: true },
+    });
+  });
+
+  test('retry feedback quotes the org target, not a global one (#313)', async () => {
+    const technical = {
+      ...presets,
+      article_preferences: {
+        ...presets.article_preferences,
+        content_seo: { ...presets.article_preferences.content_seo, readability_grade_max: 10 },
+      },
+    };
+    const priorAttempts = [{ attempt: 1, grade: 12, content: 'rewrite-high-1' }];
+    const llm = llmReplying('rewrite-pass');
+    const run = makeRun({
+      working: { draft: 'draft text', humanize_attempts: priorAttempts },
+      presets: technical,
+    });
+
+    await stageHumanize(run, llm);
+
+    const { messages } = vi.mocked(llm.complete).mock.calls[0]![0];
+    expect(messages[0]!.content).toContain('target of grade level 10');
+    expect(messages[0]!.content).toContain('grade level 10 or lower');
   });
 });

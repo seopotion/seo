@@ -1,9 +1,4 @@
-import {
-  buildHumanizePrompt,
-  FLESCH_KINCAID_TARGET,
-  fleschKincaidGrade,
-  HUMANIZE,
-} from '@shared/generation';
+import { buildHumanizePrompt, fleschKincaidGrade, HUMANIZE } from '@shared/generation';
 import type { LlmClient } from '@shared/providers';
 import type { ArticleRun, HumanizeAttempt } from '@shared/schemas';
 import { contextFromRun } from '../context';
@@ -13,7 +8,7 @@ import type { StageOutcome } from './types';
 /** Initial humanize pass + up to 2 readability retries (2026-08-28 spec). */
 export const READABILITY_MAX_PASSES = 3;
 
-const passes = (grade: number | null) => grade === null || grade <= FLESCH_KINCAID_TARGET;
+const passes = (grade: number | null, target: number) => grade === null || grade <= target;
 
 /** Lowest measured grade wins; a passing (null) grade would have exited earlier. */
 function bestAttempt(attempts: HumanizeAttempt[]): HumanizeAttempt {
@@ -26,6 +21,7 @@ export async function stageHumanize(run: ArticleRun, llm: LlmClient): Promise<St
   const draft = run.working.draft;
   if (draft === null) throw new ArticleFatalError('humanize stage requires a checkpointed draft');
   const ctx = contextFromRun(run);
+  const target = ctx.readabilityGradeMax;
 
   if (!HUMANIZE) {
     return {
@@ -51,8 +47,8 @@ export async function stageHumanize(run: ArticleRun, llm: LlmClient): Promise<St
   const feedback = previous
     ? {
         attempt: previous.attempt,
-        ...(previous.grade !== null && previous.grade > FLESCH_KINCAID_TARGET
-          ? { grade: previous.grade, target: FLESCH_KINCAID_TARGET }
+        ...(previous.grade !== null && previous.grade > target
+          ? { grade: previous.grade, target }
           : {}),
         ...(keepsBrand(previous.content) ? {} : { droppedBusinessName: true }),
       }
@@ -63,7 +59,7 @@ export async function stageHumanize(run: ArticleRun, llm: LlmClient): Promise<St
   const attempt: HumanizeAttempt = { attempt: prior.length + 1, grade, content: res.text };
   const attempts = [...prior, attempt];
 
-  if (passes(grade) && keepsBrand(attempt.content)) {
+  if (passes(grade, target) && keepsBrand(attempt.content)) {
     return {
       completed: true,
       working: { content: attempt.content, readability_grade: grade, humanize_attempts: attempts },

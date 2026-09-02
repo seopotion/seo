@@ -240,4 +240,34 @@ describe('stageFinalize', () => {
       },
     });
   });
+
+  test('stores the org readability target on the article (#313)', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat();
+    const technical = {
+      ...presetsNoVideo,
+      article_preferences: {
+        ...presetsNoVideo.article_preferences,
+        content_seo: {
+          ...presetsNoVideo.article_preferences.content_seo,
+          readability_grade_max: 12,
+        },
+      },
+    };
+    const run = makeRun({
+      working: {
+        outline,
+        content,
+        readability_grade: 10,
+        humanize_attempts: [{ attempt: 1, grade: 10, content }],
+      },
+      presets: technical,
+    });
+
+    await stageFinalize(run, { llm, youtube });
+
+    expect(createArticle.mock.calls[0]![0]).toMatchObject({
+      readability: { grade: 10, target: 12, target_met: true, attempts: 1 },
+    });
+  });
 });
