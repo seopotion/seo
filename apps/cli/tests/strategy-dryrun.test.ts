@@ -597,7 +597,7 @@ describe('simulatePlan', () => {
       ...over,
     });
 
-  test('skips rejects and candidates missing metrics, ranks by opportunity', () => {
+  test('skips rejects and missing volume, keeps unknown KD (#294), ranks by opportunity', () => {
     const plan = simulatePlan(
       [
         validated({ keyword: 'low', opportunity_score: 10 }),
@@ -608,8 +608,8 @@ describe('simulatePlan', () => {
       ],
       start,
     );
-    expect(plan.map((r) => r.keyword)).toEqual(['high', 'low']);
-    expect(plan.map((r) => r.scheduled_date)).toEqual(['2026-08-11', '2026-08-12']);
+    expect(plan.map((r) => r.keyword)).toEqual(['no kd', 'high', 'low']);
+    expect(plan.map((r) => r.scheduled_date)).toEqual(['2026-08-11', '2026-08-12', '2026-08-13']);
   });
 
   test('plans only SERP-validated candidates, under-filling rather than backfilling', () => {
