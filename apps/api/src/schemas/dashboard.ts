@@ -139,7 +139,7 @@ const PlannerKeyword = z
     // ISO date (yyyy-mm-dd) the article is scheduled to generate/publish.
     scheduled_date: z.string(),
     search_volume: z.number().int(),
-    difficulty: z.number().int(),
+    difficulty: z.number().int().nullable(),
     // Classification from the candidate/strategy pipeline; null for older entries.
     article_type: z.enum(ARTICLE_TYPES).nullable(),
     intent: z.enum(SEARCH_INTENTS).nullable(),
@@ -201,7 +201,7 @@ const ArticleListItem = z
     slug: z.string(),
     keyword: z.string(),
     status: z.enum(ARTICLE_STATUSES),
-    difficulty: z.number().int(),
+    difficulty: z.number().int().nullable(),
     search_volume: z.number().int(),
     featured_image_url: z.string(),
     created_at: z.string(),

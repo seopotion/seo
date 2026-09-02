@@ -102,7 +102,17 @@ describe('scheduleCandidate (integration)', () => {
     expect((await CandidateRepo.findById(cand.id))!.status).toBe('candidate');
   });
 
-  test('missing metrics or rejected status are not schedulable', async () => {
+  test('an unknown difficulty still schedules and lands on the planner as null (#304)', async () => {
+    const noKd = await seedCandidate('unknown kd kw', { difficulty: null });
+    const res = await scheduleCandidate(noKd, '2026-11-05');
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.keyword).toMatchObject({ difficulty: null, search_volume: 100 });
+    expect((await KeywordRepo.findByCandidateId(ORG, noKd.id))!.difficulty).toBeNull();
+    expect((await CandidateRepo.findById(noKd.id))!.status).toBe('selected');
+  });
+
+  test('missing search volume or rejected status are not schedulable', async () => {
     const noMetrics = await seedCandidate('no metrics kw', { search_volume: null });
     expect(await scheduleCandidate(noMetrics, '2026-11-04')).toEqual({
       ok: false,

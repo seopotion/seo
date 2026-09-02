@@ -25,6 +25,7 @@ import {
   formatDate,
   formatDayNumber,
   formatMonthYear,
+  formatNullableNumber,
   formatNumber,
   formatWeekday,
   isSameMonth,
@@ -813,7 +814,7 @@ function ArticleSummary({
         {t('metrics.volume')}: {formatNumber(article.volume, locale)}
       </span>
       <span className="truncate font-normal text-muted-foreground text-xs">
-        {t('metrics.difficulty')}: {formatNumber(article.difficulty, locale)}
+        {t('metrics.difficulty')}: {formatNullableNumber(article.difficulty, locale)}
       </span>
     </div>
   );

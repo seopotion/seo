@@ -118,7 +118,7 @@ export const ScheduledKeyword = z
     status: z.enum(['scheduled']),
     scheduled_date: z.string(),
     search_volume: z.number().int(),
-    difficulty: z.number().int(),
+    difficulty: z.number().int().nullable(),
     article_type: z.enum(ARTICLE_TYPES).nullable(),
     intent: z.enum(SEARCH_INTENTS).nullable(),
     opportunity_score: z.number().nullable(),

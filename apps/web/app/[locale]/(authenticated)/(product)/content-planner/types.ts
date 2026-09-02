@@ -59,7 +59,7 @@ export type CandidateKeywordResponse = {
 export type PlannerKeywordResponse = {
   article_id: string | null;
   candidate_id: string | null;
-  difficulty: number;
+  difficulty: number | null;
   generation_error: string | null;
   generation_status: PlannerGenerationStatus;
   id: string;
@@ -73,7 +73,7 @@ export type PlannerKeywordResponse = {
 export type PlannerArticle = {
   articleId: string | null;
   candidateId: string | null;
-  difficulty: number;
+  difficulty: number | null;
   generationError: string | null;
   generationStatus: PlannerGenerationStatus;
   id: string;

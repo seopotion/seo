@@ -13,6 +13,14 @@ const base = {
   created_at: new Date(),
 };
 
+describe('KeywordSchema metrics', () => {
+  test('difficulty may be unknown (#304); search_volume stays required', () => {
+    expect(KeywordSchema.parse({ ...base, difficulty: null }).difficulty).toBeNull();
+    expect(CreateKeywordInput.safeParse({ ...base, difficulty: null }).success).toBe(true);
+    expect(KeywordSchema.safeParse({ ...base, search_volume: null }).success).toBe(false);
+  });
+});
+
 describe('KeywordSchema brief fields', () => {
   test('brief fields default to null (back-compat)', () => {
     const k = KeywordSchema.parse(base);

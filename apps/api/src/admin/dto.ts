@@ -107,7 +107,7 @@ export function toAdminCandidateItem(c: Candidate): z.infer<typeof schemas.Admin
     opportunity_score: c.opportunity_score,
     source: c.source,
     status: c.status,
-    schedulable: c.search_volume !== null && c.difficulty !== null && c.status === 'candidate',
+    schedulable: c.search_volume !== null && c.status === 'candidate',
     created_at: c.created_at.toISOString(),
     rejection_reason: c.rejection_reason,
     serp_competitors: c.serp_competitors,

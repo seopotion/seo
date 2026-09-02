@@ -203,7 +203,7 @@ export interface AuditPlanRow {
   scheduled_date: string;
   keyword: string;
   search_volume: number;
-  difficulty: number;
+  difficulty: number | null;
   opportunity_score: number | null;
   article_type: string | null;
   /** From the joined candidate; null when no candidate could be found. */

@@ -44,11 +44,8 @@ export async function scheduleCandidate(
   candidate: Candidate,
   scheduledDate: string,
 ): Promise<ScheduleResult> {
-  if (
-    candidate.search_volume === null ||
-    candidate.difficulty === null ||
-    candidate.status === 'rejected'
-  ) {
+  // An unknown difficulty is fine (#304); only the search volume is required.
+  if (candidate.search_volume === null || candidate.status === 'rejected') {
     return { ok: false, reason: 'candidate_not_schedulable' };
   }
 

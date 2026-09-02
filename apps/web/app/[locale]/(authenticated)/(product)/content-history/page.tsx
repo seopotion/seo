@@ -28,12 +28,13 @@ import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { formatNullableNumber } from '../content-planner/planner-utils';
 
 type ArticleListStatus = 'generated' | 'published' | 'deleted';
 
 type ArticleListItemResponse = ArticlePublishingState & {
   created_at: string;
-  difficulty: number;
+  difficulty: number | null;
   id: string;
   keyword: string;
   published_at: string | null;
@@ -43,7 +44,7 @@ type ArticleListItemResponse = ArticlePublishingState & {
 };
 
 type PublishedArticle = ArticlePublishingState & {
-  difficulty: number;
+  difficulty: number | null;
   id: string;
   keyword: string;
   publishedAt: string;
@@ -289,7 +290,7 @@ function DesktopArticleRow({
         {formatNumber(article.volume, locale)}
       </span>
       <span className="min-w-0 truncate text-muted-foreground">
-        {formatNumber(article.difficulty, locale)}
+        {formatNullableNumber(article.difficulty, locale)}
       </span>
       <span className="grid min-w-0 gap-1 pr-2">
         <StatusBadge status={article.status} t={t} />
@@ -345,7 +346,7 @@ function MobileArticleCard({
             <div className="min-w-0">
               <dt className="text-muted-foreground text-xs">{t('columns.difficulty')}</dt>
               <dd className="mt-1 truncate font-medium text-foreground">
-                {formatNumber(article.difficulty, locale)}
+                {formatNullableNumber(article.difficulty, locale)}
               </dd>
             </div>
             <div className="min-w-0">
