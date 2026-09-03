@@ -22,12 +22,20 @@ const sqs = new SQSClient(
     : {},
 );
 
-function toRecord(queueUrl: string, body: string, id: string, receiptHandle: string): SQSRecord {
+function toRecord(
+  queueUrl: string,
+  body: string,
+  id: string,
+  receiptHandle: string,
+  attributes: Record<string, string>,
+): SQSRecord {
   return {
     messageId: id,
     receiptHandle,
     body,
-    attributes: {} as never,
+    // Only ApproximateReceiveCount is requested; the scan handler reads it to
+    // decide when a failure is final (#244).
+    attributes: attributes as never,
     messageAttributes: {},
     md5OfBody: '',
     eventSource: 'aws:sqs',
@@ -49,11 +57,18 @@ async function pollQueue(
         QueueUrl: queueUrl,
         MaxNumberOfMessages: maxMessages,
         WaitTimeSeconds: 5,
+        MessageSystemAttributeNames: ['ApproximateReceiveCount'],
       }),
     );
     if (!Messages?.length) continue;
     const records = Messages.map((m, i) =>
-      toRecord(queueUrl, m.Body ?? '', m.MessageId ?? String(i), m.ReceiptHandle ?? ''),
+      toRecord(
+        queueUrl,
+        m.Body ?? '',
+        m.MessageId ?? String(i),
+        m.ReceiptHandle ?? '',
+        m.Attributes ?? {},
+      ),
     );
     const event: SQSEvent = { Records: records };
     try {

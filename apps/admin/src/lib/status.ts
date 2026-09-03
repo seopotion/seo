@@ -12,6 +12,7 @@ export function planTone(plan: OrgSummary['plan']): Tone {
 
 export function setupTone(status: OrgSummary['setup_status']): Tone {
   if (status === 'setup_complete') return 'good';
+  if (status === 'setup_scan_failed') return 'bad';
   return status === 'setup_not_started' ? 'neutral' : 'warn';
 }
 

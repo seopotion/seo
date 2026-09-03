@@ -13,7 +13,15 @@ export async function signToken(claims: AuthClaims): Promise<string> {
   return sign({ ...claims, exp }, await getJwtSecret());
 }
 
+/**
+ * Verifies a session token. Purpose-scoped tokens (the GSC OAuth `state`,
+ * lib/gsc-state.ts) are signed with the same secret and handed to the browser,
+ * so a `purpose` claim — or a missing `sub` — is rejected here (#101).
+ */
 export async function verifyToken(token: string): Promise<AuthClaims> {
   const payload = await verify(token, await getJwtSecret(), 'HS256');
-  return { sub: String(payload.sub), email: String(payload.email) };
+  if (payload.purpose !== undefined || typeof payload.sub !== 'string') {
+    throw new Error('Not a session token');
+  }
+  return { sub: payload.sub, email: String(payload.email) };
 }

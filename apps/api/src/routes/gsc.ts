@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { GscConnectionRepo } from '@shared/db';
+import { GscAnalyticsCacheRepo, GscConnectionRepo } from '@shared/db';
 import { isGscConnected } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { decryptSecret, encryptSecret } from '../lib/crypto';
@@ -70,6 +70,10 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
           description: 'State org not found or not owned by the caller',
         },
+        503: {
+          content: { 'application/json': { schema: schemas.GscErrorResponse } },
+          description: 'Token stored, but Google could not list the properties — retry',
+        },
       },
     }),
     async (c) => {
@@ -96,7 +100,14 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
 
       const enc = encryptSecret(tokens.refreshToken, await getGscTokenKey());
       await GscConnectionRepo.upsertToken(claims.org_id, enc, tokens.email);
-      const sites = await gsc.listSites(tokens.refreshToken);
+      // The token is stored (pending, gated) either way; a transient Google
+      // failure here must not surface as a 500 (#103).
+      let sites: gsc.GscSite[];
+      try {
+        sites = await gsc.listSites(tokens.refreshToken);
+      } catch {
+        return c.json({ error: 'Search Console is unavailable, try again shortly' }, 503);
+      }
       return c.json({ org_id: claims.org_id, sites }, 200);
     },
   )
@@ -127,6 +138,10 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
           description: 'Org not found or not owned by the caller',
         },
+        503: {
+          content: { 'application/json': { schema: schemas.GscErrorResponse } },
+          description: 'Google could not list the properties — retry',
+        },
       },
     }),
     async (c) => {
@@ -140,7 +155,12 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
 
       // Validate against a fresh list so a forged site_url can't be stored.
       const refreshToken = decryptSecret(conn.refresh_token_enc, await getGscTokenKey());
-      const sites = await gsc.listSites(refreshToken);
+      let sites: gsc.GscSite[];
+      try {
+        sites = await gsc.listSites(refreshToken);
+      } catch {
+        return c.json({ error: 'Search Console is unavailable, try again shortly' }, 503);
+      }
       if (!sites.some((s) => s.site_url === site_url)) {
         return c.json({ error: 'Site not in this Google account' }, 400);
       }
@@ -175,6 +195,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.json({ error: 'Not found' }, 404);
       const ok = await GscConnectionRepo.deleteByOrgId(org_id);
+      await GscAnalyticsCacheRepo.deleteByOrgId(org_id);
       return c.json({ ok }, 200);
     },
   )

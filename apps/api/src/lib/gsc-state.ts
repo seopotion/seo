@@ -5,8 +5,8 @@ import { getJwtSecret } from '../auth/secret';
  * OAuth `state` for the GSC connect flow (#12): a short-lived signed JWT tying
  * the Google callback to the org/user that started it (CSRF protection).
  * Reuses the session-JWT secret; the `purpose` claim stops a session token
- * from doubling as state. (Session verification does not check `purpose`,
- * so the reverse is not enforced.)
+ * from doubling as state, and session verification rejects any token that
+ * carries `purpose`, so a state token can't double as a session (#101).
  */
 const STATE_TTL_SECONDS = 600;
 

@@ -7,6 +7,10 @@
 export const SETUP_STATUSES = [
   'setup_not_started',
   'setup_scan_in_progress',
+  // The scan exhausted its SQS deliveries (#244). Terminal for the poller,
+  // not for the org: a retry of POST /setup/start_scan re-arms it, and a
+  // late-but-successful delivery still advances it to setup_scan_completed.
+  'setup_scan_failed',
   'setup_scan_completed',
   'setup_complete',
 ] as const;
