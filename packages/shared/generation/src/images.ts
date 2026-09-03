@@ -1,5 +1,5 @@
 import type { LlmMessage } from '@shared/providers';
-import { toStrictJsonSchema } from '@shared/schemas';
+import { type ImageDirection, type ImageMedium, toStrictJsonSchema } from '@shared/schemas';
 import { z } from 'zod';
 import { INLINE_IMAGE_COUNT } from './config';
 import { parseJsonObject } from './json';
@@ -10,20 +10,12 @@ export interface ImagePlanInput {
   businessName: string;
   businessDescription: string;
   language: string;
-  imageStyle: string;
+  imageDirection: ImageDirection;
   articleTitle: string;
   metaDescription: string;
   headings: string[];
 }
 
-export const IMAGE_MEDIA = [
-  'photograph',
-  'flat_illustration',
-  'three_d_render',
-  'watercolor',
-  'line_art',
-  'isometric',
-] as const;
 /** Also the order a duplicate composition is reassigned in (`parseImagePlan`). */
 export const IMAGE_COMPOSITIONS = [
   'still_life',
@@ -40,13 +32,14 @@ export const IMAGE_LIGHTING = [
   'dramatic_low_key',
   'cool_ambient',
 ] as const;
-export type ImageMedium = (typeof IMAGE_MEDIA)[number];
 export type ImageComposition = (typeof IMAGE_COMPOSITIONS)[number];
 export type ImageLighting = (typeof IMAGE_LIGHTING)[number];
 
 /**
- * The planner names WHAT each picture shows and, through enums, what KIND of
- * picture it is; the prompt itself is assembled in `imagePrompt`.
+ * The planner names WHAT each picture shows and, through enums, how it is
+ * framed and lit; the kind of picture (medium) and its palette are fixed by the
+ * org's image direction (#312) and the prompt itself is assembled in
+ * `imagePrompt`.
  *
  * It used to return the prompt as free prose, and no amount of instruction
  * stopped it asking for lettering — banning "diagram" got "split-screen", and
@@ -60,14 +53,12 @@ const ImageSlotSchema = z.object({
   subject: z.string().min(1),
   composition: z.enum(IMAGE_COMPOSITIONS),
   lighting: z.enum(IMAGE_LIGHTING),
-  palette: z.string(),
   objects: z.array(z.string()),
   alt: z.string().min(1),
 });
 export type ImageSlot = z.infer<typeof ImageSlotSchema>;
 
 export const ImagePlanSchema = z.object({
-  medium: z.enum(IMAGE_MEDIA),
   cover: ImageSlotSchema,
   inline: z.array(ImageSlotSchema.extend({ section_heading: z.string().min(1) })),
 });
@@ -174,6 +165,16 @@ const MEDIUM_CLAUSE: Record<ImageMedium, string> = {
   isometric: 'An isometric illustration',
 };
 
+/** How the planner is told what kind of picture it is planning for. */
+const MEDIUM_NOUN: Record<ImageMedium, string> = {
+  photograph: 'photographs',
+  flat_illustration: 'flat vector illustrations',
+  three_d_render: '3D rendered scenes',
+  watercolor: 'watercolor paintings',
+  line_art: 'minimal line-art illustrations',
+  isometric: 'isometric illustrations',
+};
+
 const LIGHTING_CLAUSE: Record<ImageLighting, string> = {
   natural_daylight: 'Soft natural daylight.',
   golden_hour: 'Warm golden-hour light with long shadows.',
@@ -220,11 +221,12 @@ function scene(
 }
 
 /**
- * The prompt sent to the image model, assembled from the planner's structured
- * answer. This is the only way a prompt is built — the model never writes the
- * string, so it cannot ask for a diagram however it phrases things. Enums map
- * to fixed clauses; the only free text is the subject, the filtered objects
- * and a palette phrase that is dropped when it trips the text-risk check.
+ * The prompt sent to the image model, assembled from the org's image direction
+ * and the planner's structured answer. This is the only way a prompt is built —
+ * the model never writes the string, so it cannot ask for a diagram however it
+ * phrases things. Enums map to fixed clauses; the only free text is the
+ * subject, the filtered objects and the org's palette phrase, which is dropped
+ * when it trips the text-risk check.
  *
  * A composition that needs objects downgrades to `abstract` when none survive
  * the filter — that is what an abstract topic gets instead of blank
@@ -232,16 +234,16 @@ function scene(
  * such clause, fal rendered the prompt itself as a page of garbled text
  * (measured, #286).
  */
-export function imagePrompt(medium: ImageMedium, slot: Omit<ImageSlot, 'alt'>): string {
+export function imagePrompt(direction: ImageDirection, slot: Omit<ImageSlot, 'alt'>): string {
   const objects = usableObjects(slot.objects);
   const composition =
     objects.length === 0 && NEEDS_OBJECTS.has(slot.composition) ? 'abstract' : slot.composition;
-  const palette = slot.palette.trim();
+  const palette = direction.palette.trim();
   return [
-    scene(medium, composition, slot.subject, objects),
+    scene(direction.medium, composition, slot.subject, objects),
     LIGHTING_CLAUSE[slot.lighting],
     palette !== '' && findTextRisk(palette) === null ? `Palette: ${palette}.` : '',
-    medium === 'photograph'
+    direction.medium === 'photograph'
       ? 'A real physical scene, not a document, page, poster, slide or screen.'
       : 'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
     'No text, lettering, signage or logos anywhere in the frame.',
@@ -253,12 +255,11 @@ export function imagePrompt(medium: ImageMedium, slot: Omit<ImageSlot, 'alt'>): 
 export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
   const system = [
     'You are an art director deciding what each image of one blog article shows.',
-    `Return medium once, a cover entry, and exactly ${INLINE_IMAGE_COUNT} inline entries; each`,
+    `Return a cover entry and exactly ${INLINE_IMAGE_COUNT} inline entries; each`,
     'section_heading MUST be copied EXACTLY from the provided section list, each from a',
     'DIFFERENT section.',
-    `- medium: ${IMAGE_MEDIA.join(' | ')}. Read it off the preferred image style. Use`,
-    '  photograph when the style is empty or asks for screenshots, diagrams, interfaces,',
-    '  charts or anything else that carries text.',
+    'The kind of picture and its colours are fixed by the business and stated below; choose',
+    'subjects and objects that suit them.',
     'For every entry:',
     '- subject: the idea the picture stands for, a short phrase. Never a screen, diagram,',
     '  chart, document, sign or interface.',
@@ -268,8 +269,6 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
     '  Use a DIFFERENT composition for each of the three images. Abstract ideas (strategy,',
     '  automation, pricing) suit abstract or environment.',
     `- lighting: ${IMAGE_LIGHTING.join(' | ')}.`,
-    '- palette: at most 6 words naming the colours, e.g. "warm amber and slate", or "" for',
-    '  no preference.',
     '- objects: 0 to 4 tangible things a photographer could put on a table, each a plain noun',
     '  with at most one adjective. Real objects only — no concepts, activities, people or places.',
     '  Never name anything that carries writing in real life: no documents, screens, phones,',
@@ -282,9 +281,11 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
     'verbatim, so do not describe a scene, a composition, a style or a diagram.',
   ].join('\n');
 
+  const notes = input.imageDirection.notes.trim();
   const user = [
     `Business: ${input.businessName} — ${input.businessDescription}`,
-    input.imageStyle ? `Preferred image style: ${input.imageStyle}` : '',
+    `Images are ${MEDIUM_NOUN[input.imageDirection.medium]}.`,
+    notes ? `Subject preferences: ${notes}` : '',
     `Article title: ${input.articleTitle}`,
     `Article summary: ${input.metaDescription}`,
     `Sections: ${input.headings.join(' | ')}`,

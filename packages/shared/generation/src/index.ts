@@ -12,7 +12,6 @@ export { buildHumanizePrompt } from './humanize';
 export type {
   ImageComposition,
   ImageLighting,
-  ImageMedium,
   ImagePlan,
   ImagePlanInput,
   ImageSlot,
@@ -23,7 +22,6 @@ export {
   findTextRisk,
   IMAGE_COMPOSITIONS,
   IMAGE_LIGHTING,
-  IMAGE_MEDIA,
   IMAGE_PLAN_RESPONSE_SCHEMA,
   ImagePlanSchema,
   imagePrompt,
