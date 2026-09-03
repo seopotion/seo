@@ -21,7 +21,7 @@ const { buildAuthUrl, exchangeCode, listSites } = vi.hoisted(() => ({
 }));
 vi.mock('../src/clients/gsc', () => ({ buildAuthUrl, exchangeCode, listSites }));
 
-const { findById, connections } = vi.hoisted(() => {
+const { findById, connections, cacheDeleteByOrgId } = vi.hoisted(() => {
   const now = new Date();
   const orgs = new Map<string, Record<string, unknown>>([
     ['org_1', { id: 'org_1', user_id: 'u1', website_url: 'https://clewas.com', created_at: now }],
@@ -30,6 +30,7 @@ const { findById, connections } = vi.hoisted(() => {
   return {
     findById: vi.fn(async (id: string) => orgs.get(id) ?? null),
     connections: new Map<string, Record<string, unknown>>(),
+    cacheDeleteByOrgId: vi.fn(async () => 0),
   };
 });
 vi.mock('@shared/db', () => ({
@@ -53,6 +54,7 @@ vi.mock('@shared/db', () => ({
     }),
     deleteByOrgId: vi.fn(async (orgId: string) => connections.delete(orgId)),
   },
+  GscAnalyticsCacheRepo: { deleteByOrgId: cacheDeleteByOrgId },
 }));
 
 // authMiddleware sets c.var.auth from the JWT; stub it to a fixed user.
@@ -199,6 +201,7 @@ describe('DELETE /', () => {
     expect(res.status).toBe(200);
     if (res.status === 200) expect((await res.json()).ok).toBe(true);
     expect(connections.has('org_1')).toBe(false);
+    expect(cacheDeleteByOrgId).toHaveBeenCalledWith('org_1');
   });
 });
 
