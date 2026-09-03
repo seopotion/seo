@@ -50,14 +50,38 @@ export async function exchangeCode(code: string): Promise<GscTokens> {
   return { refreshToken: tokens.refresh_token, email: ticket.getPayload()?.email ?? '' };
 }
 
-async function accessToken(refreshToken: string): Promise<string> {
+/**
+ * One OAuth2Client per refresh token, kept at module scope for Lambda warm
+ * reuse (#102). OAuth2Client caches the access token it mints and only
+ * re-mints when that token is expiring, so the reads behind one dashboard
+ * render share a single refresh grant instead of each minting their own.
+ * Bounded at one entry per connected org; oldest evicted past the cap.
+ */
+const clientsByRefreshToken = new Map<string, OAuth2Client>();
+const MAX_CACHED_CLIENTS = 500;
+
+async function clientFor(refreshToken: string): Promise<OAuth2Client> {
+  const cached = clientsByRefreshToken.get(refreshToken);
+  if (cached) return cached;
   const client = await oauthClient();
   client.setCredentials({ refresh_token: refreshToken });
+  if (clientsByRefreshToken.size >= MAX_CACHED_CLIENTS) {
+    const oldest = clientsByRefreshToken.keys().next().value;
+    if (oldest !== undefined) clientsByRefreshToken.delete(oldest);
+  }
+  clientsByRefreshToken.set(refreshToken, client);
+  return client;
+}
+
+async function accessToken(refreshToken: string): Promise<string> {
+  const client = await clientFor(refreshToken);
   try {
     const { token } = await client.getAccessToken();
     if (!token) throw new Error('Google returned no access token');
     return token;
   } catch (err) {
+    // Drop the client so a reconnect with a new grant doesn't hit a dead entry.
+    clientsByRefreshToken.delete(refreshToken);
     if (String(err).includes('invalid_grant')) {
       throw new GscAuthRevokedError('GSC access revoked');
     }
