@@ -31,7 +31,7 @@ image is an enum the code maps to a fixed clause.
 | What varies per slot | `composition` (enum), `lighting` (enum), `subject`, `objects[]` — palette is per org since #312 |
 | Who guarantees variety | Code: the three slots must use distinct compositions; duplicates are reassigned |
 | Persistence | Unchanged — `ArticleImage.prompt` stores the assembled string. Old articles keep theirs. |
-| Vision check on the render | Out of scope; separate follow-up. It is the only thing that catches text flux letters on a textless prompt. |
+| Vision check on the render | Out of scope; filed as #319 (postponed until revenue). It is the only thing that catches text flux letters on a textless prompt. |
 
 ## Planner contract
 
