@@ -24,7 +24,11 @@ describe('article settings CTA preference', () => {
             table_of_contents: false,
             llm_instructions: '',
           },
-          engagement: { image_style: 'Sketch', include_cta: false, youtube_videos: false },
+          engagement: {
+            image_direction: { medium: 'photograph', palette: '', notes: '' },
+            include_cta: false,
+            youtube_videos: false,
+          },
           publishing: { auto_publish: false },
         },
       },

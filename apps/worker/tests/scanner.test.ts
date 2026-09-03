@@ -23,7 +23,7 @@ const LLM_JSON = JSON.stringify({
       article_style: 'Practical',
       llm_instructions: 'Be clear.',
     },
-    engagement: { image_style: 'Clean, minimal' },
+    engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
   },
 });
 

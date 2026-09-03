@@ -30,7 +30,11 @@ const presets: SetupPresets = {
       table_of_contents: true,
       llm_instructions: '',
     },
-    engagement: { image_style: '', include_cta: true, youtube_videos: true },
+    engagement: {
+      image_direction: { medium: 'photograph', palette: '', notes: '' },
+      include_cta: true,
+      youtube_videos: true,
+    },
     publishing: { auto_publish: false },
   },
 };

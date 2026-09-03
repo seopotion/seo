@@ -11,13 +11,56 @@ import { z } from 'zod';
  */
 export const PublishingPrefsSchema = z.object({ auto_publish: z.boolean().default(false) });
 
+/**
+ * The kind of picture every article image is. Decided once per org by the
+ * scanner and inherited by every article's image prompts (#312); the planner
+ * used to guess it per article from a free-text phrase.
+ */
+export const IMAGE_MEDIA = [
+  'photograph',
+  'flat_illustration',
+  'three_d_render',
+  'watercolor',
+  'line_art',
+  'isometric',
+] as const;
+export type ImageMedium = (typeof IMAGE_MEDIA)[number];
+
+export const ImageDirectionSchema = z.object({
+  medium: z.enum(IMAGE_MEDIA),
+  /** At most 6 words naming the colours, e.g. "deep navy and warm white"; '' = none. */
+  palette: z.string(),
+  /** Subject matter the images should favour, one short phrase; '' = none. */
+  notes: z.string(),
+});
+export type ImageDirection = z.infer<typeof ImageDirectionSchema>;
+
 const EngagementPrefsFields = {
-  image_style: z.string(),
+  image_direction: ImageDirectionSchema,
   include_cta: z.boolean(),
   youtube_videos: z.boolean(),
 };
 
-export const EngagementPrefsPatchSchema = z.object(EngagementPrefsFields).partial();
+/** Partial down to the direction's leaves so a PATCH can change just the medium. */
+export const EngagementPrefsPatchSchema = z
+  .object({ ...EngagementPrefsFields, image_direction: ImageDirectionSchema.partial() })
+  .partial();
+
+/**
+ * Pre-#312 documents carry a free-text `image_style` instead of
+ * `image_direction`. The phrase is moved into `notes` (never dropped) and the
+ * medium starts as photograph until an operator picks one. Same
+ * deploy-order-proof pattern as `audience.target` below.
+ */
+function migrateLegacyImageStyle(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const engagement = value as Record<string, unknown>;
+  if (engagement.image_direction !== undefined || typeof engagement.image_style !== 'string') {
+    return value;
+  }
+  const { image_style, ...rest } = engagement;
+  return { ...rest, image_direction: { medium: 'photograph', palette: '', notes: image_style } };
+}
 
 /** Distinct audience segments a preset may hold (design note). */
 export const AUDIENCE_TARGET_MAX = 7;
@@ -54,12 +97,15 @@ export const SetupPresetsSchema = z.object({
       table_of_contents: z.boolean().default(true),
       llm_instructions: z.string(),
     }),
-    engagement: z.object({
-      ...EngagementPrefsFields,
-      include_cta: EngagementPrefsFields.include_cta.default(true),
-      // YouTube embed toggle (#85; renamed from include_youtube_video in #73).
-      youtube_videos: EngagementPrefsFields.youtube_videos.default(true),
-    }),
+    engagement: z.preprocess(
+      migrateLegacyImageStyle,
+      z.object({
+        ...EngagementPrefsFields,
+        include_cta: EngagementPrefsFields.include_cta.default(true),
+        // YouTube embed toggle (#85; renamed from include_youtube_video in #73).
+        youtube_videos: EngagementPrefsFields.youtube_videos.default(true),
+      }),
+    ),
     // Object-level default (with the field spelled out — Zod uses the default
     // value verbatim, it does NOT re-parse it) so scan output that omits
     // publishing (the LLM never produces it) still parses to auto_publish:false.

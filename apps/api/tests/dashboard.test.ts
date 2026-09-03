@@ -370,7 +370,11 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
+            engagement: {
+              image_direction: { medium: 'photograph', palette: '', notes: '' },
+              include_cta: true,
+              youtube_videos: true,
+            },
             publishing: { auto_publish: false },
           },
         },
@@ -405,7 +409,11 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
+            engagement: {
+              image_direction: { medium: 'photograph', palette: '', notes: '' },
+              include_cta: true,
+              youtube_videos: true,
+            },
             publishing: { auto_publish: false },
           },
         },
@@ -2149,7 +2157,12 @@ describe('dashboard settings persistence', () => {
   test('PATCH /settings/articles deep-merges and persists across reads', async () => {
     const opts = await auth();
     const patched = await client.api.v0.dashboard.settings.articles.$patch(
-      { json: { org_id: 'org_1', engagement: { image_style: 'Watercolor' } } },
+      {
+        json: {
+          org_id: 'org_1',
+          engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
+        },
+      },
       opts,
     );
     expect(patched.status).toBe(200);
@@ -2277,7 +2290,12 @@ describe('dashboard settings persistence', () => {
     expect(disabled.status).toBe(200);
 
     const updated = await client.api.v0.dashboard.settings.articles.$patch(
-      { json: { org_id: 'org_1', engagement: { image_style: 'Photography' } } },
+      {
+        json: {
+          org_id: 'org_1',
+          engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
+        },
+      },
       opts,
     );
     expect(updated.status).toBe(200);
