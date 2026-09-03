@@ -176,10 +176,13 @@ export class ApiStack extends Stack {
 
     // Scan task queue. Visibility timeout >= worker timeout so an in-flight
     // message isn't redelivered while the worker is still processing it.
-    // After maxReceiveCount failed deliveries the message moves to the DLQ.
+    // After maxReceiveCount failed deliveries the message moves to the DLQ;
+    // the worker gets the same number so it can stamp the org failed on the
+    // last delivery (#244).
+    const scanMaxReceiveCount = 3;
     const scanQueue = new Queue(this, 'ScanQueue', {
       visibilityTimeout: Duration.seconds(180),
-      deadLetterQueue: { queue: scanDlq, maxReceiveCount: 3 },
+      deadLetterQueue: { queue: scanDlq, maxReceiveCount: scanMaxReceiveCount },
     });
 
     const publishDlq = new Queue(this, 'PublishDlq', {
@@ -275,6 +278,7 @@ export class ApiStack extends Stack {
         ...mongoEnv,
         ...dataForSeoEnv,
         OPENROUTER_API_KEY_PARAM: cfg.openRouterApiKeyParam,
+        SCAN_MAX_RECEIVE_COUNT: String(scanMaxReceiveCount),
       },
       bundling,
     });

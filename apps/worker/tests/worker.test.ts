@@ -4,13 +4,14 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // vi.hoisted runs with the hoisted vi.mock factory, so the spy is initialized
 // before the factory references it.
-const { completeScan, updateDomainRating } = vi.hoisted(() => ({
+const { completeScan, updateDomainRating, updateStatus } = vi.hoisted(() => ({
   completeScan: vi.fn(async (_id: string, _presets: SetupPresets) => {}),
   updateDomainRating: vi.fn(async (_id: string, _value: number) => {}),
+  updateStatus: vi.fn(async (_id: string, _status: string) => {}),
 }));
 
 vi.mock('@shared/db', () => ({
-  OrgRepo: { completeScan, updateDomainRating },
+  OrgRepo: { completeScan, updateDomainRating, updateStatus },
 }));
 
 const { scanWebsite } = vi.hoisted(() => ({
@@ -50,14 +51,16 @@ vi.mock('../src/providers', () => ({
 
 import { handler } from '../src/index';
 
-function sqsEvent(body: unknown): SQSEvent {
+function sqsEvent(body: unknown, receiveCount?: number): SQSEvent {
   return {
     Records: [
       {
         messageId: '1',
         receiptHandle: 'rh',
         body: JSON.stringify(body),
-        attributes: {} as never,
+        attributes: (receiveCount === undefined
+          ? {}
+          : { ApproximateReceiveCount: String(receiveCount) }) as never,
         messageAttributes: {},
         md5OfBody: '',
         eventSource: 'aws:sqs',
@@ -114,5 +117,56 @@ describe('scanner worker', () => {
       '6650f1a2b3c4d5e6f7a8b9c0',
       expect.anything(),
     );
+  });
+
+  // #244: nothing used to touch the org on failure, so after the message
+  // dead-lettered it polled as in-progress forever.
+  describe('scan failure', () => {
+    const task = { org_id: '6650f1a2b3c4d5e6f7a8b9c0', website_url: 'https://clewas.com' };
+
+    test('an early delivery rethrows without stamping (redelivery may recover)', async () => {
+      scanWebsite.mockRejectedValueOnce(new Error('scrape timeout'));
+
+      await expect(handler(sqsEvent(task, 1), {} as never, () => {})).rejects.toThrow(
+        'scrape timeout',
+      );
+
+      expect(updateStatus).not.toHaveBeenCalled();
+    });
+
+    test('the last delivery stamps setup_scan_failed and still rethrows', async () => {
+      scanWebsite.mockRejectedValueOnce(new Error('scrape timeout'));
+
+      await expect(handler(sqsEvent(task, 3), {} as never, () => {})).rejects.toThrow(
+        'scrape timeout',
+      );
+
+      expect(updateStatus).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', 'setup_scan_failed');
+    });
+
+    test('an unknown receive count is treated as final', async () => {
+      scanWebsite.mockRejectedValueOnce(new Error('scrape timeout'));
+
+      await expect(handler(sqsEvent(task), {} as never, () => {})).rejects.toThrow();
+
+      expect(updateStatus).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', 'setup_scan_failed');
+    });
+
+    test('a body that fails ScanTask.parse still stamps the org it names', async () => {
+      await expect(
+        handler(sqsEvent({ org_id: '6650f1a2b3c4d5e6f7a8b9c0' }, 3), {} as never, () => {}),
+      ).rejects.toThrow();
+
+      expect(updateStatus).toHaveBeenCalledWith('6650f1a2b3c4d5e6f7a8b9c0', 'setup_scan_failed');
+    });
+
+    test('a stamp failure does not mask the scan error', async () => {
+      scanWebsite.mockRejectedValueOnce(new Error('scrape timeout'));
+      updateStatus.mockRejectedValueOnce(new Error('mongo down'));
+
+      await expect(handler(sqsEvent(task, 3), {} as never, () => {})).rejects.toThrow(
+        'scrape timeout',
+      );
+    });
   });
 });
