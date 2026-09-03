@@ -437,7 +437,11 @@ const org = {
         readability_grade_max: 8,
         llm_instructions: '',
       },
-      engagement: { image_style: '', include_cta: false, youtube_videos: true },
+      engagement: {
+        image_direction: { medium: 'photograph', palette: '', notes: '' },
+        include_cta: false,
+        youtube_videos: true,
+      },
       publishing: { auto_publish: false },
     },
   },

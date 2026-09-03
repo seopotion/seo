@@ -24,7 +24,9 @@ const LLM_JSON = JSON.stringify({
       readability_grade_max: 10,
       llm_instructions: 'Be clear.',
     },
-    engagement: { image_style: 'Clean, minimal' },
+    engagement: {
+      image_direction: { medium: 'flat_illustration', palette: 'teal and white', notes: '' },
+    },
   },
 });
 
@@ -63,6 +65,11 @@ describe('scanWebsite', () => {
     expect(presets.audience.target).toEqual(['Founders comparing SEO solutions.']);
     expect(presets.audience.competitors).toEqual([]);
     expect(presets.blog).toEqual(BLOG);
+    expect(presets.article_preferences.engagement.image_direction).toEqual({
+      medium: 'flat_illustration',
+      palette: 'teal and white',
+      notes: '',
+    });
   });
 
   test('constrains the response to the presets schema', async () => {
@@ -119,6 +126,34 @@ describe('scanWebsite', () => {
 
     await expect(
       scanWebsite('https://clewas.com', { llm: llmReturning('not json') }),
+    ).rejects.toThrow();
+  });
+
+  // #312: the medium is a structured-output enum, so the model cannot invent one.
+  test('constrains image_direction.medium to the enum in the response schema', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    await scanWebsite('https://clewas.com', { llm });
+
+    const { responseSchema } = llm.complete.mock.calls[0]![0];
+    const schema = JSON.stringify(responseSchema?.schema);
+    expect(schema).toContain('"image_direction"');
+    expect(schema).toContain('"flat_illustration"');
+    expect(schema).not.toContain('image_style');
+    const system = String(llm.complete.mock.calls[0]![0].messages[0]!.content);
+    expect(system).toContain('medium');
+    expect(system).toContain('palette');
+    expect(system).toContain('notes');
+  });
+
+  test('rejects a medium outside the enum', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const bad = JSON.parse(LLM_JSON);
+    bad.article_preferences.engagement.image_direction.medium = 'screenshot';
+
+    await expect(
+      scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(bad)) }),
     ).rejects.toThrow();
   });
 

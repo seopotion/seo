@@ -1,3 +1,4 @@
+import { IMAGE_MEDIA, type ImageDirection } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
 import { INLINE_IMAGE_COUNT } from '../src/config';
 import type { ImageSlot } from '../src/images';
@@ -7,7 +8,6 @@ import {
   findTextRisk,
   IMAGE_COMPOSITIONS,
   IMAGE_LIGHTING,
-  IMAGE_MEDIA,
   imagePrompt,
   injectImageAfterHeading,
   NO_TEXT_DIRECTIVE,
@@ -20,12 +20,10 @@ const content = '# Title\n\nintro\n\n## First Section\n\nbody one\n\n## Second S
 const headings = ['First Section', 'Second Section'];
 
 const validPlan = {
-  medium: 'photograph',
   cover: {
     subject: 'a hero idea',
     composition: 'still_life',
     lighting: 'natural_daylight',
-    palette: 'warm amber and slate',
     objects: ['brass gear'],
     alt: 'a hero image',
   },
@@ -34,7 +32,6 @@ const validPlan = {
       subject: 's1',
       composition: 'macro',
       lighting: 'soft_studio',
-      palette: '',
       objects: ['stone'],
       alt: 'alt one',
       section_heading: 'First Section',
@@ -43,13 +40,15 @@ const validPlan = {
       subject: 's2',
       composition: 'abstract',
       lighting: 'cool_ambient',
-      palette: '',
       objects: [],
       alt: 'alt two',
       section_heading: 'Second Section',
     },
   ],
 };
+
+const photo: ImageDirection = { medium: 'photograph', palette: '', notes: '' };
+const direction = (patch: Partial<ImageDirection>): ImageDirection => ({ ...photo, ...patch });
 
 describe('extractH2s', () => {
   test('returns H2 texts in order, ignoring H1/H3', () => {
@@ -89,34 +88,49 @@ describe('buildImagePlanPrompt', () => {
     businessName: 'Acme',
     businessDescription: 'widgets',
     language: 'English',
-    imageStyle: 'flat illustration',
+    imageDirection: direction({ medium: 'flat_illustration', notes: 'hardware, workbenches' }),
     articleTitle: 'T',
     metaDescription: 'M',
     headings,
   };
 
-  test('carries headings, style, language, and the inline count', () => {
+  test('carries headings, language, and the inline count', () => {
     const messages = buildImagePlanPrompt(input);
     expect(messages[0]!.role).toBe('system');
     expect(messages[0]!.content).toContain(`exactly ${INLINE_IMAGE_COUNT}`);
     expect(messages[0]!.content).toContain('English');
     expect(messages[1]!.content).toContain('First Section | Second Section');
-    expect(messages[1]!.content).toContain('flat illustration');
+  });
+
+  // #312: the medium is fixed by the org preset; the planner is told which
+  // kind of picture it is planning for and what subjects the org favours.
+  test('states the preset medium and notes instead of asking for them', () => {
+    const [system, user] = buildImagePlanPrompt(input).map((m) => String(m.content));
+    expect(user).toContain('Images are flat vector illustrations.');
+    expect(user).toContain('Subject preferences: hardware, workbenches');
+    expect(system).not.toContain('medium:');
+    expect(system).not.toContain('palette');
+  });
+
+  test('omits the subject line when notes are empty', () => {
+    const [, user] = buildImagePlanPrompt({ ...input, imageDirection: photo }).map((m) =>
+      String(m.content),
+    );
+    expect(user).toContain('Images are photographs.');
+    expect(user).not.toContain('Subject preferences');
   });
 
   // #289: the planner used to write the prompt, and no wording stopped it
   // asking for lettering. It names objects and enums (#309) and never sees a prompt.
   test('asks for enums and objects and says its answer is not the prompt', () => {
-    const [system, user] = buildImagePlanPrompt(input).map((m) => String(m.content));
-    for (const value of [...IMAGE_MEDIA, ...IMAGE_COMPOSITIONS, ...IMAGE_LIGHTING]) {
+    const [system] = buildImagePlanPrompt(input).map((m) => String(m.content));
+    for (const value of [...IMAGE_COMPOSITIONS, ...IMAGE_LIGHTING]) {
       expect(system).toContain(value);
     }
     expect(system).toContain('DIFFERENT composition');
-    expect(system).toContain('palette');
     expect(system).toContain('carries writing');
     expect(system).toContain('You are NOT writing the image prompt');
     expect(system).toContain('not "Raspberry Pi"');
-    expect(user).toContain('Preferred image style: flat illustration');
   });
 });
 
@@ -125,6 +139,15 @@ describe('withNoTextDirective', () => {
     const prompt = withNoTextDirective('  a hero scene  ');
     expect(prompt.startsWith('a hero scene')).toBe(true);
     expect(prompt).toContain(NO_TEXT_DIRECTIVE);
+  });
+
+  test('bans silkscreen printing and chip markings on circuit boards', () => {
+    // A local fal render of a still-life/top-down circuit board produced
+    // legible garbled digits and a logo-like squiggle in the PCB silkscreen
+    // area even with the ban in place — the surfaces list didn't call out
+    // circuit boards, so the model treated them as fair game (#312 render check).
+    expect(NO_TEXT_DIRECTIVE).toContain('circuit boards');
+    expect(NO_TEXT_DIRECTIVE).toContain('silkscreen');
   });
 });
 
@@ -147,10 +170,7 @@ describe('parseImagePlan', () => {
     expect(() => parseImagePlan(JSON.stringify(omitted), headings)).toThrow();
   });
 
-  test('rejects an unknown medium or composition', () => {
-    expect(() =>
-      parseImagePlan(JSON.stringify({ ...validPlan, medium: 'oil' }), headings),
-    ).toThrow();
+  test('rejects an unknown composition', () => {
     const bad = { ...validPlan, cover: { ...validPlan.cover, composition: 'collage' } };
     expect(() => parseImagePlan(JSON.stringify(bad), headings)).toThrow();
   });
@@ -266,7 +286,6 @@ describe('imagePrompt', () => {
     subject: 'deployment automation',
     composition: 'still_life',
     lighting: 'natural_daylight',
-    palette: '',
     objects: ['server rack', 'coiled cable'],
     ...patch,
   });
@@ -294,7 +313,7 @@ describe('imagePrompt', () => {
       'An isometric illustration of server rack, coiled cable, arranged on a plain surface.',
     ],
   ] as const)('opens with the %s medium clause', (medium, opening) => {
-    expect(imagePrompt(medium, slot({})).startsWith(opening)).toBe(true);
+    expect(imagePrompt(direction({ medium }), slot({})).startsWith(opening)).toBe(true);
   });
 
   test.each([
@@ -310,11 +329,11 @@ describe('imagePrompt', () => {
     ['silhouette', 'server rack, coiled cable in silhouette against a bright, plain background'],
     ['top_down', 'server rack, coiled cable seen from directly above, laid out on a plain surface'],
   ] as const)('renders the %s composition', (composition, clause) => {
-    expect(imagePrompt('photograph', slot({ composition }))).toContain(clause);
+    expect(imagePrompt(photo, slot({ composition }))).toContain(clause);
   });
 
   test('environment without objects omits the setting clause', () => {
-    const prompt = imagePrompt('photograph', slot({ composition: 'environment', objects: [] }));
+    const prompt = imagePrompt(photo, slot({ composition: 'environment', objects: [] }));
     expect(prompt).toContain('a wide scene evoking deployment automation.');
     expect(prompt).not.toContain('natural setting');
   });
@@ -323,7 +342,7 @@ describe('imagePrompt', () => {
   test('compositions that need objects downgrade to abstract when none survive', () => {
     for (const composition of ['still_life', 'macro', 'silhouette', 'top_down'] as const) {
       const prompt = imagePrompt(
-        'photograph',
+        photo,
         slot({ composition, objects: ['architecture diagram', 'laptop'] }),
       );
       expect(prompt).toContain('textured surfaces and light evoking deployment automation');
@@ -331,30 +350,38 @@ describe('imagePrompt', () => {
     }
   });
 
-  test('carries lighting and a safe palette, drops a risky or empty one', () => {
+  test('carries lighting and the preset palette, drops a risky or empty one', () => {
     const lit = imagePrompt(
-      'photograph',
-      slot({ lighting: 'golden_hour', palette: 'warm amber and slate' }),
+      direction({ palette: 'warm amber and slate' }),
+      slot({ lighting: 'golden_hour' }),
     );
     expect(lit).toContain('Warm golden-hour light with long shadows.');
     expect(lit).toContain('Palette: warm amber and slate.');
-    expect(imagePrompt('photograph', slot({ palette: 'neon signage colours' }))).not.toContain(
+    expect(imagePrompt(direction({ palette: 'neon signage colours' }), slot({}))).not.toContain(
       'Palette:',
     );
-    expect(imagePrompt('photograph', slot({ palette: '  ' }))).not.toContain('Palette:');
+    expect(imagePrompt(direction({ palette: '  ' }), slot({}))).not.toContain('Palette:');
+  });
+
+  // #312: one palette per org, so every slot of every article shares it.
+  test('every slot gets the same preset palette', () => {
+    const teal = direction({ palette: 'teal and sand' });
+    for (const composition of IMAGE_COMPOSITIONS) {
+      expect(imagePrompt(teal, slot({ composition }))).toContain('Palette: teal and sand.');
+    }
   });
 
   // Measured: given prose and no such clause, fal renders the prompt itself as
   // a page of garbled text (#286).
   test('always disclaims being a document, worded per medium', () => {
-    expect(imagePrompt('photograph', slot({}))).toContain(
+    expect(imagePrompt(photo, slot({}))).toContain(
       'A real physical scene, not a document, page, poster, slide or screen.',
     );
-    expect(imagePrompt('line_art', slot({}))).toContain(
+    expect(imagePrompt(direction({ medium: 'line_art' }), slot({}))).toContain(
       'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
     );
     for (const medium of IMAGE_MEDIA) {
-      const prompt = imagePrompt(medium, slot({}));
+      const prompt = imagePrompt(direction({ medium }), slot({}));
       expect(prompt).toContain('No text, lettering, signage or logos anywhere in the frame.');
       expect(findTextRisk(prompt)).toBeNull();
     }

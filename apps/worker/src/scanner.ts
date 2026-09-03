@@ -2,6 +2,7 @@ import { parseJsonObject } from '@shared/generation';
 import type { LlmClient, LlmMessage } from '@shared/providers';
 import {
   AUDIENCE_TARGET_MAX,
+  ImageDirectionSchema,
   type SetupPresets,
   SetupPresetsSchema,
   toStrictJsonSchema,
@@ -29,7 +30,7 @@ const ScanOutputSchema = z.object({
       // Three reviewable tiers (#313); the preset itself allows 6–14 for edits.
       readability_grade_max: z.literal([8, 10, 12]),
     }),
-    engagement: z.object({ image_style: z.string() }),
+    engagement: z.object({ image_direction: ImageDirectionSchema }),
   }),
 });
 
@@ -57,7 +58,17 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'market as a plain country name (e.g. "United States") — never a region or "Global".',
     'description is 2-4 sentences summarizing the business.',
     'target is an array of 3-7 short, distinct audience segments (one segment per entry —',
-    'never a single comma-separated sentence). article_style / image_style are short phrases.',
+    'never a single comma-separated sentence). article_style is a short phrase.',
+    'image_direction is the art direction every blog image of this site will follow:',
+    "- medium: the kind of picture that matches the site's visual character — photograph for",
+    '  product, hardware or photo-led sites; flat_illustration or isometric for software and',
+    '  services with flat brand graphics; three_d_render, watercolor or line_art only when the',
+    '  site itself looks that way. Screenshots, diagrams and interfaces are never a medium; when',
+    '  the site suggests those, choose photograph.',
+    '- palette: the site\'s brand colours as at most 6 words (e.g. "deep navy and warm white"),',
+    '  or "" when none are evident.',
+    '- notes: one short phrase of subject matter the images should favour (e.g. "workshop',
+    '  hardware and tools"), or "".',
     'readability_grade_max is the highest acceptable Flesch-Kincaid grade for articles: 8 for general-public',
     'or consumer audiences, 10 for business and professional audiences, 12 for developers, engineers,',
     'scientists and other specialists.',

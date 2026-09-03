@@ -37,7 +37,7 @@ the unfinished wizard state and callback destination to be restored.
 
 ### G2 — `article_preferences` is a thin subset (8 of ~24 controls)
 Current: `content_seo.{article_style, internal_links_count, table_of_contents,
-llm_instructions}` + `engagement.{image_style, youtube_videos, include_cta}` +
+llm_instructions}` + `engagement.{image_direction, youtube_videos, include_cta}` +
 `publishing.auto_publish`. The CTA preference is enforced across outline, article,
 humanization, and final semantic validation; disabling it also clears any CTA returned in the
 outline.

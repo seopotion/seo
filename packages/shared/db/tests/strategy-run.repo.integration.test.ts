@@ -34,7 +34,7 @@ describe('StrategyRunRepo (integration)', () => {
         article_style: 'informative',
         llm_instructions: 'Be concise.',
       },
-      engagement: { image_style: 'photo' },
+      engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
     },
   };
 
@@ -301,7 +301,7 @@ describe('ArticleRunRepo (integration)', () => {
         article_style: 'informative',
         llm_instructions: 'Be concise.',
       },
-      engagement: { image_style: 'photo' },
+      engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
     },
   };
 

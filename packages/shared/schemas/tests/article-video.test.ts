@@ -25,7 +25,7 @@ const basePresetsDoc = {
   blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
   article_preferences: {
     content_seo: { article_style: 'x', internal_links_count: 0, llm_instructions: '' },
-    engagement: { image_style: 'Sketch' },
+    engagement: { image_direction: { medium: 'photograph', palette: '', notes: '' } },
   },
 };
 
@@ -51,7 +51,10 @@ describe('presets youtube_videos (#73)', () => {
       ...basePresetsDoc,
       article_preferences: {
         ...basePresetsDoc.article_preferences,
-        engagement: { image_style: 'Sketch', youtube_videos: false },
+        engagement: {
+          image_direction: { medium: 'photograph', palette: '', notes: '' },
+          youtube_videos: false,
+        },
       },
     };
     const p = SetupPresetsSchema.parse(doc);
