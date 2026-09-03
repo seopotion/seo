@@ -4,7 +4,6 @@ import {
   buildVideoEmbed,
   buildVideoPickPrompt,
   extractH2s,
-  FLESCH_KINCAID_TARGET,
   injectBlockAfterHeading,
   languageCodeFromName,
   parseSemanticResult,
@@ -126,10 +125,10 @@ export async function stageFinalize(
   const readability = {
     metric: 'flesch_kincaid_grade' as const,
     grade: run.working.readability_grade,
-    target: FLESCH_KINCAID_TARGET,
+    target: ctx.readabilityGradeMax,
     target_met:
       run.working.readability_grade === null ||
-      run.working.readability_grade <= FLESCH_KINCAID_TARGET,
+      run.working.readability_grade <= ctx.readabilityGradeMax,
     attempts: run.working.humanize_attempts.length,
   };
 

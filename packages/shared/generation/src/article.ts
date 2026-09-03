@@ -32,7 +32,7 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
       : '',
     `Write the entire article in ${ctx.language}.`,
     ctx.language === 'English'
-      ? 'Aim for Flesch-Kincaid grade level 8 or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.'
+      ? `Aim for Flesch-Kincaid grade level ${ctx.readabilityGradeMax} or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.`
       : '',
     linkLines.length
       ? 'Link to the internal pages listed below, at most once each, using descriptive anchor text. Use those exact URLs verbatim — never invent, shorten, or alter one — and include no other links of any kind.'

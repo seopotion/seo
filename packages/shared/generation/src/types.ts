@@ -19,6 +19,9 @@ export interface GenerationContext extends TopicBriefFields {
   // internal links, whatever `maxInternalLinks` says.
   linkCandidates: LinkCandidate[];
   llmInstructions: string;
+  // Highest acceptable Flesch–Kincaid grade for English articles (#313). Comes
+  // from presets.article_preferences.content_seo.readability_grade_max.
+  readabilityGradeMax: number;
   keyword: string;
   articleType: string | null;
   intent: string | null;

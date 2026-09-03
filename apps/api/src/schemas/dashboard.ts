@@ -3,6 +3,7 @@ import {
   ARTICLE_TYPES,
   ArticleVideoSchema,
   AUTO_PUBLISH_STATUSES,
+  ContentSeoPatchSchema,
   EngagementPrefsPatchSchema,
   GENERATION_STATUSES,
   IMAGES_STATUSES,
@@ -377,9 +378,7 @@ export const ArticlesSettingsResponse = z
 export const ArticlesSettingsPatchBody = z
   .object({
     org_id: z.string().openapi({ example: '6650f1a2b3c4d5e6f7a8b9c0' }),
-    content_seo: SetupPresetsSchema.shape.article_preferences.shape.content_seo
-      .partial()
-      .optional(),
+    content_seo: ContentSeoPatchSchema.optional(),
     engagement: EngagementPrefsPatchSchema.optional(),
     publishing: PublishingPrefsSchema.partial().optional(),
   })

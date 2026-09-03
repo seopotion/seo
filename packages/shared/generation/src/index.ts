@@ -1,6 +1,5 @@
 export { buildArticlePrompt } from './article';
 export {
-  FLESCH_KINCAID_TARGET,
   HUMANIZE,
   INLINE_IMAGE_COUNT,
   MAX_GENERATION_ATTEMPTS,

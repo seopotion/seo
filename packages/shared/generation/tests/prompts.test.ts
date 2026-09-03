@@ -15,6 +15,7 @@ const ctx: GenerationContext = {
   maxInternalLinks: 0,
   linkCandidates: [],
   llmInstructions: '',
+  readabilityGradeMax: 8,
   keyword: 'mejores widgets',
   topic_cluster_id: null,
   topic_cluster_label: null,
@@ -55,9 +56,9 @@ describe('article + humanize prompts', () => {
     expect(msgs[0]!.content).toContain('Spanish');
   });
 
-  test('adds grade 8 readability guidance to both English prompts only', () => {
-    const english = { ...ctx, language: 'English' };
-    const readabilityInstruction = 'Flesch-Kincaid grade level 8 or lower';
+  test('adds readability guidance at the org target to both English prompts only', () => {
+    const english = { ...ctx, language: 'English', readabilityGradeMax: 12 };
+    const readabilityInstruction = 'Flesch-Kincaid grade level 12 or lower';
 
     const englishArticle = buildArticlePrompt(english, outline)
       .map((message) => message.content)
@@ -68,6 +69,8 @@ describe('article + humanize prompts', () => {
 
     expect(englishArticle).toContain(readabilityInstruction);
     expect(englishHumanize).toContain(readabilityInstruction);
+    expect(englishArticle).not.toContain('grade level 8');
+    expect(englishHumanize).not.toContain('grade level 8');
 
     for (const language of ['Spanish', 'Turkish', 'english']) {
       const nonEnglish = { ...ctx, language };
@@ -183,10 +186,10 @@ describe('article + humanize prompts', () => {
   });
 
   test('humanize retry prompt carries the readability feedback', () => {
-    const messages = buildHumanizePrompt(ctx, '# Draft', { attempt: 1, grade: 11.2, target: 8 });
+    const messages = buildHumanizePrompt(ctx, '# Draft', { attempt: 1, grade: 11.2, target: 10 });
     const system = messages[0]!.content;
     expect(system).toContain('11.2');
-    expect(system).toContain('grade level 8');
+    expect(system).toContain('target of grade level 10');
     expect(system).toContain('previous attempt');
   });
 
