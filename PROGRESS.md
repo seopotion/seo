@@ -87,7 +87,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ `HttpApiUrl` CfnOutput — [#17](https://github.com/seopotion/seo/issues/17); API Gateway `{proxy+}` → Hono `/api/v0/...` live — [#14](https://github.com/seopotion/seo/issues/14)
 - ✅ Biome lint/format; CI (`ci.yml`) runs lint + typecheck + tests on PRs
 - ✅ Pre-deploy prereq preflight — `infra preflight --stage` CLI verifies SSM secrets + `GOOGLE_CLIENT_ID`; gates the deploy CI — [#16](https://github.com/seopotion/seo/issues/16). Provisioning of the real values is still by hand — [#9](https://github.com/seopotion/seo/issues/9)
-- ⬜ `cdk synth` PR-gate for `infra/**` (CI runs root gates only) — [#30](https://github.com/seopotion/seo/issues/30)
+- ✅ `cdk synth` PR-gate for `infra/**` (`.github/workflows/infra-synth.yml`, path-filtered) — [#30](https://github.com/seopotion/seo/issues/30)
 - ✅ Frontend hosting on AWS (OpenNext + CDK) — `SeoWebStack-staging` on `staging.seopotion.co` and `SeoWebStack-prod` on `www.seopotion.co` (apex 301s to www), DNS cut over in Cloudflare, **Vercel retired** — [#35](https://github.com/seopotion/seo/issues/35)
 
 ## Local development

@@ -1,0 +1,51 @@
+name: Infra synth
+
+# `infra/` is a standalone CDK package outside the npm workspaces, so the root
+# `verify` job never compiles it. Gate infra changes on a full `cdk synth` (#30):
+# it typechecks `infra/lib/*`, wires every construct, and runs the esbuild
+# bundling of each Lambda entry, so a broken `@shared/*` import surfaces here
+# too. No AWS credentials or stage env vars are needed — synth is
+# region-agnostic and the per-stage config tolerates empty values.
+#
+# Path-filtered so unrelated PRs don't pay the double install. Widen the
+# filter if bundling regressions from `apps/*` / `packages/*` become a problem.
+
+on:
+  push:
+    branches: [master, dev]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-synth.yml'
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra-synth.yml'
+
+concurrency:
+  group: infra-synth-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            infra/package-lock.json
+
+      # Lambda entries live in apps/* and import @shared/*; esbuild resolves
+      # their dependencies from the root workspace install.
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install infra deps
+        run: cd infra && npm ci
+
+      - name: CDK synth
+        run: cd infra && npx cdk synth --quiet
