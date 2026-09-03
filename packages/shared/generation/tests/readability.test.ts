@@ -1,5 +1,6 @@
+import { READABILITY_GRADE_MAX_DEFAULT } from '@shared/schemas';
 import { describe, expect, test } from 'vitest';
-import { FLESCH_KINCAID_TARGET, fleschKincaidGrade } from '../src';
+import { fleschKincaidGrade } from '../src';
 
 describe('fleschKincaidGrade', () => {
   test('scores simple prose at or below the target', () => {
@@ -8,7 +9,7 @@ describe('fleschKincaidGrade', () => {
     );
 
     expect(score).not.toBeNull();
-    expect(score).toBeLessThanOrEqual(FLESCH_KINCAID_TARGET);
+    expect(score).toBeLessThanOrEqual(READABILITY_GRADE_MAX_DEFAULT);
   });
 
   test('scores complex prose above the target', () => {
@@ -17,7 +18,7 @@ describe('fleschKincaidGrade', () => {
     );
 
     expect(score).not.toBeNull();
-    expect(score).toBeGreaterThan(FLESCH_KINCAID_TARGET);
+    expect(score).toBeGreaterThan(READABILITY_GRADE_MAX_DEFAULT);
   });
 
   test('gives equivalent plain text and Markdown the same score', () => {

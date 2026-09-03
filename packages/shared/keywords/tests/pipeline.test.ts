@@ -103,6 +103,7 @@ const input = (): PipelineInput => ({
         article_style: '',
         internal_links_count: 0,
         table_of_contents: true,
+        readability_grade_max: 8,
         llm_instructions: '',
       },
       engagement: { image_style: '', include_cta: true, youtube_videos: true },

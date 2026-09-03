@@ -434,6 +434,7 @@ const org = {
         article_style: 'practical',
         internal_links_count: 2,
         table_of_contents: true,
+        readability_grade_max: 8,
         llm_instructions: '',
       },
       engagement: { image_style: '', include_cta: false, youtube_videos: true },

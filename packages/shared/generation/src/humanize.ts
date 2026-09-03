@@ -30,7 +30,7 @@ export function buildHumanizePrompt(
       ? `Keep every mention of ${businessName} exactly as written; never remove, rename, or generalize the business.`
       : '',
     ctx.language === 'English'
-      ? 'Aim for Flesch-Kincaid grade level 8 or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.'
+      ? `Aim for Flesch-Kincaid grade level ${ctx.readabilityGradeMax} or lower. Prefer familiar words and direct sentences. Use active voice and short paragraphs. Explain necessary technical terms. Do not sacrifice factual accuracy, useful detail, required keywords, or meaning.`
       : '',
     feedback?.grade !== undefined
       ? `Your previous attempt (attempt ${feedback.attempt}) scored Flesch-Kincaid grade level ${feedback.grade}, above the target of grade level ${feedback.target}. Simplify further: shorter sentences, fewer syllables per word, one idea per sentence — without dropping facts, keywords, or meaning.`
