@@ -85,10 +85,48 @@ describe('ArticleContentPreview GFM', () => {
     expect(html).not.toContain('~~');
   });
 
-  test('escapes raw HTML in the body instead of mounting it', () => {
-    const html = render('Hi <img src=x onerror="alert(1)"> there.');
+  test('strips unsafe raw HTML instead of mounting it', () => {
+    const html = render(
+      'Hi <img src="https://x/1.png" onerror="alert(1)"> <b onclick="alert(1)">bold</b> <script>alert(1)</script> there.',
+    );
 
     expect(html).not.toMatch(/<img[^>]*onerror/);
-    expect(html).toContain('&lt;img src=x onerror=');
+    expect(html).not.toContain('onclick');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('alert(1)');
+    expect(html).toContain('<b>bold</b>');
+  });
+});
+
+describe('ArticleContentPreview raw HTML', () => {
+  // The generator injects the YouTube embed as a raw <iframe> (#85), which
+  // publishes verbatim to WordPress and the static site, so the preview must
+  // mount it rather than show the markup as text.
+  const embed =
+    '<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/i-VO5IuYSH4" ' +
+    'title="Deployment Automation Explained" frameborder="0" ' +
+    'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" ' +
+    'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+
+  test('renders the YouTube embed iframe', () => {
+    const html = render(['## Section', embed, 'After the video.'].join('\n\n'));
+
+    expect(html).toMatch(
+      /<iframe[^>]*src="https:\/\/www\.youtube-nocookie\.com\/embed\/i-VO5IuYSH4"/,
+    );
+    expect(html).toMatch(/<iframe[^>]*title="Deployment Automation Explained"/);
+    expect(html).toMatch(/<iframe[^>]*allowfullscreen/i);
+    expect(html).not.toContain('&lt;iframe');
+  });
+
+  test('drops iframes that are not YouTube embeds', () => {
+    const html = render(
+      [
+        '<iframe src="https://evil.example/embed/x"></iframe>',
+        '<iframe src="https://www.youtube-nocookie.com/watch?v=x"></iframe>',
+      ].join('\n\n'),
+    );
+
+    expect(html).not.toContain('<iframe');
   });
 });

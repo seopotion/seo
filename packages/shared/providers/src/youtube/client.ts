@@ -9,6 +9,25 @@ const DEFAULT_MAX_RESULTS = 10;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+
+/**
+ * search.list returns snippet text HTML-entity-encoded (`&#39;`, `&amp;`,
+ * `&quot;`). Decode it so callers get plain text and escape once themselves.
+ */
+function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const code =
+        entity[1] === 'x' || entity[1] === 'X'
+          ? Number.parseInt(entity.slice(2), 16)
+          : Number.parseInt(entity.slice(1), 10);
+      return Number.isFinite(code) && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    }
+    return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
+  });
+}
+
 export function createYouTubeClient(config: YouTubeConfig): YouTubeClient {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -46,9 +65,9 @@ export function createYouTubeClient(config: YouTubeConfig): YouTubeClient {
       .filter((item) => typeof item.id?.videoId === 'string' && item.id.videoId !== '')
       .map((item) => ({
         video_id: String(item.id?.videoId),
-        title: String(item.snippet?.title ?? ''),
-        description: String(item.snippet?.description ?? ''),
-        channel: String(item.snippet?.channelTitle ?? ''),
+        title: decodeEntities(String(item.snippet?.title ?? '')),
+        description: decodeEntities(String(item.snippet?.description ?? '')),
+        channel: decodeEntities(String(item.snippet?.channelTitle ?? '')),
       }));
   }
 
