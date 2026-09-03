@@ -18,7 +18,7 @@ export type ArticleSettingsResponse = {
       llm_instructions: string;
     };
     engagement: {
-      image_style: string;
+      image_direction: { medium: string; palette: string; notes: string };
       include_cta: boolean;
       youtube_videos: boolean;
     };

@@ -333,7 +333,7 @@ describe('setup routes', () => {
 
     const engagement = (await res.json()).presets.article_preferences.engagement;
     expect(engagement.include_cta).toBe(false);
-    expect(engagement.image_style).toBe('Minimal');
+    expect(engagement.image_direction.medium).toBe('photograph');
     expect(engagement.youtube_videos).toBe(true);
   });
 
