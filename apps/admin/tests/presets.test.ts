@@ -125,6 +125,19 @@ describe('diffPresets', () => {
       article_preferences: { content_seo: { table_of_contents: false } },
     });
   });
+
+  test('a changed image medium sends only that leaf of the direction', () => {
+    const patch = diffPresets(
+      PRESETS,
+      edit((draft) => {
+        draft.article_preferences.engagement.image_direction.medium = 'line_art';
+      }),
+    );
+
+    expect(patch).toEqual({
+      article_preferences: { engagement: { image_direction: { medium: 'line_art' } } },
+    });
+  });
 });
 
 describe('normalizePresets', () => {
