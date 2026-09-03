@@ -135,7 +135,11 @@ const org = {
         table_of_contents: true,
         llm_instructions: '',
       },
-      engagement: { image_style: 'flat', include_cta: true, youtube_videos: false },
+      engagement: {
+        image_direction: { medium: 'photograph', palette: '', notes: '' },
+        include_cta: true,
+        youtube_videos: false,
+      },
       publishing: { auto_publish: true },
     },
   },

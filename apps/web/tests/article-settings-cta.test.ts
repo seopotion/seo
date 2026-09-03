@@ -26,7 +26,11 @@ describe('article settings CTA preference', () => {
             llm_instructions: '',
             readability_grade_max: 8,
           },
-          engagement: { image_style: 'Sketch', include_cta: false, youtube_videos: false },
+          engagement: {
+            image_direction: { medium: 'photograph', palette: '', notes: '' },
+            include_cta: false,
+            youtube_videos: false,
+          },
           publishing: { auto_publish: false },
         },
       },
@@ -54,7 +58,11 @@ describe('article settings readability target (#313)', () => {
         llm_instructions: '',
         readability_grade_max: 12,
       },
-      engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
+      engagement: {
+        image_direction: { medium: 'photograph', palette: '', notes: '' },
+        include_cta: true,
+        youtube_videos: true,
+      },
       publishing: { auto_publish: false },
     },
   };

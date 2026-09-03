@@ -93,13 +93,14 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
   if (article.images.length > 0) return { completed: true, working: {} };
 
   const presets = run.input.presets;
+  const direction = presets.article_preferences.engagement.image_direction;
   const headings = extractH2s(article.content);
   const res = await llm.complete({
     messages: buildImagePlanPrompt({
       businessName: presets.business.name,
       businessDescription: presets.business.description,
       language: presets.business.language,
-      imageStyle: presets.article_preferences.engagement.image_style,
+      imageDirection: direction,
       articleTitle: article.title,
       metaDescription: article.meta_description,
       headings,
@@ -127,7 +128,7 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
     {
       role: 'cover',
       section_heading: null,
-      prompt: imagePrompt(plan.medium, plan.cover),
+      prompt: imagePrompt(direction, plan.cover),
       alt: plan.cover.alt,
       ...empty,
     },
@@ -135,7 +136,7 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
       (img): ArticleImage => ({
         role: 'inline',
         section_heading: img.section_heading,
-        prompt: imagePrompt(plan.medium, img),
+        prompt: imagePrompt(direction, img),
         alt: img.alt,
         ...empty,
       }),

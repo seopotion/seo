@@ -18,7 +18,11 @@ const base = {
       readability_grade_max: 8,
       llm_instructions: 'old',
     },
-    engagement: { image_style: 'Minimal', include_cta: true, youtube_videos: true },
+    engagement: {
+      image_direction: { medium: 'line_art' as const, palette: 'ink', notes: '' },
+      include_cta: true,
+      youtube_videos: true,
+    },
     publishing: { auto_publish: false },
   },
 };
@@ -49,7 +53,18 @@ describe('mergePresets', () => {
     });
     expect(result.article_preferences.content_seo.internal_links_count).toBe(3);
     expect(result.article_preferences.content_seo.article_style).toBe('Formal');
-    expect(result.article_preferences.engagement.image_style).toBe('Minimal');
+    expect(result.article_preferences.engagement.image_direction.medium).toBe('line_art');
+  });
+
+  test('merges a partial image_direction, keeping its other leaves', () => {
+    const result = mergePresets(base, {
+      article_preferences: { engagement: { image_direction: { medium: 'watercolor' } } },
+    });
+    expect(result.article_preferences.engagement.image_direction).toEqual({
+      medium: 'watercolor',
+      palette: 'ink',
+      notes: '',
+    });
   });
 
   test('undefined partial returns existing unchanged', () => {

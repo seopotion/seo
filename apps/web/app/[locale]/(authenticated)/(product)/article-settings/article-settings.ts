@@ -20,7 +20,7 @@ export type ArticleSettingsResponse = {
       readability_grade_max: number;
     };
     engagement: {
-      image_style: string;
+      image_direction: { medium: string; palette: string; notes: string };
       include_cta: boolean;
       youtube_videos: boolean;
     };

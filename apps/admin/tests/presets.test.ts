@@ -27,7 +27,11 @@ const PRESETS: SetupPresets = {
       readability_grade_max: 8,
       llm_instructions: 'Keep it dry.',
     },
-    engagement: { image_style: 'photo', include_cta: true, youtube_videos: true },
+    engagement: {
+      image_direction: { medium: 'photograph', palette: '', notes: '' },
+      include_cta: true,
+      youtube_videos: true,
+    },
     publishing: { auto_publish: false },
   },
 };
@@ -120,6 +124,19 @@ describe('diffPresets', () => {
     expect(patch).toEqual({
       business: { description: '' },
       article_preferences: { content_seo: { table_of_contents: false } },
+    });
+  });
+
+  test('a changed image medium sends only that leaf of the direction', () => {
+    const patch = diffPresets(
+      PRESETS,
+      edit((draft) => {
+        draft.article_preferences.engagement.image_direction.medium = 'line_art';
+      }),
+    );
+
+    expect(patch).toEqual({
+      article_preferences: { engagement: { image_direction: { medium: 'line_art' } } },
     });
   });
 });

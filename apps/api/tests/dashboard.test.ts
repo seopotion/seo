@@ -370,7 +370,11 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
+            engagement: {
+              image_direction: { medium: 'photograph', palette: '', notes: '' },
+              include_cta: true,
+              youtube_videos: true,
+            },
             publishing: { auto_publish: false },
           },
         },
@@ -405,7 +409,11 @@ vi.mock('@shared/db', () => {
               table_of_contents: true,
               llm_instructions: 'x',
             },
-            engagement: { image_style: 'Sketch', include_cta: true, youtube_videos: true },
+            engagement: {
+              image_direction: { medium: 'photograph', palette: '', notes: '' },
+              include_cta: true,
+              youtube_videos: true,
+            },
             publishing: { auto_publish: false },
           },
         },
@@ -2149,12 +2157,16 @@ describe('dashboard settings persistence', () => {
   test('PATCH /settings/articles deep-merges and persists across reads', async () => {
     const opts = await auth();
     const patched = await client.api.v0.dashboard.settings.articles.$patch(
-      { json: { org_id: 'org_1', engagement: { image_style: 'Watercolor' } } },
+      { json: { org_id: 'org_1', engagement: { image_direction: { medium: 'watercolor' } } } },
       opts,
     );
     expect(patched.status).toBe(200);
     if (patched.status === 200) {
-      expect((await patched.json()).article_preferences.engagement.image_style).toBe('Watercolor');
+      const direction = (await patched.json()).article_preferences.engagement.image_direction;
+      expect(direction.medium).toBe('watercolor');
+      // A partial direction patch keeps the other leaves (deep merge).
+      expect(direction.palette).toBe('');
+      expect(direction.notes).toBe('');
     }
 
     // Persistence: a fresh GET reflects the saved change.
@@ -2165,7 +2177,7 @@ describe('dashboard settings persistence', () => {
     expect(get.status).toBe(200);
     if (get.status === 200) {
       const body = await get.json();
-      expect(body.article_preferences.engagement.image_style).toBe('Watercolor');
+      expect(body.article_preferences.engagement.image_direction.medium).toBe('watercolor');
       // Sibling content_seo left untouched by the merge.
       expect(body.article_preferences.content_seo.article_style).toBeTruthy();
     }
@@ -2258,7 +2270,7 @@ describe('dashboard settings persistence', () => {
     if (res.status === 200) {
       const preferences = (await res.json()).article_preferences;
       expect(preferences.engagement.include_cta).toBe(false);
-      expect(preferences.engagement.image_style).toBeTruthy();
+      expect(preferences.engagement.image_direction.medium).toBeTruthy();
       expect(preferences.content_seo.article_style).toBeTruthy();
     }
   });
@@ -2277,13 +2289,19 @@ describe('dashboard settings persistence', () => {
     expect(disabled.status).toBe(200);
 
     const updated = await client.api.v0.dashboard.settings.articles.$patch(
-      { json: { org_id: 'org_1', engagement: { image_style: 'Photography' } } },
+      {
+        json: {
+          org_id: 'org_1',
+          engagement: { image_direction: { palette: 'slate and amber' } },
+        },
+      },
       opts,
     );
     expect(updated.status).toBe(200);
     if (updated.status === 200) {
       const engagement = (await updated.json()).article_preferences.engagement;
-      expect(engagement.image_style).toBe('Photography');
+      expect(engagement.image_direction.palette).toBe('slate and amber');
+      expect(engagement.image_direction.medium).toBeTruthy(); // sibling leaf survives
       expect(engagement.include_cta).toBe(false);
       expect(engagement.youtube_videos).toBe(false);
     }

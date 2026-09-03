@@ -153,7 +153,10 @@ describe('onboarding CTA preference', () => {
       blog: { sitemap_url: '', main_blog_url: '', best_articles: [] },
       article_preferences: {
         content_seo: { article_style: 'Practical', llm_instructions: '' },
-        engagement: { image_style: 'Sketch', include_cta: false },
+        engagement: {
+          image_direction: { medium: 'photograph', palette: '', notes: '' },
+          include_cta: false,
+        },
       },
     });
 

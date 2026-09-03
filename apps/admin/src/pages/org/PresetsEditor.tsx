@@ -1,3 +1,4 @@
+import { IMAGE_MEDIA, type ImageMedium } from '@shared/schemas';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useMemo, useState } from 'react';
 import { errorText } from '../../lib/errors';
@@ -6,6 +7,16 @@ import { updatePresets } from '../../lib/queries';
 
 /** `audience.target` caps at 7 in `SetupPresetsSchema` — the API 400s past it. */
 const MAX_AUDIENCE = 7;
+
+/** Option labels for the `IMAGE_MEDIA` enum — the stored value is the enum key. */
+const MEDIUM_LABEL: Record<ImageMedium, string> = {
+  photograph: 'Photograph',
+  flat_illustration: 'Flat illustration',
+  three_d_render: '3D render',
+  watercolor: 'Watercolor',
+  line_art: 'Line art',
+  isometric: 'Isometric',
+};
 
 const INPUT =
   'w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-sm text-neutral-100';
@@ -93,6 +104,9 @@ function PresetsForm({ orgId, presets }: { orgId: string; presets: Presets }) {
         engagement: { ...current.article_preferences.engagement, ...values },
       },
     }));
+  const direction = engagement.image_direction;
+  const setDirection = (values: Partial<typeof direction>) =>
+    setEngagement({ image_direction: { ...direction, ...values } });
   const setPublishing = (values: Partial<Presets['article_preferences']['publishing']>) =>
     setDraft((current) => ({
       ...current,
@@ -197,10 +211,34 @@ function PresetsForm({ orgId, presets }: { orgId: string; presets: Presets }) {
               ))}
             </select>
           </label>
+          <label className="block">
+            <span className={LABEL}>Image medium</span>
+            <select
+              className={`${INPUT} mt-1`}
+              value={direction.medium}
+              onChange={(event) => setDirection({ medium: event.target.value as ImageMedium })}
+            >
+              {IMAGE_MEDIA.map((medium) => (
+                <option key={medium} value={medium}>
+                  {MEDIUM_LABEL[medium]}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-neutral-500">
+              The kind of picture every article image is.
+            </span>
+          </label>
           <TextField
-            label="Image style"
-            value={engagement.image_style}
-            onChange={(image_style) => setEngagement({ image_style })}
+            label="Image palette"
+            hint="Up to 6 words naming the colours; empty for none."
+            value={direction.palette}
+            onChange={(palette) => setDirection({ palette })}
+          />
+          <TextField
+            label="Image subject notes"
+            hint="What the pictures should favour showing."
+            value={direction.notes}
+            onChange={(notes) => setDirection({ notes })}
           />
           <CheckField
             label="Table of contents"
@@ -280,10 +318,12 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function TextField({
   label,
+  hint,
   value,
   onChange,
 }: {
   label: string;
+  hint?: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -295,6 +335,7 @@ function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {hint && <span className="mt-1 block text-xs text-neutral-500">{hint}</span>}
     </label>
   );
 }

@@ -1192,9 +1192,9 @@
         "turkish": "Turkish"
       },
       "readabilityTiers": {
-        "generalPublic": "General public",
-        "professional": "Professional",
-        "technical": "Technical"
+        "generalPublic": "General readers",
+        "professional": "Professionals",
+        "technical": "Specialists and engineers"
       },
       "referralSources": {
         "community": "Community",
