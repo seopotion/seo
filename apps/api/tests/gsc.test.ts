@@ -134,6 +134,18 @@ describe('POST /connect', () => {
     const res = await client.connect.$post({ json: { code: 'bad', state } });
     expect(res.status).toBe(400);
   });
+
+  // #103: the token is already stored (pending); a transient Google failure
+  // listing properties is a 503 with a body, not an uncaught 500.
+  test('503s when listing the properties fails, keeping the stored token', async () => {
+    listSites.mockRejectedValueOnce(new Error('GSC sites list failed (502)'));
+    const state = await signGscState({ org_id: 'org_1', user_id: 'u1' });
+    const res = await client.connect.$post({ json: { code: 'auth-code', state } });
+    expect(res.status).toBe(503);
+    if (res.status === 503) expect((await res.json()).error).toMatch(/unavailable/);
+    expect(connections.get('org_1')?.site_url).toBeNull();
+    expect(decryptSecret(connections.get('org_1')?.refresh_token_enc as string, key)).toBe('rt-1');
+  });
 });
 
 describe('POST /site', () => {
@@ -165,6 +177,16 @@ describe('POST /site', () => {
   test('400s when no connection is pending', async () => {
     const res = await client.site.$post({ json: { org_id: 'org_1', site_url: 'x' } });
     expect(res.status).toBe(400);
+  });
+
+  test('503s when re-listing the properties fails, storing nothing (#103)', async () => {
+    await connect();
+    listSites.mockRejectedValueOnce(new Error('GSC sites list failed (502)'));
+    const res = await client.site.$post({
+      json: { org_id: 'org_1', site_url: 'sc-domain:clewas.com' },
+    });
+    expect(res.status).toBe(503);
+    expect(connections.get('org_1')?.site_url).toBeNull();
   });
 });
 

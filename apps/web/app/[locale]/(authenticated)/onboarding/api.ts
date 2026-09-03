@@ -175,7 +175,7 @@ async function waitForSetupScan(orgId: string) {
       return;
     }
 
-    if (setupStatus === 'setup_not_started') {
+    if (setupStatus === 'setup_not_started' || setupStatus === 'setup_scan_failed') {
       throw new OnboardingApiError('request_failed');
     }
 

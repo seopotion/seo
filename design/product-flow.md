@@ -91,6 +91,10 @@ scanner_worker in progress
 
 endpoint `/api/v0/setup/status` returns `setup_scan_in_progress` .
 
+If the scan exhausts its SQS deliveries the worker stamps `setup_scan_failed` on
+the last one (#244), so the poller stops with an error instead of spinning
+forever; re-submitting `/api/v0/setup/start_scan` re-arms the same org.
+
 ## 3. User Input Overrides Setup Presets.
 
 **Mockup — About your business (editable, pre-populated form):** Heading "About your business" with subtext "Based on your website, we've populated the following information, please verify and complete as needed." Fields, all pre-filled from the scan and editable:
