@@ -63,6 +63,7 @@ export const OrgSchema = z.object({
   setup_status: z.enum([
     'setup_not_started',
     'setup_scan_in_progress',
+    'setup_scan_failed', // scan exhausted its SQS deliveries (#244); retry re-arms
     'setup_scan_completed',
     'setup_complete',
   ]),
