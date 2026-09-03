@@ -64,6 +64,12 @@ export class WebStack extends Stack {
       autoDeleteObjects: !isProd,
     });
 
+    // All three deployments share one handler Lambda (same memoryLimit ⇒ same
+    // singleton). At the 128 MB default the awscli `s3 sync` of the ~17 MiB
+    // incremental cache is memory-starved, crawls at a few hundred KiB/s and
+    // hits the 15-min Lambda timeout, failing the whole stack update (#328).
+    const memoryLimit = 1024;
+
     // Hashed build assets are content-addressed — cache forever. prune:false
     // keeps prior deploys' chunks alive for HTML still cached at the edge.
     new BucketDeployment(this, 'HashedAssets', {
@@ -74,6 +80,7 @@ export class WebStack extends Stack {
       ],
       prune: false,
       cacheControl: [CacheControl.fromString('public,max-age=31536000,immutable')],
+      memoryLimit,
     });
     new BucketDeployment(this, 'PublicAssets', {
       destinationBucket: bucket,
@@ -81,12 +88,14 @@ export class WebStack extends Stack {
       sources: [Source.asset(join(OPEN_NEXT_DIR, 'assets'), { exclude: ['_next/**'] })],
       prune: false,
       cacheControl: [CacheControl.fromString('public,max-age=0,s-maxage=31536000,must-revalidate')],
+      memoryLimit,
     });
     new BucketDeployment(this, 'IncrementalCache', {
       destinationBucket: bucket,
       destinationKeyPrefix: '_cache',
       sources: [Source.asset(join(OPEN_NEXT_DIR, 'cache'))],
       prune: false,
+      memoryLimit,
     });
 
     // --- ISR machinery (provisioned, idle today — spec § Architecture) ---
