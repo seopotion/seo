@@ -48,6 +48,28 @@ describe('searchVideos', () => {
     expect(url.searchParams.get('relevanceLanguage')).toBe('de');
   });
 
+  test('decodes the HTML entities search.list puts in snippet text', async () => {
+    // The API returns titles pre-encoded (`&#39;`, `&amp;`, `&quot;`); the embed
+    // builder escapes again, so undecoded titles came out as `&amp;#39;`.
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          searchResponse([
+            item('v1', 'Here&#39;s A &amp; B &quot;C&quot; &lt;3', 'D &amp; E', 'Tom &amp; Jerry'),
+          ]),
+        ),
+    );
+    const out = await client().searchVideos('x');
+    expect(out[0]).toEqual({
+      video_id: 'v1',
+      title: 'Here\'s A & B "C" <3',
+      description: 'D & E',
+      channel: 'Tom & Jerry',
+    });
+  });
+
   test('drops items without a videoId', async () => {
     vi.stubGlobal(
       'fetch',
