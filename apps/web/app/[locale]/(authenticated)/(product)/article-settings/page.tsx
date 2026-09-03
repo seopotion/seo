@@ -22,7 +22,7 @@ import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useConnectedIntegrations } from '@/lib/integrations';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
-import { articleStyles, internalLinkCounts } from '../../onboarding/constants';
+import { articleStyles, internalLinkCounts, readabilityTiers } from '../../onboarding/constants';
 import {
   type ArticleSettingsForm,
   type ArticleSettingsResponse,
@@ -348,6 +348,30 @@ export default function ArticleSettingsPage() {
               {articleStyles.map((style) => (
                 <SelectItem key={style.value} value={style.value}>
                   {optionsT(`articleStyles.${style.labelKey}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2 p-4">
+          <div>
+            <Label htmlFor="readability">{t('fields.readability.label')}</Label>
+            <p className="mt-1 text-muted-foreground text-sm">
+              {t('fields.readability.description')}
+            </p>
+          </div>
+          <Select
+            value={settings.readabilityGradeMax}
+            onValueChange={(value) => updateSetting('readabilityGradeMax', value)}
+          >
+            <SelectTrigger id="readability" className="max-w-95">
+              <SelectValue placeholder={t('fields.readability.placeholder')} />
+            </SelectTrigger>
+            <SelectContent>
+              {readabilityTiers.map((tier) => (
+                <SelectItem key={tier.value} value={tier.value}>
+                  {optionsT(`readabilityTiers.${tier.labelKey}`)}
                 </SelectItem>
               ))}
             </SelectContent>

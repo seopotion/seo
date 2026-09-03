@@ -803,6 +803,11 @@
         "description": "Oluşturulan makalelerin kaç iç bağlantı içereceğini seçin (0–3).",
         "label": "İç bağlantılar"
       },
+      "readability": {
+        "description": "Oluşturulan makalelerin ne kadar sade okunması gerektiği. Hedef kitlenize uyan seviyeyi seçin; yalnızca İngilizce makalelere uygulanır.",
+        "label": "Okunabilirlik",
+        "placeholder": "Hedef kitle seç"
+      },
       "tableOfContents": {
         "description": "Oluşturulan makalelere içindekiler bölümü ekleyin.",
         "label": "İçindekiler"
@@ -1185,6 +1190,11 @@
         "german": "Almanca",
         "spanish": "İspanyolca",
         "turkish": "Türkçe"
+      },
+      "readabilityTiers": {
+        "generalPublic": "Genel okuyucular",
+        "professional": "Profesyoneller",
+        "technical": "Uzmanlar ve mühendisler"
       },
       "referralSources": {
         "community": "Topluluk",

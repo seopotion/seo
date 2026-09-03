@@ -12,6 +12,7 @@ export const presets = {
       article_style: 'x',
       internal_links_count: 0,
       table_of_contents: true,
+      readability_grade_max: 8,
       llm_instructions: '',
     },
     engagement: {

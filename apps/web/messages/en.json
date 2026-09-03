@@ -803,6 +803,11 @@
         "description": "Choose how many internal links generated articles should include (0–3).",
         "label": "Internal links"
       },
+      "readability": {
+        "description": "How simply generated articles must read. Pick the tier that matches your audience; applies to English articles only.",
+        "label": "Readability",
+        "placeholder": "Select audience"
+      },
       "tableOfContents": {
         "description": "Include a table of contents in generated articles.",
         "label": "Table of contents"
@@ -1185,6 +1190,11 @@
         "german": "German",
         "spanish": "Spanish",
         "turkish": "Turkish"
+      },
+      "readabilityTiers": {
+        "generalPublic": "General readers",
+        "professional": "Professionals",
+        "technical": "Specialists and engineers"
       },
       "referralSources": {
         "community": "Community",

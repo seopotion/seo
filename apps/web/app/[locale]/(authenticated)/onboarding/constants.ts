@@ -38,6 +38,14 @@ export const articleStyles = [
   { value: 'Friendly', labelKey: 'friendly' },
 ] as const;
 
+/** Article-settings readability tiers (#313): value is the preset's
+ * readability_grade_max; labels name the audience, not the number. */
+export const readabilityTiers = [
+  { value: '8', labelKey: 'generalPublic' },
+  { value: '10', labelKey: 'professional' },
+  { value: '12', labelKey: 'technical' },
+] as const;
+
 export const internalLinkCounts = ['0', '1', '2', '3'];
 
 export const referralSources = [

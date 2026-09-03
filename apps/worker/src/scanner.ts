@@ -24,7 +24,12 @@ const ScanOutputSchema = z.object({
   business: SetupPresetsSchema.shape.business,
   audience: z.object({ target: z.array(z.string()) }),
   article_preferences: z.object({
-    content_seo: z.object({ article_style: z.string(), llm_instructions: z.string() }),
+    content_seo: z.object({
+      article_style: z.string(),
+      llm_instructions: z.string(),
+      // Three reviewable tiers (#313); the preset itself allows 6–14 for edits.
+      readability_grade_max: z.literal([8, 10, 12]),
+    }),
     engagement: z.object({ image_direction: ImageDirectionSchema }),
   }),
 });
@@ -64,6 +69,9 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     '  or "" when none are evident.',
     '- notes: one short phrase of subject matter the images should favour (e.g. "workshop',
     '  hardware and tools"), or "".',
+    'readability_grade_max is the highest acceptable Flesch-Kincaid grade for articles: 8 for general-public',
+    'or consumer audiences, 10 for business and professional audiences, 12 for developers, engineers,',
+    'scientists and other specialists.',
   ].join('\n');
 
   const user = pageText

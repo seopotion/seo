@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
+  ContentSeoPatchSchema,
   EngagementPrefsPatchSchema,
   IMAGE_MEDIA,
   ImageDirectionSchema,
+  READABILITY_GRADE_MAX_DEFAULT,
   SetupPresetsSchema,
 } from '../src/presets';
 
@@ -172,5 +174,57 @@ describe('SetupPresetsSchema engagement.image_direction', () => {
       'line_art',
       'isometric',
     ]);
+  });
+});
+
+describe('SetupPresetsSchema content_seo.readability_grade_max', () => {
+  const withAudience = { ...base, audience: { target: ['a'], competitors: [] } };
+
+  test('defaults to READABILITY_GRADE_MAX_DEFAULT (8) when absent', () => {
+    expect(READABILITY_GRADE_MAX_DEFAULT).toBe(8);
+    const p = SetupPresetsSchema.parse(withAudience);
+    expect(p.article_preferences.content_seo.readability_grade_max).toBe(8);
+  });
+
+  test('keeps an explicit value', () => {
+    const p = SetupPresetsSchema.parse({
+      ...withAudience,
+      article_preferences: {
+        ...withAudience.article_preferences,
+        content_seo: { ...withAudience.article_preferences.content_seo, readability_grade_max: 12 },
+      },
+    });
+    expect(p.article_preferences.content_seo.readability_grade_max).toBe(12);
+  });
+
+  test.each([5, 15, 8.5])('rejects %s', (value) => {
+    expect(() =>
+      SetupPresetsSchema.parse({
+        ...withAudience,
+        article_preferences: {
+          ...withAudience.article_preferences,
+          content_seo: {
+            ...withAudience.article_preferences.content_seo,
+            readability_grade_max: value,
+          },
+        },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('ContentSeoPatchSchema', () => {
+  test('does not materialize defaults for omitted fields', () => {
+    expect(ContentSeoPatchSchema.parse({ article_style: 'x' })).toEqual({ article_style: 'x' });
+  });
+
+  test('rejects an out-of-range readability_grade_max', () => {
+    expect(() => ContentSeoPatchSchema.parse({ readability_grade_max: 20 })).toThrow();
+  });
+
+  test('keeps an explicit readability_grade_max', () => {
+    expect(ContentSeoPatchSchema.parse({ readability_grade_max: 12 })).toEqual({
+      readability_grade_max: 12,
+    });
   });
 });
