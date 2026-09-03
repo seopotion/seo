@@ -27,8 +27,8 @@ image is an enum the code maps to a fixed clause.
 
 | Concern | Choice |
 | --- | --- |
-| Where style is decided | The planner classifies the org's free-text `image_style` into a `medium` enum, once per plan. `image_style` stays free text in presets (changing it touches six surfaces; revisit if the classification misreads a style). |
-| What varies per slot | `composition` (enum), `lighting` (enum), `palette` (short phrase), `subject`, `objects[]` |
+| Where style is decided | Superseded by [`article-image-direction.md`](article-image-direction.md) (#312): the scanner fixes `engagement.image_direction` (medium enum, palette, notes) once per org and the planner inherits it. |
+| What varies per slot | `composition` (enum), `lighting` (enum), `subject`, `objects[]` — palette is per org since #312 |
 | Who guarantees variety | Code: the three slots must use distinct compositions; duplicates are reassigned |
 | Persistence | Unchanged — `ArticleImage.prompt` stores the assembled string. Old articles keep theirs. |
 | Vision check on the render | Out of scope; separate follow-up. It is the only thing that catches text flux letters on a textless prompt. |
