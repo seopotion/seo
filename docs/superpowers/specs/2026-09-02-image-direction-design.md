@@ -53,8 +53,8 @@ which re-exports them so existing imports keep working.
 A `z.preprocess` on `engagement`, the same pattern as `audience.target`: a
 document with a string `image_style` and no `image_direction` parses to
 `image_direction: { medium: 'photograph', palette: '', notes: <image_style> }`.
-The old key is left in place on disk; the next save through the admin editor
-persists the new shape. Existing orgs (4 staging, 1 prod) get `photograph`
+The parsed object no longer carries the old key, so the first save through any editor
+persists the new shape; the value itself survives in `notes`. Existing orgs (4 staging, 1 prod) get `photograph`
 until someone picks a medium in the editor. No migration script.
 
 ### Patch schema
