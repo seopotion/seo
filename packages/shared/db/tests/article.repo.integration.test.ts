@@ -54,7 +54,8 @@ describe('ArticleRepo (integration)', () => {
   test('findLatestForKeywordSince scopes by org + keyword and ignores older articles (#67)', async () => {
     const before = new Date(Date.now() - 60_000);
     const older = await ArticleRepo.create(base({ org_id: 'org_since', keyword_id: 'k_since' }));
-    const runStart = new Date();
+    // Strictly after `older` — same-millisecond creation would otherwise match.
+    const runStart = new Date(older.created_at.getTime() + 1);
     await ArticleRepo.create(base({ org_id: 'other_org', keyword_id: 'k_since', slug: 'x' }));
     await ArticleRepo.create(base({ org_id: 'org_since', keyword_id: 'k_other', slug: 'y' }));
 
