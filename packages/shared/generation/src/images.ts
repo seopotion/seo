@@ -96,7 +96,9 @@ export const NO_TEXT_DIRECTIVE = [
   'Absolutely no text anywhere in the image: no words, letters, numbers, captions,',
   'labels, signage, watermarks, logos or brand marks. Surfaces that would normally',
   'carry writing — screens, monitors, signs, packaging, documents, book covers,',
-  'clothing — are blank, abstract or turned away from the camera.',
+  'clothing, circuit boards and other electronic components — are blank, unmarked',
+  'or turned away from the camera; no silkscreen printing, chip markings or part',
+  'numbers.',
 ].join(' ');
 
 /** Prompt as sent to the image model: the planned scene plus the no-text ban. */

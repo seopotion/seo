@@ -140,6 +140,15 @@ describe('withNoTextDirective', () => {
     expect(prompt.startsWith('a hero scene')).toBe(true);
     expect(prompt).toContain(NO_TEXT_DIRECTIVE);
   });
+
+  test('bans silkscreen printing and chip markings on circuit boards', () => {
+    // A local fal render of a still-life/top-down circuit board produced
+    // legible garbled digits and a logo-like squiggle in the PCB silkscreen
+    // area even with the ban in place — the surfaces list didn't call out
+    // circuit boards, so the model treated them as fair game (#312 render check).
+    expect(NO_TEXT_DIRECTIVE).toContain('circuit boards');
+    expect(NO_TEXT_DIRECTIVE).toContain('silkscreen');
+  });
 });
 
 describe('parseImagePlan', () => {
