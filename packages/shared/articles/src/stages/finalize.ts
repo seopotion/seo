@@ -45,6 +45,20 @@ export async function stageFinalize(
   const ctx = contextFromRun(run);
   const keyword = run.input.keyword;
 
+  // Second seam of the same guard (#67): the checkpoint above is written only
+  // after ArticleRepo.create + KeywordRepo.linkArticle, so a crash between
+  // those and the checkpoint leaves an article this run already produced
+  // (and maybe already linked). Reuse it instead of generating an orphan.
+  const earlier = await ArticleRepo.findLatestForKeywordSince(
+    run.org_id,
+    keyword.id,
+    run.created_at,
+  );
+  if (earlier) {
+    await KeywordRepo.linkArticle(keyword.id, earlier.id);
+    return { completed: true, working: { article_id: earlier.id } };
+  }
+
   // Fail closed (#186): unwrap anything invented or over-placed before
   // validation, which then asserts the invariant as a backstop.
   let content = sanitizeLinks(chosenContent, outline.internal_links, ctx.maxInternalLinks);

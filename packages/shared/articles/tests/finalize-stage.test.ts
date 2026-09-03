@@ -1,12 +1,16 @@
 import type { LlmClient, YouTubeClient } from '@shared/providers';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { createArticle, linkArticle } = vi.hoisted(() => ({
+const { createArticle, findLatestForKeywordSince, linkArticle } = vi.hoisted(() => ({
   createArticle: vi.fn(async (_doc: unknown) => ({ id: 'a1' })),
+  findLatestForKeywordSince: vi.fn(
+    async (_orgId: string, _keywordId: string, _since: Date): Promise<{ id: string } | null> =>
+      null,
+  ),
   linkArticle: vi.fn(async () => {}),
 }));
 vi.mock('@shared/db', () => ({
-  ArticleRepo: { create: createArticle },
+  ArticleRepo: { create: createArticle, findLatestForKeywordSince },
   KeywordRepo: { linkArticle },
 }));
 
@@ -194,6 +198,26 @@ describe('stageFinalize', () => {
     expect(result).toEqual({ completed: true, working: { article_id: 'existing-1' } });
     expect(createArticle).not.toHaveBeenCalled();
     expect(linkArticle).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+  });
+
+  // #67: the checkpoint is written after create + link, so a crash in between
+  // used to redrive into a second article (orphaning the first).
+  test('redrive guard: an article this run already created is reused, not duplicated', async () => {
+    const complete = vi.fn(() => {
+      throw new Error('must not be called');
+    });
+    const llm: LlmClient = { complete };
+    const youtube = youtubeThat();
+    findLatestForKeywordSince.mockResolvedValueOnce({ id: 'orphan-1' });
+    const run = makeRun({ working: { outline, content, readability_grade: 6 } });
+
+    const result = await stageFinalize(run, { llm, youtube });
+
+    expect(findLatestForKeywordSince).toHaveBeenCalledWith('o1', keyword.id, run.created_at);
+    expect(createArticle).not.toHaveBeenCalled();
+    expect(linkArticle).toHaveBeenCalledWith(keyword.id, 'orphan-1');
+    expect(result).toEqual({ completed: true, working: { article_id: 'orphan-1' } });
     expect(complete).not.toHaveBeenCalled();
   });
 

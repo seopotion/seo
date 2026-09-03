@@ -51,6 +51,28 @@ describe('ArticleRepo (integration)', () => {
     expect(await ArticleRepo.countByStatus('org_art', 'generated')).toBe(1);
   });
 
+  test('findLatestForKeywordSince scopes by org + keyword and ignores older articles (#67)', async () => {
+    const before = new Date(Date.now() - 60_000);
+    const older = await ArticleRepo.create(base({ org_id: 'org_since', keyword_id: 'k_since' }));
+    const runStart = new Date();
+    await ArticleRepo.create(base({ org_id: 'other_org', keyword_id: 'k_since', slug: 'x' }));
+    await ArticleRepo.create(base({ org_id: 'org_since', keyword_id: 'k_other', slug: 'y' }));
+
+    expect(
+      await ArticleRepo.findLatestForKeywordSince('org_since', 'k_since', runStart),
+    ).toBeNull();
+    expect((await ArticleRepo.findLatestForKeywordSince('org_since', 'k_since', before))?.id).toBe(
+      older.id,
+    );
+
+    const mine = await ArticleRepo.create(
+      base({ org_id: 'org_since', keyword_id: 'k_since', slug: 'z' }),
+    );
+    expect(
+      (await ArticleRepo.findLatestForKeywordSince('org_since', 'k_since', runStart))?.id,
+    ).toBe(mine.id);
+  });
+
   test('topic metadata round-trips and published cluster lookup stays org-scoped', async () => {
     const topic = {
       topic_cluster_id: 'topic:membrane fouling',

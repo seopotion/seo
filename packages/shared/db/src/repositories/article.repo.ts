@@ -54,6 +54,24 @@ export const ArticleRepo = {
     return (await collection()).countDocuments({ org_id: orgId, status });
   },
 
+  /**
+   * The newest article generated for a keyword since `since` — the finalize
+   * stage's redrive guard (#67): the keyword claim allows one run in flight,
+   * so an article created after that run started can only be the run's own
+   * earlier attempt (crashed between `create` and the checkpoint).
+   */
+  async findLatestForKeywordSince(
+    orgId: string,
+    keywordId: string,
+    since: Date,
+  ): Promise<Article | null> {
+    const doc = await (await collection()).findOne(
+      { org_id: orgId, keyword_id: keywordId, created_at: { $gte: since } },
+      { sort: { created_at: -1 } },
+    );
+    return doc ? toEntity(doc) : null;
+  },
+
   async listPublishedByTopicCluster(
     orgId: string,
     topicClusterId: string,
