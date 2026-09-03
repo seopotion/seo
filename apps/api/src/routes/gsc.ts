@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { GscConnectionRepo } from '@shared/db';
+import { GscAnalyticsCacheRepo, GscConnectionRepo } from '@shared/db';
 import { isGscConnected } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { decryptSecret, encryptSecret } from '../lib/crypto';
@@ -195,6 +195,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
       const org = await loadOwnedOrg(org_id, userId);
       if (!org) return c.json({ error: 'Not found' }, 404);
       const ok = await GscConnectionRepo.deleteByOrgId(org_id);
+      await GscAnalyticsCacheRepo.deleteByOrgId(org_id);
       return c.json({ ok }, 200);
     },
   )

@@ -133,7 +133,24 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '5. Generated Content',
+    title: '5. Google Search Console Integration',
+    paragraphs: [
+      "If you connect Google Search Console to Seopotion, we access your Google account through Google's OAuth authorization with read-only permission (the webmasters.readonly scope). We may process:",
+    ],
+    bullets: [
+      'the email address of the Google account you connect;',
+      'the Search Console property (website) you select;',
+      'authorization tokens issued by Google, which we store in encrypted form; and',
+      'search performance data for the selected property, such as clicks, impressions, click-through rate, average position, search queries, and page URLs.',
+    ],
+    afterBullets: [
+      'We use this information only to display search performance analytics for your website and the content Seopotion publishes for you. Search performance data may be cached for up to 48 hours to reduce requests to Google. We do not use Google user data for advertising, do not sell it, and do not share it with third parties except as necessary to operate the Service (for example, hosting providers) or as required by law. Humans do not read this data except with your consent, for security purposes, or to comply with applicable law.',
+      "Seopotion's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy (https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.",
+      "You may disconnect Google Search Console at any time in the Service settings, or revoke Seopotion's access from your Google Account permissions page (https://myaccount.google.com/permissions). When you disconnect, we delete the stored authorization token and any cached search performance data.",
+    ],
+  },
+  {
+    title: '6. Generated Content',
     paragraphs: ['We process and store content generated through Seopotion, including:'],
     bullets: [
       'article topics;',
@@ -150,7 +167,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '6. Business',
+    title: '7. Business',
     paragraphs: [
       'If you subscribe to Business, an authorized Seopotion reviewer may access limited information as necessary to provide human review of up to 10 selected Seopotion-generated articles per month.',
       'This may include:',
@@ -167,7 +184,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '7. Technical and Usage Information',
+    title: '8. Technical and Usage Information',
     paragraphs: [
       'When you visit or use Seopotion, we may automatically collect technical information necessary to operate and secure the Service, such as:',
     ],
@@ -188,7 +205,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '8. Support Communications',
+    title: '9. Support Communications',
     paragraphs: [
       'If you contact us, we may process information contained in your communication, including:',
     ],
@@ -205,7 +222,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '9. How We Use Personal Data',
+    title: '10. How We Use Personal Data',
     paragraphs: ['We process personal data for purposes including:'],
     subsections: [
       {
@@ -278,7 +295,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '10. Marketing Communications',
+    title: '11. Marketing Communications',
     paragraphs: [
       'We will not use personal data received from Lemon Squeezy solely for product fulfillment or transaction administration to send unrelated direct marketing unless we have an appropriate legal basis or consent where required.',
       'If you separately choose to receive marketing communications from Seopotion, you may unsubscribe at any time using the unsubscribe mechanism provided or by contacting support@seopotion.co.',
@@ -286,7 +303,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '11. Legal Bases for Processing',
+    title: '12. Legal Bases for Processing',
     paragraphs: [
       'Depending on your location and the circumstances, we may process personal data on one or more of the following legal bases:',
     ],
@@ -302,7 +319,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '12. How We Share Personal Data',
+    title: '13. How We Share Personal Data',
     paragraphs: [
       'We do not sell your personal data.',
       'We may share personal data only where reasonably necessary to operate Seopotion, including with the categories described below.',
@@ -387,7 +404,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '13. Third-Party Personal Data',
+    title: '14. Third-Party Personal Data',
     paragraphs: [
       'You may provide Seopotion with information that relates to other individuals, for example through website content or material included in article instructions.',
       'If you provide personal data relating to another person, you are responsible for ensuring that you have an appropriate legal basis and authority to provide and process that information through Seopotion.',
@@ -395,7 +412,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '14. International Data Transfers',
+    title: '15. International Data Transfers',
     paragraphs: [
       'Seopotion operates from Türkiye and may use technology and service providers located in other countries.',
       'As a result, personal data may be processed or stored outside your country of residence, including in countries whose data-protection laws may differ from those in your jurisdiction.',
@@ -404,7 +421,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '15. Data Retention',
+    title: '16. Data Retention',
     paragraphs: [
       'We retain personal data only for as long as reasonably necessary for the purposes for which it was collected, including to:',
     ],
@@ -423,7 +440,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '16. Account Closure and Deletion',
+    title: '17. Account Closure and Deletion',
     paragraphs: [
       'You may request closure of your Seopotion account by contacting support@seopotion.co.',
       'When an account is closed, we will delete or anonymize personal data that is no longer necessary, subject to information we must retain for legitimate legal, security, fraud-prevention, transaction, or recordkeeping purposes.',
@@ -431,7 +448,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '17. Security',
+    title: '18. Security',
     paragraphs: [
       'We use reasonable technical and organizational safeguards designed to protect personal data against:',
     ],
@@ -449,7 +466,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '18. Cookies and Similar Technologies',
+    title: '19. Cookies and Similar Technologies',
     paragraphs: [
       'Seopotion may use strictly necessary cookies or similar technologies required for:',
     ],
@@ -466,7 +483,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '19. Your Privacy Rights',
+    title: '20. Your Privacy Rights',
     paragraphs: [
       'Depending on where you live, applicable data-protection laws may give you rights regarding your personal data.',
       'These may include the right to:',
@@ -491,7 +508,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '20. Exercising Your Rights',
+    title: '21. Exercising Your Rights',
     paragraphs: [
       'To make a privacy request, contact support@seopotion.co.',
       'Please describe the request and identify the account or email address concerned.',
@@ -501,7 +518,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '21. Automated and AI-Assisted Processing',
+    title: '22. Automated and AI-Assisted Processing',
     paragraphs: [
       'Seopotion uses automated and artificial-intelligence technologies as part of its content-generation and website-analysis functionality.',
       'These systems may process information you provide in order to:',
@@ -521,7 +538,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '22. Children',
+    title: '23. Children',
     paragraphs: [
       'Seopotion is not directed at children and is not designed as a service for children.',
       'We do not knowingly collect personal data from children who are not legally able to provide the information or use the Service under applicable law.',
@@ -529,7 +546,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '23. Third-Party Websites',
+    title: '24. Third-Party Websites',
     paragraphs: [
       'Seopotion may contain links to or integrate with websites and services operated by third parties.',
       'Their collection and processing of personal information is governed by their own privacy policies and practices.',
@@ -537,7 +554,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '24. Changes to This Privacy Policy',
+    title: '25. Changes to This Privacy Policy',
     paragraphs: [
       'We may update this Privacy Policy as Seopotion develops, our processing practices change, or applicable laws and regulations change.',
       'We will publish the current version at seopotion.co and update the "Last updated" date above.',
@@ -545,7 +562,7 @@ const sections: PrivacySection[] = [
     ],
   },
   {
-    title: '25. Contact',
+    title: '26. Contact',
     paragraphs: [
       'For questions, requests, or concerns concerning this Privacy Policy or the processing of your personal data, contact:',
       'Deniz Yazagan\nData Controller and operator of Seopotion\nIstanbul, Türkiye',
@@ -607,7 +624,7 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
       <article className="mx-auto max-w-3xl">
         <header className="mb-12 border-border border-b pb-8">
           <h1 className="font-bold text-4xl text-foreground sm:text-5xl">Privacy Policy</h1>
-          <p className="mt-4 text-muted-foreground">Last updated: August 13, 2026</p>
+          <p className="mt-4 text-muted-foreground">Last updated: September 3, 2026</p>
           <div className="mt-8 space-y-4 leading-7">
             <p>
               This Privacy Policy explains how personal data is collected, used, stored, and shared
