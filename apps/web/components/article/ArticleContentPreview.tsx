@@ -1,5 +1,7 @@
 import Image from 'next/image';
 import Markdown, { type Components } from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 
@@ -8,15 +10,42 @@ import { cn } from '@/lib/utils';
  * Markdown (packages/shared/generation/src/article.ts) and the WordPress client
  * publishes it through `marked` (apps/api/src/clients/wordpress.ts), so the
  * preview parses the same dialect rather than a hand-rolled subset of it.
+ *
+ * The body also carries raw HTML: the YouTube embed is injected as an
+ * `<iframe>` (packages/shared/generation/src/video.ts) and publishes verbatim.
+ * Raw HTML is parsed, then sanitized to GitHub's default schema plus `iframe`;
+ * the `iframe` component below only mounts YouTube embed URLs.
  */
 export function ArticleContentPreview({ content }: { content: string }) {
   return (
     <article className="grid gap-4 wrap-break-word text-foreground">
-      <Markdown remarkPlugins={[remarkGfm]} components={components}>
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
+        components={components}
+      >
         {content}
       </Markdown>
     </article>
   );
+}
+
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), 'iframe'],
+  attributes: { ...defaultSchema.attributes, iframe: ['src', 'title'] },
+};
+
+const YOUTUBE_EMBED_HOSTS = new Set(['www.youtube-nocookie.com', 'www.youtube.com']);
+
+function isYouTubeEmbed(src: unknown): src is string {
+  if (typeof src !== 'string') return false;
+  try {
+    const url = new URL(src);
+    return YOUTUBE_EMBED_HOSTS.has(url.hostname) && url.pathname.startsWith('/embed/');
+  } catch {
+    return false;
+  }
 }
 
 const components: Components = {
@@ -55,6 +84,17 @@ const components: Components = {
     <h4 className="font-semibold text-foreground text-sm leading-snug">{children}</h4>
   ),
   hr: () => <hr className="border-border" />,
+  iframe: ({ src, title }) =>
+    isYouTubeEmbed(src) ? (
+      <iframe
+        src={src}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
+        className="aspect-video w-full rounded-md border border-border"
+      />
+    ) : null,
   img: ({ alt, src }) =>
     typeof src === 'string' ? (
       <Image
