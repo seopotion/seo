@@ -99,9 +99,42 @@ describe('listSites', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer at-1');
   });
 
+  // #102: one OAuth2Client per refresh token survives across calls, so the
+  // second read reuses the client (and the access token it cached) instead of
+  // minting a new grant — setCredentials runs once per refresh token.
+  test('reuses the OAuth client for the same refresh token across calls', async () => {
+    getAccessToken.mockResolvedValue({ token: 'at-1' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ siteEntry: [] }), { status: 200 })),
+    );
+
+    await listSites('rt-reuse');
+    await listSites('rt-reuse');
+    await listSites('rt-other');
+
+    expect(setCredentials).toHaveBeenCalledTimes(2);
+    expect(setCredentials).toHaveBeenNthCalledWith(1, { refresh_token: 'rt-reuse' });
+    expect(setCredentials).toHaveBeenNthCalledWith(2, { refresh_token: 'rt-other' });
+  });
+
   test('maps invalid_grant refresh failures to GscAuthRevokedError', async () => {
     getAccessToken.mockRejectedValue(new Error('invalid_grant: token revoked'));
     await expect(listSites('rt-revoked')).rejects.toBeInstanceOf(GscAuthRevokedError);
+  });
+
+  test('a failed mint evicts the cached client so the next call starts fresh', async () => {
+    getAccessToken.mockRejectedValueOnce(new Error('invalid_grant: token revoked'));
+    await expect(listSites('rt-evict')).rejects.toBeInstanceOf(GscAuthRevokedError);
+
+    getAccessToken.mockResolvedValue({ token: 'at-2' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ siteEntry: [] }), { status: 200 })),
+    );
+    await listSites('rt-evict');
+
+    expect(setCredentials).toHaveBeenCalledTimes(2);
   });
 
   test('throws when Google mints no access token', async () => {
