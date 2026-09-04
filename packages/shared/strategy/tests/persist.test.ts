@@ -397,31 +397,33 @@ describe('stagePersistSchedule', () => {
     }
   });
 
-  test('a top-up still offsets by the entries already scheduled, counted from tomorrow', async () => {
+  test('a top-up fills days freed by unscheduled entries before appending to the tail', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-01T23:59:00.000Z'));
     try {
       findById.mockResolvedValue(org);
+      const old = (kw: string, scheduled_date: string) => ({
+        keyword: kw,
+        opportunity_score: 50,
+        scheduled_date,
+        topic_role: 'pillar',
+        topic_cluster_id: `topic:${kw}`,
+      });
+      // 09-04 was unscheduled by hand; 09-02, 09-03 and 09-05 are still taken.
       listByOrg.mockResolvedValue([
-        {
-          keyword: 'old a',
-          opportunity_score: 50,
-          scheduled_date: '2026-09-10',
-          topic_role: 'pillar',
-          topic_cluster_id: 'topic:old a',
-        },
-        {
-          keyword: 'old b',
-          opportunity_score: 40,
-          scheduled_date: '2026-09-11',
-          topic_role: 'pillar',
-          topic_cluster_id: 'topic:old b',
-        },
+        old('old a', '2026-09-02'),
+        old('old b', '2026-09-03'),
+        old('old c', '2026-09-05'),
       ] as never);
 
-      await stagePersistSchedule(state([candidate('new', 90)]), { orgId: 'o1' });
+      await stagePersistSchedule(state([candidate('new a', 90), candidate('new b', 80)]), {
+        orgId: 'o1',
+      });
 
-      expect(scheduleCandidate.mock.calls[0]![1]).toBe('2026-09-04');
+      expect(scheduleCandidate.mock.calls.map(([, date]) => date)).toEqual([
+        '2026-09-04',
+        '2026-09-06',
+      ]);
     } finally {
       vi.useRealTimers();
     }
