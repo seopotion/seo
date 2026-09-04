@@ -9,7 +9,6 @@ import {
   type EnrichedCandidate,
   type StrategyWorkState,
   selectTopicCandidateTargets,
-  stampScheduledDates,
   type TopicCandidateTarget,
   toEnriched,
 } from '@shared/keywords';
@@ -130,10 +129,13 @@ export async function stagePersistSchedule(
   // Start tomorrow (UTC): the generation cron runs at 07:00 UTC, so a plan
   // stamped "today" for an org finalized after that hour has a day-1 slot
   // already in the past, and listDueForGeneration catches days 1 and 2 up
-  // together the next morning (#292). Offset further by what a redelivered
-  // partial run already scheduled.
+  // together the next morning (#292). Every entry then takes the first free
+  // day from there, so a top-up fills days freed by unscheduled entries
+  // before appending past the tail, and a redelivered partial run continues
+  // after what it already wrote.
   const startDay = new Date();
-  startDay.setUTCDate(startDay.getUTCDate() + 1 + alreadyScheduled);
+  startDay.setUTCDate(startDay.getUTCDate() + 1);
+  const startIso = startDay.toISOString().slice(0, 10);
   const occupied = new Set(scheduled.map((k) => k.scheduled_date));
   let qualifiedCount = 0;
   let scheduledCount = 0;
@@ -155,19 +157,13 @@ export async function stagePersistSchedule(
     }
 
     qualifiedCount++;
-    const slotStart = new Date(startDay);
-    slotStart.setUTCDate(slotStart.getUTCDate() + scheduledCount);
-    const entry = stampScheduledDates([stored], slotStart, 1)[0] as {
-      item: Candidate;
-      scheduled_date: string;
-    };
-    let date = nextFreeDate(entry.scheduled_date, occupied);
-    let res = await scheduleCandidate(entry.item, date);
+    let date = nextFreeDate(startIso, occupied);
+    let res = await scheduleCandidate(stored, date);
     if (!res.ok && res.reason === 'date_occupied') {
       // Lost a race for the date: mark it taken and try the next free one.
       occupied.add(date);
       date = nextFreeDate(date, occupied);
-      res = await scheduleCandidate(entry.item, date);
+      res = await scheduleCandidate(stored, date);
     }
     if (res.ok) {
       occupied.add(res.keyword.scheduled_date);
@@ -175,7 +171,7 @@ export async function stagePersistSchedule(
       if (target.topic_role === 'pillar') confirmedTopicClusters.add(target.topic_cluster_id);
     } else {
       if (res.reason === 'date_occupied') occupied.add(date);
-      log?.('strategy schedule skipped', { keyword: entry.item.keyword, reason: res.reason });
+      log?.('strategy schedule skipped', { keyword: stored.keyword, reason: res.reason });
     }
   }
 
