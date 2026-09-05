@@ -46,13 +46,11 @@ export default function OnboardingPage() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   // `?new=1` is the switcher's "Add website": the user already has a complete
-  // org and must not be bounced to /home. Read once, the way settings reads
-  // `?tab=` — useSearchParams would force a Suspense boundary on this page.
-  const [isAddingWebsite] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('new') === '1',
-  );
+  // org and must not be bounced to /home. Read inside the gate effect, the way
+  // settings reads `?tab=` in an effect — on a soft navigation Next writes the
+  // new URL after the render phase, so a render-phase read still sees the old
+  // one. useSearchParams would force a Suspense boundary on this page.
+  const [isAddingWebsite, setIsAddingWebsite] = useState(false);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [errors, setErrors] = useState<Errors>({});
@@ -102,14 +100,21 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (status.setupComplete && !isAddingWebsite) {
+      // Only a user who already has a complete org is "adding a website" — for
+      // a brand-new user `?new=1` is noise, and honouring it would show a
+      // "back to dashboard" link that ProductAccessGuard bounces straight back.
+      const addingWebsite =
+        new URLSearchParams(window.location.search).get('new') === '1' && status.setupComplete;
+      setIsAddingWebsite(addingWebsite);
+
+      if (status.setupComplete && !addingWebsite) {
         router.replace('/home', { locale });
         return;
       }
 
       setWorkspaceGate('ready');
     },
-    [isAddingWebsite, locale, router],
+    [locale, router],
   );
 
   useEffect(() => {

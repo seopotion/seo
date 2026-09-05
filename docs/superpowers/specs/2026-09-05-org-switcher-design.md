@@ -68,8 +68,16 @@ export function useActiveOrganizationId(): string | null;   // useSyncExternalSt
 
 Rule 1's status check means a stored id that points at an abandoned scan, a
 deleted org, or (later) an org the user was removed from falls through
-silently. The stale value is harmless and is overwritten on the next switch;
-no cleanup pass.
+silently. The stale value is harmless for exactly that reason — rule 1 falls
+through on any id that does not name a `setup_complete` org — so there is no
+cleanup pass.
+
+The store reads localStorage once per page load and caches the result, so a
+switch made in another tab is not seen here until this tab reloads. That is
+deliberate: `useSyncExternalStore` re-reads the snapshot on every render, and
+letting another tab's id land mid-session would move the shell to a different
+org without the `router.replace('/home')` a deliberate switch pairs with,
+stranding the user on a detail page of the org they just left.
 
 `useActiveOrganization` passes `useActiveOrganizationId()` into `select`. Both
 `ProductShell` and the page keep calling it; react-query still dedupes the
