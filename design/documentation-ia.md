@@ -50,7 +50,7 @@ content history + editor, WordPress publishing, Google Search Console + Home car
 
 **Hold — do NOT document as available** (roadmap page only): Ads, Analytics, Backlinks, Article
 Improvements (placeholder pages); Domain Rating (backend-only, not in UI); hosted-CMS integrations
-(Notion, Webflow, Shopify, …); auto-publish on generation; multi-org switching.
+(Notion, Webflow, Shopify, …); auto-publish on generation. Multi-org switching shipped (#127, `docs/superpowers/specs/2026-09-05-org-switcher-design.md`) — its docs page is a follow-up.
 
 > **Amended 2026-08-08.** The hold above used to read "non-WordPress integrations", which now
 > over-reaches: the **custom site (GitHub)** integration shipped (#7, `static-site-integration.md`)

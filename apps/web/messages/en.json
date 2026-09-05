@@ -1082,6 +1082,7 @@
     "actions": {
       "add": "Add",
       "back": "Back",
+      "backToDashboard": "Back to dashboard",
       "finalizing": "Finalizing...",
       "getStarted": "Get Started",
       "next": "Next",
@@ -1478,7 +1479,11 @@
         "label": "Settings"
       }
     },
-    "organizationFallback": "Your organization"
+    "organizationFallback": "Your organization",
+    "switcher": {
+      "addWebsite": "Add website",
+      "label": "Switch organization"
+    }
   },
   "DocsMetadata": {
     "title": "Documentation | Seopotion",

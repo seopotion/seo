@@ -24,6 +24,7 @@ import { clearToken } from '@/lib/auth';
 import { useActiveOrganization } from '@/lib/organizations';
 import { clearWorkspaceStatusCache } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { OrganizationSwitcher } from './OrganizationSwitcher';
 
 const navItems = [
   { href: '/home', key: 'home', icon: Home },
@@ -112,6 +113,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
               <p className="font-semibold text-sm">Seopotion</p>
             </div>
           </div>
+
+          <OrganizationSwitcher />
 
           <nav className="flex flex-col">
             {navItems.map((item) => {
