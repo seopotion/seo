@@ -83,6 +83,7 @@ export interface ResetUserData {
     articles: number;
     gsc_connections: number;
     subscriptions: number;
+    members: number;
   };
 }
 
@@ -119,6 +120,7 @@ export interface DeleteOrgData {
     strategy_runs: number;
     article_runs: number;
     gsc_analytics_cache: number;
+    members: number;
   };
 }
 

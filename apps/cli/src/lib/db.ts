@@ -14,6 +14,7 @@ import {
   IntegrationRepo,
   KeywordRepo,
   type MigrationReport,
+  OrgMemberRepo,
   OrgRepo,
   runMigrations,
   StrategyRunRepo,
@@ -517,6 +518,7 @@ async function wipeUser(user: string | undefined, alsoDeleteUser: boolean) {
     articles: 0,
     gsc_connections: 0,
     subscriptions: 0,
+    members: 0,
   };
   for (const org of orgs) {
     deleted.keywords += await KeywordRepo.deleteByOrgId(org.id);
@@ -524,6 +526,7 @@ async function wipeUser(user: string | undefined, alsoDeleteUser: boolean) {
     deleted.articles += await ArticleRepo.deleteByOrgId(org.id);
     if (await GscConnectionRepo.deleteByOrgId(org.id)) deleted.gsc_connections += 1;
     deleted.subscriptions += await SubscriptionRepo.deleteByOrgId(org.id);
+    deleted.members += await OrgMemberRepo.deleteByOrgId(org.id);
     if (await OrgRepo.deleteById(org.id)) deleted.orgs += 1;
   }
 
@@ -615,6 +618,7 @@ export async function deleteOrgs(input: {
       strategy_runs: 0,
       article_runs: 0,
       gsc_analytics_cache: 0,
+      members: 0,
     };
     const orgIds = targets.map((o) => o.id);
     const active = await listActiveSubscriptions(orgIds);
@@ -650,6 +654,7 @@ export async function deleteOrgs(input: {
       deleted.strategy_runs += await StrategyRunRepo.deleteByOrgId(id);
       deleted.article_runs += await ArticleRunRepo.deleteByOrgId(id);
       deleted.gsc_analytics_cache += await GscAnalyticsCacheRepo.deleteByOrgId(id);
+      deleted.members += await OrgMemberRepo.deleteByOrgId(id);
       // The org doc goes last: a crash mid-purge leaves it findable, so a
       // re-run picks the same target up instead of orphaning its data.
       if (await OrgRepo.deleteById(id)) deleted.orgs += 1;

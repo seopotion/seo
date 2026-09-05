@@ -92,6 +92,10 @@ export async function loadOrgForUser(
 ): Promise<OrgAccess | null>;
 ```
 
+A sibling `loadAccessibleOrg(org_id, auth)` returns just the `Org` (or null) so the
+~50 routes that never look at the role migrate by a pure rename; only billing
+and the members routes call `loadOrgForUser`.
+
 Order of checks: `OrgRepo.findById`; if `org.user_id === auth.userId` return
 `owner`; else `OrgMemberRepo.findByOrgAndEmail(org_id, auth.email)` and return
 `member` if found; else null. The email from the JWT is lowercased before the
@@ -114,9 +118,10 @@ const { org } = access;
 Article- and keyword-keyed routes that today call
 `loadOwnedOrg(article.org_id, userId)` do the same with `article.org_id`.
 
-`loadOwnedPaidOrg` (`load-owned-paid-org.ts`) takes the same `auth` object,
-uses `loadOrgForUser`, and its reason `'not_owner'` is renamed `'not_member'`;
-the keyword routes still map it to 403. The file keeps its name.
+`loadOwnedPaidOrg` (`load-owned-paid-org.ts`) takes the same `auth` object and
+uses `loadOrgForUser`; a missing or inaccessible org is `not_found` (404) like
+every other route, so the old `not_owner` reason and its 403 are gone. The file
+keeps its name.
 
 Owner-only routes check `access.role !== 'owner'` and return
 `403 { error: 'Owner only' }`: billing `POST /checkout`, `GET /portal`,
@@ -191,7 +196,7 @@ added to passes the product gate.
 | member calls an owner-only route | 403 `{ error: 'Owner only' }` |
 | add an email that is the owner or already a member | 409 `{ error: 'already_member' }` |
 | remove an email that is not a member | 404 |
-| paid gate for a member of an unpaid org | 402 (same as owner) |
+| paid gate for a member of an unpaid org | 402 (same as owner); a stranger gets 404 |
 | Team tab list 401 | existing `onUnauthorized` path |
 
 ## Testing
@@ -206,7 +211,7 @@ Vitest, no infra:
   user whose only org is one they were added to.
 - `apps/api/tests/billing.test.ts`: checkout as member returns 403.
 - `apps/api/tests/load-owned-paid-org.test.ts`: new signature; a member
-  passes the gate; `not_member` for a stranger.
+  passes the gate; `not_found` for a stranger.
 - Existing route tests keep their `OrgRepo.findById` mocks; the `@shared/db`
   mock gains an `OrgMemberRepo` stub returning `null` so owner paths are
   unchanged.
