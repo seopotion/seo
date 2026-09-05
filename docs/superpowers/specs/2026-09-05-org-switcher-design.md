@@ -104,7 +104,10 @@ i18n: `ProductShell.switcher.label`, `ProductShell.switcher.addWebsite` in
 
 ### 3. "Add website" mode in onboarding
 
-`onboarding/page.tsx` reads `useSearchParams().get('new')`. When it is set:
+`onboarding/page.tsx` reads `?new=1` once via
+`new URLSearchParams(window.location.search)`, the way `settings/page.tsx`
+reads `?tab=` (`useSearchParams` would force a Suspense boundary on this
+statically prerendered page). When it is set:
 
 - `checkWorkspaceGate` still checks auth and `status.ok`, but does not redirect
   to `/home` on `setupComplete`.
@@ -127,14 +130,15 @@ one code path instead of two).
 
 ### 4. Logout and OAuth returns
 
-- `ProductShell.logout` adds `clearActiveOrganizationId()`. Same for the other
-  logout paths that call `clearToken()` on a 401 (`useActiveOrganization`,
-  guards, onboarding): add the clear next to `clearWorkspaceStatusCache()`.
-- `dashboard/gsc/callback/page.tsx` and
-  `dashboard/integrations/github/callback/page.tsx` call
-  `setActiveOrganizationId(body.org_id)` before redirecting to settings. The
-  signed OAuth state already carries the org id; this only makes sure the
-  settings page that opens is the one the user connected.
+- `clearToken()` in `lib/auth.ts` also calls `clearActiveOrganizationId()`.
+  Every logout and 401 path (sixteen call sites) goes through `clearToken`, so
+  one line covers them all.
+- `dashboard/gsc/callback/page.tsx` calls `setActiveOrganizationId(body.org_id)`
+  before redirecting to settings, so the settings page that opens is the org
+  that was connected even if another tab switched during the OAuth round trip.
+  The GitHub callback gets no such line: its exchange response carries no
+  `org_id` (the id lives only in the signed state), and the stored value
+  survives the round trip unchanged in the common case.
 
 ### 5. CLI, admin, docs
 
@@ -186,8 +190,8 @@ New: `apps/web/lib/active-organization.ts`,
 `apps/web/app/[locale]/(authenticated)/(product)/OrganizationSwitcher.tsx`,
 `apps/web/tests/active-organization.test.ts`.
 
-Modified: `apps/web/lib/organizations.ts`, `ProductShell.tsx`,
-`onboarding/page.tsx`, the two OAuth callback pages, `messages/en.json`,
+Modified: `apps/web/lib/organizations.ts`, `apps/web/lib/auth.ts`,
+`ProductShell.tsx`, `onboarding/page.tsx`, the GSC callback page, `messages/en.json`,
 `messages/tr.json`, `PROGRESS.md`, `design/documentation-ia.md`.
 
 One frontend PR into `dev`, `Closes #127`.
