@@ -13,7 +13,7 @@ export interface GoogleIdentity {
 export async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity> {
   const ticket = await client.verifyIdToken({ idToken, audience: config.GOOGLE_CLIENT_ID });
   const payload = ticket.getPayload();
-  if (!payload?.sub || !payload.email) {
+  if (!payload?.sub || !payload.email || payload.email_verified !== true) {
     throw new Error('Invalid Google ID token');
   }
   return { sub: payload.sub, email: payload.email, name: payload.name };

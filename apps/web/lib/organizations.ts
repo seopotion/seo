@@ -1,6 +1,6 @@
 'use client';
 
-import type { EntitlementPlan, SetupStatus } from '@shared/schemas';
+import type { EntitlementPlan, OrgRole, SetupStatus } from '@shared/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
@@ -20,6 +20,9 @@ export type ProductOrganization = {
   };
   id: string;
   name?: string;
+  // owner = created it; member = added by email (#333). Only the Team tab
+  // and nothing else in the shell reads this.
+  role: OrgRole;
   setup_status: SetupStatus;
   website_url: string;
 };

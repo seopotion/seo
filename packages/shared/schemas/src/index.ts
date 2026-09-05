@@ -1,4 +1,4 @@
-export type { EntitlementPlan, SetupStatus, StrategyStatus } from '@shared/types';
+export type { EntitlementPlan, OrgRole, SetupStatus, StrategyStatus } from '@shared/types';
 export * from './admin-action';
 export * from './article';
 export * from './article-run';
@@ -8,6 +8,7 @@ export * from './integration';
 export * from './json-schema';
 export * from './keyword';
 export * from './org';
+export * from './org-member';
 export * from './presets';
 export * from './promo-code';
 export * from './promo-redemption';

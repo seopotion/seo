@@ -119,6 +119,7 @@ vi.mock('@shared/db', () => ({
     finalize: vi.fn(async () => {}),
     claimStrategy: vi.fn(async () => true),
   },
+  OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
 }));
 
 import { OrgRepo } from '@shared/db';

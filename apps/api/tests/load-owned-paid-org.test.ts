@@ -1,7 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
 
-const { findById } = vi.hoisted(() => ({ findById: vi.fn() }));
-vi.mock('@shared/db', () => ({ OrgRepo: { findById } }));
+const { findById, findByOrgAndEmail } = vi.hoisted(() => ({
+  findById: vi.fn(),
+  findByOrgAndEmail: vi.fn(),
+}));
+vi.mock('@shared/db', () => ({
+  OrgRepo: { findById },
+  OrgMemberRepo: { findByOrgAndEmail },
+}));
 
 import { loadOwnedPaidOrg } from '../src/lib/load-owned-paid-org';
 
@@ -15,23 +21,32 @@ const org = (over: Record<string, unknown>) => ({
   created_at: new Date(),
   ...over,
 });
+const owner = { userId: 'u1', email: 'u1@example.com' };
+const teammate = { userId: 'u2', email: 'u2@example.com' };
 
 describe('loadOwnedPaidOrg', () => {
   test('not_found when missing', async () => {
     findById.mockResolvedValueOnce(null);
-    expect(await loadOwnedPaidOrg('o1', 'u1')).toEqual({ ok: false, reason: 'not_found' });
+    expect(await loadOwnedPaidOrg('o1', owner)).toEqual({ ok: false, reason: 'not_found' });
   });
-  test('not_owner for a different user', async () => {
+  test('not_found for a stranger (existence never leaks)', async () => {
     findById.mockResolvedValueOnce(org({ user_id: 'someone_else' }));
-    expect(await loadOwnedPaidOrg('o1', 'u1')).toEqual({ ok: false, reason: 'not_owner' });
+    findByOrgAndEmail.mockResolvedValueOnce(null);
+    expect(await loadOwnedPaidOrg('o1', owner)).toEqual({ ok: false, reason: 'not_found' });
   });
   test('not_paid for free plan', async () => {
     findById.mockResolvedValueOnce(org({ plan: 'free' }));
-    expect(await loadOwnedPaidOrg('o1', 'u1')).toEqual({ ok: false, reason: 'not_paid' });
+    expect(await loadOwnedPaidOrg('o1', owner)).toEqual({ ok: false, reason: 'not_paid' });
   });
-  test('ok for owned paid org', async () => {
+  test('ok for an owned paid org', async () => {
     const paid = org({});
     findById.mockResolvedValueOnce(paid);
-    expect(await loadOwnedPaidOrg('o1', 'u1')).toEqual({ ok: true, org: paid });
+    expect(await loadOwnedPaidOrg('o1', owner)).toEqual({ ok: true, org: paid });
+  });
+  test('ok for a member of a paid org', async () => {
+    const paid = org({});
+    findById.mockResolvedValueOnce(paid);
+    findByOrgAndEmail.mockResolvedValueOnce({ id: 'm1', org_id: 'o1', email: 'u2@example.com' });
+    expect(await loadOwnedPaidOrg('o1', teammate)).toEqual({ ok: true, org: paid });
   });
 });

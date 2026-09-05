@@ -18,6 +18,7 @@ function org(overrides: Partial<ProductOrganization> = {}): ProductOrganization 
     capabilities: { keyword_research: false, keyword_scheduling: false },
     id: 'org-1',
     name: 'Org 1',
+    role: 'owner',
     setup_status: 'setup_complete',
     website_url: 'https://one.example',
     ...overrides,

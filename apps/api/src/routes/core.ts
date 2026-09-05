@@ -1,8 +1,9 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
-import { OrgRepo, UserRepo } from '@shared/db';
+import { UserRepo } from '@shared/db';
 import { isPaid } from '@shared/schemas';
 import { signToken } from '../auth/jwt';
 import { verifyGoogleIdToken } from '../clients/google';
+import { listAccessibleOrgs } from '../lib/list-accessible-orgs';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/core';
 
@@ -55,8 +56,8 @@ const core = new OpenAPIHono<AuthEnv>()
       },
     }),
     async (c) => {
-      const { userId } = c.get('auth');
-      const orgs = await OrgRepo.findByUserId(userId);
+      const auth = c.get('auth');
+      const orgs = await listAccessibleOrgs(auth);
       return c.json({
         organizations: orgs.map((o) => ({
           id: o.id,
@@ -68,6 +69,7 @@ const core = new OpenAPIHono<AuthEnv>()
             keyword_scheduling: isPaid(o),
           },
           billing_tier: o.plan,
+          role: o.user_id === auth.userId ? ('owner' as const) : ('member' as const),
         })),
       });
     },
@@ -88,8 +90,7 @@ const core = new OpenAPIHono<AuthEnv>()
       },
     }),
     async (c) => {
-      const { userId } = c.get('auth');
-      const orgs = await OrgRepo.findByUserId(userId);
+      const orgs = await listAccessibleOrgs(c.get('auth'));
       const setup_complete = orgs.some((o) => o.setup_status === 'setup_complete');
       return c.json({ setup_complete });
     },

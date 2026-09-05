@@ -17,7 +17,7 @@ import {
 } from '../lib/gsc-analytics';
 import { cachedSearchAnalytics } from '../lib/gsc-cache';
 import { finalSegment, matchArticleByPage } from '../lib/gsc-urls';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/analytics';
@@ -95,14 +95,13 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id, range, scope } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const access = await gscAccess(org_id);
@@ -178,14 +177,13 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id, range } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const access = await gscAccess(org_id);
@@ -268,17 +266,20 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { id } = c.req.valid('param');
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
       // Missing, foreign-org, and mismatched-org all 404 — never leak existence.
-      if (!article || article.org_id !== org_id || !(await loadOwnedOrg(org_id, userId))) {
+      if (
+        !article ||
+        article.org_id !== org_id ||
+        !(await loadAccessibleOrg(org_id, c.get('auth')))
+      ) {
         return c.json({ error: 'Article not found' }, 404);
       }
 

@@ -20,6 +20,7 @@ const {
   deleteStrategyRunsByOrgId,
   deleteArticleRunsByOrgId,
   deleteGscCacheByOrgId,
+  deleteMembersByOrgId,
   listAllSummaries,
   listActiveByOrg,
   deleteUserById,
@@ -69,6 +70,7 @@ const {
   deleteStrategyRunsByOrgId: vi.fn(async () => 4),
   deleteArticleRunsByOrgId: vi.fn(async () => 6),
   deleteGscCacheByOrgId: vi.fn(async () => 5),
+  deleteMembersByOrgId: vi.fn(async () => 1),
   // Two orgs: `keep` sweeps target whichever is not named.
   listAllSummaries: vi.fn(async () => [
     {
@@ -117,6 +119,7 @@ vi.mock('@shared/db', () => ({
   StrategyRunRepo: { deleteByOrgId: deleteStrategyRunsByOrgId },
   ArticleRunRepo: { deleteByOrgId: deleteArticleRunsByOrgId },
   GscAnalyticsCacheRepo: { deleteByOrgId: deleteGscCacheByOrgId },
+  OrgMemberRepo: { deleteByOrgId: deleteMembersByOrgId },
 }));
 
 vi.mock('@shared/strategy', () => ({ launchStrategy, createStrategyRun, runLocalStrategy }));
@@ -384,6 +387,7 @@ describe('resetUser', () => {
     expect(deleteArticlesByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteGscConnectionByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteSubscriptionsByOrgId).toHaveBeenCalledWith('org_1');
+    expect(deleteMembersByOrgId).toHaveBeenCalledWith('org_1');
     expect(deleteOrgById).toHaveBeenCalledWith('org_1');
     expect(deleteUserById).not.toHaveBeenCalled();
     expect(closeDb).toHaveBeenCalledOnce();
@@ -400,6 +404,7 @@ describe('resetUser', () => {
         articles: 1,
         gsc_connections: 1,
         subscriptions: 1,
+        members: 1,
       },
     });
   });
@@ -454,6 +459,7 @@ describe('resetUser', () => {
       articles: 2,
       gsc_connections: 2,
       subscriptions: 2,
+      members: 2,
     });
   });
 
@@ -471,6 +477,7 @@ describe('resetUser', () => {
       articles: 0,
       gsc_connections: 0,
       subscriptions: 0,
+      members: 0,
     });
   });
 
@@ -514,6 +521,7 @@ describe('deleteUser', () => {
         articles: 1,
         gsc_connections: 1,
         subscriptions: 1,
+        members: 1,
       },
     });
   });
@@ -570,6 +578,7 @@ describe('deleteOrgs', () => {
       deleteStrategyRunsByOrgId,
       deleteArticleRunsByOrgId,
       deleteGscCacheByOrgId,
+      deleteMembersByOrgId,
       deleteOrgById,
     ]) {
       expect(fn).toHaveBeenCalledExactlyOnceWith('org_1');
@@ -587,6 +596,7 @@ describe('deleteOrgs', () => {
       strategy_runs: 4,
       article_runs: 6,
       gsc_analytics_cache: 5,
+      members: 1,
     });
   });
 

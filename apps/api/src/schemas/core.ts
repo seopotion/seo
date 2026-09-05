@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { ENTITLEMENT_PLANS, SETUP_STATUSES } from '@shared/types';
+import { ENTITLEMENT_PLANS, ORG_ROLES, SETUP_STATUSES } from '@shared/types';
 
 export const LoginBody = z
   .object({
@@ -28,6 +28,9 @@ const Organization = z
     // Display-only: lets the billing page label the current plan and offer
     // higher tiers. Gate features on `capabilities`, never on this.
     billing_tier: z.enum(ENTITLEMENT_PLANS),
+    // owner = orgs.user_id; member = added by email (#333). Only billing and
+    // team management are owner-only; the client does not gate anything else.
+    role: z.enum(ORG_ROLES),
   })
   .openapi('Organization');
 
