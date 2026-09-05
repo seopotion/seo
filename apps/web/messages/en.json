@@ -923,8 +923,7 @@
       "member": "Member",
       "owner": "Owner",
       "ownerOnly": "Only the owner can add or remove teammates.",
-      "remove": "Remove",
-      "title": "Team"
+      "remove": "Remove"
     },
     "wordpress": {
       "badges": {

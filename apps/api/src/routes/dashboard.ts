@@ -178,7 +178,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -235,7 +235,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.AutoPublishRetryErrorResponse } },
@@ -351,7 +351,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -413,7 +413,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -441,7 +441,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -481,7 +481,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         502: {
           content: { 'application/json': { schema: schemas.WordPressConnectionErrorResponse } },
@@ -537,7 +537,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -579,7 +579,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         204: { description: 'Disconnected (idempotent — also 204 when not connected)' },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -612,7 +612,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -658,7 +658,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -707,7 +707,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -774,7 +774,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
@@ -935,7 +935,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
@@ -1069,7 +1069,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -1103,7 +1103,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -1135,7 +1135,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -1169,7 +1169,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),

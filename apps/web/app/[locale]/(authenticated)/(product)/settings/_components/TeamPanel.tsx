@@ -1,5 +1,6 @@
 'use client';
 
+import type { OrgRole } from '@shared/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
@@ -8,7 +9,7 @@ import { api } from '@/lib/api';
 import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import type { ProductOrganization } from '@/lib/organizations';
 
-type Member = { email: string; role: 'owner' | 'member'; created_at: string };
+type Member = { email: string; role: OrgRole; created_at: string };
 
 /**
  * Settings → Team (#333). Everyone on the org sees the roster; only the owner
@@ -90,10 +91,7 @@ export function TeamPanel({
   });
 
   function submitAdd(event: FormEvent<HTMLFormElement>) {
-    // The panel lives inside the settings <form>; stop this submit from
-    // reaching it and from reloading the page.
     event.preventDefault();
-    event.stopPropagation();
     const value = email.trim();
     if (!value || addMutation.isPending) return;
     setAddError(null);
@@ -102,6 +100,7 @@ export function TeamPanel({
 
   const removeFailed =
     removeMutation.isError && (removeMutation.error as Error | null)?.message !== 'unauthorized';
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   return (
     <div className="grid gap-4 rounded-md border border-border bg-card p-4">
@@ -120,7 +119,7 @@ export function TeamPanel({
               onChange={(event) => setEmail(event.target.value)}
             />
           </div>
-          <Button type="submit" disabled={!organization || !email.trim() || addMutation.isPending}>
+          <Button type="submit" disabled={!organization || !isValidEmail || addMutation.isPending}>
             {addMutation.isPending ? t('adding') : t('add')}
           </Button>
         </form>

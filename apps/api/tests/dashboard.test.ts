@@ -599,7 +599,7 @@ vi.mock('@shared/db', () => {
   };
 });
 
-import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, IntegrationRepo, OrgMemberRepo, OrgRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import { decryptSecret, encryptSecret } from '../src/lib/crypto';
 import { logger } from '../src/logger';
@@ -763,6 +763,22 @@ describe('dashboard home routes', () => {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(res.status).toBe(404);
+  });
+
+  test('GET /articles/published 200s for a member of an org owned by someone else', async () => {
+    vi.mocked(OrgMemberRepo.findByOrgAndEmail).mockResolvedValueOnce({
+      id: 'member_1',
+      org_id: 'org_3',
+      email: 'u@example.com',
+      invited_by: 'user_2',
+      created_at: new Date(),
+    });
+    const token = await login();
+    const res = await client.api.v0.dashboard.articles.published.$get(
+      { query: { org_id: 'org_3' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(res.status).toBe(200);
   });
 
   test('GET /articles/best is empty and gated until Google data is connected', async () => {

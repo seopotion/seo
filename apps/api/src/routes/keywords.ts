@@ -183,7 +183,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
         401: { description: 'Missing or invalid bearer token' },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -229,7 +229,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Candidate/org not found or not owned by the caller',
+          description: 'Candidate/org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
@@ -280,7 +280,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Keyword/org not found or not owned by the caller',
+          description: 'Keyword/org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
@@ -337,7 +337,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Keyword/org not found or not owned by the caller',
+          description: 'Keyword/org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
@@ -381,7 +381,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Candidate/org not found or not owned by the caller',
+          description: 'Candidate/org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },

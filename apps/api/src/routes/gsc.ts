@@ -11,7 +11,7 @@ import * as schemas from '../schemas/gsc';
 
 /**
  * Google Search Console connect flow (#12, design/product-flow.md §1 + §2.6).
- * Mounted at /dashboard/gsc. All routes require a Bearer JWT and org ownership.
+ * Mounted at /dashboard/gsc. All routes require a Bearer JWT and org access (owner or member).
  */
 const gscRoutes = new OpenAPIHono<AuthEnv>()
   .openapi(
@@ -30,7 +30,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -68,7 +68,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
-          description: 'State org not found or not owned by the caller',
+          description: 'State org not found or not accessible to the caller',
         },
         503: {
           content: { 'application/json': { schema: schemas.GscErrorResponse } },
@@ -136,7 +136,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         503: {
           content: { 'application/json': { schema: schemas.GscErrorResponse } },
@@ -184,7 +184,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -213,7 +213,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.GscNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),

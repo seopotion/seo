@@ -95,7 +95,7 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -177,7 +177,7 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
@@ -266,7 +266,7 @@ const analytics = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
       },
     }),

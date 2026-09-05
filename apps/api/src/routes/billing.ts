@@ -46,7 +46,7 @@ const billing = new OpenAPIHono<AuthEnv>()
       const { org_id, tier, promo_code } = c.req.valid('json');
       const { email } = c.get('auth');
       const access = await loadOrgForUser(org_id, c.get('auth'));
-      if (!access) return c.body(null, 403);
+      if (!access) return c.json({ error: 'Owner only' }, 403);
       if (access.role !== 'owner') return c.json({ error: 'Owner only' }, 403);
       const { org } = access;
       // Already entitled at an equal-or-higher tier -> send them to the portal instead.
@@ -98,7 +98,7 @@ const billing = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { org_id } = c.req.valid('json');
       const access = await loadOrgForUser(org_id, c.get('auth'));
-      if (!access) return c.body(null, 403);
+      if (!access) return c.json({ error: 'Owner only' }, 403);
       if (access.role !== 'owner') return c.json({ error: 'Owner only' }, 403);
       const { org } = access;
       const sub = await SubscriptionRepo.findLatestByOrg(org.id);

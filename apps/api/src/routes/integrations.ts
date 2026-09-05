@@ -23,7 +23,7 @@ import * as schemas from '../schemas/integrations';
  * Mounted at /dashboard/integrations, alongside the WordPress connect,
  * connected-list and disconnect routes that live in routes/dashboard.ts.
  *
- * All three require a Bearer JWT and org ownership.
+ * All three require a Bearer JWT and org access (owner or member).
  */
 
 /**
@@ -67,7 +67,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         503: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },
@@ -119,7 +119,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'State org not found or not owned by the caller',
+          description: 'State org not found or not accessible to the caller',
         },
         422: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },
@@ -198,7 +198,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'Grant org not found or not owned by the caller',
+          description: 'Grant org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },

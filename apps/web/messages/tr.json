@@ -923,8 +923,7 @@
       "member": "Üye",
       "owner": "Sahip",
       "ownerOnly": "Ekip arkadaşlarını yalnızca sahip ekleyebilir veya kaldırabilir.",
-      "remove": "Kaldır",
-      "title": "Ekip"
+      "remove": "Kaldır"
     },
     "wordpress": {
       "badges": {

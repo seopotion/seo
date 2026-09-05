@@ -126,7 +126,7 @@ const setup = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.NotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ConflictResponse } },
@@ -169,7 +169,7 @@ const setup = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.NotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.ConflictResponse } },
