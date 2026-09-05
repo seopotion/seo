@@ -225,12 +225,13 @@ describe('POST /promo/validate', () => {
     promoRedemptionRepo.countConfirmed.mockResolvedValue(0);
   });
 
-  test('403 when the org is not owned', async () => {
+  test('403 with an empty body when the org is not owned', async () => {
     loadOrgForUser.mockResolvedValueOnce(null);
     const res = await testClient(app).promo.validate.$post({
       json: { org_id: 'o1', code: 'LAUNCH30' },
     });
     expect(res.status).toBe(403);
+    expect(await res.text()).toBe('');
   });
 
   test('200 with the discount terms; input is trimmed and uppercased', async () => {
@@ -283,7 +284,7 @@ describe('POST /promo/validate', () => {
     expect(await res.json()).toEqual({ valid: false, reason });
   });
 
-  test('403 for a member', async () => {
+  test('403 with { error: "Owner only" } for a member', async () => {
     loadOrgForUser.mockResolvedValueOnce({
       org: { id: 'o1', user_id: 'owner', plan: 'free' },
       role: 'member',
@@ -292,6 +293,7 @@ describe('POST /promo/validate', () => {
       json: { org_id: 'o1', code: 'X' },
     });
     expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Owner only' });
   });
 });
 

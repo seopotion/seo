@@ -128,7 +128,6 @@ const billing = new OpenAPIHono<AuthEnv>()
           description: 'The code is applicable; discount terms for display',
         },
         403: {
-          content: { 'application/json': { schema: schemas.OwnerOnlyResponse } },
           description: 'Org not found, not accessible, or the caller is not its owner',
         },
         422: {
@@ -140,7 +139,8 @@ const billing = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { org_id, code } = c.req.valid('json');
       const access = await loadOrgForUser(org_id, c.get('auth'));
-      if (access?.role !== 'owner') return c.json({ error: 'Owner only' } as const, 403);
+      if (!access) return c.body(null, 403);
+      if (access.role !== 'owner') return c.json({ error: 'Owner only' }, 403);
       const { org } = access;
       const result = await validatePromoCode(code, org.id);
       if (!result.ok) return c.json({ valid: false as const, reason: result.reason }, 422);
