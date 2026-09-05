@@ -907,7 +907,24 @@
       "business": "Business",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Integrations",
-      "label": "Settings sections"
+      "label": "Settings sections",
+      "team": "Team"
+    },
+    "team": {
+      "add": "Add",
+      "adding": "Adding...",
+      "alreadyMember": "That email is already on the team.",
+      "description": "Teammates you add here can use everything in this workspace except billing and this team list. They sign in with Google using the email you enter.",
+      "emailLabel": "Teammate email",
+      "emailPlaceholder": "name@company.com",
+      "error": "Something went wrong. Please try again.",
+      "listError": "Could not load the team.",
+      "loading": "Loading the team...",
+      "member": "Member",
+      "owner": "Owner",
+      "ownerOnly": "Only the owner can add or remove teammates.",
+      "remove": "Remove",
+      "title": "Team"
     },
     "wordpress": {
       "badges": {

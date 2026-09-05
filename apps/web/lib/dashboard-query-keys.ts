@@ -49,4 +49,6 @@ export const dashboardQueryKeys = {
     [...dashboardQueryKeys.organization(organizationId), 'integrations', 'connected'] as const,
   gscStatus: (organizationId: string) =>
     [...dashboardQueryKeys.organization(organizationId), 'gsc', 'status'] as const,
+  members: (organizationId: string) =>
+    [...dashboardQueryKeys.organization(organizationId), 'members'] as const,
 };
