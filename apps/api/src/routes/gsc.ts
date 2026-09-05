@@ -4,7 +4,7 @@ import { isGscConnected } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { decryptSecret, encryptSecret } from '../lib/crypto';
 import { signGscState, verifyGscState } from '../lib/gsc-state';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { getGscTokenKey } from '../lib/secrets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/gsc';
@@ -37,7 +37,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { org_id } = c.req.valid('query');
       const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const state = await signGscState({ org_id, user_id: userId });
       return c.json({ url: await gsc.buildAuthUrl(state) }, 200);
@@ -88,7 +88,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
       }
       // The state must have been minted by this same user's session.
       if (claims.user_id !== userId) return c.json({ error: 'Invalid state' }, 400);
-      const org = await loadOwnedOrg(claims.org_id, userId);
+      const org = await loadAccessibleOrg(claims.org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       let tokens: { refreshToken: string; email: string };
@@ -146,8 +146,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, site_url } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const conn = await GscConnectionRepo.findByOrgId(org_id);
@@ -191,8 +190,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const ok = await GscConnectionRepo.deleteByOrgId(org_id);
       await GscAnalyticsCacheRepo.deleteByOrgId(org_id);
@@ -221,8 +219,7 @@ const gscRoutes = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const conn = await GscConnectionRepo.findByOrgId(org_id);
       return c.json(

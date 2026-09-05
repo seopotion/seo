@@ -3,7 +3,7 @@ import { OrgRepo } from '@shared/db';
 import { isPaid } from '@shared/schemas';
 import { launchStrategy } from '@shared/strategy';
 import { enqueueScanTask } from '../clients/sqs';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { mergePresets } from '../lib/merge-presets';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/setup';
@@ -98,8 +98,7 @@ const setup = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org?.presets) {
         return c.json({ error: 'Setup details not available' }, 404);
       }
@@ -137,8 +136,7 @@ const setup = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, presets } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) {
         return c.json({ error: 'Setup details not available' }, 404);
       }
@@ -181,8 +179,7 @@ const setup = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, presets, referral_source, integrations } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) {
         return c.json({ error: 'Setup details not available' }, 404);
       }

@@ -10,14 +10,14 @@ import {
 import { DataForSeoError } from '@shared/providers';
 import { type Candidate, isPaid, type Keyword } from '@shared/schemas';
 import { researchKeyword } from '../lib/keyword-research';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { loadOwnedPaidOrg, type OwnedPaidResult } from '../lib/load-owned-paid-org';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/keywords';
 
 /** Map a loadOwnedPaidOrg failure to its HTTP status. */
-function gateStatus(reason: Exclude<OwnedPaidResult, { ok: true }>['reason']): 404 | 403 | 402 {
-  return reason === 'not_found' ? 404 : reason === 'not_owner' ? 403 : 402;
+function gateStatus(reason: Exclude<OwnedPaidResult, { ok: true }>['reason']): 404 | 402 {
+  return reason === 'not_found' ? 404 : 402;
 }
 
 /** Map a Candidate entity to the pool-read row (#99). */
@@ -87,10 +87,6 @@ const keywords = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Active paid entitlement required',
         },
-        403: {
-          content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Not owned by the caller',
-        },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Org not found',
@@ -103,8 +99,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, seed } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const gate = await loadOwnedPaidOrg(org_id, userId);
+      const gate = await loadOwnedPaidOrg(org_id, c.get('auth'));
       if (!gate.ok) return c.json({ error: gate.reason }, gateStatus(gate.reason));
 
       const loc = {
@@ -143,10 +138,6 @@ const keywords = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Active paid entitlement required',
         },
-        403: {
-          content: { 'application/json': { schema: schemas.ErrorResponse } },
-          description: 'Not owned by the caller',
-        },
         404: {
           content: { 'application/json': { schema: schemas.ErrorResponse } },
           description: 'Org not found',
@@ -155,8 +146,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, keywords } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const gate = await loadOwnedPaidOrg(org_id, userId);
+      const gate = await loadOwnedPaidOrg(org_id, c.get('auth'));
       if (!gate.ok) return c.json({ error: gate.reason }, gateStatus(gate.reason));
 
       const items = keywords.map((m) => ({
@@ -199,8 +189,7 @@ const keywords = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, status, limit, offset } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'not_found' }, 404);
 
       const { candidates, total } = await CandidateRepo.listByOrg(org_id, {
@@ -252,12 +241,11 @@ const keywords = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { candidate_id } = c.req.valid('param');
       const { scheduled_date } = c.req.valid('json');
-      const { userId } = c.get('auth');
 
       // Org is derived from the candidate; a missing candidate and one in an
       // unowned org both 404 so existence never leaks across accounts.
       const candidate = await CandidateRepo.findById(candidate_id);
-      const org = candidate && (await loadOwnedOrg(candidate.org_id, userId));
+      const org = candidate && (await loadAccessibleOrg(candidate.org_id, c.get('auth')));
       if (!candidate || !org) return c.json({ error: 'not_found' }, 404);
       if (!isPaid(org)) return c.json({ error: 'not_paid' }, 402);
 
@@ -303,10 +291,9 @@ const keywords = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { keyword_id } = c.req.valid('param');
       const { scheduled_date } = c.req.valid('json');
-      const { userId } = c.get('auth');
 
       const keyword = await KeywordRepo.findById(keyword_id);
-      const org = keyword && (await loadOwnedOrg(keyword.org_id, userId));
+      const org = keyword && (await loadAccessibleOrg(keyword.org_id, c.get('auth')));
       if (!keyword || !org) return c.json({ error: 'not_found' }, 404);
       if (!isPaid(org)) return c.json({ error: 'not_paid' }, 402);
 
@@ -360,10 +347,9 @@ const keywords = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { keyword_id } = c.req.valid('param');
-      const { userId } = c.get('auth');
 
       const keyword = await KeywordRepo.findById(keyword_id);
-      const org = keyword && (await loadOwnedOrg(keyword.org_id, userId));
+      const org = keyword && (await loadAccessibleOrg(keyword.org_id, c.get('auth')));
       if (!keyword || !org) return c.json({ error: 'not_found' }, 404);
       if (!isPaid(org)) return c.json({ error: 'not_paid' }, 402);
 
@@ -405,12 +391,11 @@ const keywords = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { candidate_id } = c.req.valid('param');
-      const { userId } = c.get('auth');
 
       // Org is derived from the candidate; a missing candidate and one in an
       // unowned org both 404 so existence never leaks across accounts.
       const candidate = await CandidateRepo.findById(candidate_id);
-      const org = candidate && (await loadOwnedOrg(candidate.org_id, userId));
+      const org = candidate && (await loadAccessibleOrg(candidate.org_id, c.get('auth')));
       if (!candidate || !org) return c.json({ error: 'not_found' }, 404);
       if (!isPaid(org)) return c.json({ error: 'not_paid' }, 402);
 

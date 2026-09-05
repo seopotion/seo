@@ -490,6 +490,7 @@ vi.mock('@shared/db', () => {
         if (o) o.domain_rating = { value, checked_at: new Date() };
       }),
     },
+    OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
     KeywordRepo: {
       listByOrg: vi.fn(async (orgId: string) =>
         keywords
