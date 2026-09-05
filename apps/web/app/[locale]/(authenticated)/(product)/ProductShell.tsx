@@ -114,8 +114,6 @@ export function ProductShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <OrganizationSwitcher />
-
           <nav className="flex flex-col">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -138,6 +136,8 @@ export function ProductShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+
+          <OrganizationSwitcher />
         </div>
       </aside>
 
