@@ -89,6 +89,24 @@ export const OrgRepo = {
   },
 
   /**
+   * Orgs the user may see (#333): the ones they own plus the ones they were
+   * added to. Owned first, then member orgs, each oldest-first — the switcher
+   * renders in this order.
+   */
+  async findAccessible(userId: string, memberOrgIds: string[]): Promise<Org[]> {
+    const ids = memberOrgIds.filter((id) => ObjectId.isValid(id)).map((id) => new ObjectId(id));
+    const docs = await (await collection())
+      .find({ $or: [{ user_id: userId }, { _id: { $in: ids } }] })
+      .sort({ created_at: 1 })
+      .toArray();
+    const orgs = docs.map(toEntity);
+    return [
+      ...orgs.filter((o) => o.user_id === userId),
+      ...orgs.filter((o) => o.user_id !== userId),
+    ];
+  },
+
+  /**
    * Every org, reduced to the fields the `db delete-org` sweep reports.
    * Projected and deliberately NOT Zod-parsed: a sweep whose whole job is to
    * remove stale orgs must not abort because one of them is legacy-shaped.
