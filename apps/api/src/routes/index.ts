@@ -10,6 +10,7 @@ import dashboard from './dashboard';
 import gsc from './gsc';
 import integrations from './integrations';
 import keywords from './keywords';
+import members from './members';
 import setup from './setup';
 
 const app = new OpenAPIHono();
@@ -25,6 +26,7 @@ app.get('/health', (c) => c.text('OK'));
  */
 const routes = app
   .route(`/api/${API_VERSION}/core`, core)
+  .route(`/api/${API_VERSION}/core/members`, members)
   .route(`/api/${API_VERSION}/billing`, billing)
   .route(`/api/${API_VERSION}/setup`, setup)
   .route(`/api/${API_VERSION}/keywords`, keywords)
