@@ -1,11 +1,14 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocaleSwitcher } from '@/components/i18n/LocaleSwitcher';
 import { Button, Card, CardContent } from '@/components/ui';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
+import { setActiveOrganizationId } from '@/lib/active-organization';
 import { clearToken, getToken } from '@/lib/auth';
+import { dashboardQueryKeys } from '@/lib/dashboard-query-keys';
 import { useConnectedIntegrations } from '@/lib/integrations';
 import {
   clearWorkspaceStatusCache,
@@ -41,6 +44,13 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<OnboardingForm>(initialForm);
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [orgId, setOrgId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  // `?new=1` is the switcher's "Add website": the user already has a complete
+  // org and must not be bounced to /home. Read inside the gate effect, the way
+  // settings reads `?tab=` in an effect — on a soft navigation Next writes the
+  // new URL after the render phase, so a render-phase read still sees the old
+  // one. useSearchParams would force a Suspense boundary on this page.
+  const [isAddingWebsite, setIsAddingWebsite] = useState(false);
   const [audienceDraft, setAudienceDraft] = useState('');
   const [competitorDraft, setCompetitorDraft] = useState('');
   const [errors, setErrors] = useState<Errors>({});
@@ -90,7 +100,14 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (status.setupComplete) {
+      // Only a user who already has a complete org is "adding a website" — for
+      // a brand-new user `?new=1` is noise, and honouring it would show a
+      // "back to dashboard" link that ProductAccessGuard bounces straight back.
+      const addingWebsite =
+        new URLSearchParams(window.location.search).get('new') === '1' && status.setupComplete;
+      setIsAddingWebsite(addingWebsite);
+
+      if (status.setupComplete && !addingWebsite) {
         router.replace('/home', { locale });
         return;
       }
@@ -354,6 +371,11 @@ export default function OnboardingPage() {
       }
 
       setWorkspaceStatusCache(workspaceStatus.ok ? workspaceStatus.setupComplete : true);
+      // The shell must mount on the org we just finished. The cached org list
+      // (5 min staleTime) predates it, so drop it rather than let the selector
+      // fall back to the previous org.
+      setActiveOrganizationId(orgId);
+      queryClient.removeQueries({ queryKey: dashboardQueryKeys.organizations() });
       router.replace('/home', { locale });
     } catch (error) {
       if (error instanceof OnboardingApiError && error.reason === 'unauthorized') {
@@ -527,6 +549,14 @@ export default function OnboardingPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
+            {isAddingWebsite ? (
+              <Link
+                href="/home"
+                className="mb-2 inline-block text-muted-foreground text-sm hover:text-foreground"
+              >
+                ← {t('actions.backToDashboard')}
+              </Link>
+            ) : null}
             <p className="font-semibold text-primary text-sm">{t('eyebrow')}</p>
             <h1 className="mt-1 font-bold text-3xl text-foreground">{t('title')}</h1>
           </div>

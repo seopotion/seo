@@ -1082,6 +1082,7 @@
     "actions": {
       "add": "Ekle",
       "back": "Geri",
+      "backToDashboard": "Panele dön",
       "finalizing": "Tamamlanıyor...",
       "getStarted": "Başla",
       "next": "İleri",
@@ -1478,7 +1479,13 @@
         "label": "Ayarlar"
       }
     },
-    "organizationFallback": "Organizasyonunuz"
+    "organizationFallback": "Organizasyonunuz",
+    "switcher": {
+      "addWebsite": "Web sitesi ekle",
+      "label": "Organizasyon değiştir",
+      "settings": "Çalışma alanı ayarlarını aç",
+      "switchTo": "Şuna geç"
+    }
   },
   "DocsMetadata": {
     "title": "Dokümantasyon | Seopotion",

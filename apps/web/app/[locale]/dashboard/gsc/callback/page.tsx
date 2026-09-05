@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { Badge, Button, PageTitle, StatusPanel } from '@/components/ui';
 import { Link, useRouter } from '@/i18n/navigation';
 import { routing } from '@/i18n/routing';
+import { setActiveOrganizationId } from '@/lib/active-organization';
 import { api } from '@/lib/api';
 import { clearToken, getToken } from '@/lib/auth';
 import { GSC_RETURN_LOCALE_KEY, type GscSite, matchGscProperty } from '@/lib/gsc';
@@ -63,6 +64,9 @@ function CallbackInner() {
       }
       const body = await res.json();
       setOrgId(body.org_id);
+      // Settings opens on the org that started the connect, even if another
+      // tab switched orgs during the OAuth round trip.
+      setActiveOrganizationId(body.org_id);
       setSites(body.sites);
       // Preselect the property matching the org's website — a nicety, non-fatal.
       try {
