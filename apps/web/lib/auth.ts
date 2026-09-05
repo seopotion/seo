@@ -1,3 +1,5 @@
+import { clearActiveOrganizationId } from './active-organization';
+
 const STORAGE_KEY = 'seo_jwt';
 
 /**
@@ -15,5 +17,8 @@ export function setToken(token: string): void {
 }
 
 export function clearToken(): void {
-  if (typeof window !== 'undefined') window.localStorage.removeItem(STORAGE_KEY);
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(STORAGE_KEY);
+  // The active org belongs to the session that picked it.
+  clearActiveOrganizationId();
 }

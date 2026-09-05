@@ -2,8 +2,9 @@
 
 import type { EntitlementPlan, SetupStatus } from '@shared/schemas';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useRouter } from '@/i18n/navigation';
+import { getActiveOrganizationId, useActiveOrganizationId } from './active-organization';
 import { api } from './api';
 import { clearToken } from './auth';
 import { dashboardQueryKeys } from './dashboard-query-keys';
@@ -43,8 +44,15 @@ export class OrganizationsApiError extends Error {
 
 export function selectActiveOrganization(
   organizations: ProductOrganization[],
+  preferredId: string | null,
 ): ProductOrganization | null {
+  const preferred = organizations.find(
+    (organization) =>
+      organization.id === preferredId && organization.setup_status === 'setup_complete',
+  );
+
   return (
+    preferred ??
     organizations.find((organization) => organization.setup_status === 'setup_complete') ??
     organizations[0] ??
     null
@@ -67,7 +75,7 @@ export async function getOrganizations(): Promise<ProductOrganization[]> {
 }
 
 export async function getActiveOrganization(): Promise<ProductOrganization | null> {
-  return selectActiveOrganization(await getOrganizations());
+  return selectActiveOrganization(await getOrganizations(), getActiveOrganizationId());
 }
 
 /**
@@ -76,15 +84,23 @@ export async function getActiveOrganization(): Promise<ProductOrganization | nul
  * all, so a background refetch never blanks a page that already rendered.
  *
  * Called by both `ProductShell` and the page; react-query dedupes the two
- * observers into one request, which is why there is no context/provider.
+ * observers into one request, which is why there is no context/provider — the
+ * active id lives in `active-organization.ts`.
  */
 export function useActiveOrganization(): ActiveOrganizationState {
   const router = useRouter();
+  const preferredId = useActiveOrganizationId();
 
   const query = useQuery({
     queryKey: dashboardQueryKeys.organizations(),
     queryFn: getOrganizations,
-    select: selectActiveOrganization,
+    // A new `select` identity re-runs the selection on the cached list, so a
+    // switch never refetches.
+    select: useCallback(
+      (organizations: ProductOrganization[]) =>
+        selectActiveOrganization(organizations, preferredId),
+      [preferredId],
+    ),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -112,4 +128,15 @@ export function useActiveOrganization(): ActiveOrganizationState {
   }, [error, router]);
 
   return { error, loading: query.isPending, organization };
+}
+
+/** The full org list, for the switcher. Same query key as above, so it shares the fetch. */
+export function useOrganizations(): ProductOrganization[] {
+  const query = useQuery({
+    queryKey: dashboardQueryKeys.organizations(),
+    queryFn: getOrganizations,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return query.data ?? [];
 }
