@@ -1482,7 +1482,9 @@
     "organizationFallback": "Your organization",
     "switcher": {
       "addWebsite": "Add website",
-      "label": "Switch organization"
+      "label": "Switch organization",
+      "settings": "Open workspace settings",
+      "switchTo": "Switch to"
     }
   },
   "DocsMetadata": {

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
+import type { ComponentProps } from 'react';
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ActiveOrganizationState, ProductOrganization } from '../lib/organizations';
 import messages from '../messages/en.json';
@@ -17,6 +18,7 @@ const useActiveOrganization = vi.hoisted(() => vi.fn());
 const useOrganizations = vi.hoisted(() => vi.fn());
 
 vi.mock('@/i18n/navigation', () => ({
+  Link: ({ children, ...props }: ComponentProps<'a'>) => <a {...props}>{children}</a>,
   useRouter: () => ({ push, replace }),
   usePathname: () => '/home',
 }));
@@ -94,21 +96,32 @@ describe('rendering', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  test('shows the active org name and host in the trigger', () => {
+  test('shows the active org name and host on the settings half of the control', () => {
     renderSwitcher(first, [first, second]);
 
-    const trigger = screen.getByRole('combobox', { name: 'Switch organization' });
-    expect(trigger.textContent).toContain('Org One');
-    expect(trigger.textContent).toContain('one.example');
+    const link = screen.getByRole('link', { name: 'Open workspace settings' });
+    expect(link.getAttribute('href')).toBe('/settings');
+    expect(link.textContent).toContain('Org One');
+    expect(link.textContent).toContain('one.example');
+  });
+
+  test('only the chevron button opens the menu', async () => {
+    const { user } = renderSwitcher(first, [first, second]);
+    await user.click(screen.getByRole('link', { name: 'Open workspace settings' }));
+
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    await openMenu(user);
+    expect(screen.getByRole('listbox')).toBeTruthy();
   });
 
   test('lists only completed orgs', async () => {
     const { user } = renderSwitcher(first, [first, scanning, second]);
     await openMenu(user);
 
-    expect(screen.getByRole('option', { name: 'Org One' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Org Two' })).toBeTruthy();
-    expect(screen.queryByRole('option', { name: 'Org Scanning' })).toBeNull();
+    expect(screen.getByRole('option', { name: /Org One/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Org Two/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /Org Scanning/ })).toBeNull();
   });
 });
 
@@ -116,7 +129,7 @@ describe('choosing an item', () => {
   test('another org becomes active and the shell goes back to /home', async () => {
     const { user } = renderSwitcher(first, [first, second]);
     await openMenu(user);
-    await user.click(screen.getByRole('option', { name: 'Org Two' }));
+    await user.click(screen.getByRole('option', { name: /Org Two/ }));
 
     expect(getActiveOrganizationId()).toBe('c2');
     expect(replace).toHaveBeenCalledWith('/home');
@@ -126,7 +139,7 @@ describe('choosing an item', () => {
   test('re-picking the active org changes nothing', async () => {
     const { user } = renderSwitcher(first, [first, second]);
     await openMenu(user);
-    await user.click(screen.getByRole('option', { name: 'Org One' }));
+    await user.click(screen.getByRole('option', { name: /Org One/ }));
 
     expect(getActiveOrganizationId()).toBeNull();
     expect(replace).not.toHaveBeenCalled();
