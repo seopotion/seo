@@ -4,7 +4,7 @@ import type { PromoCode } from '@shared/schemas';
 import { isPaid, planRank } from '@shared/schemas';
 import { getBillingProvider } from '../clients/billing';
 import { applyBillingEvent } from '../lib/billing/apply-event';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadOrgForUser } from '../lib/load-org-for-user';
 import { validatePromoCode } from '../lib/promo/validate-code';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/billing';
@@ -31,7 +31,10 @@ const billing = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.CheckoutResponse } },
           description: 'Checkout URL',
         },
-        403: { description: 'Org not found or not owned by the caller' },
+        403: {
+          content: { 'application/json': { schema: schemas.OwnerOnlyResponse } },
+          description: 'Org not found, not accessible, or the caller is not its owner',
+        },
         409: { description: 'Already subscribed at this tier or higher' },
         422: {
           content: { 'application/json': { schema: schemas.CheckoutPromoErrorResponse } },
@@ -41,9 +44,11 @@ const billing = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, tier, promo_code } = c.req.valid('json');
-      const { userId, email } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
-      if (!org) return c.body(null, 403);
+      const { email } = c.get('auth');
+      const access = await loadOrgForUser(org_id, c.get('auth'));
+      if (!access) return c.body(null, 403);
+      if (access.role !== 'owner') return c.json({ error: 'Owner only' }, 403);
+      const { org } = access;
       // Already entitled at an equal-or-higher tier -> send them to the portal instead.
       if (isPaid(org) && planRank(org.plan) >= planRank(tier)) return c.body(null, 409);
       // Re-validate at checkout time — the code may have died since apply.
@@ -83,15 +88,19 @@ const billing = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.PortalResponse } },
           description: 'Portal URL',
         },
-        403: { description: 'Org not found or not owned by the caller' },
+        403: {
+          content: { 'application/json': { schema: schemas.OwnerOnlyResponse } },
+          description: 'Org not found, not accessible, or the caller is not its owner',
+        },
         404: { description: 'No subscription for this org' },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
-      if (!org) return c.body(null, 403);
+      const access = await loadOrgForUser(org_id, c.get('auth'));
+      if (!access) return c.body(null, 403);
+      if (access.role !== 'owner') return c.json({ error: 'Owner only' }, 403);
+      const { org } = access;
       const sub = await SubscriptionRepo.findLatestByOrg(org.id);
       if (!sub) return c.body(null, 404);
       const provider = await getBillingProvider();
@@ -118,7 +127,10 @@ const billing = new OpenAPIHono<AuthEnv>()
           content: { 'application/json': { schema: schemas.PromoValidateResponse } },
           description: 'The code is applicable; discount terms for display',
         },
-        403: { description: 'Org not found or not owned by the caller' },
+        403: {
+          content: { 'application/json': { schema: schemas.OwnerOnlyResponse } },
+          description: 'Org not found, not accessible, or the caller is not its owner',
+        },
         422: {
           content: { 'application/json': { schema: schemas.PromoInvalidResponse } },
           description: 'Code rejected (see reason)',
@@ -127,9 +139,9 @@ const billing = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, code } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
-      if (!org) return c.body(null, 403);
+      const access = await loadOrgForUser(org_id, c.get('auth'));
+      if (access?.role !== 'owner') return c.json({ error: 'Owner only' } as const, 403);
+      const { org } = access;
       const result = await validatePromoCode(code, org.id);
       if (!result.ok) return c.json({ valid: false as const, reason: result.reason }, 422);
       const { promo } = result;
