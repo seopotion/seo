@@ -17,7 +17,9 @@ stays per org.
   session carries a Google-verified email. The owner adds an email; the org
   becomes visible to whoever logs in with that email. No invite token, no
   accept step, no mail provider. The owner tells the teammate out of band.
-  Real invite emails are deferred to a follow-up issue.
+  Real invite emails are deferred to a follow-up issue. Login rejects any
+  Google ID token whose `email_verified` claim is not `true`, since email is
+  now an authorization key.
 - **Two roles, derived.** `owner` is `orgs.user_id`; `member` is a row in
   `org_members`. Members can do everything except billing (checkout, portal,
   promo validate) and team management. Finer roles are a follow-up issue.
