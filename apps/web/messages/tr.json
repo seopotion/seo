@@ -1478,7 +1478,11 @@
         "label": "Ayarlar"
       }
     },
-    "organizationFallback": "Organizasyonunuz"
+    "organizationFallback": "Organizasyonunuz",
+    "switcher": {
+      "addWebsite": "Web sitesi ekle",
+      "label": "Organizasyon değiştir"
+    }
   },
   "DocsMetadata": {
     "title": "Dokümantasyon | Seopotion",

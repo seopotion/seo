@@ -1478,7 +1478,11 @@
         "label": "Settings"
       }
     },
-    "organizationFallback": "Your organization"
+    "organizationFallback": "Your organization",
+    "switcher": {
+      "addWebsite": "Add website",
+      "label": "Switch organization"
+    }
   },
   "DocsMetadata": {
     "title": "Documentation | Seopotion",
