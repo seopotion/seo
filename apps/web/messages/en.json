@@ -1082,6 +1082,7 @@
     "actions": {
       "add": "Add",
       "back": "Back",
+      "backToDashboard": "Back to dashboard",
       "finalizing": "Finalizing...",
       "getStarted": "Get Started",
       "next": "Next",

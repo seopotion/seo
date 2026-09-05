@@ -1082,6 +1082,7 @@
     "actions": {
       "add": "Ekle",
       "back": "Geri",
+      "backToDashboard": "Panele dön",
       "finalizing": "Tamamlanıyor...",
       "getStarted": "Başla",
       "next": "İleri",
