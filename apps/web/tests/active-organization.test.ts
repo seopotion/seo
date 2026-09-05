@@ -10,12 +10,6 @@ vi.mock('@/i18n/navigation', () => ({
   Link: () => null,
 }));
 
-import {
-  clearActiveOrganizationId,
-  getActiveOrganizationId,
-  setActiveOrganizationId,
-  subscribeActiveOrganizationId,
-} from '../lib/active-organization';
 import { type ProductOrganization, selectActiveOrganization } from '../lib/organizations';
 
 function org(overrides: Partial<ProductOrganization> = {}): ProductOrganization {
@@ -59,6 +53,13 @@ describe('selectActiveOrganization', () => {
 describe('active organization store', () => {
   const storage = new Map<string, string>();
 
+  // The store caches the localStorage read for the life of the module, so each
+  // test gets a fresh module instead of inheriting the previous test's cache.
+  function loadStore() {
+    vi.resetModules();
+    return import('../lib/active-organization');
+  }
+
   beforeEach(() => {
     storage.clear();
     vi.stubGlobal('window', {
@@ -74,7 +75,10 @@ describe('active organization store', () => {
     vi.unstubAllGlobals();
   });
 
-  test('round-trips set, get and clear through localStorage', () => {
+  test('round-trips set, get and clear through localStorage', async () => {
+    const { clearActiveOrganizationId, getActiveOrganizationId, setActiveOrganizationId } =
+      await loadStore();
+
     expect(getActiveOrganizationId()).toBeNull();
     setActiveOrganizationId('c2');
     expect(getActiveOrganizationId()).toBe('c2');
@@ -83,7 +87,29 @@ describe('active organization store', () => {
     expect(getActiveOrganizationId()).toBeNull();
   });
 
-  test('notifies subscribers on set and clear, and stops after unsubscribe', () => {
+  test('reads localStorage once per page load', async () => {
+    storage.set('seo_active_org', 'c1');
+    const { getActiveOrganizationId } = await loadStore();
+
+    expect(getActiveOrganizationId()).toBe('c1');
+    // Stands in for another tab writing the key: this tab keeps its snapshot
+    // until it reloads, so the shell never moves org without navigating.
+    storage.set('seo_active_org', 'c2');
+    expect(getActiveOrganizationId()).toBe('c1');
+  });
+
+  test('caches an absent value too', async () => {
+    const { getActiveOrganizationId } = await loadStore();
+
+    expect(getActiveOrganizationId()).toBeNull();
+    storage.set('seo_active_org', 'c2');
+    expect(getActiveOrganizationId()).toBeNull();
+  });
+
+  test('notifies subscribers on set and clear, and stops after unsubscribe', async () => {
+    const { clearActiveOrganizationId, setActiveOrganizationId, subscribeActiveOrganizationId } =
+      await loadStore();
+
     const listener = vi.fn();
     const unsubscribe = subscribeActiveOrganizationId(listener);
     setActiveOrganizationId('c1');
@@ -94,8 +120,24 @@ describe('active organization store', () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  test('reads null when there is no window', () => {
+  test('reads null when there is no window', async () => {
+    const { getActiveOrganizationId } = await loadStore();
+
     vi.unstubAllGlobals();
+    expect(getActiveOrganizationId()).toBeNull();
+  });
+
+  test('clearToken drops the active org along with the session', async () => {
+    storage.set('seo_jwt', 'token');
+    storage.set('seo_active_org', 'c1');
+    vi.resetModules();
+    const { clearToken } = await import('../lib/auth');
+    const { getActiveOrganizationId } = await import('../lib/active-organization');
+
+    clearToken();
+
+    expect(storage.has('seo_jwt')).toBe(false);
+    expect(storage.has('seo_active_org')).toBe(false);
     expect(getActiveOrganizationId()).toBeNull();
   });
 });
