@@ -22,11 +22,12 @@ import { S3BucketOrigin } from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Alarm, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
+import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Runtime } from 'aws-cdk-lib/aws-lambda';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
-import { BlockPublicAccess, Bucket } from 'aws-cdk-lib/aws-s3';
+import { BlockPublicAccess, Bucket, HttpMethods } from 'aws-cdk-lib/aws-s3';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import {
@@ -381,6 +382,14 @@ export class ApiStack extends Stack {
     const imagesBucket = new Bucket(this, 'ImagesBucket', {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
+      cors: [
+        {
+          allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+          allowedMethods: [HttpMethods.PUT],
+          allowedHeaders: ['content-type', 'cache-control', 'if-none-match', 'x-amz-*'],
+          maxAge: 300,
+        },
+      ],
     });
     // Customer sites embed these URLs, and image components across Astro, Next
     // and Nuxt routinely set `crossorigin="anonymous"` on the <img>. That makes
@@ -664,6 +673,8 @@ export class ApiStack extends Stack {
         ...dataForSeoEnv, // operator keyword research (DataForSEO, phase 1)
         ADMIN_JWT_SECRET_PARAM: cfg.adminJwtSecretParam,
         ADMIN_OPERATORS_PARAM: cfg.adminOperatorsParam,
+        IMAGES_BUCKET: imagesBucket.bucketName,
+        IMAGES_CDN_DOMAIN: imagesCdn.distributionDomainName,
         GOOGLE_CLIENT_ID: cfg.googleClientId,
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_STATE_MACHINE_ARN: strategyStateMachine.stateMachineArn,
@@ -678,6 +689,12 @@ export class ApiStack extends Stack {
       bundling,
     });
     scanQueue.grantSendMessages(adminFn);
+    adminFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['s3:PutObject', 's3:GetObject'],
+        resources: [imagesBucket.arnForObjects('articles/*/manual-*')],
+      }),
+    );
     mongoUriParam.grantRead(adminFn);
     grantDataForSeo(adminFn);
     adminJwtSecretParam.grantRead(adminFn);

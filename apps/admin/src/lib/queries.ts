@@ -147,6 +147,19 @@ export async function fetchCandidates(orgId: string, status: CandidateStatus | n
 export type CandidatePage = Awaited<ReturnType<typeof fetchCandidates>>;
 export type CandidateItem = CandidatePage['candidates'][number];
 
+export async function fetchAllCandidates(orgId: string, status: CandidateStatus | null) {
+  const candidates: CandidateItem[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await fetchCandidates(orgId, status, offset);
+    candidates.push(...page.candidates);
+
+    if (page.candidates.length === 0 || candidates.length >= page.total) return candidates;
+    offset += page.candidates.length;
+  }
+}
+
 export async function researchKeywords(orgId: string, seed: string) {
   return unwrap(
     await adminApi.admin.v0.orgs[':org_id'].research.$post({

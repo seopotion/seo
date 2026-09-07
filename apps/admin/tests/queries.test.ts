@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 type Call = { url: string; method: string; auth: string | null; body: string | null };
 const calls: Call[] = [];
 let reply: { status: number; body: unknown } = { status: 200, body: {} };
+let replyQueue: Array<{ status: number; body: unknown }> = [];
 
 vi.stubGlobal('window', {
   localStorage: {
@@ -27,8 +28,9 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
   });
   // The unstick levers that succeed with 204 have no body to send, and
   // constructing a `Response` with one at that status throws.
-  return new Response(reply.status === 204 ? null : JSON.stringify(reply.body), {
-    status: reply.status,
+  const currentReply = replyQueue.shift() ?? reply;
+  return new Response(currentReply.status === 204 ? null : JSON.stringify(currentReply.body), {
+    status: currentReply.status,
     headers: { 'content-type': 'application/json' },
   });
 });
@@ -39,6 +41,7 @@ const {
   createArticle,
   disconnectGsc,
   disconnectWordPress,
+  fetchAllCandidates,
   fetchArticle,
   fetchArticles,
   fetchAudit,
@@ -61,6 +64,7 @@ const { ApiError } = await import('../src/lib/api');
 beforeEach(() => {
   calls.length = 0;
   reply = { status: 200, body: {} };
+  replyQueue = [];
 });
 
 describe('searchOrgs', () => {
@@ -251,6 +255,39 @@ describe('disconnectGsc', () => {
       code: 'gsc_not_connected',
       status: 409,
     });
+  });
+});
+
+describe('fetchAllCandidates', () => {
+  test('retrieves every page for the selected status', async () => {
+    replyQueue = [
+      {
+        status: 200,
+        body: {
+          candidates: Array.from({ length: 50 }, (_, index) => ({ id: `candidate-${index}` })),
+          total: 51,
+          limit: 50,
+          offset: 0,
+        },
+      },
+      {
+        status: 200,
+        body: {
+          candidates: [{ id: 'candidate-50' }],
+          total: 51,
+          limit: 50,
+          offset: 50,
+        },
+      },
+    ];
+
+    const candidates = await fetchAllCandidates('org1', 'candidate');
+
+    expect(candidates).toHaveLength(51);
+    expect(calls.map((call) => call.url)).toEqual([
+      'http://localhost:8788/admin/v0/orgs/org1/candidates?status=candidate&limit=50&offset=0',
+      'http://localhost:8788/admin/v0/orgs/org1/candidates?status=candidate&limit=50&offset=50',
+    ]);
   });
 });
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router';
 import { ArticleFieldErrors, ArticleFields } from '../components/ArticleFields';
+import { ArticleImages } from '../components/ArticleImages';
 import { Badge } from '../components/Badge';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ApiError } from '../lib/api';
@@ -112,6 +113,7 @@ function ArticleEditor({
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<ArticleDraft>(() => toDraft(article));
   const [pending, setPending] = useState<Pending | null>(null);
+  const [imageUploadBusy, setImageUploadBusy] = useState(false);
 
   // Dirty is measured against the record the cache holds, so a save (which
   // writes the response back) clears it, and a background refetch that finds
@@ -128,13 +130,13 @@ function ArticleEditor({
 
   // The tab-close half of the leave guard; the in-app half is the blocker below.
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !imageUploadBusy) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [dirty, imageUploadBusy]);
 
-  const blocker = useBlocker(dirty);
+  const blocker = useBlocker(dirty || imageUploadBusy);
 
   const save = useMutation({
     mutationFn: () => updateArticle(article.id, draft),
@@ -231,13 +233,13 @@ function ArticleEditor({
       )}
 
       <div className="mt-6">
-        <ArticleFields draft={draft} disabled={imagesPending} onChange={set} />
+        <ArticleFields draft={draft} disabled={imagesPending || imageUploadBusy} onChange={set} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          disabled={!dirty || imagesPending || save.isPending}
+          disabled={!dirty || imagesPending || save.isPending || imageUploadBusy}
           onClick={() => save.mutate()}
           className="rounded bg-neutral-100 px-3 py-1.5 text-sm font-semibold text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -254,6 +256,17 @@ function ArticleEditor({
         </div>
       )}
 
+      <ArticleImages
+        article={article}
+        disabled={dirty || save.isPending}
+        onBusy={setImageUploadBusy}
+        onUploaded={(updated) => {
+          setDraft(toDraft(updated));
+          queryClient.setQueryData(['article', article.id], updated);
+          invalidateArticle();
+        }}
+      />
+
       <section className="mt-8 rounded border border-neutral-800 bg-neutral-900 p-5">
         <h2 className="font-semibold">WordPress</h2>
         <p className="mt-1 text-sm text-neutral-400">
@@ -265,7 +278,9 @@ function ArticleEditor({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={!imagesComplete || publish.isPending || updatePost.isPending}
+            disabled={
+              !imagesComplete || publish.isPending || updatePost.isPending || imageUploadBusy
+            }
             onClick={() => setPending({ kind: published ? 'update' : 'publish' })}
             className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -350,8 +365,12 @@ function ArticleEditor({
 
       {blocker.state === 'blocked' && (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          body="This article has edits that were never saved. Leaving throws them away."
+          title={imageUploadBusy ? 'Leave during image upload?' : 'Discard unsaved changes?'}
+          body={
+            imageUploadBusy
+              ? 'The image upload is still running. Stay here until it finishes.'
+              : 'This article has edits that were never saved. Leaving throws them away.'
+          }
           confirmLabel="Discard and leave"
           variant="danger"
           onCancel={() => blocker.reset()}

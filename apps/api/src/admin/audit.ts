@@ -31,6 +31,7 @@ export type AdminActionName =
   | 'article.wordpress_publish'
   | 'article.wordpress_update'
   | 'article.images_replay'
+  | 'article.image_upload'
   | 'promo_code.create'
   | 'promo_code.deactivate';
 

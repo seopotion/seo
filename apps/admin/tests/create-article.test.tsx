@@ -42,6 +42,8 @@ function articleDetail(overrides: Partial<ArticleDetail> = {}): ArticleDetail {
     auto_publish_error: null,
     auto_publish_attempts: [],
     images_status: 'complete',
+    images: [],
+    image_headings: ['Body'],
     created_at: '2026-09-04T10:00:00.000Z',
     updated_at: null,
     published_at: null,

@@ -7,6 +7,7 @@ export const ARTICLE_STATUSES = ['generated', 'published', 'deleted'] as const;
 
 /** Image slot roles + article-level image pipeline states (#51). */
 export const ARTICLE_IMAGE_ROLES = ['cover', 'inline'] as const;
+export const MAX_MANUAL_ARTICLE_IMAGES = 8;
 export const IMAGES_STATUSES = ['pending', 'complete', 'failed'] as const;
 export const AUTO_PUBLISH_STATUSES = [
   'queued',
