@@ -1,13 +1,17 @@
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { OrgMemberRepo, UserRepo } from '@shared/db';
+import { sendEmail } from '../clients/ses';
 import { loadOrgForUser } from '../lib/load-org-for-user';
+import { memberAddedEmail } from '../lib/member-added-email';
+import { logger } from '../logger';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/members';
 
 /**
  * Org roster (#333). Reads are open to owner and members; add/remove are
- * owner-only. Membership is by email — no invite mail is sent; the teammate
- * simply logs in with Google using that address.
+ * owner-only. Membership is by email: the teammate logs in with Google using
+ * that address. Adding sends a courtesy notification email (#336) — access
+ * never depends on it.
  */
 const members = new OpenAPIHono<AuthEnv>()
   .openapi(
@@ -99,6 +103,21 @@ const members = new OpenAPIHono<AuthEnv>()
       }
       const row = await OrgMemberRepo.add({ org_id, email: normalized, invited_by: auth.userId });
       if (!row) return c.json({ error: 'already_member' as const }, 409);
+      // Courtesy notification (#336). Access comes from the row above, so a
+      // failed send must not fail the add — log and move on.
+      try {
+        await sendEmail({
+          to: row.email,
+          replyTo: auth.email,
+          ...memberAddedEmail({
+            ownerEmail: auth.email,
+            recipient: row.email,
+            websiteUrl: access.org.website_url,
+          }),
+        });
+      } catch (err) {
+        logger.warn('member-added email failed', { org_id, to: row.email, err });
+      }
       return c.json(
         { email: row.email, role: 'member' as const, created_at: row.created_at.toISOString() },
         201,
