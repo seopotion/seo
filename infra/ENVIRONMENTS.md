@@ -225,7 +225,12 @@ for `member-added email failed`:
   `apiFn` in `infra/lib/api-stack.ts`.
 - `MessageRejected` — the sending identity isn't verified, or (in the
   sandbox) the recipient isn't verified.
-- `AccessDenied` — the Lambda's send grant is missing.
+- `AccessDenied` on `identity/<recipient address>` — SES checks the send
+  against every verified identity in the request, recipients included, so
+  the grant must cover `identity/*` (pinned to the sender with
+  `ses:FromAddress`), not just the domain identity. That is what the stack
+  does; a denial here means the policy regressed.
+- `AccessDenied` on `identity/<domain>` — the Lambda's send grant is missing.
 
 **Reputation.** SES suspends sending once the bounce rate crosses roughly 5%.
 Watch **SES → Reputation metrics** in each account. Bounce/complaint handling
