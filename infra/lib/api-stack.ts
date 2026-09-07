@@ -28,6 +28,7 @@ import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { NodejsFunction, OutputFormat } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { BlockPublicAccess, Bucket, HttpMethods } from 'aws-cdk-lib/aws-s3';
+import { EmailIdentity, Identity } from 'aws-cdk-lib/aws-ses';
 import { Queue } from 'aws-cdk-lib/aws-sqs';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import {
@@ -143,6 +144,7 @@ export class ApiStack extends Stack {
       GOOGLE_CLIENT_SECRET_PARAM: cfg.googleClientSecretParam,
       GSC_TOKEN_KEY_PARAM: cfg.gscTokenKeyParam,
       WEB_ORIGIN: cfg.webOrigin,
+      MAIL_FROM: cfg.mailFrom,
       LEMONSQUEEZY_API_KEY_PARAM: cfg.lemonSqueezyApiKeyParam,
       LEMONSQUEEZY_WEBHOOK_SECRET_PARAM: cfg.lemonSqueezyWebhookSecretParam,
       LEMONSQUEEZY_STORE_ID: cfg.lemonSqueezyStoreId,
@@ -265,6 +267,20 @@ export class ApiStack extends Stack {
     lemonSqueezyApiKeyParam.grantRead(apiFn);
     lemonSqueezyWebhookSecretParam.grantRead(apiFn);
     githubAppKeyParam.grantRead(apiFn);
+
+    // Transactional email (#336): one SES domain identity per stage, Easy DKIM.
+    // Only the API Lambda may send. DNS is Cloudflare, so the DKIM CNAMEs are
+    // surfaced as outputs to paste by hand — see ENVIRONMENTS.md § Transactional
+    // email. Until they're added (and prod leaves the SES sandbox) sends fail
+    // and the API logs them; adding a member still succeeds.
+    const mailIdentity = new EmailIdentity(this, 'MailIdentity', {
+      identity: Identity.domain(cfg.mailFrom.split('@')[1]),
+    });
+    mailIdentity.grantSendEmail(apiFn);
+    mailIdentity.dkimRecords.forEach((record, i) => {
+      new CfnOutput(this, `MailDkim${i + 1}Name`, { value: record.name });
+      new CfnOutput(this, `MailDkim${i + 1}Value`, { value: record.value });
+    });
 
     // Scanner worker Lambda — consumes scan tasks from the queue.
     const workerFn = new NodejsFunction(this, 'WorkerFn', {
