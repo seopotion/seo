@@ -35,12 +35,14 @@ import type { TextEntry } from '../../onboarding/types';
 import { createEntryId, stringsToTextEntries, textEntriesToStrings } from '../../onboarding/utils';
 import { GoogleSearchConsolePanel } from './_components/GoogleSearchConsolePanel';
 import { IntegrationsPanel } from './_components/IntegrationsPanel';
+import { TeamPanel } from './_components/TeamPanel';
 
 const settingsTabs = [
   'business',
   'audienceCompetitors',
   'integrations',
   'googleSearchConsole',
+  'team',
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number];
@@ -375,174 +377,189 @@ export default function SettingsPage() {
   }
 
   return (
-    <form className="grid w-full gap-4" onSubmit={saveSettings}>
-      {saveState === 'saved' && <StatusPanel tone="success">{t('status.saved')}</StatusPanel>}
-      {saveState === 'error' && <StatusPanel tone="error">{t('status.saveError')}</StatusPanel>}
+    <>
+      <form className="grid w-full gap-4" onSubmit={saveSettings}>
+        {saveState === 'saved' && <StatusPanel tone="success">{t('status.saved')}</StatusPanel>}
+        {saveState === 'error' && <StatusPanel tone="error">{t('status.saveError')}</StatusPanel>}
 
-      <div className="overflow-x-auto border-border border-b">
-        <div role="tablist" aria-label={t('tabs.label')} className="flex min-w-max gap-1">
-          {settingsTabs.map((tab) => {
-            const isActive = activeTab === tab;
+        <div className="overflow-x-auto border-border border-b">
+          <div role="tablist" aria-label={t('tabs.label')} className="flex min-w-max gap-1">
+            {settingsTabs.map((tab) => {
+              const isActive = activeTab === tab;
 
-            return (
-              <button
-                key={tab}
-                type="button"
-                id={`settings-tab-${tab}`}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`settings-panel-${tab}`}
-                className={cn(
-                  'h-10 border-b-2 px-3 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/35',
-                  isActive
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted-foreground hover:text-foreground',
-                )}
-                onClick={() => setActiveTab(tab)}
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  id={`settings-tab-${tab}`}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={`settings-panel-${tab}`}
+                  className={cn(
+                    'h-10 border-b-2 px-3 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/35',
+                    isActive
+                      ? 'border-foreground text-foreground'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {t(`tabs.${tab}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          id="settings-panel-business"
+          role="tabpanel"
+          aria-labelledby="settings-tab-business"
+          hidden={activeTab !== 'business'}
+        >
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <FieldPanel>
+              <Label htmlFor="business-name">{businessT('businessName')}</Label>
+              <Input
+                className="mt-2"
+                id="business-name"
+                type="text"
+                value={settings.businessName}
+                onChange={(event) => updateSetting('businessName', event.target.value)}
+              />
+            </FieldPanel>
+
+            <FieldPanel>
+              <Label htmlFor="language">{businessT('language')}</Label>
+              <Select
+                value={settings.language}
+                onValueChange={(value) => updateSetting('language', value)}
               >
-                {t(`tabs.${tab}`)}
-              </button>
-            );
-          })}
+                <SelectTrigger id="language" className="mt-2">
+                  <SelectValue placeholder={businessT('selectLanguage')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((language) => (
+                    <SelectItem key={language.value} value={language.value}>
+                      {optionsT(`languages.${language.labelKey}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldPanel>
+
+            <FieldPanel>
+              <Label htmlFor="country">{businessT('country')}</Label>
+              <Select
+                value={settings.country}
+                onValueChange={(value) => updateSetting('country', value)}
+              >
+                <SelectTrigger id="country" className="mt-2">
+                  <SelectValue placeholder={businessT('selectCountry')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {countries.map((country) => (
+                    <SelectItem key={country.value} value={country.value}>
+                      {optionsT(`countries.${country.labelKey}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldPanel>
+
+            <FieldPanel className="col-span-full">
+              <Label htmlFor="business-description">{businessT('businessDescription')}</Label>
+              <Textarea
+                className="mt-2"
+                id="business-description"
+                value={settings.businessDescription}
+                onChange={(event) => updateSetting('businessDescription', event.target.value)}
+                rows={5}
+              />
+            </FieldPanel>
+          </div>
         </div>
-      </div>
+
+        <div
+          id="settings-panel-audienceCompetitors"
+          role="tabpanel"
+          aria-labelledby="settings-tab-audienceCompetitors"
+          hidden={activeTab !== 'audienceCompetitors'}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldPanel>
+              <TextEntryList
+                ariaInvalid={Boolean(audienceError)}
+                draft={audienceDraft}
+                entries={settings.targetAudience}
+                errors={audienceError ? [audienceError] : undefined}
+                inputId="target-audience"
+                label={audienceT('targetAudience')}
+                onAdd={addAudienceEntry}
+                onDraftChange={updateAudienceDraft}
+                onRemove={removeAudienceEntry}
+                placeholder={audienceT('targetAudiencePlaceholder')}
+              />
+            </FieldPanel>
+
+            <FieldPanel>
+              <TextEntryList
+                ariaInvalid={Boolean(competitorError)}
+                description={audienceT('competitorsHelp')}
+                draft={competitorDraft}
+                entries={settings.competitors}
+                errors={competitorError ? [competitorError] : undefined}
+                inputId="competitor-url"
+                label={audienceT('competitorUrls')}
+                onAdd={addCompetitorEntry}
+                onDraftChange={setCompetitorDraft}
+                onRemove={removeCompetitorEntry}
+                placeholder={t('placeholders.competitorUrl')}
+              />
+              <p className="mt-2 text-muted-foreground text-sm">{audienceT('competitorsHint')}</p>
+            </FieldPanel>
+          </div>
+        </div>
+
+        <div
+          id="settings-panel-integrations"
+          role="tabpanel"
+          aria-labelledby="settings-tab-integrations"
+          hidden={activeTab !== 'integrations'}
+        >
+          <IntegrationsPanel organization={organization} onUnauthorized={handleUnauthorized} />
+        </div>
+
+        <div
+          id="settings-panel-googleSearchConsole"
+          role="tabpanel"
+          aria-labelledby="settings-tab-googleSearchConsole"
+          hidden={activeTab !== 'googleSearchConsole'}
+        >
+          <GoogleSearchConsolePanel
+            organization={organization}
+            onUnauthorized={handleUnauthorized}
+          />
+        </div>
+
+        {SAVEABLE_TABS.has(activeTab) ? (
+          <div className="flex justify-end">
+            <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
+              {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
+            </Button>
+          </div>
+        ) : null}
+      </form>
 
       <div
-        id="settings-panel-business"
+        id="settings-panel-team"
         role="tabpanel"
-        aria-labelledby="settings-tab-business"
-        hidden={activeTab !== 'business'}
+        aria-labelledby="settings-tab-team"
+        hidden={activeTab !== 'team'}
+        className="mt-4"
       >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <FieldPanel>
-            <Label htmlFor="business-name">{businessT('businessName')}</Label>
-            <Input
-              className="mt-2"
-              id="business-name"
-              type="text"
-              value={settings.businessName}
-              onChange={(event) => updateSetting('businessName', event.target.value)}
-            />
-          </FieldPanel>
-
-          <FieldPanel>
-            <Label htmlFor="language">{businessT('language')}</Label>
-            <Select
-              value={settings.language}
-              onValueChange={(value) => updateSetting('language', value)}
-            >
-              <SelectTrigger id="language" className="mt-2">
-                <SelectValue placeholder={businessT('selectLanguage')} />
-              </SelectTrigger>
-              <SelectContent>
-                {languages.map((language) => (
-                  <SelectItem key={language.value} value={language.value}>
-                    {optionsT(`languages.${language.labelKey}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldPanel>
-
-          <FieldPanel>
-            <Label htmlFor="country">{businessT('country')}</Label>
-            <Select
-              value={settings.country}
-              onValueChange={(value) => updateSetting('country', value)}
-            >
-              <SelectTrigger id="country" className="mt-2">
-                <SelectValue placeholder={businessT('selectCountry')} />
-              </SelectTrigger>
-              <SelectContent>
-                {countries.map((country) => (
-                  <SelectItem key={country.value} value={country.value}>
-                    {optionsT(`countries.${country.labelKey}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldPanel>
-
-          <FieldPanel className="col-span-full">
-            <Label htmlFor="business-description">{businessT('businessDescription')}</Label>
-            <Textarea
-              className="mt-2"
-              id="business-description"
-              value={settings.businessDescription}
-              onChange={(event) => updateSetting('businessDescription', event.target.value)}
-              rows={5}
-            />
-          </FieldPanel>
-        </div>
+        <TeamPanel organization={organization} onUnauthorized={handleUnauthorized} />
       </div>
-
-      <div
-        id="settings-panel-audienceCompetitors"
-        role="tabpanel"
-        aria-labelledby="settings-tab-audienceCompetitors"
-        hidden={activeTab !== 'audienceCompetitors'}
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <FieldPanel>
-            <TextEntryList
-              ariaInvalid={Boolean(audienceError)}
-              draft={audienceDraft}
-              entries={settings.targetAudience}
-              errors={audienceError ? [audienceError] : undefined}
-              inputId="target-audience"
-              label={audienceT('targetAudience')}
-              onAdd={addAudienceEntry}
-              onDraftChange={updateAudienceDraft}
-              onRemove={removeAudienceEntry}
-              placeholder={audienceT('targetAudiencePlaceholder')}
-            />
-          </FieldPanel>
-
-          <FieldPanel>
-            <TextEntryList
-              ariaInvalid={Boolean(competitorError)}
-              description={audienceT('competitorsHelp')}
-              draft={competitorDraft}
-              entries={settings.competitors}
-              errors={competitorError ? [competitorError] : undefined}
-              inputId="competitor-url"
-              label={audienceT('competitorUrls')}
-              onAdd={addCompetitorEntry}
-              onDraftChange={setCompetitorDraft}
-              onRemove={removeCompetitorEntry}
-              placeholder={t('placeholders.competitorUrl')}
-            />
-            <p className="mt-2 text-muted-foreground text-sm">{audienceT('competitorsHint')}</p>
-          </FieldPanel>
-        </div>
-      </div>
-
-      <div
-        id="settings-panel-integrations"
-        role="tabpanel"
-        aria-labelledby="settings-tab-integrations"
-        hidden={activeTab !== 'integrations'}
-      >
-        <IntegrationsPanel organization={organization} onUnauthorized={handleUnauthorized} />
-      </div>
-
-      <div
-        id="settings-panel-googleSearchConsole"
-        role="tabpanel"
-        aria-labelledby="settings-tab-googleSearchConsole"
-        hidden={activeTab !== 'googleSearchConsole'}
-      >
-        <GoogleSearchConsolePanel organization={organization} onUnauthorized={handleUnauthorized} />
-      </div>
-
-      {SAVEABLE_TABS.has(activeTab) ? (
-        <div className="flex justify-end">
-          <Button type="submit" disabled={saveSettingsMutation.isPending || !organization}>
-            {saveSettingsMutation.isPending ? t('actions.saving') : t('actions.save')}
-          </Button>
-        </div>
-      ) : null}
-    </form>
+    </>
   );
 }
 

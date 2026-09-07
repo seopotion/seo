@@ -34,6 +34,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ Real `JWT_SECRET` / `GOOGLE_CLIENT_ID` configured for **both** stages — [#9](https://github.com/seopotion/seo/issues/9); all 14 SSM parameters provisioned per account, preflight 18/18 — [#43](https://github.com/seopotion/seo/issues/43)
 - 🟡 JWT remains in localStorage with no refresh / expiry handling; tracking issue is closed but the code gap remains — [#18](https://github.com/seopotion/seo/issues/18)
 - ✅ Multi-organization switching — sidebar switcher over `GET /core/organizations`, active org persisted client-side, "Add website" re-enters onboarding; billing stays per org — [#127](https://github.com/seopotion/seo/issues/127)
+- ✅ Org membership — owner adds teammates by email (`org_members`, no invite mail), `GET/POST/DELETE /core/members`, Team tab in settings; members can do everything except billing and team management — [#333](https://github.com/seopotion/seo/issues/333). Real invite emails: [#336](https://github.com/seopotion/seo/issues/336); finer roles: [#337](https://github.com/seopotion/seo/issues/337)
 
 ## Dashboard (design mapped; build is the frontier)
 
@@ -72,7 +73,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 ## Admin panel (wizard-of-oz operations)
 
 - ✅ Phase 0 — separate admin Lambda/HTTP API, allowlist-gated Google login + admin JWT, append-only `admin_actions` audit, org search/detail (redacted), plan override with strategy kick, `getAdminApiClient` — [#150](https://github.com/seopotion/seo/issues/150)
-- ✅ Phase 1 — content-curation MVP: research (extracted core), candidate pool + planner curation, generate-now, article editor + WordPress publish/update, presets PATCH, strategy run, audit read — [#150](https://github.com/seopotion/seo/issues/150)
+- ✅ Phase 1 — content-curation MVP: research (extracted core), candidate pool + planner curation, generate-now, article editor + optional manual cover/inline uploads + WordPress publish/update, presets PATCH, strategy run, audit read — [#150](https://github.com/seopotion/seo/issues/150)
 - ✅ Phase 2 — unstick levers: generation reset (over-cap), candidate restore, brief edit, strategy force-rerun, guarded scan re-run, image replay, WordPress connect/disconnect, GSC disconnect — [#150](https://github.com/seopotion/seo/issues/150). Backend epic complete; Phase 3 deliberately unbuilt
 - ✅ Operator UI (`apps/admin`) — **the whole admin API is now reachable from the panel**. Vite + React SPA on the admin typed client: Google login, token-guarded shell, URL-derived stage banner, org search → workspace (tabbed) → Overview (set-plan, presets editor over the deep-merge PATCH, strategy run), candidate pool (research → add → schedule/reject), planner (reschedule/unschedule/generate-now), articles → editor (save + WordPress publish/update, images-pending guard), and the read-only Audit tab (paginated, expandable payload/`before`). Phase-2 unstick levers landed on those same screens: candidate restore, generation reset + brief edit, strategy force-rerun, scan re-run (disabled for live orgs), WordPress connect-on-behalf/disconnect, GSC disconnect, image replay. Every mutation is behind the shared two-step confirm, and a lever the API would refuse renders disabled with its reason — [#151](https://github.com/seopotion/seo/issues/151)
 

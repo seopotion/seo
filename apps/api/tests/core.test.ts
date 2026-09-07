@@ -15,23 +15,41 @@ vi.mock('@shared/db', () => ({
     })),
   },
   OrgRepo: {
-    findByUserId: vi.fn(async (userId: string) =>
-      userId === 'user_1'
+    findAccessible: vi.fn(async (userId: string, memberOrgIds: string[]) => {
+      const owned =
+        userId === 'user_1'
+          ? [
+              {
+                id: 'org_1',
+                user_id: 'user_1',
+                website_url: 'https://example.com',
+                setup_status: 'setup_complete',
+                plan: 'free',
+                strategy_status: 'none',
+                wordpress_token: 'never-return-this-token',
+                wordpress_connected_at: new Date('2026-07-14T10:00:00.000Z'),
+                created_at: new Date(),
+              },
+            ]
+          : [];
+      const member = memberOrgIds.includes('org_shared')
         ? [
             {
-              id: 'org_1',
-              user_id: 'user_1',
-              website_url: 'https://example.com',
+              id: 'org_shared',
+              user_id: 'someone_else',
+              website_url: 'https://shared.example',
               setup_status: 'setup_complete',
-              plan: 'free',
+              plan: 'paid',
               strategy_status: 'none',
-              wordpress_token: 'never-return-this-token',
-              wordpress_connected_at: new Date('2026-07-14T10:00:00.000Z'),
               created_at: new Date(),
             },
           ]
-        : [],
-    ),
+        : [];
+      return [...owned, ...member];
+    }),
+  },
+  OrgMemberRepo: {
+    listOrgIdsByEmail: vi.fn(async () => []),
   },
 }));
 
@@ -86,11 +104,12 @@ describe('core auth routes', () => {
       keyword_scheduling: false,
     });
     expect(json.organizations[0]?.billing_tier).toBe('free');
+    expect(json.organizations[0]?.role).toBe('owner');
   });
 
   test('GET /organizations reports capabilities true for a paid org', async () => {
     const { OrgRepo } = await import('@shared/db');
-    vi.mocked(OrgRepo.findByUserId).mockResolvedValueOnce([
+    vi.mocked(OrgRepo.findAccessible).mockResolvedValueOnce([
       {
         id: 'org_paid',
         user_id: 'user_1',
@@ -116,7 +135,7 @@ describe('core auth routes', () => {
 
   test('GET /organizations reports billing_tier for an expert org', async () => {
     const { OrgRepo } = await import('@shared/db');
-    vi.mocked(OrgRepo.findByUserId).mockResolvedValueOnce([
+    vi.mocked(OrgRepo.findAccessible).mockResolvedValueOnce([
       {
         id: 'org_expert',
         user_id: 'user_1',
@@ -150,5 +169,42 @@ describe('core auth routes', () => {
 
     const json = await res.json();
     expect(json.setup_complete).toBe(true);
+  });
+
+  test('GET /organizations includes orgs the user was added to, with role member', async () => {
+    const { OrgMemberRepo } = await import('@shared/db');
+    vi.mocked(OrgMemberRepo.listOrgIdsByEmail).mockResolvedValueOnce(['org_shared']);
+    const token = await login();
+    const res = await client.api.v0.core.organizations.$get(undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.organizations.map((o) => [o.id, o.role])).toEqual([
+      ['org_1', 'owner'],
+      ['org_shared', 'member'],
+    ]);
+    expect(OrgMemberRepo.listOrgIdsByEmail).toHaveBeenCalledWith('u@example.com');
+  });
+
+  test('GET /status is true for a user whose only org is one they were added to', async () => {
+    const { OrgRepo, OrgMemberRepo } = await import('@shared/db');
+    vi.mocked(OrgMemberRepo.listOrgIdsByEmail).mockResolvedValueOnce(['org_shared']);
+    vi.mocked(OrgRepo.findAccessible).mockResolvedValueOnce([
+      {
+        id: 'org_shared',
+        user_id: 'someone_else',
+        website_url: 'https://shared.example',
+        setup_status: 'setup_complete',
+        plan: 'paid',
+        strategy_status: 'none',
+        created_at: new Date(),
+      },
+    ]);
+    const token = await login();
+    const res = await client.api.v0.core.status.$get(undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(await res.json()).toEqual({ setup_complete: true });
   });
 });

@@ -5,10 +5,12 @@ import { Badge, type Tone } from '../../components/Badge';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { DateForm } from '../../components/DateForm';
 import { Table, Td, Th } from '../../components/Table';
+import { downloadCandidateCsv } from '../../lib/candidate-export';
 import { errorText } from '../../lib/errors';
 import { EMPTY, orEmpty } from '../../lib/format';
 import {
   type CandidateItem,
+  fetchAllCandidates,
   fetchCandidates,
   POOL_PAGE_SIZE,
   rejectCandidate,
@@ -75,6 +77,14 @@ export function PoolTab() {
     },
   });
 
+  const download = useMutation({
+    mutationFn: (filter: CandidateStatus | null) => fetchAllCandidates(orgId, filter),
+    onSuccess: (candidates, filter) => {
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCandidateCsv(candidates, `keyword-pool-${orgId}-${filter ?? 'all'}-${date}.csv`);
+    },
+  });
+
   const page = pool.data;
   const shown = page ? page.candidates.length : 0;
 
@@ -101,13 +111,23 @@ export function PoolTab() {
           </select>
         </label>
 
-        <button
-          type="button"
-          onClick={() => setResearching(true)}
-          className="ml-auto rounded bg-neutral-100 px-3 py-1.5 text-sm font-semibold text-neutral-900 hover:bg-white"
-        >
-          Research keywords
-        </button>
+        <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            disabled={download.isPending || !page || page.total === 0}
+            onClick={() => download.mutate(status)}
+            className="rounded border border-neutral-700 px-3 py-1.5 text-sm font-semibold hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {download.isPending ? 'Preparing CSV…' : 'Download CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setResearching(true)}
+            className="rounded bg-neutral-100 px-3 py-1.5 text-sm font-semibold text-neutral-900 hover:bg-white"
+          >
+            Research keywords
+          </button>
+        </div>
       </div>
 
       {reject.isError && (
@@ -123,6 +143,11 @@ export function PoolTab() {
       {schedule.isError && (
         <p className="mt-3 text-sm text-red-400">
           {errorText(schedule.error, 'Could not schedule that candidate.')}
+        </p>
+      )}
+      {download.isError && (
+        <p className="mt-3 text-sm text-red-400">
+          {errorText(download.error, 'Could not download the candidate pool.')}
         </p>
       )}
 

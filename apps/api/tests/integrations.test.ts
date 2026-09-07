@@ -45,6 +45,7 @@ const { findById, connectStaticSite } = vi.hoisted(() => {
 });
 vi.mock('@shared/db', () => ({
   OrgRepo: { findById },
+  OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
   IntegrationRepo: { connectStaticSite },
 }));
 

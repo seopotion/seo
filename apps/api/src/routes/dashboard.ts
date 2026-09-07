@@ -1,23 +1,16 @@
-import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { ArticleRepo, GscConnectionRepo, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { domainRatingFromRank } from '@shared/providers';
-import {
-  type Article,
-  type Integration,
-  isPaid,
-  META_DESCRIPTION_MAX,
-  META_DESCRIPTION_MIN,
-  META_TITLE_MAX,
-  PublishTask,
-} from '@shared/schemas';
+import { type Article, type Integration, isPaid, PublishTask } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
 import { enqueuePublishTask } from '../clients/sqs';
 import { testWordPressIntegration } from '../clients/wordpress';
+import { validateArticleFields } from '../lib/article-validation';
 import { encryptSecret } from '../lib/crypto';
 import { gscAccess } from '../lib/gsc-access';
 import { matchArticleByPage } from '../lib/gsc-urls';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { mergePresets } from '../lib/merge-presets';
 import { recordWordPressPublication } from '../lib/publications';
 import {
@@ -113,34 +106,6 @@ function toConnectedIntegration(i: Integration) {
   };
 }
 
-/**
- * Editor save rules (#74). Mirrors the modal's client-side checks — including
- * trimming, so `"   "` fails on both sides rather than only one. Returns the
- * offending fields; an empty object means valid.
- */
-function validateArticleUpdate(
-  body: z.infer<typeof schemas.ArticleUpdateBody>,
-): Record<string, string> {
-  const fields: Record<string, string> = {};
-
-  if (!body.title.trim()) fields.title = 'Title is required';
-  if (!body.slug.trim()) fields.slug = 'Slug is required';
-  if (!body.content.trim()) fields.content = 'Content is required';
-
-  if (!body.meta_title.trim()) fields.meta_title = 'Meta title is required';
-  else if (body.meta_title.length > META_TITLE_MAX)
-    fields.meta_title = `Meta title must be ${META_TITLE_MAX} characters or fewer`;
-
-  if (!body.meta_description.trim()) fields.meta_description = 'Meta description is required';
-  else if (
-    body.meta_description.length < META_DESCRIPTION_MIN ||
-    body.meta_description.length > META_DESCRIPTION_MAX
-  )
-    fields.meta_description = `Meta description must be between ${META_DESCRIPTION_MIN} and ${META_DESCRIPTION_MAX} characters`;
-
-  return fields;
-}
-
 /** Search Analytics window: the trailing 28 days, as yyyy-mm-dd bounds. */
 function analyticsWindow(): { startDate: string; endDate: string } {
   const end = new Date();
@@ -178,14 +143,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const access = await gscAccess(org_id);
@@ -236,7 +200,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.AutoPublishRetryErrorResponse } },
@@ -254,9 +218,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { id } = c.req.valid('param');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
-      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      const org = article ? await loadAccessibleOrg(article.org_id, c.get('auth')) : null;
       if (!article || !org) return c.json({ error: 'Article not found' }, 404);
       if (article.images_status !== 'complete') {
         return c.json({ error: 'Article images are not complete', code: 'images_incomplete' }, 409);
@@ -353,14 +316,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const gatedBody = {
@@ -416,14 +378,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const count = await ArticleRepo.countByStatus(org_id, 'published');
       return c.json({ count }, 200);
@@ -445,14 +406,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const count = await KeywordRepo.countScheduled(org_id);
       return c.json({ count }, 200);
@@ -486,7 +446,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         502: {
           content: { 'application/json': { schema: schemas.WordPressConnectionErrorResponse } },
@@ -496,8 +456,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { org_id, token } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       try {
@@ -543,14 +502,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const rows = (await IntegrationRepo.listByOrgId(org.id)).map(toConnectedIntegration);
       // The admin connect lever writes only the org mirror — the admin Lambda
@@ -586,15 +544,14 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         204: { description: 'Disconnected (idempotent — also 204 when not connected)' },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { provider } = c.req.valid('param');
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       await IntegrationRepo.deleteByOrgAndProvider(org.id, provider);
@@ -620,14 +577,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       const current = org.domain_rating ?? null;
@@ -667,14 +623,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const keywords = await KeywordRepo.listByOrg(org_id);
       return c.json(
@@ -717,14 +672,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.OrgNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id, status, limit, offset } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       const { articles, total } = await ArticleRepo.listByOrg(org_id, { status, limit, offset });
       return c.json({ articles: articles.map(toArticleListItem), total }, 200);
@@ -752,11 +706,10 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { id } = c.req.valid('param');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
       // A missing article and one owned by another user both 404 — never leak
-      // existence across accounts (same rule as loadOwnedOrg).
-      if (!article || !(await loadOwnedOrg(article.org_id, userId))) {
+      // existence across accounts (same rule as loadAccessibleOrg).
+      if (!article || !(await loadAccessibleOrg(article.org_id, c.get('auth')))) {
         return c.json({ error: 'Article not found' }, 404);
       }
       return c.json(toArticleDetail(article), 200);
@@ -786,7 +739,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.WordPressArticleErrorResponse } },
@@ -804,9 +757,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { id } = c.req.valid('param');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
-      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      const org = article ? await loadAccessibleOrg(article.org_id, c.get('auth')) : null;
       if (!article || !org) return c.json({ error: 'Article not found' }, 404);
       if (!org.wordpress_token || !org.wordpress_connected_at) {
         return c.json({ error: 'WordPress is not connected' }, 409);
@@ -892,9 +844,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { id } = c.req.valid('param');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
-      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      const org = article ? await loadAccessibleOrg(article.org_id, c.get('auth')) : null;
       if (!article || !org) return c.json({ error: 'Article not found' }, 404);
       if (!org.wordpress_token || !org.wordpress_connected_at) {
         return c.json({ error: 'WordPress is not connected' }, 409);
@@ -949,7 +900,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.ArticleNotFoundResponse } },
-          description: 'Article not found or not owned by the caller',
+          description: 'Article not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.StaticSitePublishErrorResponse } },
@@ -971,9 +922,8 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     }),
     async (c) => {
       const { id } = c.req.valid('param');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
-      const org = article ? await loadOwnedOrg(article.org_id, userId) : null;
+      const org = article ? await loadAccessibleOrg(article.org_id, c.get('auth')) : null;
       if (!article || !org) return c.json({ error: 'Article not found' }, 404);
 
       const integration = await IntegrationRepo.findByOrgAndProvider(org.id, 'static-site');
@@ -1050,15 +1000,14 @@ const dashboard = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
-      const { userId } = c.get('auth');
       const article = await ArticleRepo.findById(id);
       // A missing article and one owned by another user both 404 — never leak
-      // existence across accounts (same rule as loadOwnedOrg).
-      if (!article || !(await loadOwnedOrg(article.org_id, userId))) {
+      // existence across accounts (same rule as loadAccessibleOrg).
+      if (!article || !(await loadAccessibleOrg(article.org_id, c.get('auth')))) {
         return c.json({ error: 'Article not found' }, 404);
       }
 
-      const fields = validateArticleUpdate(body);
+      const fields = validateArticleFields(body);
       if (Object.keys(fields).length > 0) {
         return c.json({ error: 'Validation failed', fields }, 400);
       }
@@ -1085,14 +1034,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org?.presets) {
         return c.json({ error: 'Settings not available' }, 404);
       }
@@ -1120,14 +1068,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id, ...patch } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org?.presets) {
         return c.json({ error: 'Settings not available' }, 404);
       }
@@ -1153,14 +1100,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id } = c.req.valid('query');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org?.presets) {
         return c.json({ error: 'Settings not available' }, 404);
       }
@@ -1188,14 +1134,13 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.SettingsNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
       },
     }),
     async (c) => {
       const { org_id, ...patch } = c.req.valid('json');
-      const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org?.presets) {
         return c.json({ error: 'Settings not available' }, 404);
       }

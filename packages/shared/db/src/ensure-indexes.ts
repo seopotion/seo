@@ -12,6 +12,10 @@ export async function ensureIndexes(): Promise<void> {
   // start_scan lookup (OrgRepo.findActiveByUserAndUrl, user_id + website_url).
   await db.collection('orgs').createIndex({ user_id: 1, website_url: 1 });
   await db.collection('orgs').createIndex({ website_url: 1 });
+  // Org membership (#333): one row per (org, email); the email index backs
+  // "orgs I was added to" on every org-list and status call.
+  await db.collection('org_members').createIndex({ org_id: 1, email: 1 }, { unique: true });
+  await db.collection('org_members').createIndex({ email: 1 });
   // One planner entry per org per day (#99) — the final concurrency backstop
   // for manual + strategy scheduling. The pre-#99 index had the same name
   // without `unique`, so recreate on a spec/options conflict (codes 85/86).

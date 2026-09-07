@@ -35,6 +35,7 @@ const { findById, connections, cacheDeleteByOrgId } = vi.hoisted(() => {
 });
 vi.mock('@shared/db', () => ({
   OrgRepo: { findById },
+  OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
   GscConnectionRepo: {
     findByOrgId: vi.fn(async (orgId: string) => connections.get(orgId) ?? null),
     upsertToken: vi.fn(async (orgId: string, enc: string, email: string) => {

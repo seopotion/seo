@@ -14,7 +14,7 @@ import {
   verifyInstallGrant,
   verifyInstallState,
 } from '../lib/github-state';
-import { loadOwnedOrg } from '../lib/load-owned-org';
+import { loadAccessibleOrg } from '../lib/load-org-for-user';
 import { type AuthEnv, authMiddleware } from '../middlewares/auth';
 import * as schemas from '../schemas/integrations';
 
@@ -23,7 +23,7 @@ import * as schemas from '../schemas/integrations';
  * Mounted at /dashboard/integrations, alongside the WordPress connect,
  * connected-list and disconnect routes that live in routes/dashboard.ts.
  *
- * All three require a Bearer JWT and org ownership.
+ * All three require a Bearer JWT and org access (owner or member).
  */
 
 /**
@@ -67,7 +67,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'Org not found or not owned by the caller',
+          description: 'Org not found or not accessible to the caller',
         },
         503: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },
@@ -78,7 +78,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
     async (c) => {
       const { org_id } = c.req.valid('query');
       const { userId } = c.get('auth');
-      const org = await loadOwnedOrg(org_id, userId);
+      const org = await loadAccessibleOrg(org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
       // One App per environment, registered by hand; until that happens there is
       // no slug to build a URL from, and an empty one would 404 on github.com.
@@ -119,7 +119,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'State org not found or not owned by the caller',
+          description: 'State org not found or not accessible to the caller',
         },
         422: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },
@@ -145,7 +145,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
       if (claims.user_id !== userId) {
         return c.json({ error: 'Invalid state', code: 'invalid_state' }, 400);
       }
-      const org = await loadOwnedOrg(claims.org_id, userId);
+      const org = await loadAccessibleOrg(claims.org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       try {
@@ -198,7 +198,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
         },
         404: {
           content: { 'application/json': { schema: schemas.IntegrationNotFoundResponse } },
-          description: 'Grant org not found or not owned by the caller',
+          description: 'Grant org not found or not accessible to the caller',
         },
         409: {
           content: { 'application/json': { schema: schemas.IntegrationErrorResponse } },
@@ -229,7 +229,7 @@ const integrationsRoutes = new OpenAPIHono<AuthEnv>()
       if (claims.user_id !== userId) {
         return c.json({ error: 'Invalid grant', code: 'invalid_grant' }, 400);
       }
-      const org = await loadOwnedOrg(claims.org_id, userId);
+      const org = await loadAccessibleOrg(claims.org_id, c.get('auth'));
       if (!org) return c.json({ error: 'Not found' }, 404);
 
       // Verify before you save: mint the scoped token and read the branch, so a

@@ -26,6 +26,10 @@ export const PortalResponse = z
 
 export const WebhookResponse = z.object({ received: z.boolean() }).openapi('WebhookResponse');
 
+export const OwnerOnlyResponse = z
+  .object({ error: z.literal('Owner only') })
+  .openapi('OwnerOnlyResponse');
+
 export const PROMO_REJECT_REASONS = [
   'not_found',
   'inactive',

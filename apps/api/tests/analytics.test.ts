@@ -192,6 +192,7 @@ vi.mock('@shared/db', () => {
     OrgRepo: {
       findById: vi.fn(async (id: string) => orgs.get(id) ?? null),
     },
+    OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
     ArticleRepo: {
       listByOrg: vi.fn(
         async (orgId: string, opts: { status?: string; limit: number; offset: number }) => {

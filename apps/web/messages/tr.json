@@ -530,6 +530,9 @@
       "description": "İçerik planınız makale oluşturmaya başladığında makaleler burada görünecek.",
       "title": "Henüz makale yok"
     },
+    "fallbacks": {
+      "noKeyword": "Anahtar kelime yok"
+    },
     "listLabel": "Makaleler listesi",
     "pagination": {
       "emptyPage": "Sayfa yok",
@@ -568,6 +571,8 @@
       "createdAt": "Oluşturulma",
       "keyword": "Anahtar kelime",
       "keywordId": "Anahtar kelime ID",
+      "noKeyword": "Anahtar kelime yok",
+      "notLinkedToPlanner": "Planlayıcıya bağlı değil",
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
       "slug": "Slug"
@@ -907,7 +912,23 @@
       "business": "İşletme",
       "googleSearchConsole": "Google Search Console",
       "integrations": "Entegrasyonlar",
-      "label": "Ayar bölümleri"
+      "label": "Ayar bölümleri",
+      "team": "Ekip"
+    },
+    "team": {
+      "add": "Ekle",
+      "adding": "Ekleniyor...",
+      "alreadyMember": "Bu e-posta zaten ekipte.",
+      "description": "Buraya eklediğiniz ekip arkadaşları, faturalandırma ve bu ekip listesi dışında bu çalışma alanındaki her şeyi kullanabilir. Girdiğiniz e-posta ile Google üzerinden giriş yaparlar.",
+      "emailLabel": "Ekip arkadaşı e-postası",
+      "emailPlaceholder": "isim@sirket.com",
+      "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",
+      "listError": "Ekip yüklenemedi.",
+      "loading": "Ekip yükleniyor...",
+      "member": "Üye",
+      "owner": "Sahip",
+      "ownerOnly": "Ekip arkadaşlarını yalnızca sahip ekleyebilir veya kaldırabilir.",
+      "remove": "Kaldır"
     },
     "wordpress": {
       "badges": {

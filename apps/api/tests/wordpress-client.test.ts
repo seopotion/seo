@@ -180,6 +180,21 @@ describe('WordPress client', () => {
     });
   });
 
+  test('submit omits focus_keyword when the article has no keyword', async () => {
+    fetchMock.mockResolvedValueOnce({
+      status: 200,
+      json: vi.fn(async () => ({ success: true, post_id: 321 })),
+    });
+
+    await submitWordPressArticle('https://example.com', 'site-token', {
+      ...article,
+      keyword: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(init.body)).not.toHaveProperty('focus_keyword');
+  });
+
   test('reads the plugin idempotent-publish capability contract', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -249,6 +264,21 @@ describe('WordPress client', () => {
     expect(payload).not.toHaveProperty('status');
     expect(payload).not.toHaveProperty('created_at');
     expect(payload).not.toHaveProperty('meta_title');
+  });
+
+  test('update omits focus_keyword when the article has no keyword', async () => {
+    fetchMock.mockResolvedValueOnce({
+      status: 200,
+      json: vi.fn(async () => ({ success: true, post_id: 321 })),
+    });
+
+    await editWordPressArticle('https://example.com', 'site-token', 321, {
+      ...article,
+      keyword: null,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(init.body)).not.toHaveProperty('focus_keyword');
   });
 
   test('omits image_url when the article has no featured image', async () => {

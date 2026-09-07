@@ -3,11 +3,21 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const repos = vi.hoisted(() => ({
   OrgRepo: { findById: vi.fn() },
   ArticleRepo: {
+    create: vi.fn(),
     findById: vi.fn(),
     listByOrg: vi.fn(),
     updateContent: vi.fn(),
     setWordPressPostId: vi.fn(),
     recordPublication: vi.fn(),
+  },
+  KeywordRepo: {
+    deleteUnstarted: vi.fn(),
+    findById: vi.fn(),
+    findByOrgAndDate: vi.fn(),
+    listByOrg: vi.fn(),
+    reschedulePending: vi.fn(),
+    resetGeneration: vi.fn(),
+    updateBrief: vi.fn(),
   },
   AdminActionRepo: { insert: vi.fn() },
   PromoCodeRepo: {
@@ -85,6 +95,39 @@ const editBody = {
   content: article.content,
 };
 
+const createBody = {
+  keyword: '  crm software  ',
+  title: 'CRM Software Guide',
+  slug: 'crm-software-guide',
+  meta_title: 'CRM Software Guide for Growing Teams',
+  meta_description: 'M'.repeat(130),
+  content: '# CRM Software Guide\n\nStandalone body.',
+};
+
+const standaloneArticle = (keyword: string | null = 'crm software') => ({
+  ...article,
+  id: 'c'.repeat(24),
+  keyword_id: null,
+  keyword,
+  title: createBody.title,
+  slug: createBody.slug,
+  meta_title: createBody.meta_title,
+  meta_description: createBody.meta_description,
+  content: createBody.content,
+  search_volume: null,
+  difficulty: null,
+  topic_cluster_id: null,
+  topic_cluster_label: null,
+  topic_role: null,
+  topic_content_focus: null,
+  topic_primary_keyword: null,
+  featured_image_url: '',
+  images: [],
+  images_status: 'complete' as const,
+  video: null,
+  readability: null,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   repos.AdminActionRepo.insert.mockResolvedValue({});
@@ -112,6 +155,198 @@ describe('GET /admin/v0/orgs/{org_id}/articles', () => {
       offset: 0,
     });
   });
+
+  test('rows expose nullable standalone article fields', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.ArticleRepo.listByOrg.mockResolvedValueOnce({
+      articles: [{ ...article, keyword_id: null, keyword: null, search_volume: null }],
+      total: 1,
+    });
+
+    const res = await client.admin.v0.orgs[':org_id'].articles.$get(
+      { param: { org_id: org.id }, query: {} },
+      await authed(),
+    );
+    if (res.status !== 200) throw new Error('expected 200');
+    expect((await res.json()).articles[0]).toMatchObject({ keyword: null, search_volume: null });
+  });
+});
+
+describe('POST /admin/v0/orgs/{org_id}/articles', () => {
+  const create = async (
+    org_id: string,
+    body: { keyword: string | null } & Omit<typeof createBody, 'keyword'> = createBody,
+  ) =>
+    client.admin.v0.orgs[':org_id'].articles.$post(
+      { param: { org_id }, json: body },
+      await authed(),
+    );
+
+  test('creates a standalone article with a trimmed keyword, exact defaults, and audit record', async () => {
+    const created = standaloneArticle();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.ArticleRepo.create.mockResolvedValueOnce(created);
+
+    const res = await create(org.id);
+
+    expect(res.status).toBe(201);
+    if (res.status !== 201) throw new Error('expected 201');
+    expect(await res.json()).toMatchObject({
+      id: created.id,
+      keyword_id: null,
+      keyword: 'crm software',
+      title: createBody.title,
+      images_status: 'complete',
+    });
+    expect(repos.ArticleRepo.create).toHaveBeenCalledWith({
+      org_id: org.id,
+      keyword_id: null,
+      keyword: 'crm software',
+      title: createBody.title,
+      slug: createBody.slug,
+      meta_title: createBody.meta_title,
+      meta_description: createBody.meta_description,
+      content: createBody.content,
+      search_volume: null,
+      difficulty: null,
+      topic_cluster_id: null,
+      topic_cluster_label: null,
+      topic_role: null,
+      topic_content_focus: null,
+      topic_primary_keyword: null,
+      featured_image_url: '',
+      images: [],
+      images_status: 'complete',
+      video: null,
+      readability: null,
+      status: 'generated',
+      published_at: null,
+    });
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledWith({
+      actor: 'op@example.com',
+      action: 'article.create_manual',
+      org_id: org.id,
+      entity: { type: 'article', id: created.id },
+      payload: createBody,
+      before: null,
+    });
+    for (const interaction of Object.values(repos.KeywordRepo)) {
+      expect(interaction).not.toHaveBeenCalled();
+    }
+  });
+
+  test.each([
+    ['null', null, null],
+    ['whitespace', ' \t ', null],
+  ])('stores a %s keyword as null', async (_name, keyword, storedKeyword) => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.ArticleRepo.create.mockResolvedValueOnce(standaloneArticle(storedKeyword));
+
+    const res = await create(org.id, { ...createBody, keyword });
+
+    expect(res.status).toBe(201);
+    expect(repos.ArticleRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: storedKeyword }),
+    );
+  });
+
+  test('missing org returns 404 without writing or auditing', async () => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(null);
+
+    const res = await create('f'.repeat(24));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(repos.ArticleRepo.create).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('structurally invalid input uses the documented field-error response', async () => {
+    const token = await signAdminToken('op@example.com');
+    const res = await adminApp.request(`/admin/v0/orgs/${org.id}/articles`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ keyword: null }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      error: string;
+      fields: Record<string, string>;
+    };
+    expect(body.error).toBe('validation_failed');
+    expect(Object.keys(body.fields).sort()).toEqual([
+      'content',
+      'meta_description',
+      'meta_title',
+      'slug',
+      'title',
+    ]);
+    expect(repos.OrgRepo.findById).not.toHaveBeenCalled();
+    expect(repos.ArticleRepo.create).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['title required', { title: '   ' }, 'title', 'Title is required'],
+    ['slug required', { slug: '   ' }, 'slug', 'Slug is required'],
+    [
+      'slug format',
+      { slug: 'nested/article' },
+      'slug',
+      'Slug must be one path segment containing letters, numbers, and hyphens',
+    ],
+    ['content required', { content: ' \n ' }, 'content', 'Content is required'],
+    ['meta title required', { meta_title: '   ' }, 'meta_title', 'Meta title is required'],
+    [
+      'meta title maximum',
+      { meta_title: 'x'.repeat(61) },
+      'meta_title',
+      'Meta title must be 60 characters or fewer',
+    ],
+    [
+      'meta description required',
+      { meta_description: '   ' },
+      'meta_description',
+      'Meta description is required',
+    ],
+    [
+      'meta description minimum',
+      { meta_description: 'x'.repeat(119) },
+      'meta_description',
+      'Meta description must be between 120 and 160 characters',
+    ],
+    [
+      'meta description maximum',
+      { meta_description: 'x'.repeat(161) },
+      'meta_description',
+      'Meta description must be between 120 and 160 characters',
+    ],
+  ])('%s returns its field error without persistence or audit', async (_name, patch, field, error) => {
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+
+    const res = await create(org.id, { ...createBody, ...patch });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'validation_failed', fields: { [field]: error } });
+    expect(repos.ArticleRepo.create).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('audit insertion failure still returns the created article with 201', async () => {
+    const created = standaloneArticle();
+    repos.OrgRepo.findById.mockResolvedValueOnce(org);
+    repos.ArticleRepo.create.mockResolvedValueOnce(created);
+    repos.AdminActionRepo.insert.mockRejectedValueOnce(new Error('mongo down'));
+
+    const res = await create(org.id);
+
+    expect(res.status).toBe(201);
+    if (res.status === 201) expect((await res.json()).id).toBe(created.id);
+  });
 });
 
 describe('GET /admin/v0/articles/{article_id}', () => {
@@ -124,6 +359,21 @@ describe('GET /admin/v0/articles/{article_id}', () => {
     if (res.status !== 200) throw new Error('expected 200');
     const json = await res.json();
     expect(json).toMatchObject({ title: 'CRM Guide', images_status: 'complete', video: null });
+  });
+
+  test('returns nullable keyword linkage for a standalone article', async () => {
+    repos.ArticleRepo.findById.mockResolvedValueOnce({
+      ...article,
+      keyword_id: null,
+      keyword: null,
+      search_volume: null,
+    });
+    const res = await client.admin.v0.articles[':article_id'].$get(
+      { param: { article_id: article.id } },
+      await authed(),
+    );
+    if (res.status !== 200) throw new Error('expected 200');
+    expect(await res.json()).toMatchObject({ keyword_id: null, keyword: null });
   });
 
   test('unknown article -> 404', async () => {
@@ -162,6 +412,16 @@ describe('PATCH /admin/v0/articles/{article_id}', () => {
     const json = (await res.json()) as { error: string; fields: Record<string, string> };
     expect(json.error).toBe('validation_failed');
     expect(json.fields.meta_title).toContain('60');
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('customer slug-format validation applies -> 400 with fields', async () => {
+    repos.ArticleRepo.findById.mockResolvedValueOnce(article);
+    const res = await patch(article.id, { ...editBody, slug: 'nested/article' });
+    expect(res.status).toBe(400);
+    if (res.status !== 400) throw new Error('expected 400');
+    expect((await res.json()).fields.slug).toContain('one path segment');
+    expect(repos.ArticleRepo.updateContent).not.toHaveBeenCalled();
     expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 
@@ -363,5 +623,19 @@ describe('POST /admin/v0/articles/{article_id}/images (replay)', () => {
     );
     expect(res.status).toBe(404);
     expect(launchImageRepair).not.toHaveBeenCalled();
+  });
+
+  test('standalone article -> 409 images_not_supported without launch or audit', async () => {
+    repos.ArticleRepo.findById.mockResolvedValueOnce({ ...article, keyword_id: null });
+
+    const res = await client.admin.v0.articles[':article_id'].images.$post(
+      { param: { article_id: article.id } },
+      await authed(),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'images_not_supported' });
+    expect(launchImageRepair).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
   });
 });

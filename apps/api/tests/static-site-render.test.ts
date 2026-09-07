@@ -119,6 +119,13 @@ describe('renderArticle', () => {
     );
   });
 
+  test('serializes a null keyword as an empty version-1 frontmatter string', () => {
+    const generated = renderArticle(published());
+    const standalone = renderArticle(published({ article: article({ keyword: null }) }));
+
+    expect(standalone).toBe(generated.replace('keyword: "ai outfit generator"', 'keyword: ""'));
+  });
+
   test('quotes scalars that would otherwise change meaning in YAML', () => {
     const out = renderArticle(
       published({
@@ -237,6 +244,17 @@ describe('renderManifest', () => {
     ]);
     // Ends with a newline: this file lands in someone else's `git diff`.
     expect(json.endsWith('}\n')).toBe(true);
+  });
+
+  test('serializes a null keyword as an empty version-1 manifest string', () => {
+    const generated = renderManifest([published()], 'seopotion/', generatedAt);
+    const standalone = renderManifest(
+      [published({ article: article({ keyword: null }) })],
+      'seopotion/',
+      generatedAt,
+    );
+
+    expect(standalone).toBe(generated.replace('"keyword": "ai outfit generator"', '"keyword": ""'));
   });
 
   test('repeats the inline images, so an adapter never has to parse the frontmatter', () => {

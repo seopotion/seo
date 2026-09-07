@@ -25,3 +25,7 @@ export type EntitlementPlan = (typeof ENTITLEMENT_PLANS)[number];
 /** Lifecycle of an org's automatic 30-day strategy job (#47). */
 export const STRATEGY_STATUSES = ['none', 'pending', 'completed', 'failed'] as const;
 export type StrategyStatus = (typeof STRATEGY_STATUSES)[number];
+
+/** Org membership roles (#333). `owner` is `orgs.user_id`; `member` is a row in `org_members`. */
+export const ORG_ROLES = ['owner', 'member'] as const;
+export type OrgRole = (typeof ORG_ROLES)[number];

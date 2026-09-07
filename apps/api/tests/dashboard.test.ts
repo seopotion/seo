@@ -190,15 +190,15 @@ vi.mock('@shared/db', () => {
     {
       id: 'art_4',
       org_id: 'org_2',
-      keyword_id: 'kw_4',
+      keyword_id: null,
       title: 'Disconnected Article',
       slug: 'disconnected-article',
-      keyword: 'disconnected',
+      keyword: null,
       meta_description: 'm',
       featured_image_url: 'https://x/4.png',
       content: '# d',
-      difficulty: 10,
-      search_volume: 50,
+      difficulty: null,
+      search_volume: null,
       status: 'generated',
       images_status: 'complete',
       created_at: now,
@@ -490,6 +490,7 @@ vi.mock('@shared/db', () => {
         if (o) o.domain_rating = { value, checked_at: new Date() };
       }),
     },
+    OrgMemberRepo: { findByOrgAndEmail: vi.fn(async () => null) },
     KeywordRepo: {
       listByOrg: vi.fn(async (orgId: string) =>
         keywords
@@ -598,7 +599,7 @@ vi.mock('@shared/db', () => {
   };
 });
 
-import { ArticleRepo, IntegrationRepo, OrgRepo } from '@shared/db';
+import { ArticleRepo, IntegrationRepo, OrgMemberRepo, OrgRepo } from '@shared/db';
 import { testClient } from 'hono/testing';
 import { decryptSecret, encryptSecret } from '../src/lib/crypto';
 import { logger } from '../src/logger';
@@ -762,6 +763,22 @@ describe('dashboard home routes', () => {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     expect(res.status).toBe(404);
+  });
+
+  test('GET /articles/published 200s for a member of an org owned by someone else', async () => {
+    vi.mocked(OrgMemberRepo.findByOrgAndEmail).mockResolvedValueOnce({
+      id: 'member_1',
+      org_id: 'org_3',
+      email: 'u@example.com',
+      invited_by: 'user_2',
+      created_at: new Date(),
+    });
+    const token = await login();
+    const res = await client.api.v0.dashboard.articles.published.$get(
+      { query: { org_id: 'org_3' } },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    expect(res.status).toBe(200);
   });
 
   test('GET /articles/best is empty and gated until Google data is connected', async () => {
@@ -1851,6 +1868,27 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     const pubBody = await published.json();
     expect(pubBody.articles.every((a) => a.status === 'published')).toBe(true);
     expect(pubBody.total).toBeLessThan(allBody.total);
+  });
+
+  test('GET /articles returns nullable keyword and search volume for standalone articles', async () => {
+    const opts = await auth();
+    const list = await client.api.v0.dashboard.articles.$get({ query: { org_id: 'org_2' } }, opts);
+    expect(list.status).toBe(200);
+    if (list.status !== 200) return;
+    expect((await list.json()).articles[0]).toMatchObject({
+      id: 'art_4',
+      keyword: null,
+      difficulty: null,
+      search_volume: null,
+    });
+
+    const detail = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_4' } },
+      opts,
+    );
+    expect(detail.status).toBe(200);
+    if (detail.status !== 200) return;
+    expect(await detail.json()).toMatchObject({ id: 'art_4', keyword_id: null, keyword: null });
   });
 
   test('GET /articles includes safe provider publishing state without leases or secrets', async () => {

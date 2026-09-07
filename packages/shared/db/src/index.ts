@@ -10,6 +10,7 @@ export { GscConnectionRepo } from './repositories/gsc-connection.repo';
 export { IntegrationRepo } from './repositories/integration.repo';
 export { KeywordRepo } from './repositories/keyword.repo';
 export { OrgRepo, type OrgSummary } from './repositories/org.repo';
+export { OrgMemberRepo } from './repositories/org-member.repo';
 export { PromoCodeRepo } from './repositories/promo-code.repo';
 export { PromoRedemptionRepo } from './repositories/promo-redemption.repo';
 export {

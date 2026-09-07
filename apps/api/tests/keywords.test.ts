@@ -41,8 +41,8 @@ vi.mock('@shared/db', () => ({
   isDuplicateKeyError,
 }));
 
-const { loadOwnedOrg } = vi.hoisted(() => ({ loadOwnedOrg: vi.fn() }));
-vi.mock('../src/lib/load-owned-org', () => ({ loadOwnedOrg }));
+const { loadAccessibleOrg } = vi.hoisted(() => ({ loadAccessibleOrg: vi.fn() }));
+vi.mock('../src/lib/load-org-for-user', () => ({ loadAccessibleOrg }));
 
 // authMiddleware sets c.var.auth from the JWT; stub it to a fixed user.
 vi.mock('../src/middlewares/auth', async (orig) => {
@@ -114,10 +114,10 @@ describe('POST /research', () => {
     expect(keywordIdeas).not.toHaveBeenCalled();
   });
 
-  test('403 for an org owned by someone else', async () => {
-    loadOwnedPaidOrg.mockResolvedValueOnce({ ok: false, reason: 'not_owner' });
+  test('404 for an org owned by someone else (existence never leaks)', async () => {
+    loadOwnedPaidOrg.mockResolvedValueOnce({ ok: false, reason: 'not_found' });
     const res = await testClient(app).research.$post({ json: { org_id: 'o1', seed: 'crm' } });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(keywordIdeas).not.toHaveBeenCalled();
   });
 
@@ -307,7 +307,7 @@ describe('GET /candidates', () => {
   });
 
   test('returns the mapped pool with schedulable flags and pagination echo', async () => {
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg); // read needs no paid plan
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg); // read needs no paid plan
     CandidateRepo.listByOrg.mockResolvedValueOnce({
       candidates: [
         candidate,
@@ -341,7 +341,7 @@ describe('GET /candidates', () => {
   });
 
   test('empty pool returns [] and total 0', async () => {
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg);
     CandidateRepo.listByOrg.mockResolvedValueOnce({ candidates: [], total: 0 });
     const res = await testClient(app).candidates.$get({ query: { org_id: 'o1' } });
     expect(res.status).toBe(200);
@@ -350,7 +350,7 @@ describe('GET /candidates', () => {
   });
 
   test('404 for an org the caller does not own', async () => {
-    loadOwnedOrg.mockResolvedValueOnce(null);
+    loadAccessibleOrg.mockResolvedValueOnce(null);
     const res = await testClient(app).candidates.$get({ query: { org_id: 'other' } });
     expect(res.status).toBe(404);
     expect(CandidateRepo.listByOrg).not.toHaveBeenCalled();
@@ -375,7 +375,7 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
 
   test('201 on first-time scheduling with the copied fields', async () => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     scheduleCandidate.mockResolvedValueOnce({ ok: true, created: true, keyword: scheduledKeyword });
 
     const res = await schedule();
@@ -395,7 +395,7 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
 
   test('200 on an idempotent retry for the same date', async () => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     scheduleCandidate.mockResolvedValueOnce({
       ok: true,
       created: false,
@@ -412,7 +412,7 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
     'candidate_not_schedulable',
   ] as const)('409 %s conflict', async (reason) => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     scheduleCandidate.mockResolvedValueOnce({ ok: false, reason });
     const res = await schedule();
     expect(res.status).toBe(409);
@@ -422,7 +422,7 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
 
   test('402 for a free org, without touching the scheduler', async () => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg);
     const res = await schedule();
     expect(res.status).toBe(402);
     if (res.status !== 402) throw new Error('expected 402');
@@ -435,7 +435,7 @@ describe('POST /candidates/{candidate_id}/schedule', () => {
     expect((await schedule('nope')).status).toBe(404);
 
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(null);
+    loadAccessibleOrg.mockResolvedValueOnce(null);
     expect((await schedule()).status).toBe(404);
     expect(scheduleCandidate).not.toHaveBeenCalled();
   });
@@ -463,7 +463,7 @@ describe('DELETE /candidates/{candidate_id}', () => {
 
   test('204 rejects a pooled candidate', async () => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     CandidateRepo.rejectIfCandidate.mockResolvedValueOnce(true);
 
     const res = await del();
@@ -473,7 +473,7 @@ describe('DELETE /candidates/{candidate_id}', () => {
 
   test('409 candidate_not_deletable when the conditional update refuses', async () => {
     CandidateRepo.findById.mockResolvedValueOnce({ ...candidate, status: 'selected' });
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     CandidateRepo.rejectIfCandidate.mockResolvedValueOnce(false);
 
     const res = await del();
@@ -484,7 +484,7 @@ describe('DELETE /candidates/{candidate_id}', () => {
 
   test('402 for a free org, without touching the pool', async () => {
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg);
     const res = await del();
     expect(res.status).toBe(402);
     if (res.status !== 402) throw new Error('expected 402');
@@ -497,7 +497,7 @@ describe('DELETE /candidates/{candidate_id}', () => {
     expect((await del('nope')).status).toBe(404);
 
     CandidateRepo.findById.mockResolvedValueOnce(candidate);
-    loadOwnedOrg.mockResolvedValueOnce(null);
+    loadAccessibleOrg.mockResolvedValueOnce(null);
     expect((await del()).status).toBe(404);
     expect(CandidateRepo.rejectIfCandidate).not.toHaveBeenCalled();
   });
@@ -516,7 +516,7 @@ describe('PATCH /scheduled/{keyword_id}', () => {
 
   test('200 moves a pending keyword to a free date', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     KeywordRepo.findByOrgAndDate.mockResolvedValueOnce(null);
     KeywordRepo.reschedulePending.mockResolvedValueOnce({
       ...scheduledKeyword,
@@ -532,7 +532,7 @@ describe('PATCH /scheduled/{keyword_id}', () => {
 
   test('200 idempotent when the keyword is already on that date', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     const res = await patch('2026-07-20');
     expect(res.status).toBe(200);
     expect(KeywordRepo.reschedulePending).not.toHaveBeenCalled();
@@ -540,7 +540,7 @@ describe('PATCH /scheduled/{keyword_id}', () => {
 
   test('409 date_occupied when another keyword owns the date', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     KeywordRepo.findByOrgAndDate.mockResolvedValueOnce({ ...scheduledKeyword, id: 'k2' });
     const res = await patch('2026-07-24');
     expect(res.status).toBe(409);
@@ -550,14 +550,14 @@ describe('PATCH /scheduled/{keyword_id}', () => {
 
   test('409 generation_started for linked or non-pending keywords', async () => {
     KeywordRepo.findById.mockResolvedValueOnce({ ...scheduledKeyword, article_id: 'a1' });
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     expect((await patch('2026-07-24')).status).toBe(409);
 
     KeywordRepo.findById.mockResolvedValueOnce({
       ...scheduledKeyword,
       generation_status: 'generating',
     });
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     const res = await patch('2026-07-24');
     expect(res.status).toBe(409);
     if (res.status !== 409) throw new Error('expected 409');
@@ -567,11 +567,11 @@ describe('PATCH /scheduled/{keyword_id}', () => {
 
   test('402 free org / 404 unowned', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg);
     expect((await patch('2026-07-24')).status).toBe(402);
 
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(null);
+    loadAccessibleOrg.mockResolvedValueOnce(null);
     expect((await patch('2026-07-24')).status).toBe(404);
   });
 });
@@ -586,7 +586,7 @@ describe('DELETE /scheduled/{keyword_id}', () => {
 
   test('204 deletes and returns the candidate to the pool', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     KeywordRepo.deleteUnstarted.mockResolvedValueOnce(scheduledKeyword);
 
     const res = await del();
@@ -596,7 +596,7 @@ describe('DELETE /scheduled/{keyword_id}', () => {
 
   test('204 without a candidate release for legacy entries (no candidate_id)', async () => {
     KeywordRepo.findById.mockResolvedValueOnce({ ...scheduledKeyword, candidate_id: null });
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     KeywordRepo.deleteUnstarted.mockResolvedValueOnce({ ...scheduledKeyword, candidate_id: null });
     expect((await del()).status).toBe(204);
     expect(CandidateRepo.releaseAfterUnschedule).not.toHaveBeenCalled();
@@ -607,7 +607,7 @@ describe('DELETE /scheduled/{keyword_id}', () => {
       ...scheduledKeyword,
       generation_status: 'generating',
     });
-    loadOwnedOrg.mockResolvedValueOnce(ownedPaidOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedPaidOrg);
     KeywordRepo.deleteUnstarted.mockResolvedValueOnce(null);
     const res = await del();
     expect(res.status).toBe(409);
@@ -618,7 +618,7 @@ describe('DELETE /scheduled/{keyword_id}', () => {
 
   test('402 free org / 404 unowned', async () => {
     KeywordRepo.findById.mockResolvedValueOnce(scheduledKeyword);
-    loadOwnedOrg.mockResolvedValueOnce(ownedFreeOrg);
+    loadAccessibleOrg.mockResolvedValueOnce(ownedFreeOrg);
     expect((await del()).status).toBe(402);
 
     KeywordRepo.findById.mockResolvedValueOnce(null);

@@ -680,7 +680,10 @@ export default function ArticleDetailPage() {
             canSave={editor.canSave}
             context={
               <dl className="grid gap-3 text-sm">
-                <ArticleEditorDetailItem label={t('labels.keyword')} value={article.keyword} />
+                <ArticleEditorDetailItem
+                  label={t('labels.keyword')}
+                  value={article.keyword ?? t('labels.noKeyword')}
+                />
                 <ArticleEditorDetailItem
                   label={t('labels.createdAt')}
                   value={formatDate(article.created_at, dateFormatter)}
@@ -720,7 +723,10 @@ export default function ArticleDetailPage() {
         <section className="grid gap-4 rounded-lg border border-border bg-card p-4 sm:p-6">
           <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
             <DetailItem label={t('labels.slug')} value={article.slug} />
-            <DetailItem label={t('labels.keywordId')} value={article.keyword_id} />
+            <DetailItem
+              label={t('labels.keywordId')}
+              value={article.keyword_id ?? t('labels.notLinkedToPlanner')}
+            />
             <DetailItem
               label={t('labels.createdAt')}
               value={formatDate(article.created_at, dateFormatter)}

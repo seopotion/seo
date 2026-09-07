@@ -83,6 +83,7 @@ export interface ResetUserData {
     articles: number;
     gsc_connections: number;
     subscriptions: number;
+    members: number;
   };
 }
 
@@ -119,6 +120,7 @@ export interface DeleteOrgData {
     strategy_runs: number;
     article_runs: number;
     gsc_analytics_cache: number;
+    members: number;
   };
 }
 
@@ -408,7 +410,7 @@ export interface ArticleShowData {
   org_id: string;
   title: string;
   slug: string;
-  keyword: string;
+  keyword: string | null;
   status: string;
   images_status: string;
   created_at: string;
@@ -417,7 +419,8 @@ export interface ArticleShowData {
   preflight_error: PublishingErrorView | null;
   attempts: ArticleAttemptView[];
   publications: ArticlePublicationView[];
-  /** The linked planner keyword; null when it was deleted out from under the article. */
+  /** The linked planner keyword; null for standalone articles or when the
+   * keyword was deleted. */
   planner: {
     keyword_id: string;
     scheduled_date: string;

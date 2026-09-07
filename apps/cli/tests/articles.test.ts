@@ -192,6 +192,18 @@ describe('showArticle', () => {
     expect(result.data.planner).toBeNull();
   });
 
+  test('returns planner null without loading KeywordRepo for a standalone article', async () => {
+    repos.articleFindById.mockResolvedValueOnce(article({ keyword_id: null, keyword: null }));
+
+    const result = await showArticle('a1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.keyword).toBeNull();
+    expect(result.data.planner).toBeNull();
+    expect(repos.keywordFindById).not.toHaveBeenCalled();
+  });
+
   test('fails ARTICLE_NOT_FOUND for an unknown id', async () => {
     repos.articleFindById.mockResolvedValueOnce(null);
     const result = await showArticle('nope');

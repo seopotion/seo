@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 type Call = { url: string; method: string; auth: string | null; body: string | null };
 const calls: Call[] = [];
 let reply: { status: number; body: unknown } = { status: 200, body: {} };
+let replyQueue: Array<{ status: number; body: unknown }> = [];
 
 vi.stubGlobal('window', {
   localStorage: {
@@ -27,8 +28,9 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
   });
   // The unstick levers that succeed with 204 have no body to send, and
   // constructing a `Response` with one at that status throws.
-  return new Response(reply.status === 204 ? null : JSON.stringify(reply.body), {
-    status: reply.status,
+  const currentReply = replyQueue.shift() ?? reply;
+  return new Response(currentReply.status === 204 ? null : JSON.stringify(currentReply.body), {
+    status: currentReply.status,
     headers: { 'content-type': 'application/json' },
   });
 });
@@ -36,8 +38,10 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
 const {
   ArticleValidationError,
   connectWordPress,
+  createArticle,
   disconnectGsc,
   disconnectWordPress,
+  fetchAllCandidates,
   fetchArticle,
   fetchArticles,
   fetchAudit,
@@ -60,6 +64,7 @@ const { ApiError } = await import('../src/lib/api');
 beforeEach(() => {
   calls.length = 0;
   reply = { status: 200, body: {} };
+  replyQueue = [];
 });
 
 describe('searchOrgs', () => {
@@ -253,6 +258,39 @@ describe('disconnectGsc', () => {
   });
 });
 
+describe('fetchAllCandidates', () => {
+  test('retrieves every page for the selected status', async () => {
+    replyQueue = [
+      {
+        status: 200,
+        body: {
+          candidates: Array.from({ length: 50 }, (_, index) => ({ id: `candidate-${index}` })),
+          total: 51,
+          limit: 50,
+          offset: 0,
+        },
+      },
+      {
+        status: 200,
+        body: {
+          candidates: [{ id: 'candidate-50' }],
+          total: 51,
+          limit: 50,
+          offset: 50,
+        },
+      },
+    ];
+
+    const candidates = await fetchAllCandidates('org1', 'candidate');
+
+    expect(candidates).toHaveLength(51);
+    expect(calls.map((call) => call.url)).toEqual([
+      'http://localhost:8788/admin/v0/orgs/org1/candidates?status=candidate&limit=50&offset=0',
+      'http://localhost:8788/admin/v0/orgs/org1/candidates?status=candidate&limit=50&offset=50',
+    ]);
+  });
+});
+
 describe('restoreCandidate', () => {
   test('posts to the restore route', async () => {
     reply = { status: 204, body: null };
@@ -356,6 +394,46 @@ describe('fetchArticle', () => {
     reply = { status: 404, body: { error: 'not_found' } };
 
     await expect(fetchArticle('missing')).rejects.toMatchObject({ code: 'not_found', status: 404 });
+  });
+});
+
+describe('createArticle', () => {
+  const draft = {
+    keyword: 'focus keyword',
+    title: 'T',
+    slug: 's',
+    meta_title: 'MT',
+    meta_description: 'MD',
+    content: '## Body',
+  };
+
+  test('POSTs the draft to the org route and returns the 201 response', async () => {
+    reply = { status: 201, body: { id: 'art1', title: 'T' } };
+
+    await expect(createArticle('org1', draft)).resolves.toEqual({ id: 'art1', title: 'T' });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/articles');
+    expect(calls[0]?.body).toBe(JSON.stringify(draft));
+  });
+
+  test('sends a null focus keyword unchanged', async () => {
+    reply = { status: 201, body: { id: 'art1' } };
+
+    await createArticle('org1', { ...draft, keyword: null });
+    expect(calls[0]?.body).toBe(JSON.stringify({ ...draft, keyword: null }));
+  });
+
+  test('carries the per-field messages of a 400 through to the form', async () => {
+    reply = {
+      status: 400,
+      body: { error: 'validation_failed', fields: { title: 'Title is required' } },
+    };
+
+    await expect(createArticle('org1', draft)).rejects.toBeInstanceOf(ArticleValidationError);
+    await expect(createArticle('org1', draft)).rejects.toMatchObject({
+      code: 'validation_failed',
+      fields: { title: 'Title is required' },
+    });
   });
 });
 

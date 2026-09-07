@@ -80,6 +80,8 @@ export async function launchImageRepair(
   const article = await ArticleRepo.findById(articleId);
   if (!article || article.org_id !== orgId)
     throw new ArticleFatalError(`article ${articleId} not found in org ${orgId}`);
+  if (article.keyword_id === null)
+    throw new ArticleFatalError(`article ${articleId} is not linked to a planner keyword`);
   const org = await OrgRepo.findById(orgId);
   if (!org?.presets) throw new ArticleFatalError(`org ${orgId} missing or has no presets`);
   const keyword = await KeywordRepo.findById(article.keyword_id);
