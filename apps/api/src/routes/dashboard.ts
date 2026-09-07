@@ -1,19 +1,12 @@
-import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { ArticleRepo, GscConnectionRepo, IntegrationRepo, KeywordRepo, OrgRepo } from '@shared/db';
 import { domainRatingFromRank } from '@shared/providers';
-import {
-  type Article,
-  type Integration,
-  isPaid,
-  META_DESCRIPTION_MAX,
-  META_DESCRIPTION_MIN,
-  META_TITLE_MAX,
-  PublishTask,
-} from '@shared/schemas';
+import { type Article, type Integration, isPaid, PublishTask } from '@shared/schemas';
 import * as gsc from '../clients/gsc';
 import { getDataForSeoClient } from '../clients/providers';
 import { enqueuePublishTask } from '../clients/sqs';
 import { testWordPressIntegration } from '../clients/wordpress';
+import { validateArticleFields } from '../lib/article-validation';
 import { encryptSecret } from '../lib/crypto';
 import { gscAccess } from '../lib/gsc-access';
 import { matchArticleByPage } from '../lib/gsc-urls';
@@ -111,34 +104,6 @@ function toConnectedIntegration(i: Integration) {
     connected_at: i.connected_at.toISOString(),
     last_error: i.last_error && { code: i.last_error.code, at: i.last_error.at.toISOString() },
   };
-}
-
-/**
- * Editor save rules (#74). Mirrors the modal's client-side checks — including
- * trimming, so `"   "` fails on both sides rather than only one. Returns the
- * offending fields; an empty object means valid.
- */
-function validateArticleUpdate(
-  body: z.infer<typeof schemas.ArticleUpdateBody>,
-): Record<string, string> {
-  const fields: Record<string, string> = {};
-
-  if (!body.title.trim()) fields.title = 'Title is required';
-  if (!body.slug.trim()) fields.slug = 'Slug is required';
-  if (!body.content.trim()) fields.content = 'Content is required';
-
-  if (!body.meta_title.trim()) fields.meta_title = 'Meta title is required';
-  else if (body.meta_title.length > META_TITLE_MAX)
-    fields.meta_title = `Meta title must be ${META_TITLE_MAX} characters or fewer`;
-
-  if (!body.meta_description.trim()) fields.meta_description = 'Meta description is required';
-  else if (
-    body.meta_description.length < META_DESCRIPTION_MIN ||
-    body.meta_description.length > META_DESCRIPTION_MAX
-  )
-    fields.meta_description = `Meta description must be between ${META_DESCRIPTION_MIN} and ${META_DESCRIPTION_MAX} characters`;
-
-  return fields;
 }
 
 /** Search Analytics window: the trailing 28 days, as yyyy-mm-dd bounds. */
@@ -1042,7 +1007,7 @@ const dashboard = new OpenAPIHono<AuthEnv>()
         return c.json({ error: 'Article not found' }, 404);
       }
 
-      const fields = validateArticleUpdate(body);
+      const fields = validateArticleFields(body);
       if (Object.keys(fields).length > 0) {
         return c.json({ error: 'Validation failed', fields }, 400);
       }

@@ -123,12 +123,12 @@ export type ArticleReadability = z.infer<typeof ArticleReadabilitySchema>;
 export const ArticleSchema = z.object({
   id: z.string(),
   org_id: z.string(),
-  keyword_id: z.string(),
+  keyword_id: z.string().nullable(),
   title: z.string(),
   // SERP <title>, distinct from `title` (the H1). Added by generation (#55).
   meta_title: z.string(),
   slug: z.string(),
-  keyword: z.string(),
+  keyword: z.string().nullable(),
   topic_cluster_id: z.string().nullable().default(null),
   topic_cluster_label: z.string().nullable().default(null),
   topic_role: z.enum(TOPIC_ROLES).nullable().default(null),
@@ -137,9 +137,9 @@ export const ArticleSchema = z.object({
   meta_description: z.string(),
   featured_image_url: z.string(),
   content: z.string(),
-  // null when the provider returned no KD (#304); search_volume stays required.
+  // null when the provider returned no KD (#304).
   difficulty: z.number().int().nullable(),
-  search_volume: z.number().int(),
+  search_volume: z.number().int().nullable(),
   status: z.enum(ARTICLE_STATUSES),
   created_at: z.date(),
   published_at: z.date().nullable(),

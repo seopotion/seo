@@ -13,6 +13,7 @@ describe('errorMessage', () => {
     for (const code of [
       'validation_failed',
       'images_in_progress',
+      'images_not_supported',
       'wordpress_not_connected',
       'already_published',
       'not_published',

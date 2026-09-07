@@ -54,6 +54,55 @@ describe('ArticleSchema', () => {
     expect(a.auto_publish).toEqual({ preflight_error: null, attempts: [] });
   });
 
+  test('parses a standalone article with a denormalized keyword', () => {
+    const a = ArticleSchema.parse({
+      id: 'a1',
+      org_id: 'o1',
+      keyword_id: null,
+      title: 'Best Practices',
+      meta_title: 'Best Practices 2026',
+      slug: 'best-practices',
+      keyword: 'notion seo',
+      meta_description: 'meta',
+      featured_image_url: '',
+      content: '# body',
+      difficulty: null,
+      search_volume: null,
+      status: 'generated',
+      created_at: new Date(),
+      published_at: null,
+    });
+
+    expect(a).toMatchObject({
+      keyword_id: null,
+      keyword: 'notion seo',
+      difficulty: null,
+      search_volume: null,
+    });
+  });
+
+  test('parses a standalone article without a keyword', () => {
+    const a = ArticleSchema.parse({
+      id: 'a1',
+      org_id: 'o1',
+      keyword_id: null,
+      title: 'Company News',
+      meta_title: 'Company News',
+      slug: 'company-news',
+      keyword: null,
+      meta_description: 'meta',
+      featured_image_url: '',
+      content: '# body',
+      difficulty: null,
+      search_volume: null,
+      status: 'generated',
+      created_at: new Date(),
+      published_at: null,
+    });
+
+    expect(a).toMatchObject({ keyword_id: null, keyword: null, search_volume: null });
+  });
+
   test('historical publications parse with a nullable remote URL', () => {
     const a = ArticleSchema.parse({
       id: 'a1',

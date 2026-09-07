@@ -31,6 +31,7 @@ const MESSAGES: Record<string, string> = {
   images_in_progress:
     'The images worker is still writing this article — it would overwrite the save. ' +
     'Wait for images to finish, then reload.',
+  images_not_supported: 'Standalone articles do not support image generation.',
 
   // WordPress publish / update.
   wordpress_not_connected: 'This org has no WordPress connection — connect the plugin first.',

@@ -8,6 +8,7 @@ import {
 import { AuthedLayout } from './components/AuthedLayout';
 import { StageBanner } from './components/StageBanner';
 import { ArticlePage } from './pages/ArticlePage';
+import { CreateArticlePage } from './pages/CreateArticlePage';
 import { LoginPage } from './pages/LoginPage';
 import { OrgWorkspace } from './pages/OrgWorkspace';
 import { ArticlesTab } from './pages/org/ArticlesTab';
@@ -33,6 +34,7 @@ const router = createBrowserRouter(
           <Route path="pool" element={<PoolTab />} />
           <Route path="planner" element={<PlannerTab />} />
           <Route path="articles" element={<ArticlesTab />} />
+          <Route path="articles/new" element={<CreateArticlePage />} />
           <Route path="audit" element={<AuditTab />} />
         </Route>
         {/* Workspace-independent, so an article link stands on its own. */}

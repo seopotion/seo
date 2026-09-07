@@ -280,6 +280,17 @@ export const AdminGenerateNowResponse = z
 
 export const AdminArticleParams = z.object({ article_id: z.string() });
 
+export const AdminArticleCreateBody = z
+  .object({
+    keyword: z.string().nullable(),
+    title: z.string(),
+    slug: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    content: z.string(),
+  })
+  .openapi('AdminArticleCreateBody');
+
 export const AdminArticlesQuery = z.object({
   status: z.enum(ARTICLE_STATUSES).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -292,10 +303,10 @@ const AdminArticleListItem = z
     id: z.string(),
     title: z.string(),
     slug: z.string(),
-    keyword: z.string(),
+    keyword: z.string().nullable(),
     status: z.enum(ARTICLE_STATUSES),
     difficulty: z.number().int().nullable(),
-    search_volume: z.number().int(),
+    search_volume: z.number().int().nullable(),
     featured_image_url: z.string(),
     created_at: z.string(),
     published_at: z.string().nullable(),

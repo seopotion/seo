@@ -19,7 +19,7 @@ export default defineConfig({
   resolve,
   test: {
     exclude,
-    // Two projects, split by file extension: `.test.ts` runs in node, `.test.tsx`
+    // Projects split by file extension and app: `.test.ts` runs in node, `.test.tsx`
     // runs in jsdom. Component tests need a DOM, but the ~146 backend/shared
     // suites must stay on node — jsdom would slow them down and could mask
     // node-only bugs.
@@ -40,6 +40,16 @@ export default defineConfig({
           exclude,
           environment: 'jsdom',
           setupFiles: ['./apps/web/tests/setup-dom.ts'],
+        },
+      },
+      {
+        resolve,
+        test: {
+          name: 'admin-dom',
+          include: ['apps/admin/tests/**/*.test.tsx'],
+          exclude,
+          environment: 'jsdom',
+          setupFiles: ['./apps/admin/tests/setup-dom.ts'],
         },
       },
     ],

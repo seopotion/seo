@@ -36,6 +36,7 @@ vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit)
 const {
   ArticleValidationError,
   connectWordPress,
+  createArticle,
   disconnectGsc,
   disconnectWordPress,
   fetchArticle,
@@ -356,6 +357,46 @@ describe('fetchArticle', () => {
     reply = { status: 404, body: { error: 'not_found' } };
 
     await expect(fetchArticle('missing')).rejects.toMatchObject({ code: 'not_found', status: 404 });
+  });
+});
+
+describe('createArticle', () => {
+  const draft = {
+    keyword: 'focus keyword',
+    title: 'T',
+    slug: 's',
+    meta_title: 'MT',
+    meta_description: 'MD',
+    content: '## Body',
+  };
+
+  test('POSTs the draft to the org route and returns the 201 response', async () => {
+    reply = { status: 201, body: { id: 'art1', title: 'T' } };
+
+    await expect(createArticle('org1', draft)).resolves.toEqual({ id: 'art1', title: 'T' });
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/orgs/org1/articles');
+    expect(calls[0]?.body).toBe(JSON.stringify(draft));
+  });
+
+  test('sends a null focus keyword unchanged', async () => {
+    reply = { status: 201, body: { id: 'art1' } };
+
+    await createArticle('org1', { ...draft, keyword: null });
+    expect(calls[0]?.body).toBe(JSON.stringify({ ...draft, keyword: null }));
+  });
+
+  test('carries the per-field messages of a 400 through to the form', async () => {
+    reply = {
+      status: 400,
+      body: { error: 'validation_failed', fields: { title: 'Title is required' } },
+    };
+
+    await expect(createArticle('org1', draft)).rejects.toBeInstanceOf(ArticleValidationError);
+    await expect(createArticle('org1', draft)).rejects.toMatchObject({
+      code: 'validation_failed',
+      fields: { title: 'Title is required' },
+    });
   });
 });
 

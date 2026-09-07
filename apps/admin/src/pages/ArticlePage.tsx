@@ -1,7 +1,7 @@
-import { META_DESCRIPTION_MAX, META_DESCRIPTION_MIN, META_TITLE_MAX } from '@shared/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router';
+import { ArticleFieldErrors, ArticleFields } from '../components/ArticleFields';
 import { Badge } from '../components/Badge';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ApiError } from '../lib/api';
@@ -191,8 +191,8 @@ function ArticleEditor({
           )}
         </div>
         <p className="mt-3 text-sm text-neutral-400">
-          keyword: {article.keyword} · created {formatDateTime(article.created_at)} · last saved{' '}
-          {formatDateTime(article.updated_at)}{' '}
+          keyword: {article.keyword ?? 'No focus keyword'} · created{' '}
+          {formatDateTime(article.created_at)} · last saved {formatDateTime(article.updated_at)}{' '}
           <span className="font-mono text-xs">{article.id}</span>
         </p>
       </header>
@@ -230,87 +230,8 @@ function ArticleEditor({
         </div>
       )}
 
-      <div className="mt-6 space-y-4">
-        <Field id="title" label="Title">
-          <input
-            id="title"
-            type="text"
-            value={draft.title}
-            disabled={imagesPending}
-            onChange={(event) => set('title', event.target.value)}
-            className={INPUT_CLASS}
-          />
-        </Field>
-
-        <Field id="slug" label="Slug">
-          <input
-            id="slug"
-            type="text"
-            value={draft.slug}
-            disabled={imagesPending}
-            onChange={(event) => set('slug', event.target.value)}
-            className={`${INPUT_CLASS} font-mono`}
-          />
-        </Field>
-
-        <Field
-          id="meta_title"
-          label="Meta title"
-          hint={
-            <Counter length={draft.meta_title.length} max={META_TITLE_MAX} label={META_TITLE_MAX} />
-          }
-        >
-          <input
-            id="meta_title"
-            type="text"
-            value={draft.meta_title}
-            disabled={imagesPending}
-            onChange={(event) => set('meta_title', event.target.value)}
-            className={INPUT_CLASS}
-          />
-        </Field>
-
-        <Field
-          id="meta_description"
-          label="Meta description"
-          hint={
-            <Counter
-              length={draft.meta_description.length}
-              min={META_DESCRIPTION_MIN}
-              max={META_DESCRIPTION_MAX}
-              label={`${META_DESCRIPTION_MIN}–${META_DESCRIPTION_MAX}`}
-            />
-          }
-        >
-          <textarea
-            id="meta_description"
-            rows={3}
-            value={draft.meta_description}
-            disabled={imagesPending}
-            onChange={(event) => set('meta_description', event.target.value)}
-            className={INPUT_CLASS}
-          />
-        </Field>
-
-        <Field
-          id="content"
-          label="Content"
-          hint={
-            <span className="text-xs text-neutral-500">
-              Markdown — <code>## headings</code>, <code>**bold**</code>, <code>![alt](url)</code>{' '}
-              images, plus a raw <code>&lt;iframe&gt;</code> for the YouTube embed
-            </span>
-          }
-        >
-          <textarea
-            id="content"
-            rows={28}
-            value={draft.content}
-            disabled={imagesPending}
-            onChange={(event) => set('content', event.target.value)}
-            className={`${INPUT_CLASS} font-mono text-xs leading-5`}
-          />
-        </Field>
+      <div className="mt-6">
+        <ArticleFields draft={draft} disabled={imagesPending} onChange={set} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -329,15 +250,7 @@ function ArticleEditor({
       {save.isError && (
         <div className="mt-3 text-sm text-red-400">
           <p>{errorText(save.error, 'Could not save the article.')}</p>
-          {fieldErrors && (
-            <ul className="mt-1 list-disc pl-5">
-              {Object.entries(fieldErrors).map(([field, message]) => (
-                <li key={field}>
-                  <span className="font-mono text-xs">{field}</span>: {message}
-                </li>
-              ))}
-            </ul>
-          )}
+          {fieldErrors && <ArticleFieldErrors fields={fieldErrors} />}
         </div>
       )}
 
@@ -446,51 +359,6 @@ function ArticleEditor({
         />
       )}
     </div>
-  );
-}
-
-const INPUT_CLASS =
-  'mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm text-neutral-100 disabled:cursor-not-allowed disabled:opacity-50';
-
-/** `id` must match the control's own `id` — that pairing is the label. */
-function Field({
-  id,
-  label,
-  hint,
-  children,
-}: {
-  id: string;
-  label: string;
-  hint?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="flex flex-wrap items-baseline gap-2 text-sm text-neutral-400">
-        {label} {hint}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-/** The length rules the API enforces, shown before the save is refused. */
-function Counter({
-  length,
-  min = 0,
-  max,
-  label,
-}: {
-  length: number;
-  min?: number;
-  max: number;
-  label: string | number;
-}) {
-  const ok = length >= min && length <= max;
-  return (
-    <span className={`text-xs ${ok ? 'text-neutral-500' : 'text-amber-300'}`}>
-      {length}/{label}
-    </span>
   );
 }
 

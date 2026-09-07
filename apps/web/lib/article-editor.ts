@@ -29,8 +29,8 @@ export type ArticleDetailResponse = ArticlePublishingState & {
   featured_image_url: string;
   id: string;
   images_status: ArticleImagesStatus;
-  keyword: string;
-  keyword_id: string;
+  keyword: string | null;
+  keyword_id: string | null;
   meta_description: string;
   meta_title: string;
   published_at: string | null;
@@ -48,7 +48,7 @@ export type ArticleEditorDraft = {
   featuredImageUrl: string;
   id: string;
   imagesStatus: ArticleImagesStatus;
-  keyword: string;
+  keyword: string | null;
   metaDescription: string;
   metaTitle: string;
   publishedAt: string | null;
