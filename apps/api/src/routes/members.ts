@@ -116,7 +116,7 @@ const members = new OpenAPIHono<AuthEnv>()
           }),
         });
       } catch (err) {
-        logger.warn('member-added email failed', { org_id, to: row.email, err });
+        logger.warn('member-added email failed', { org_id, to: row.email, error: err as Error });
       }
       return c.json(
         { email: row.email, role: 'member' as const, created_at: row.created_at.toISOString() },

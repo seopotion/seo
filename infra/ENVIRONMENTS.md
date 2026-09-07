@@ -180,7 +180,21 @@ The API sends one courtesy email today: "you've been added to a workspace"
 API Lambda only. Sends fail — logged, never blocking the add — until the two
 manual steps below are done.
 
-1. **DKIM CNAMEs in Cloudflare** (after the first deploy that includes the
+1. **Confirm no existing identity.** Before merging `dev` → `master`
+   (staging) and before publishing a prod release, confirm neither account
+   already holds the domain identity — `AWS::SES::EmailIdentity` creation
+   fails with `AlreadyExistsException` if it does, and CloudFormation rolls
+   back the whole `SeoApiStack-*` deploy:
+
+   ```sh
+   aws sesv2 list-email-identities --profile seo-staging   # staging.seopotion.co must be absent
+   aws sesv2 list-email-identities --profile seo-prod      # seopotion.co must be absent
+   ```
+
+   If one exists, delete it in the console (or
+   `aws sesv2 delete-email-identity --email-identity <domain>`) before
+   deploying, so CDK can own it.
+2. **DKIM CNAMEs in Cloudflare** (after the first deploy that includes the
    identity). Read the three name/value pairs from the stack outputs and add
    each as a CNAME, **DNS only** (grey cloud, not proxied):
 
@@ -192,7 +206,7 @@ manual steps below are done.
    SES flips the identity to *Verified* within minutes of the records
    resolving: `aws sesv2 get-email-identity --email-identity staging.seopotion.co --profile seo-staging`
    → `VerifiedForSendingStatus: true`.
-2. **Sandbox.** New accounts can only deliver to verified recipients.
+3. **Sandbox.** New accounts can only deliver to verified recipients.
    - *Staging* stays in the sandbox. Verify each team test inbox once (a
      confirmation link is emailed to it):
      ```sh
@@ -202,6 +216,20 @@ manual steps below are done.
      *Account dashboard* → *Request production access*, or
      `aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL --website-url https://www.seopotion.co --use-case-description '...' --profile seo-prod`).
      Approval takes up to 24h.
+
+**If the test email doesn't arrive**, read the API Lambda's CloudWatch logs
+for `member-added email failed`:
+- `MODULE_NOT_FOUND` for `@aws-sdk/client-sesv2` — CDK's `NodejsFunction`
+  bundling externalizes `@aws-sdk/*` (the Lambda runtime's own SDK is used),
+  and the runtime SDK doesn't carry this client. Set `bundleAwsSDK: true` on
+  `apiFn` in `infra/lib/api-stack.ts`.
+- `MessageRejected` — the sending identity isn't verified, or (in the
+  sandbox) the recipient isn't verified.
+- `AccessDenied` — the Lambda's send grant is missing.
+
+**Reputation.** SES suspends sending once the bounce rate crosses roughly 5%.
+Watch **SES → Reputation metrics** in each account. Bounce/complaint handling
+(an SNS topic) is a follow-up, not covered here.
 
 No custom MAIL FROM domain: the envelope sender stays on `amazonses.com`, so
 the Zoho SPF record is untouched and DKIM alignment on the From domain
