@@ -25,7 +25,7 @@ type WordPressArticleSnapshot = {
   content: string;
   image_url?: string;
   meta_description: string;
-  focus_keyword: string;
+  focus_keyword?: string;
 };
 
 function articleSnapshot(article: Article): WordPressArticleSnapshot {
@@ -35,7 +35,7 @@ function articleSnapshot(article: Article): WordPressArticleSnapshot {
     content: marked.parse(article.content, { async: false }),
     ...(article.featured_image_url ? { image_url: article.featured_image_url } : {}),
     meta_description: article.meta_description,
-    focus_keyword: article.keyword,
+    ...(article.keyword !== null ? { focus_keyword: article.keyword } : {}),
   };
 }
 
@@ -127,7 +127,7 @@ export function submitWordPressArticle(
     content: articleSnapshot(article).content,
     ...(article.featured_image_url ? { image_url: article.featured_image_url } : {}),
     meta_description: article.meta_description,
-    focus_keyword: article.keyword,
+    ...(article.keyword !== null ? { focus_keyword: article.keyword } : {}),
     ...(options?.sourceArticleId ? { source_article_id: options.sourceArticleId } : {}),
     ...(options?.status ? { status: options.status } : {}),
   });

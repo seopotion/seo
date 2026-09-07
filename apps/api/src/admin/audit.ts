@@ -26,10 +26,12 @@ export type AdminActionName =
   | 'keyword.generate_now'
   | 'keyword.reset_generation'
   | 'keyword.update_brief'
+  | 'article.create_manual'
   | 'article.update_content'
   | 'article.wordpress_publish'
   | 'article.wordpress_update'
   | 'article.images_replay'
+  | 'article.image_upload'
   | 'promo_code.create'
   | 'promo_code.deactivate';
 

@@ -1,12 +1,8 @@
-import { createRoute, OpenAPIHono, type z } from '@hono/zod-openapi';
+import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { launchImageRepair } from '@shared/articles';
 import { ArticleRepo, OrgRepo } from '@shared/db';
-import {
-  META_DESCRIPTION_MAX,
-  META_DESCRIPTION_MIN,
-  META_TITLE_MAX,
-  type Org,
-} from '@shared/schemas';
+import type { Org } from '@shared/schemas';
+import { validateArticleFields } from '../../lib/article-validation';
 import { recordWordPressPublication } from '../../lib/publications';
 import { publishWordPressArticle, updateWordPressArticle } from '../../lib/publishers';
 import { PublishingFailure } from '../../lib/publishing-errors';
@@ -14,34 +10,6 @@ import { audit } from '../audit';
 import { toAdminArticleDetail, toAdminArticleListItem } from '../dto';
 import type { AdminEnv } from '../middleware';
 import * as schemas from '../schemas';
-
-/**
- * Editor save rules — a deliberate verbatim replica of the customer
- * `validateArticleUpdate` in routes/dashboard.ts (#74), which must stay
- * byte-identical (epic #150 ground rule 1). Keep the two in sync.
- */
-function validateArticleUpdate(
-  body: z.infer<typeof schemas.ArticleUpdateBody>,
-): Record<string, string> {
-  const fields: Record<string, string> = {};
-
-  if (!body.title.trim()) fields.title = 'Title is required';
-  if (!body.slug.trim()) fields.slug = 'Slug is required';
-  if (!body.content.trim()) fields.content = 'Content is required';
-
-  if (!body.meta_title.trim()) fields.meta_title = 'Meta title is required';
-  else if (body.meta_title.length > META_TITLE_MAX)
-    fields.meta_title = `Meta title must be ${META_TITLE_MAX} characters or fewer`;
-
-  if (!body.meta_description.trim()) fields.meta_description = 'Meta description is required';
-  else if (
-    body.meta_description.length < META_DESCRIPTION_MIN ||
-    body.meta_description.length > META_DESCRIPTION_MAX
-  )
-    fields.meta_description = `Meta description must be between ${META_DESCRIPTION_MIN} and ${META_DESCRIPTION_MAX} characters`;
-
-  return fields;
-}
 
 /** WordPress connection guard shared by publish/update. */
 function wordpressConnected(org: Org): boolean {
@@ -86,6 +54,91 @@ const articles = new OpenAPIHono<AdminEnv>()
         offset,
       });
       return c.json({ articles: rows.map(toAdminArticleListItem), total }, 200);
+    },
+  )
+  .openapi(
+    createRoute({
+      tags: ['admin'],
+      method: 'post',
+      path: '/orgs/{org_id}/articles',
+      summary: 'Create a planner-independent article',
+      security: [{ Bearer: [] }],
+      request: {
+        params: schemas.AdminOrgParams,
+        body: {
+          content: { 'application/json': { schema: schemas.AdminArticleCreateBody } },
+          required: true,
+        },
+      },
+      responses: {
+        201: {
+          content: { 'application/json': { schema: schemas.ArticleDetailResponse } },
+          description: 'The created article record',
+        },
+        400: {
+          content: { 'application/json': { schema: schemas.ArticleValidationErrorResponse } },
+          description: 'One or more fields failed validation',
+        },
+        401: { description: 'Missing or invalid admin token' },
+        404: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'Org not found',
+        },
+      },
+    }),
+    async (c) => {
+      const { org_id } = c.req.valid('param');
+      const body = c.req.valid('json');
+      const org = await OrgRepo.findById(org_id);
+      if (!org) return c.json({ error: 'not_found' }, 404);
+
+      const fields = validateArticleFields(body);
+      if (Object.keys(fields).length > 0) {
+        return c.json({ error: 'validation_failed', fields }, 400);
+      }
+
+      const normalizedKeyword = body.keyword?.trim() || null;
+      const created = await ArticleRepo.create({
+        org_id,
+        keyword_id: null,
+        keyword: normalizedKeyword,
+        title: body.title,
+        slug: body.slug,
+        meta_title: body.meta_title,
+        meta_description: body.meta_description,
+        content: body.content,
+        search_volume: null,
+        difficulty: null,
+        topic_cluster_id: null,
+        topic_cluster_label: null,
+        topic_role: null,
+        topic_content_focus: null,
+        topic_primary_keyword: null,
+        featured_image_url: '',
+        images: [],
+        images_status: 'complete',
+        video: null,
+        readability: null,
+        status: 'generated',
+        published_at: null,
+      });
+      await audit(c, {
+        action: 'article.create_manual',
+        org_id,
+        entity: { type: 'article', id: created.id },
+        payload: body,
+      });
+      return c.json(toAdminArticleDetail(created), 201);
+    },
+    (result, c) => {
+      if (result.success) return;
+
+      const fields: Record<string, string> = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0];
+        fields[typeof field === 'string' ? field : 'body'] = issue.message;
+      }
+      return c.json({ error: 'validation_failed', fields }, 400);
     },
   )
   .openapi(
@@ -161,7 +214,7 @@ const articles = new OpenAPIHono<AdminEnv>()
         return c.json({ error: 'images_in_progress' }, 409);
       }
 
-      const fields = validateArticleUpdate(body);
+      const fields = validateArticleFields(body);
       if (Object.keys(fields).length > 0) {
         return c.json({ error: 'validation_failed', fields }, 400);
       }
@@ -383,12 +436,19 @@ const articles = new OpenAPIHono<AdminEnv>()
           content: { 'application/json': { schema: schemas.AdminErrorResponse } },
           description: 'Article not found',
         },
+        409: {
+          content: { 'application/json': { schema: schemas.AdminErrorResponse } },
+          description: 'images_not_supported — standalone articles have no planner keyword',
+        },
       },
     }),
     async (c) => {
       const { article_id } = c.req.valid('param');
       const article = await ArticleRepo.findById(article_id);
       if (!article) return c.json({ error: 'not_found' }, 404);
+      if (article.keyword_id === null) {
+        return c.json({ error: 'images_not_supported' }, 409);
+      }
 
       await launchImageRepair(article.org_id, article.id);
       await audit(c, {

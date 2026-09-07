@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { API_VERSION } from '../config';
 import { requestLogger } from '../middlewares/logger';
 import { type AdminEnv, adminAuthMiddleware } from './middleware';
+import articleImages from './routes/article-images';
 import articles from './routes/articles';
 import candidates from './routes/candidates';
 import login from './routes/login';
@@ -53,6 +54,7 @@ const routes = app
   .route(`/admin/${API_VERSION}`, candidates)
   .route(`/admin/${API_VERSION}`, planner)
   .route(`/admin/${API_VERSION}`, articles)
+  .route(`/admin/${API_VERSION}`, articleImages)
   .route(`/admin/${API_VERSION}`, promoCodes);
 
 export default app;

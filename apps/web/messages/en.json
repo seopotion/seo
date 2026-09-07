@@ -530,6 +530,9 @@
       "description": "Articles will appear here once your content plan starts generating them.",
       "title": "No articles yet"
     },
+    "fallbacks": {
+      "noKeyword": "No keyword"
+    },
     "listLabel": "Articles list",
     "pagination": {
       "emptyPage": "No pages",
@@ -568,6 +571,8 @@
       "createdAt": "Created",
       "keyword": "Keyword",
       "keywordId": "Keyword ID",
+      "noKeyword": "No keyword",
+      "notLinkedToPlanner": "Not linked to planner",
       "notPublished": "Not published",
       "publishedAt": "Published",
       "slug": "Slug"

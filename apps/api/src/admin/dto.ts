@@ -12,6 +12,7 @@ import type {
 } from '@shared/schemas';
 import { isGscConnected } from '@shared/schemas';
 import type * as schemas from './schemas';
+import { imageHeadings } from './schemas';
 
 /**
  * Admin DTO mappers — the admin API's own (do not import from customer route
@@ -164,6 +165,11 @@ export function toAdminArticleDetail(a: Article): z.infer<typeof schemas.Article
       ? { code: error.code, kind: error.kind, message: error.message, at: error.at.toISOString() }
       : null;
   return {
+    images: (a.images ?? []).map((image) => ({
+      ...image,
+      generated_at: image.generated_at?.toISOString() ?? null,
+    })),
+    image_headings: imageHeadings(a.content),
     id: a.id,
     keyword_id: a.keyword_id,
     keyword: a.keyword,

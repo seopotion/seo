@@ -125,7 +125,8 @@ export async function listArticles(opts: {
 
 /** The `articles show` projection — also the per-poll read behind `--wait`. */
 async function toShowData(article: Article): Promise<ArticleShowData> {
-  const planner = await KeywordRepo.findById(article.keyword_id);
+  const planner =
+    article.keyword_id === null ? null : await KeywordRepo.findById(article.keyword_id);
   return {
     id: article.id,
     org_id: article.org_id,

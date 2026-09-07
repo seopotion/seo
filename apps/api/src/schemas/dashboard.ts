@@ -200,10 +200,10 @@ const ArticleListItem = z
     id: z.string(),
     title: z.string(),
     slug: z.string(),
-    keyword: z.string(),
+    keyword: z.string().nullable(),
     status: z.enum(ARTICLE_STATUSES),
     difficulty: z.number().int().nullable(),
-    search_volume: z.number().int(),
+    search_volume: z.number().int().nullable(),
     featured_image_url: z.string(),
     created_at: z.string(),
     published_at: z.string().nullable(),
@@ -253,9 +253,9 @@ export const ArticleParams = z.object({
 export const ArticleDetailResponse = z
   .object({
     id: z.string(),
-    keyword_id: z.string(),
+    keyword_id: z.string().nullable(),
     // Denormalized keyword + SERP <title>; both drive the editor modal (#74).
-    keyword: z.string(),
+    keyword: z.string().nullable(),
     title: z.string(),
     meta_title: z.string(),
     slug: z.string(),

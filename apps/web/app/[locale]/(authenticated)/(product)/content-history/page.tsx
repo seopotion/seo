@@ -36,9 +36,9 @@ type ArticleListItemResponse = ArticlePublishingState & {
   created_at: string;
   difficulty: number | null;
   id: string;
-  keyword: string;
+  keyword: string | null;
   published_at: string | null;
-  search_volume: number;
+  search_volume: number | null;
   status: ArticleListStatus;
   title: string;
 };
@@ -46,11 +46,11 @@ type ArticleListItemResponse = ArticlePublishingState & {
 type PublishedArticle = ArticlePublishingState & {
   difficulty: number | null;
   id: string;
-  keyword: string;
+  keyword: string | null;
   publishedAt: string;
   status: ArticleListStatus;
   title: string;
-  volume: number;
+  volume: number | null;
 };
 
 type ContentHistoryData = {
@@ -285,9 +285,11 @@ function DesktopArticleRow({
       )}
     >
       <ArticleName title={article.title} linked />
-      <span className="min-w-0 truncate px-3 text-muted-foreground">{article.keyword}</span>
+      <span className="min-w-0 truncate px-3 text-muted-foreground">
+        {article.keyword ?? t('fallbacks.noKeyword')}
+      </span>
       <span className="min-w-0 truncate text-muted-foreground">
-        {formatNumber(article.volume, locale)}
+        {formatNullableNumber(article.volume, locale)}
       </span>
       <span className="min-w-0 truncate text-muted-foreground">
         {formatNullableNumber(article.difficulty, locale)}
@@ -335,12 +337,14 @@ function MobileArticleCard({
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div className="min-w-0">
               <dt className="text-muted-foreground text-xs">{t('columns.keyword')}</dt>
-              <dd className="mt-1 truncate font-medium text-foreground">{article.keyword}</dd>
+              <dd className="mt-1 truncate font-medium text-foreground">
+                {article.keyword ?? t('fallbacks.noKeyword')}
+              </dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground text-xs">{t('columns.volume')}</dt>
               <dd className="mt-1 truncate font-medium text-foreground">
-                {formatNumber(article.volume, locale)}
+                {formatNullableNumber(article.volume, locale)}
               </dd>
             </div>
             <div className="min-w-0">
@@ -557,8 +561,4 @@ function formatPublishedDate(publishedAt: string, formatter: Intl.DateTimeFormat
   const date = new Date(publishedAt);
 
   return Number.isNaN(date.getTime()) ? publishedAt : formatter.format(date);
-}
-
-function formatNumber(value: number, locale: string) {
-  return new Intl.NumberFormat(locale).format(value);
 }
