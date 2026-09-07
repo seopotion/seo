@@ -276,7 +276,18 @@ export class ApiStack extends Stack {
     const mailIdentity = new EmailIdentity(this, 'MailIdentity', {
       identity: Identity.domain(cfg.mailFrom.split('@')[1]),
     });
-    mailIdentity.grantSendEmail(apiFn);
+    // Not `grantSendEmail`: SES authorizes a send against every verified
+    // identity in the request, recipients included, and sandbox test inboxes
+    // are verified identities — so a grant scoped to the domain identity is
+    // denied on `identity/<recipient>`. Allow any identity in the account and
+    // pin the sender instead.
+    apiFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: [`arn:aws:ses:${this.region}:${this.account}:identity/*`],
+        conditions: { StringEquals: { 'ses:FromAddress': cfg.mailFrom } },
+      }),
+    );
     mailIdentity.dkimRecords.forEach((record, i) => {
       new CfnOutput(this, `MailDkim${i + 1}Name`, { value: record.name });
       new CfnOutput(this, `MailDkim${i + 1}Value`, { value: record.value });
