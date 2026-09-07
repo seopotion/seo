@@ -34,7 +34,7 @@ Legend: ✅ done · 🟡 partial / stubbed · ⬜ not started. Issue tag/title c
 - ✅ Real `JWT_SECRET` / `GOOGLE_CLIENT_ID` configured for **both** stages — [#9](https://github.com/seopotion/seo/issues/9); all 14 SSM parameters provisioned per account, preflight 18/18 — [#43](https://github.com/seopotion/seo/issues/43)
 - 🟡 JWT remains in localStorage with no refresh / expiry handling; tracking issue is closed but the code gap remains — [#18](https://github.com/seopotion/seo/issues/18)
 - ✅ Multi-organization switching — sidebar switcher over `GET /core/organizations`, active org persisted client-side, "Add website" re-enters onboarding; billing stays per org — [#127](https://github.com/seopotion/seo/issues/127)
-- ✅ Org membership — owner adds teammates by email (`org_members`, no invite mail), `GET/POST/DELETE /core/members`, Team tab in settings; members can do everything except billing and team management — [#333](https://github.com/seopotion/seo/issues/333). Real invite emails: [#336](https://github.com/seopotion/seo/issues/336); finer roles: [#337](https://github.com/seopotion/seo/issues/337)
+- ✅ Org membership — owner adds teammates by email (`org_members`, courtesy email on add via SES), `GET/POST/DELETE /core/members`, Team tab in settings; members can do everything except billing and team management — [#333](https://github.com/seopotion/seo/issues/333). Member-added email: ✅ [#336](https://github.com/seopotion/seo/issues/336) (DKIM + SES sandbox steps are per-env runbook items in `infra/ENVIRONMENTS.md`); finer roles: [#337](https://github.com/seopotion/seo/issues/337)
 
 ## Dashboard (design mapped; build is the frontier)
 

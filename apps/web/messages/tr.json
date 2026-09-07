@@ -919,7 +919,7 @@
       "add": "Ekle",
       "adding": "Ekleniyor...",
       "alreadyMember": "Bu e-posta zaten ekipte.",
-      "description": "Buraya eklediğiniz ekip arkadaşları, faturalandırma ve bu ekip listesi dışında bu çalışma alanındaki her şeyi kullanabilir. Girdiğiniz e-posta ile Google üzerinden giriş yaparlar.",
+      "description": "Buraya eklediğiniz ekip arkadaşları, faturalandırma ve bu ekip listesi dışında bu çalışma alanındaki her şeyi kullanabilir. Bir e-posta alırlar ve girdiğiniz adresle Google üzerinden giriş yaparlar.",
       "emailLabel": "Ekip arkadaşı e-postası",
       "emailPlaceholder": "isim@sirket.com",
       "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin.",

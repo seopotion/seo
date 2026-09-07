@@ -19,6 +19,9 @@ vi.mock('@shared/db', () => ({
   OrgMemberRepo: members,
 }));
 
+const { sendEmail } = vi.hoisted(() => ({ sendEmail: vi.fn(async () => {}) }));
+vi.mock('../src/clients/ses', () => ({ sendEmail }));
+
 // Two callers: the owner and a teammate. Swap via `caller` before each request.
 let caller = { userId: 'owner', email: 'owner@example.com' };
 vi.mock('../src/middlewares/auth', async (orig) => {
@@ -118,6 +121,39 @@ describe('POST /core/members', () => {
       email: 'new@example.com',
       invited_by: 'owner',
     });
+  });
+
+  test('emails the new member, Reply-To the owner', async () => {
+    members.add.mockResolvedValueOnce({ ...mateRow, email: 'new@example.com' });
+    const res = await client.members.$post({ json: { org_id: 'o1', email: 'new@example.com' } });
+    expect(res.status).toBe(201);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'new@example.com',
+        replyTo: 'owner@example.com',
+        subject: "You've been added to https://example.com on SEOPotion",
+      }),
+    );
+  });
+
+  test('still 201 when the email fails', async () => {
+    members.add.mockResolvedValueOnce({ ...mateRow, email: 'new@example.com' });
+    sendEmail.mockRejectedValueOnce(new Error('MessageRejected'));
+    const res = await client.members.$post({ json: { org_id: 'o1', email: 'new@example.com' } });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      email: 'new@example.com',
+      role: 'member',
+      created_at: now.toISOString(),
+    });
+  });
+
+  test('sends nothing on 409', async () => {
+    members.add.mockResolvedValueOnce(null);
+    const res = await client.members.$post({ json: { org_id: 'o1', email: 'mate@example.com' } });
+    expect(res.status).toBe(409);
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   test('403 for a member', async () => {
