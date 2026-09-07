@@ -530,6 +530,9 @@
       "description": "İçerik planınız makale oluşturmaya başladığında makaleler burada görünecek.",
       "title": "Henüz makale yok"
     },
+    "fallbacks": {
+      "noKeyword": "Anahtar kelime yok"
+    },
     "listLabel": "Makaleler listesi",
     "pagination": {
       "emptyPage": "Sayfa yok",
@@ -568,6 +571,8 @@
       "createdAt": "Oluşturulma",
       "keyword": "Anahtar kelime",
       "keywordId": "Anahtar kelime ID",
+      "noKeyword": "Anahtar kelime yok",
+      "notLinkedToPlanner": "Planlayıcıya bağlı değil",
       "notPublished": "Yayınlanmadı",
       "publishedAt": "Yayınlanma",
       "slug": "Slug"

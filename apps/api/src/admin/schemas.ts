@@ -1,7 +1,9 @@
 import { z } from '@hono/zod-openapi';
+import { extractH2s } from '@shared/generation';
 import {
   ARTICLE_STATUSES,
   ARTICLE_TYPES,
+  ArticleImageSchema,
   CANDIDATE_STATUSES,
   IMAGES_STATUSES,
   ONBOARDING_INTEGRATIONS,
@@ -14,18 +16,60 @@ import {
   SUBSCRIPTION_STATUSES,
 } from '@shared/schemas';
 import { ENTITLEMENT_PLANS, SETUP_STATUSES, STRATEGY_STATUSES } from '@shared/types';
+import { ArticleDetailResponse as CustomerArticleDetailResponse } from '../schemas/dashboard';
 // Customer request/response schemas reused directly (single-sourced shapes) —
 // these live in apps/api/src/schemas/*, never in route files.
 import { CandidateItem, KeywordMetric, ScheduledKeyword } from '../schemas/keywords';
 import { SetupPresetsPatchSchema } from '../schemas/setup';
 
 export {
-  ArticleDetailResponse,
   ArticleUpdateBody,
   ArticleValidationErrorResponse,
   WordPressArticleErrorResponse,
   WordPressArticleResponse,
 } from '../schemas/dashboard';
+
+export const ArticleDetailResponse = CustomerArticleDetailResponse.extend({
+  images: z.array(ArticleImageSchema.extend({ generated_at: z.string().nullable() })),
+  image_headings: z.array(z.string()),
+}).openapi('AdminArticleDetailResponse');
+
+export function imageHeadings(content: string): string[] {
+  const headings = extractH2s(content);
+  return headings.filter((heading) => headings.filter((other) => other === heading).length === 1);
+}
+
+export const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+export const AdminImageUploadBody = z
+  .object({
+    role: z.enum(['cover', 'inline']),
+    section_heading: z.string().min(1).max(500).nullable(),
+    alt: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .regex(/^[^\r\n]+$/),
+    content_type: z.enum(['image/webp', 'image/jpeg', 'image/png']),
+    size: z.number().int().min(1).max(MAX_UPLOAD_IMAGE_BYTES),
+  })
+  .strict()
+  .openapi('AdminImageUploadBody');
+export type AdminImageUploadBody = z.infer<typeof AdminImageUploadBody>;
+
+export const AdminImageUploadResponse = z
+  .object({
+    upload_url: z.string(),
+    headers: z.record(z.string(), z.string()),
+    upload_token: z.string(),
+  })
+  .openapi('AdminImageUploadResponse');
+export const AdminImageFinalizeBody = z
+  .object({
+    upload_token: z.string().min(1).max(6000),
+  })
+  .strict()
+  .openapi('AdminImageFinalizeBody');
 export { ScheduleBody } from '../schemas/keywords';
 
 export const AdminErrorResponse = z.object({ error: z.string() }).openapi('AdminError');
@@ -280,6 +324,17 @@ export const AdminGenerateNowResponse = z
 
 export const AdminArticleParams = z.object({ article_id: z.string() });
 
+export const AdminArticleCreateBody = z
+  .object({
+    keyword: z.string().nullable(),
+    title: z.string(),
+    slug: z.string(),
+    meta_title: z.string(),
+    meta_description: z.string(),
+    content: z.string(),
+  })
+  .openapi('AdminArticleCreateBody');
+
 export const AdminArticlesQuery = z.object({
   status: z.enum(ARTICLE_STATUSES).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -292,10 +347,10 @@ const AdminArticleListItem = z
     id: z.string(),
     title: z.string(),
     slug: z.string(),
-    keyword: z.string(),
+    keyword: z.string().nullable(),
     status: z.enum(ARTICLE_STATUSES),
     difficulty: z.number().int().nullable(),
-    search_volume: z.number().int(),
+    search_volume: z.number().int().nullable(),
     featured_image_url: z.string(),
     created_at: z.string(),
     published_at: z.string().nullable(),

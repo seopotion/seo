@@ -190,15 +190,15 @@ vi.mock('@shared/db', () => {
     {
       id: 'art_4',
       org_id: 'org_2',
-      keyword_id: 'kw_4',
+      keyword_id: null,
       title: 'Disconnected Article',
       slug: 'disconnected-article',
-      keyword: 'disconnected',
+      keyword: null,
       meta_description: 'm',
       featured_image_url: 'https://x/4.png',
       content: '# d',
-      difficulty: 10,
-      search_volume: 50,
+      difficulty: null,
+      search_volume: null,
       status: 'generated',
       images_status: 'complete',
       created_at: now,
@@ -1868,6 +1868,27 @@ describe('dashboard planner / history / settings routes (mock data)', () => {
     const pubBody = await published.json();
     expect(pubBody.articles.every((a) => a.status === 'published')).toBe(true);
     expect(pubBody.total).toBeLessThan(allBody.total);
+  });
+
+  test('GET /articles returns nullable keyword and search volume for standalone articles', async () => {
+    const opts = await auth();
+    const list = await client.api.v0.dashboard.articles.$get({ query: { org_id: 'org_2' } }, opts);
+    expect(list.status).toBe(200);
+    if (list.status !== 200) return;
+    expect((await list.json()).articles[0]).toMatchObject({
+      id: 'art_4',
+      keyword: null,
+      difficulty: null,
+      search_volume: null,
+    });
+
+    const detail = await client.api.v0.dashboard.articles[':id'].$get(
+      { param: { id: 'art_4' } },
+      opts,
+    );
+    expect(detail.status).toBe(200);
+    if (detail.status !== 200) return;
+    expect(await detail.json()).toMatchObject({ id: 'art_4', keyword_id: null, keyword: null });
   });
 
   test('GET /articles includes safe provider publishing state without leases or secrets', async () => {

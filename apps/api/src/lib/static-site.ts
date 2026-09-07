@@ -88,7 +88,7 @@ export function manifestEntry(entry: PublishedArticle, contentPath: string) {
     title: article.title,
     meta_title: article.meta_title,
     meta_description: article.meta_description,
-    keyword: article.keyword,
+    keyword: article.keyword ?? '',
     cover: article.featured_image_url,
     cover_alt: cover.alt,
     cover_width: cover.width,
@@ -121,7 +121,7 @@ export function renderArticle(entry: PublishedArticle): string {
     `title: ${yamlString(article.title)}`,
     `meta_title: ${yamlString(article.meta_title)}`,
     `meta_description: ${yamlString(article.meta_description)}`,
-    `keyword: ${yamlString(article.keyword)}`,
+    `keyword: ${yamlString(article.keyword ?? '')}`,
     // Quoted so every parser hands back a string rather than coercing to its
     // own date type.
     `published_at: ${yamlString(entry.published_at.toISOString())}`,

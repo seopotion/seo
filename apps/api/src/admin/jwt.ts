@@ -20,5 +20,8 @@ export async function signAdminToken(email: string): Promise<string> {
 export async function verifyAdminToken(token: string): Promise<AdminClaims> {
   // This hono/jwt version requires the explicit algorithm argument.
   const payload = await verify(token, await getAdminJwtSecret(), 'HS256');
+  if (payload.role !== 'operator' || typeof payload.email !== 'string') {
+    throw new Error('Invalid admin claims');
+  }
   return { sub: String(payload.sub), email: String(payload.email), role: 'operator' };
 }

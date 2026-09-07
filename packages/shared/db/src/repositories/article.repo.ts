@@ -1,12 +1,14 @@
 import {
   type Article,
   type ArticleImage,
+  ArticleImageSchema,
   type ArticlePublication,
   ArticleSchema,
   type AutoPublishAttempt,
   type CreateArticleInput,
   CreateArticleInput as CreateArticleInputSchema,
   type IntegrationProvider,
+  MAX_MANUAL_ARTICLE_IMAGES,
   type PublishingError,
   type TopicRole,
 } from '@shared/schemas';
@@ -446,6 +448,43 @@ export const ArticleRepo = {
       { $set: { content } },
     );
     return res.matchedCount > 0;
+  },
+
+  async saveManualImage(
+    article: Article,
+    images: ArticleImage[],
+    content: string,
+    featuredImageUrl: string,
+  ): Promise<Article | null> {
+    if (!ObjectId.isValid(article.id) || article.keyword_id !== null) return null;
+    const validated = images.map((image) => ArticleImageSchema.parse(image));
+    if (
+      validated.filter((image) => image.role === 'cover').length > 1 ||
+      validated.length > MAX_MANUAL_ARTICLE_IMAGES
+    )
+      return null;
+    const doc = await (await collection()).findOneAndUpdate(
+      {
+        _id: new ObjectId(article.id),
+        org_id: article.org_id,
+        keyword_id: null,
+        status: { $ne: 'deleted' },
+        content: article.content,
+        images: article.images,
+        updated_at: article.updated_at,
+      },
+      {
+        $set: {
+          images: validated,
+          content,
+          featured_image_url: featuredImageUrl,
+          images_status: 'complete',
+          updated_at: new Date(),
+        },
+      },
+      { returnDocument: 'after' },
+    );
+    return doc ? toEntity(doc) : null;
   },
 
   /** Persist the image plan once (set-if-absent) — a retry never re-plans (#51). */

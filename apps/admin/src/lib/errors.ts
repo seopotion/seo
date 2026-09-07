@@ -31,6 +31,25 @@ const MESSAGES: Record<string, string> = {
   images_in_progress:
     'The images worker is still writing this article — it would overwrite the save. ' +
     'Wait for images to finish, then reload.',
+  images_not_supported: 'Standalone articles do not support image generation.',
+  invalid_upload_metadata: 'Choose a WebP, JPEG, or PNG up to 5 MiB, with descriptive alt text.',
+  invalid_image_placement:
+    'The H2 section is missing or ambiguous. Reload and choose a unique section.',
+  manual_image_limit:
+    'This article already has eight images. Choose an existing placement to replace one.',
+  image_slot_changed: 'This placement changed during the upload. Reload before trying again.',
+  article_changed: 'The article changed during the upload. Reload and retry finalization.',
+  invalid_upload_token:
+    'This upload expired or belongs to another session. Select the file again to restart.',
+  upload_not_found: 'The file has not reached storage. Select the file again and retry the upload.',
+  uploaded_file_mismatch:
+    'The uploaded file does not match its declared type or size. Select the file again.',
+  invalid_image_file: 'The file is not a valid supported image, or exceeds 40 megapixels.',
+  image_storage_unavailable: 'Image storage is not configured for this environment.',
+  image_upload_failed:
+    'The upload failed. Check your connection and retry; the upload URL may have expired.',
+  image_upload_timeout: 'The upload timed out. Check your connection and try again.',
+  manual_images_only: 'Manual uploads are available only for manually created articles.',
 
   // WordPress publish / update.
   wordpress_not_connected: 'This org has no WordPress connection — connect the plugin first.',

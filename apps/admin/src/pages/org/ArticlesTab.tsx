@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { Badge } from '../../components/Badge';
 import { Table, Td, Th } from '../../components/Table';
 import { errorText } from '../../lib/errors';
-import { EMPTY, formatDateTime } from '../../lib/format';
+import { EMPTY, formatDateTime, orEmpty } from '../../lib/format';
 import { ARTICLES_PAGE_SIZE, type ArticleStatus, fetchArticles } from '../../lib/queries';
 import { articleStatusTone, imagesTone } from '../../lib/status';
 import { useOrgDetail } from '../OrgWorkspace';
@@ -33,6 +33,13 @@ export function ArticlesTab() {
 
   return (
     <div>
+      <Link
+        to="new"
+        className="mb-5 inline-block rounded bg-neutral-100 px-3 py-2 text-sm font-semibold text-neutral-900 hover:bg-white"
+      >
+        Add article manually
+      </Link>
+
       <label className="text-sm text-neutral-400">
         Status{' '}
         <select
@@ -64,7 +71,7 @@ export function ArticlesTab() {
         <p className="mt-6 text-sm text-neutral-400">
           {status
             ? `No "${status}" articles.`
-            : 'No articles yet — generation produces them from the planner.'}
+            : 'No articles yet — add one manually above or generate one from the planner.'}
         </p>
       )}
 
@@ -75,6 +82,7 @@ export function ArticlesTab() {
               <>
                 <Th>Title</Th>
                 <Th>Keyword</Th>
+                <Th>Search volume</Th>
                 <Th>Status</Th>
                 <Th>Images</Th>
                 <Th>WordPress</Th>
@@ -96,7 +104,8 @@ export function ArticlesTab() {
                   </Link>
                   <div className="text-xs text-neutral-500">/{article.slug}</div>
                 </Td>
-                <Td>{article.keyword}</Td>
+                <Td>{orEmpty(article.keyword)}</Td>
+                <Td numeric>{orEmpty(article.search_volume)}</Td>
                 <Td>
                   <Badge tone={articleStatusTone(article.status)}>{article.status}</Badge>
                 </Td>

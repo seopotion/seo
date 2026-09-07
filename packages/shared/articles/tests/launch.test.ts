@@ -283,6 +283,16 @@ describe('launchImageRepair', () => {
     expect(runRepoCreate).not.toHaveBeenCalled();
   });
 
+  test('throws ArticleFatalError before loading a keyword for a standalone article', async () => {
+    articleFindById.mockResolvedValue({ id: 'art1', org_id: 'org1', keyword_id: null });
+    const repair = launchImageRepair('org1', 'art1');
+
+    await expect(repair).rejects.toBeInstanceOf(ArticleFatalError);
+    await expect(repair).rejects.toThrow('article art1 is not linked to a planner keyword');
+    expect(keywordFindById).not.toHaveBeenCalled();
+    expect(runRepoCreate).not.toHaveBeenCalled();
+  });
+
   test('throws ArticleFatalError when the keyword is missing', async () => {
     keywordFindById.mockResolvedValue(null);
 

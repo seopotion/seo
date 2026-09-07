@@ -147,6 +147,19 @@ export async function fetchCandidates(orgId: string, status: CandidateStatus | n
 export type CandidatePage = Awaited<ReturnType<typeof fetchCandidates>>;
 export type CandidateItem = CandidatePage['candidates'][number];
 
+export async function fetchAllCandidates(orgId: string, status: CandidateStatus | null) {
+  const candidates: CandidateItem[] = [];
+  let offset = 0;
+
+  while (true) {
+    const page = await fetchCandidates(orgId, status, offset);
+    candidates.push(...page.candidates);
+
+    if (page.candidates.length === 0 || candidates.length >= page.total) return candidates;
+    offset += page.candidates.length;
+  }
+}
+
 export async function researchKeywords(orgId: string, seed: string) {
   return unwrap(
     await adminApi.admin.v0.orgs[':org_id'].research.$post({
@@ -272,6 +285,19 @@ export async function fetchArticles(orgId: string, status: ArticleStatus | null,
 }
 
 export type ArticleListItem = Awaited<ReturnType<typeof fetchArticles>>['articles'][number];
+
+export type CreateArticleDraft = Parameters<
+  (typeof adminApi.admin.v0.orgs)[':org_id']['articles']['$post']
+>[0]['json'];
+
+export async function createArticle(orgId: string, draft: CreateArticleDraft) {
+  const res = await adminApi.admin.v0.orgs[':org_id'].articles.$post({
+    param: { org_id: orgId },
+    json: draft,
+  });
+  if (res.status === 400) throw new ArticleValidationError((await res.json()).fields);
+  return unwrap(res);
+}
 
 export async function fetchArticle(articleId: string) {
   const res = await adminApi.admin.v0.articles[':article_id'].$get({

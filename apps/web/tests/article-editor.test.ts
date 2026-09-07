@@ -77,6 +77,10 @@ describe('mapArticleDetail / toArticleUpdateBody', () => {
     expect(mapArticleDetail({ ...response, updated_at: null }).updatedAt).toBeNull();
   });
 
+  test('a null keyword survives the mapping for standalone articles', () => {
+    expect(mapArticleDetail({ ...response, keyword_id: null, keyword: null }).keyword).toBeNull();
+  });
+
   test('round-trips the editable fields back to snake_case', () => {
     expect(toArticleUpdateBody(mapArticleDetail(response))).toEqual({
       content: response.content,
