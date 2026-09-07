@@ -172,6 +172,42 @@ comes from the account boundary, not the path.
    Both deploy jobs declare `environment:`, so every job resolving these secrets
    gets its own stage's values.
 
+## Transactional email (SES, #336)
+
+The API sends one courtesy email today: "you've been added to a workspace"
+(`POST /core/members`). CDK creates an SES **domain identity** per stage
+(`staging.seopotion.co` / `seopotion.co`, Easy DKIM) and grants send to the
+API Lambda only. Sends fail — logged, never blocking the add — until the two
+manual steps below are done.
+
+1. **DKIM CNAMEs in Cloudflare** (after the first deploy that includes the
+   identity). Read the three name/value pairs from the stack outputs and add
+   each as a CNAME, **DNS only** (grey cloud, not proxied):
+
+   ```sh
+   aws cloudformation describe-stacks --stack-name SeoApiStack-staging --profile seo-staging \
+     --query "Stacks[0].Outputs[?starts_with(OutputKey,'MailDkim')].[OutputKey,OutputValue]" --output table
+   ```
+
+   SES flips the identity to *Verified* within minutes of the records
+   resolving: `aws sesv2 get-email-identity --email-identity staging.seopotion.co --profile seo-staging`
+   → `VerifiedForSendingStatus: true`.
+2. **Sandbox.** New accounts can only deliver to verified recipients.
+   - *Staging* stays in the sandbox. Verify each team test inbox once (a
+     confirmation link is emailed to it):
+     ```sh
+     aws sesv2 create-email-identity --email-identity you@example.com --profile seo-staging
+     ```
+   - *Prod* needs production access once (form in the SES console →
+     *Account dashboard* → *Request production access*, or
+     `aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL --website-url https://www.seopotion.co --use-case-description '...' --profile seo-prod`).
+     Approval takes up to 24h.
+
+No custom MAIL FROM domain: the envelope sender stays on `amazonses.com`, so
+the Zoho SPF record is untouched and DKIM alignment on the From domain
+satisfies DMARC. The team's Zoho Mail is deliberately **not** used for app
+mail — its free-tier send cap is reserved for customer outreach.
+
 ## Google OAuth clients
 
 Login is the Google Identity Services **ID-token** flow (`google.accounts.id` →
