@@ -177,7 +177,7 @@ comes from the account boundary, not the path.
 The API sends one courtesy email today: "you've been added to a workspace"
 (`POST /core/members`). CDK creates an SES **domain identity** per stage
 (`staging.seopotion.co` / `seopotion.co`, Easy DKIM) and grants send to the
-API Lambda only. Sends fail — logged, never blocking the add — until the two
+API Lambda only. Sends fail — logged, never blocking the add — until the three
 manual steps below are done.
 
 1. **Confirm no existing identity.** Before merging `dev` → `master`
