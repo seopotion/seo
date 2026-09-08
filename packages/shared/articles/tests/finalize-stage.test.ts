@@ -78,6 +78,20 @@ beforeEach(() => {
 });
 
 describe('stageFinalize', () => {
+  test('strips a leading H1 the humanize pass added back, instead of failing the run', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat();
+    const run = makeRun({
+      working: { outline, content: `# ${outline.h1}\n\n${content}`, readability_grade: 6 },
+      presets: presetsNoVideo,
+    });
+
+    await stageFinalize(run, { llm, youtube });
+
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(createArticle).toHaveBeenCalledWith(expect.objectContaining({ content }));
+  });
+
   test('happy path: creates the article with the readability object and links the keyword', async () => {
     const llm = llmReplying(semanticPass);
     const youtube = youtubeThat();
