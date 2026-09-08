@@ -46,20 +46,35 @@ const MESSAGES: Record<string, string> = {
     'The uploaded file does not match its declared type or size. Select the file again.',
   invalid_image_file: 'The file is not a valid supported image, or exceeds 40 megapixels.',
   image_storage_unavailable: 'Image storage is not configured for this environment.',
-  image_upload_failed:
-    'The upload failed. Check your connection and retry; the upload URL may have expired.',
+  image_upload_failed: 'Image storage rejected the upload. Please try again.',
+  image_upload_network_error:
+    'The browser could not upload to image storage. Check your connection and whether storage CORS allows this admin app address.',
+  image_upload_cancelled: 'The image upload was cancelled. Please try again.',
   image_upload_timeout: 'The upload timed out. Check your connection and try again.',
   manual_images_only: 'Manual uploads are available only for manually created articles.',
 
-  // WordPress publish / update.
+  // Publishing.
   wordpress_not_connected: 'This org has no WordPress connection — connect the plugin first.',
   already_published: 'This article already has a WordPress post — use “Update live post”.',
   not_published: 'This article was never published — use “Publish to WordPress” first.',
-  images_not_complete: 'WordPress publishing needs the images to be complete.',
+  images_not_complete: 'Publishing needs the images to be complete.',
   post_id_not_saved:
     'WordPress created the post but we failed to store its id — check the site before retrying, ' +
     'or a second publish would duplicate it.',
   wordpress_request_failed: "The customer's WordPress site did not respond — try again.",
+  static_site_not_connected: 'This org has no custom-site connection.',
+  static_publish_in_progress: 'A custom-site publish is already in progress — try again shortly.',
+  slug_conflict: 'Another published article already uses this slug on the custom site.',
+  installation_not_found: 'The GitHub App installation no longer exists for this repository.',
+  installation_suspended: 'The GitHub App installation is suspended.',
+  missing_write_permission: 'The GitHub App does not have write access to this repository.',
+  repo_not_found: 'The connected GitHub repository or branch could not be found.',
+  commit_rejected: 'GitHub rejected the custom-site commit.',
+  ref_conflict: 'The repository changed during publishing — retry with the latest branch state.',
+  github_request_failed: 'GitHub did not respond successfully — try again.',
+  invalid_provider_response: 'GitHub returned an invalid response — try again.',
+  record_failed:
+    'The commit succeeded but its publication state was not saved — check the repository before retrying.',
 
   // Phase-2 unstick levers. Each is a conditional update losing its race: the
   // row moved on since the page loaded, so the copy says what to do about it.
@@ -89,5 +104,8 @@ export function errorMessage(code: string): string {
 
 /** What to show the operator for a thrown query/mutation error. */
 export function errorText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.code === 'image_upload_failed' && error.status > 0) {
+    return `Image storage rejected the upload (HTTP ${error.status}). Please try again.`;
+  }
   return error instanceof ApiError ? errorMessage(error.code) : fallback;
 }

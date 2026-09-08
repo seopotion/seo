@@ -18,6 +18,7 @@ const queryMocks = vi.hoisted(() => ({
   createArticle: vi.fn(),
   fetchArticle: vi.fn(),
   fetchArticles: vi.fn(),
+  fetchPublishingTargets: vi.fn(),
 }));
 
 vi.mock('../src/lib/queries', async (importOriginal) => ({
@@ -113,6 +114,8 @@ beforeEach(() => {
   vi.mocked(createArticle).mockReset();
   vi.mocked(fetchArticle).mockReset();
   vi.mocked(fetchArticles).mockReset();
+  queryMocks.fetchPublishingTargets.mockReset();
+  queryMocks.fetchPublishingTargets.mockResolvedValue({ destinations: [] });
 });
 
 describe('CreateArticlePage', () => {
@@ -268,6 +271,7 @@ test('nullable article list and detail values use explicit fallbacks', async () 
         published_at: null,
         images_status: 'complete',
         wordpress_post_id: null,
+        published_to: [],
       },
     ],
     total: 1,

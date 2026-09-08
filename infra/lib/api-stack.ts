@@ -104,7 +104,7 @@ export class ApiStack extends Stack {
     // registration, minting per-publish installation tokens. Same out-of-band
     // SecureString pattern — `file://` so the PEM's newlines survive:
     //   aws ssm put-parameter --name /seo/<stage>/github-app-key --type SecureString --value file://seopotion.<stage>.private-key.pem
-    // Granted only to the API and dedicated publish worker.
+    // Granted only to the API, dedicated publish worker, and admin API.
     const githubAppKeyParam = StringParameter.fromSecureStringParameterAttributes(
       this,
       'GithubAppKeyParam',
@@ -384,7 +384,12 @@ export class ApiStack extends Stack {
       enforceSSL: true,
       cors: [
         {
-          allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+          allowedOrigins: [
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+          ],
           allowedMethods: [HttpMethods.PUT],
           allowedHeaders: ['content-type', 'cache-control', 'if-none-match', 'x-amz-*'],
           maxAge: 300,
@@ -679,6 +684,8 @@ export class ApiStack extends Stack {
         SCAN_QUEUE_URL: scanQueue.queueUrl,
         STRATEGY_STATE_MACHINE_ARN: strategyStateMachine.stateMachineArn,
         ARTICLE_STATE_MACHINE_ARN: articleStateMachine.stateMachineArn,
+        GITHUB_APP_CLIENT_ID: cfg.githubAppClientId,
+        GITHUB_APP_KEY_PARAM: cfg.githubAppKeyParam,
         // Promo-code mint/deactivate (apps/api/src/admin/routes/promo-codes.ts)
         // call the LS discounts API via getBillingProvider(). Only the API key
         // + store id are needed — createDiscount/deleteDiscount never touch the
@@ -700,6 +707,7 @@ export class ApiStack extends Stack {
     adminJwtSecretParam.grantRead(adminFn);
     adminOperatorsParam.grantRead(adminFn);
     lemonSqueezyApiKeyParam.grantRead(adminFn);
+    githubAppKeyParam.grantRead(adminFn);
     strategyStateMachine.grantStartExecution(adminFn);
     articleStateMachine.grantStartExecution(adminFn);
 

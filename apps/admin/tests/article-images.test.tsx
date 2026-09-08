@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   uploadImageFile: vi.fn(),
   finalizeImageUpload: vi.fn(),
   fetchArticle: vi.fn(),
+  fetchPublishingTargets: vi.fn(),
 }));
 vi.mock('../src/lib/image-uploads', () => mocks);
 vi.mock('../src/lib/queries', async (importOriginal) => ({
@@ -74,6 +75,7 @@ beforeEach(() => {
   );
   mocks.finalizeImageUpload.mockResolvedValue(uploaded);
   mocks.fetchArticle.mockResolvedValue(article);
+  mocks.fetchPublishingTargets.mockResolvedValue({ destinations: [] });
 });
 afterEach(cleanup);
 
@@ -177,15 +179,19 @@ test('retains a successful upload token to retry finalization after a network er
   expect(mocks.finalizeImageUpload).toHaveBeenCalledTimes(2);
 });
 
-test('shows upload errors without finalizing or changing the article', async () => {
+test.each([
+  ['image_upload_failed', 403, 'HTTP 403'],
+  ['image_upload_network_error', 0, 'storage CORS allows this admin app address'],
+] as const)('shows %s after preparation succeeds without finalizing the article', async (code, status, message) => {
   const user = setup();
-  mocks.uploadImageFile.mockRejectedValueOnce(new ApiError('image_upload_failed', 403));
+  mocks.uploadImageFile.mockRejectedValueOnce(new ApiError(code, status));
   await selectFile(user);
   await user.click(screen.getByRole('button', { name: 'Upload image' }));
   expect(await screen.findByRole('alert')).toHaveProperty(
     'textContent',
-    expect.stringContaining('upload failed'),
+    expect.stringContaining(message),
   );
+  expect(mocks.prepareImageUpload).toHaveBeenCalledTimes(1);
   expect(mocks.finalizeImageUpload).not.toHaveBeenCalled();
   expect(onUploaded).not.toHaveBeenCalled();
 });

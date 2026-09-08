@@ -40,9 +40,9 @@ export function uploadImageFile(
       xhr.status >= 200 && xhr.status < 300
         ? resolve()
         : reject(new ApiError('image_upload_failed', xhr.status));
-    xhr.onerror = () => reject(new ApiError('image_upload_failed', 0));
+    xhr.onerror = () => reject(new ApiError('image_upload_network_error', 0));
     xhr.ontimeout = () => reject(new ApiError('image_upload_timeout', 0));
-    xhr.onabort = () => reject(new ApiError('image_upload_failed', 0));
+    xhr.onabort = () => reject(new ApiError('image_upload_cancelled', 0));
     xhr.timeout = 120_000;
     xhr.send(file);
   });

@@ -341,7 +341,7 @@ export const AdminArticlesQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-/** Admin history row with operational image and legacy WordPress state. */
+/** Admin history row with operational image and provider publication state. */
 const AdminArticleListItem = z
   .object({
     id: z.string(),
@@ -356,12 +356,34 @@ const AdminArticleListItem = z
     published_at: z.string().nullable(),
     images_status: z.enum(IMAGES_STATUSES),
     wordpress_post_id: z.number().int().nullable(),
+    published_to: z.array(z.enum(['wordpress', 'static-site'])),
   })
   .openapi('AdminArticleListItem');
 
 export const AdminArticlesResponse = z
   .object({ articles: z.array(AdminArticleListItem), total: z.number().int() })
   .openapi('AdminArticlesResponse');
+
+export const AdminPublishingTarget = z
+  .object({
+    provider: z.enum(['wordpress', 'static-site']),
+    target: z.string(),
+    connected_at: z.string(),
+    last_error: z.object({ code: z.string(), at: z.string() }).nullable(),
+  })
+  .openapi('AdminPublishingTarget');
+
+export const AdminPublishingTargetsResponse = z
+  .object({ destinations: z.array(AdminPublishingTarget) })
+  .openapi('AdminPublishingTargetsResponse');
+
+export const AdminStaticSitePublishResponse = z
+  .object({ commit_sha: z.string(), commit_url: z.string(), path: z.string() })
+  .openapi('AdminStaticSitePublishResponse');
+
+export const AdminStaticSitePublishErrorResponse = z
+  .object({ error: z.string() })
+  .openapi('AdminStaticSitePublishErrorResponse');
 
 // --- Promo codes (design spec 2026-08-29) ---
 
