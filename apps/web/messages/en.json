@@ -343,6 +343,8 @@
     },
     "description": "Plan one article per day, month by month.",
     "modal": {
+      "failureReason": "Failure reason",
+      "generationFailed": "The last generation attempt failed.",
       "keyword": "Keyword",
       "notGenerated": "This article has not been generated yet.",
       "scheduledDate": "Scheduled date",
@@ -412,6 +414,7 @@
     },
     "scheduledCount": "{count} scheduled",
     "statuses": {
+      "failed": "Failed",
       "generated": "Generated",
       "planned": "Planned"
     },

@@ -167,6 +167,8 @@ function PlannedArticleDetails({
   onClose: () => void;
   t: ContentPlannerTranslations;
 }) {
+  const failed = article.generationStatus === 'failed';
+
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -178,7 +180,9 @@ function PlannedArticleDetails({
           >
             {article.keyword}
           </h2>
-          <p className="mt-2 text-muted-foreground text-sm">{t('modal.notGenerated')}</p>
+          <p className={cn('mt-2 text-sm', failed ? 'text-error' : 'text-muted-foreground')}>
+            {failed ? t('modal.generationFailed') : t('modal.notGenerated')}
+          </p>
         </div>
         <Button
           type="button"
@@ -212,9 +216,15 @@ function PlannedArticleDetails({
         <div className="grid gap-1">
           <dt className="text-muted-foreground">{t('modal.status')}</dt>
           <dd>
-            <StatusBadge status={article.status} t={t} />
+            <StatusBadge status={failed ? 'failed' : article.status} t={t} />
           </dd>
         </div>
+        {failed && article.generationError ? (
+          <div className="grid gap-1">
+            <dt className="text-muted-foreground">{t('modal.failureReason')}</dt>
+            <dd className="break-words text-foreground">{article.generationError}</dd>
+          </div>
+        ) : null}
       </dl>
     </>
   );
@@ -224,7 +234,7 @@ function StatusBadge({
   status,
   t,
 }: {
-  status: PlannerArticleStatus;
+  status: PlannerArticleStatus | 'failed';
   t: ContentPlannerTranslations;
 }) {
   return (
@@ -232,7 +242,9 @@ function StatusBadge({
       variant="secondary"
       className={cn(
         'w-fit border-transparent',
-        status === 'generated' ? 'bg-success-muted text-success' : 'bg-info-muted text-info',
+        status === 'generated' && 'bg-success-muted text-success',
+        status === 'planned' && 'bg-info-muted text-info',
+        status === 'failed' && 'bg-error-muted text-error',
       )}
     >
       {t(`statuses.${status}`)}
