@@ -287,7 +287,10 @@ export function ArticleEditorPanel({
             ) : (
               <div className="min-h-90 rounded-md border border-border bg-card p-4 lg:min-h-107">
                 {draftArticle.content.trim() ? (
-                  <ArticleContentPreview content={draftArticle.content} />
+                  <ArticleContentPreview
+                    title={draftArticle.title}
+                    content={draftArticle.content}
+                  />
                 ) : (
                   <p className="text-muted-foreground">{t('preview.empty')}</p>
                 )}

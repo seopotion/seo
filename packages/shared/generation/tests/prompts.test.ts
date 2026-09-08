@@ -49,6 +49,15 @@ describe('article + humanize prompts', () => {
     expect(joined.toLowerCase()).toContain('markdown');
   });
 
+  test('buildArticlePrompt hands over the title but forbids an H1 in the body', () => {
+    const [system, user] = buildArticlePrompt(ctx, outline);
+    expect(system!.content).toContain('Do not write an H1');
+    expect(system!.content).not.toContain('Start with a single H1');
+    expect(user!.content).toContain(
+      'Title (rendered by the page; do not repeat it): Los Mejores Widgets',
+    );
+  });
+
   test('buildHumanizePrompt passes the markdown as the user message', () => {
     const msgs = buildHumanizePrompt(ctx, '# Title\n\nbody');
     expect(msgs.at(-1)!.role).toBe('user');

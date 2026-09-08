@@ -9,6 +9,23 @@ import {
 import { extractLinks, maskCode, maskIndentedCode, normalizeUrl } from './links';
 import type { GenerationContext, ValidationFailure } from './types';
 
+/**
+ * Drop an H1 that opens the body (blank lines and up to 3 spaces of indent
+ * tolerated), plus the blank lines after it. The model is told not to write
+ * one, but a title line is the format it has seen most; stripping it here
+ * beats failing the whole run. Anything else is returned unchanged — an H1
+ * later in the body is a real validation failure, not something to hide.
+ */
+export function stripLeadingH1(md: string): string {
+  const lines = md.split('\n');
+  let i = 0;
+  while (i < lines.length && lines[i]?.trim() === '') i++;
+  if (i === lines.length || !/^ {0,3}#\s+/.test(lines[i] as string)) return md;
+  i++;
+  while (i < lines.length && lines[i]?.trim() === '') i++;
+  return lines.slice(i).join('\n');
+}
+
 export function countWords(md: string): number {
   return md
     .replace(/[#>*_`~-]/g, ' ')
@@ -86,8 +103,13 @@ export function validateArticle(
       code: 'meta_description_length',
       message: `meta_description not ${META_DESCRIPTION_MIN}-${META_DESCRIPTION_MAX} chars`,
     });
-  if (h1Count !== 1)
-    failures.push({ code: 'h1_count', message: `expected 1 H1, found ${h1Count}` });
+  // The page renders `title` as the H1 (static-site contract § Body rules 2,
+  // WordPress themes, the in-app preview), so one in the body doubles it.
+  if (h1Count !== 0)
+    failures.push({
+      code: 'h1_count',
+      message: `expected no H1 (the page renders the title), found ${h1Count}`,
+    });
   if (h2Count < MIN_H2)
     failures.push({ code: 'h2_count', message: `fewer than ${MIN_H2} H2 sections` });
   if (introText(lines, masked).length === 0)
