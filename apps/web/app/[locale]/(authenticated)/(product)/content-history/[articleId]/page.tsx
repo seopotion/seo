@@ -754,7 +754,7 @@ export default function ArticleDetailPage() {
             />
           ) : null}
 
-          <ArticleContentPreview content={article.content} />
+          <ArticleContentPreview title={article.title} content={article.content} />
         </section>
       ) : null}
     </div>

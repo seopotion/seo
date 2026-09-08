@@ -358,6 +358,52 @@ export const dbCommand = defineCommand({
         }
       },
     }),
+    'strip-h1': defineCommand({
+      meta: {
+        name: 'strip-h1',
+        description:
+          'Drop the leading H1 from existing article bodies (the page renders the title); dry run by default',
+      },
+      args: {
+        org: { type: 'string', description: 'Org id to clean' },
+        apply: {
+          type: 'boolean',
+          description: 'Write the changes (default: dry run)',
+          default: false,
+        },
+        ...outputOption,
+        ...verboseOption,
+      },
+      async run({ args }) {
+        const emitter = createEmitter(args.output as OutputMode);
+        try {
+          const { stripH1 } = await import('../lib/strip-h1');
+
+          emitter.warn(
+            args.apply
+              ? "Writes to whatever MONGO_URI targets — safe and intended for prod. Republish every published article it changes, or the customer's site keeps the duplicate H1."
+              : 'Dry run against whatever MONGO_URI targets — nothing is written. Safe and intended for prod; pass --apply to write.',
+          );
+          emitter.step('db:strip-h1', 'start');
+
+          const result = await stripH1({
+            org: args.org as string | undefined,
+            apply: args.apply as boolean,
+          });
+          emitter.step('db:strip-h1', result.ok ? 'done' : 'fail');
+          if (result.ok && result.data.publishedChanged.length) {
+            emitter.warn(
+              `${result.data.publishedChanged.length} PUBLISHED article(s) changed — republish them so the customer's site picks up the fix.`,
+            );
+          }
+          emitter.result(result);
+
+          process.exit(result.ok ? EXIT.SUCCESS : EXIT.USER_ERROR);
+        } catch (e) {
+          return emitInternal(emitter, e);
+        }
+      },
+    }),
     'reset-images': defineCommand({
       meta: {
         name: 'reset-images',

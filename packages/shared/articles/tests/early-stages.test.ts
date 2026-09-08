@@ -136,22 +136,32 @@ describe('stageDraft', () => {
     expect(llm.complete).not.toHaveBeenCalled();
   });
 
+  const outline = {
+    h1: 'Best Widgets For Makers',
+    meta_title: 'Best Widgets For Makers 2026',
+    meta_description: 'x'.repeat(140),
+    slug: 'best-widgets',
+    sections: [{ heading: 'One', intent: 'i' }],
+    faqs: [],
+    internal_links: [],
+    cta: 'Compare the best option for your needs.',
+  };
+
   test('returns the draft text from the llm when an outline is checkpointed', async () => {
-    const outline = {
-      h1: 'Best Widgets For Makers',
-      meta_title: 'Best Widgets For Makers 2026',
-      meta_description: 'x'.repeat(140),
-      slug: 'best-widgets',
-      sections: [{ heading: 'One', intent: 'i' }],
-      faqs: [],
-      internal_links: [],
-      cta: 'Compare the best option for your needs.',
-    };
     const llm = llmReplying('<llm text>');
     const run = makeRun({ working: { outline } });
 
     const result = await stageDraft(run, llm);
 
     expect(result).toEqual({ completed: true, working: { draft: '<llm text>' } });
+  });
+
+  test('strips an H1 the model opens with anyway: the page renders the title', async () => {
+    const llm = llmReplying('# Best Widgets For Makers\n\nIntro.\n\n## One\n\nBody.');
+    const run = makeRun({ working: { outline } });
+
+    const result = await stageDraft(run, llm);
+
+    expect(result.working).toEqual({ draft: 'Intro.\n\n## One\n\nBody.' });
   });
 });

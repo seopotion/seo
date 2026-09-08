@@ -16,9 +16,11 @@ import { cn } from '@/lib/utils';
  * Raw HTML is parsed, then sanitized to GitHub's default schema plus `iframe`;
  * the `iframe` component below only mounts YouTube embed URLs.
  */
-export function ArticleContentPreview({ content }: { content: string }) {
+export function ArticleContentPreview({ title, content }: { title: string; content: string }) {
   return (
     <article className="grid gap-4 wrap-break-word text-foreground">
+      {/* The body carries no H1: the page renders `title`, here as on the customer's site. */}
+      <h1 className="font-semibold text-2xl text-foreground leading-tight">{title}</h1>
       <Markdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema]]}

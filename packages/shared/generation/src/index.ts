@@ -64,7 +64,7 @@ export {
 export type { CompleteTopicBrief, TopicBriefFields } from './topic';
 export { completeTopicBrief } from './topic';
 export type * from './types';
-export { countWords, validateArticle } from './validate';
+export { countWords, stripLeadingH1, validateArticle } from './validate';
 export type { VideoPickInput } from './video';
 export {
   buildVideoEmbed,
