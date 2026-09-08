@@ -25,6 +25,29 @@ describe('errorMessage', () => {
     }
   });
 
+  test('maps every static-site publishing refusal', () => {
+    for (const code of [
+      'static_site_not_connected',
+      'static_publish_in_progress',
+      'slug_conflict',
+      'installation_not_found',
+      'installation_suspended',
+      'missing_write_permission',
+      'repo_not_found',
+      'commit_rejected',
+      'ref_conflict',
+      'github_request_failed',
+      'invalid_provider_response',
+      'record_failed',
+    ]) {
+      expect(errorMessage(code)).not.toBe(code);
+    }
+  });
+
+  test('describes the images guard for every publishing destination', () => {
+    expect(errorMessage('images_not_complete')).not.toContain('WordPress');
+  });
+
   test('maps every refusal the phase-2 unstick levers can return', () => {
     for (const code of [
       'candidate_not_restorable',
@@ -50,6 +73,12 @@ describe('errorMessage', () => {
 });
 
 describe('errorText', () => {
+  test('distinguishes storage HTTP failures from browser network/CORS failures', () => {
+    expect(errorText(new ApiError('image_upload_failed', 403), 'fallback')).toContain('HTTP 403');
+    const networkMessage = errorText(new ApiError('image_upload_network_error', 0), 'fallback');
+    expect(networkMessage).toContain('CORS');
+    expect(networkMessage).not.toContain('expired');
+  });
   test('renders the mapped message for an ApiError', () => {
     expect(errorText(new ApiError('no_presets', 409), 'fallback')).toBe(errorMessage('no_presets'));
   });

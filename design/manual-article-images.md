@@ -43,7 +43,14 @@ Each stage's AdminFn receives that stack's ImagesBucket and image CDN domain.
 Its object permissions are only GetObject and PutObject on `articles/*/manual-*`;
 there is no bucket listing, deletion, ACL, or generated-image write permission.
 The bucket remains private with CloudFront OAC. Upload CORS permits PUT from the
-current locally hosted admin app at `http://localhost:5173` and
-`http://127.0.0.1:5173`. If the admin app is hosted elsewhere, add that exact origin
+locally hosted admin app on ports 3000 and 5173 at `http://localhost` and
+`http://127.0.0.1`. If the admin app is hosted elsewhere, add that exact origin
 to the bucket CORS configuration. Local API development needs IMAGES_BUCKET,
 IMAGES_CDN_DOMAIN, and AWS credentials for the intended stage.
+
+The preparation endpoint returns 200 when the upload URL is ready, before any
+file bytes are sent. The browser then performs a separate S3 PUT and calls
+finalization only after that succeeds. A CORS failure can therefore follow a
+successful preparation response. Compare the failing OPTIONS request's Origin
+with the deployed bucket CORS allowlist; ports are part of the origin. Browser
+network/CORS failures and storage HTTP rejections have distinct UI messages.

@@ -12,7 +12,7 @@ import { useOrgDetail } from '../OrgWorkspace';
 
 /**
  * Every article the org has, with the two states the customer app never shows:
- * how far the image pipeline got, and whether the piece is live on WordPress.
+ * how far the image pipeline got, and where the piece has been published.
  * Both decide what the editor will let an operator do, so they are columns here
  * rather than a surprise on the next screen.
  */
@@ -85,7 +85,7 @@ export function ArticlesTab() {
                 <Th>Search volume</Th>
                 <Th>Status</Th>
                 <Th>Images</Th>
-                <Th>WordPress</Th>
+                <Th>Publishing</Th>
                 <Th>Created</Th>
                 <Th>Published</Th>
               </>
@@ -115,10 +115,16 @@ export function ArticlesTab() {
                   </Badge>
                 </Td>
                 <Td>
-                  {article.wordpress_post_id ? (
-                    <Badge tone="good">published to WP · #{article.wordpress_post_id}</Badge>
+                  {article.published_to.length === 0 ? (
+                    <Badge>not published</Badge>
                   ) : (
-                    <Badge>not on WP</Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {article.published_to.map((provider) => (
+                        <Badge key={provider} tone="good">
+                          {provider === 'wordpress' ? 'WordPress' : 'Custom site'}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                 </Td>
                 <Td>

@@ -136,10 +136,19 @@ export function toAdminScheduledKeyword(k: Keyword): z.infer<typeof schemas.Admi
   };
 }
 
-/** Admin history row with operational image and legacy WordPress state. */
+/** Admin history row with operational image and provider publication state. */
 export function toAdminArticleListItem(
   a: Article,
 ): z.infer<typeof schemas.AdminArticlesResponse>['articles'][number] {
+  const publications = a.publications ?? [];
+  const publishedTo = [
+    ...(a.wordpress_post_id || publications.some((entry) => entry.provider === 'wordpress')
+      ? (['wordpress'] as const)
+      : []),
+    ...(publications.some((entry) => entry.provider === 'static-site')
+      ? (['static-site'] as const)
+      : []),
+  ];
   return {
     id: a.id,
     title: a.title,
@@ -153,6 +162,7 @@ export function toAdminArticleListItem(
     published_at: a.published_at ? a.published_at.toISOString() : null,
     images_status: a.images_status,
     wordpress_post_id: a.wordpress_post_id ?? null,
+    published_to: publishedTo,
   };
 }
 

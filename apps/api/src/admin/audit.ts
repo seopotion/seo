@@ -30,6 +30,8 @@ export type AdminActionName =
   | 'article.update_content'
   | 'article.wordpress_publish'
   | 'article.wordpress_update'
+  | 'article.static_site_publish'
+  | 'article.static_site_update'
   | 'article.images_replay'
   | 'article.image_upload'
   | 'promo_code.create'
