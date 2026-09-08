@@ -20,7 +20,7 @@ import { keyword, makeRun, presets } from './fixtures';
 
 // Copied from packages/shared/generation/tests/generate.test.ts — clears
 // WORD_COUNT_FLOOR (800) and carries two distinct H2 sections.
-const content = `# Best Widgets For Makers\n\n${'Intro paragraph words here. '.repeat(20)}\n\n## One\n\n${'Body one content unique. '.repeat(100)}\n\n## Two\n\n${'Body two content unique. '.repeat(100)}\n`;
+const content = `${'Intro paragraph words here. '.repeat(20)}\n\n## One\n\n${'Body one content unique. '.repeat(100)}\n\n## Two\n\n${'Body two content unique. '.repeat(100)}\n`;
 
 const outline = {
   h1: 'Best Widgets For Makers',
@@ -179,7 +179,7 @@ describe('stageFinalize', () => {
 
     await expect(stageFinalize(run, { llm, youtube })).rejects.toThrow(
       new ArticleFatalError(
-        'validation: h1_count: expected 1 H1, found 2 | semantic: keyword_use: keyword absent; call_to_action: no CTA',
+        'validation: h1_count: expected no H1 (the page renders the title), found 1 | semantic: keyword_use: keyword absent; call_to_action: no CTA',
       ),
     );
     expect(createArticle).not.toHaveBeenCalled();

@@ -355,6 +355,14 @@ export interface CleanLinksData {
   publishedChanged: { id: string; title: string }[];
 }
 
+export interface StripH1Data {
+  org: string;
+  apply: boolean;
+  scanned: number;
+  changed: number;
+  publishedChanged: { id: string; title: string }[];
+}
+
 export interface SetPostBaseData {
   org: string;
   postUrlBase: string;
