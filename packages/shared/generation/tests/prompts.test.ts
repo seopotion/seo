@@ -58,6 +58,17 @@ describe('article + humanize prompts', () => {
     );
   });
 
+  test('buildArticlePrompt asks for the introduction as plain paragraphs under no heading', () => {
+    const [system] = buildArticlePrompt(ctx, outline);
+    expect(system!.content).toContain('under no heading');
+    expect(system!.content).toContain('not even "## Introduction"');
+  });
+
+  test('buildHumanizePrompt forbids adding a title or H1', () => {
+    const [system] = buildHumanizePrompt(ctx, 'Intro.\n\n## A\n\nBody.');
+    expect(system!.content).toContain('Do not add a title or H1');
+  });
+
   test('buildHumanizePrompt passes the markdown as the user message', () => {
     const msgs = buildHumanizePrompt(ctx, '# Title\n\nbody');
     expect(msgs.at(-1)!.role).toBe('user');

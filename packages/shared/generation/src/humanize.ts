@@ -20,6 +20,8 @@ export function buildHumanizePrompt(
     'You are an editor improving readability and natural human tone.',
     'Rewrite the article to read naturally and engagingly while preserving meaning,',
     'the Markdown structure (same headings, same order), all facts, and keyword usage.',
+    // The page renders the title; a restored `# Title` fails validation.
+    'Do not add a title or H1: the body starts with its introduction paragraphs and its first heading is an H2.',
     'Return ONLY the revised Markdown, with no commentary.',
     `Keep it written in ${ctx.language}.`,
     ctx.includeCta
