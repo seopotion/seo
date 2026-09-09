@@ -45,8 +45,11 @@ jobs:
   # is behind the base. Not enforced — a red check is a signal, not a block —
   # and it only re-runs on PR events, so a PR can still go stale after going
   # green. Uses the compare API, so no checkout or history depth needed.
+  # Skipped for release PRs (dev -> master): master carries the merge commits
+  # of every earlier release, which dev never gets back, so it always reads as
+  # "behind" there — release PRs are ahead of master by construction.
   up-to-date:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'master'
     runs-on: ubuntu-latest
     steps:
       - name: Fail when the PR branch is behind its base
