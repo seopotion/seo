@@ -28,7 +28,12 @@ export default defineConfig({
         resolve,
         test: {
           name: 'node',
-          include: ['apps/**/tests/**/*.test.ts', 'packages/**/tests/**/*.test.ts'],
+          include: [
+            'apps/**/tests/**/*.test.ts',
+            'packages/**/tests/**/*.test.ts',
+            // Standalone CDK package (own node_modules); only its git-only guard is unit-tested here.
+            'infra/tests/**/*.test.ts',
+          ],
           exclude,
         },
       },
