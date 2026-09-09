@@ -39,3 +39,25 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+  # Free-tier stand-in for "require branches to be up to date before merging"
+  # (rulesets need GitHub Team on a private repo): fail the PR when its branch
+  # is behind the base. Not enforced — a red check is a signal, not a block —
+  # and it only re-runs on PR events, so a PR can still go stale after going
+  # green. Uses the compare API, so no checkout or history depth needed.
+  up-to-date:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when the PR branch is behind its base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          behind=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE}...${HEAD}" --jq .behind_by)
+          echo "behind ${BASE} by ${behind} commit(s)"
+          if [ "$behind" -gt 0 ]; then
+            echo "::error::Branch is ${behind} commit(s) behind ${BASE} — merge ${BASE} into it (or use 'Update branch') and push."
+            exit 1
+          fi

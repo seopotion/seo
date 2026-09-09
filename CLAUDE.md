@@ -95,7 +95,8 @@ staging deploy run of its own. Despite the git prelude naming `master`, **PRs ta
 - Never commit or merge directly to `dev` or `master` — always go through a PR.
 - Branch off `dev`, named `<gh-name>/<short-description>` (e.g. `ozykhan/backend-stuff`),
   and open the PR into `dev`. Run the checks above before pushing — CI runs the same
-  checks and must pass.
+  checks and must pass. CI also fails a PR whose branch is behind its base (`up-to-date`
+  job), so merge `dev` into the branch before pushing.
 - Only maintainers merge `dev` → `master` (also via PR) — that's what ships **staging**.
 - Prod ships by publishing a GitHub Release from a `master` commit that staging
   already deployed successfully — see
