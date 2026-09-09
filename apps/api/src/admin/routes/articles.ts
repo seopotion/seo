@@ -33,7 +33,7 @@ const articles = new OpenAPIHono<AdminEnv>()
       responses: {
         200: {
           content: { 'application/json': { schema: schemas.AdminArticlesResponse } },
-          description: 'Article rows incl. images_status + wordpress_post_id',
+          description: 'Article rows including image and provider publication status',
         },
         401: { description: 'Missing or invalid admin token' },
         404: {

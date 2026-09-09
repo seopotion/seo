@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useBlocker, useParams, useSearchParams } from 'react-router';
 import { ArticleFieldErrors, ArticleFields } from '../components/ArticleFields';
 import { ArticleImages } from '../components/ArticleImages';
+import { ArticlePublishing } from '../components/ArticlePublishing';
 import { Badge } from '../components/Badge';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ApiError } from '../lib/api';
@@ -13,21 +14,10 @@ import {
   type ArticleDraft,
   ArticleValidationError,
   fetchArticle,
-  publishToWordPress,
   retryImages,
   updateArticle,
-  updateWordPressPost,
 } from '../lib/queries';
 import { articleStatusTone, imagesTone } from '../lib/status';
-
-const PUBLISH_CUSTOMER_VISIBLE = "This posts the article to the customer's LIVE WordPress site.";
-
-const UPDATE_CUSTOMER_VISIBLE =
-  "This overwrites the article on the customer's LIVE WordPress site.";
-
-const UNSAVED_WARNING =
-  'You have unsaved edits — WordPress is sent the last saved version, not what is in the editor. ' +
-  'Save first if you meant to publish these changes.';
 
 const IMAGES_REPLAY_BODY =
   'The image task is queued again for this article. Replay is idempotent by design — the worker ' +
@@ -99,7 +89,7 @@ function toDraft(article: ArticleDetail): ArticleDraft {
 }
 
 /** The pending two-step confirm, if any. */
-type Pending = { kind: 'publish' } | { kind: 'update' } | { kind: 'images' };
+type Pending = { kind: 'images' };
 
 function ArticleEditor({
   article,
@@ -124,9 +114,14 @@ function ArticleEditor({
   );
 
   const imagesPending = article.images_status === 'pending';
-  const imagesComplete = article.images_status === 'complete';
   const imagesFailed = article.images_status === 'failed';
-  const published = article.wordpress_post_id;
+  const wordpressPublication = article.publications.find(
+    (publication) => publication.provider === 'wordpress',
+  );
+  const staticSitePublication = article.publications.find(
+    (publication) => publication.provider === 'static-site',
+  );
+  const wordpressRef = article.wordpress_post_id ?? wordpressPublication?.ref;
 
   // The tab-close half of the leave guard; the in-app half is the blocker below.
   useEffect(() => {
@@ -149,20 +144,11 @@ function ArticleEditor({
     },
   });
 
-  const invalidateArticle = () => {
-    queryClient.invalidateQueries({ queryKey: ['article', article.id] });
-    queryClient.invalidateQueries({ queryKey: ['articles'] });
-  };
-
-  const publish = useMutation({
-    mutationFn: () => publishToWordPress(article.id),
-    onSuccess: invalidateArticle,
-  });
-
-  const updatePost = useMutation({
-    mutationFn: () => updateWordPressPost(article.id),
-    onSuccess: invalidateArticle,
-  });
+  const invalidateArticle = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['article', article.id] }),
+      queryClient.invalidateQueries({ queryKey: ['articles'] }),
+    ]);
 
   const replayImages = useMutation({
     mutationFn: () => retryImages(article.id),
@@ -186,11 +172,8 @@ function ArticleEditor({
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone={articleStatusTone(article.status)}>{article.status}</Badge>
           <Badge tone={imagesTone(article.images_status)}>images: {article.images_status}</Badge>
-          {published ? (
-            <Badge tone="good">WordPress: published · #{published}</Badge>
-          ) : (
-            <Badge>WordPress: not published</Badge>
-          )}
+          {wordpressRef && <Badge tone="good">WordPress: published · #{wordpressRef}</Badge>}
+          {staticSitePublication && <Badge tone="good">Custom site: published</Badge>}
         </div>
         <p className="mt-3 text-sm text-neutral-400">
           keyword: {article.keyword ?? 'No focus keyword'} · created{' '}
@@ -208,8 +191,8 @@ function ArticleEditor({
       {imagesFailed && (
         <div className="mt-5 rounded border border-red-800 bg-red-950/50 p-3 text-sm text-red-200">
           <p>
-            Image generation failed, which blocks publishing to WordPress. Replaying the task is
-            safe — the worker only fills slots that are still empty.
+            Image generation failed, which blocks publishing. Replaying the task is safe — the
+            worker only fills slots that are still empty.
           </p>
           <button
             type="button"
@@ -267,88 +250,12 @@ function ArticleEditor({
         }}
       />
 
-      <section className="mt-8 rounded border border-neutral-800 bg-neutral-900 p-5">
-        <h2 className="font-semibold">WordPress</h2>
-        <p className="mt-1 text-sm text-neutral-400">
-          {published
-            ? `Live on the customer's site as post #${published}.`
-            : 'Not published. Publishing creates the post on the live site.'}
-        </p>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={
-              !imagesComplete || publish.isPending || updatePost.isPending || imageUploadBusy
-            }
-            onClick={() => setPending({ kind: published ? 'update' : 'publish' })}
-            className="rounded bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {published ? 'Update live post' : 'Publish to WordPress'}
-          </button>
-          {!imagesComplete && (
-            <span className="text-sm text-amber-300">
-              The API refuses this until every image is generated — images are{' '}
-              {article.images_status}.
-            </span>
-          )}
-        </div>
-
-        {publish.isError && (
-          <p className="mt-3 text-sm text-red-400">
-            {errorText(publish.error, 'Could not publish to WordPress.')}
-          </p>
-        )}
-        {updatePost.isError && (
-          <p className="mt-3 text-sm text-red-400">
-            {errorText(updatePost.error, 'Could not update the WordPress post.')}
-          </p>
-        )}
-        {publish.isSuccess && (
-          <WordPressResult
-            message={`Published as post #${publish.data.post_id}.`}
-            warnings={publish.data.warnings}
-          />
-        )}
-        {updatePost.isSuccess && (
-          <WordPressResult
-            message={`Live post #${updatePost.data.post_id} updated.`}
-            warnings={updatePost.data.warnings}
-          />
-        )}
-      </section>
-
-      {pending?.kind === 'publish' && (
-        <ConfirmDialog
-          title="Publish to WordPress"
-          body={`“${article.title}” is created as a new post on the customer's WordPress site.`}
-          confirmLabel="Publish to the live site"
-          variant="danger"
-          warning={dirty ? UNSAVED_WARNING : undefined}
-          customerVisible={PUBLISH_CUSTOMER_VISIBLE}
-          onCancel={() => setPending(null)}
-          onConfirm={() => {
-            setPending(null);
-            publish.mutate();
-          }}
-        />
-      )}
-
-      {pending?.kind === 'update' && (
-        <ConfirmDialog
-          title="Update the live WordPress post"
-          body={`Post #${published} is overwritten with the saved version of this article.`}
-          confirmLabel="Update the live post"
-          variant="danger"
-          warning={dirty ? UNSAVED_WARNING : undefined}
-          customerVisible={UPDATE_CUSTOMER_VISIBLE}
-          onCancel={() => setPending(null)}
-          onConfirm={() => {
-            setPending(null);
-            updatePost.mutate();
-          }}
-        />
-      )}
+      <ArticlePublishing
+        article={article}
+        dirty={dirty}
+        imageUploadBusy={imageUploadBusy}
+        onPublished={invalidateArticle}
+      />
 
       {pending?.kind === 'images' && (
         <ConfirmDialog
@@ -376,22 +283,6 @@ function ArticleEditor({
           onCancel={() => blocker.reset()}
           onConfirm={() => blocker.proceed()}
         />
-      )}
-    </div>
-  );
-}
-
-/** The plugin reports non-fatal problems (missing media, taxonomy) as warnings. */
-function WordPressResult({ message, warnings }: { message: string; warnings?: string[] }) {
-  return (
-    <div className="mt-3 text-sm text-emerald-400">
-      <p>{message}</p>
-      {warnings && warnings.length > 0 && (
-        <ul className="mt-1 list-disc pl-5 text-amber-300">
-          {warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
       )}
     </div>
   );

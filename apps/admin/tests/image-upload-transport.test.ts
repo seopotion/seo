@@ -10,6 +10,7 @@ class FakeXMLHttpRequest {
   onload = () => {};
   onerror = () => {};
   ontimeout = () => {};
+  onabort = () => {};
   status = 200;
   timeout = 0;
   constructor() {
@@ -40,7 +41,12 @@ test('sends file bytes with only the prescribed S3 headers and reports progress'
   await expect(promise).resolves.toBeUndefined();
 });
 
-test.each(['http', 'network', 'timeout'])('reports %s upload failures', async (kind) => {
+test.each([
+  ['http', 'image_upload_failed'],
+  ['network', 'image_upload_network_error'],
+  ['timeout', 'image_upload_timeout'],
+  ['abort', 'image_upload_cancelled'],
+])('reports %s upload failures', async (kind, code) => {
   const promise = uploadImageFile(
     'https://bucket.example.com/key',
     {},
@@ -53,7 +59,9 @@ test.each(['http', 'network', 'timeout'])('reports %s upload failures', async (k
   }
   if (kind === 'network') xhr.onerror();
   if (kind === 'timeout') xhr.ontimeout();
+  if (kind === 'abort') xhr.onabort();
   await expect(promise).rejects.toMatchObject({
-    code: kind === 'timeout' ? 'image_upload_timeout' : 'image_upload_failed',
+    code,
+    status: kind === 'http' ? 403 : 0,
   });
 });

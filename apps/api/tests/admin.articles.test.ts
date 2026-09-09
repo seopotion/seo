@@ -134,11 +134,36 @@ beforeEach(() => {
 });
 
 describe('GET /admin/v0/orgs/{org_id}/articles', () => {
-  test('rows include images_status and wordpress_post_id', async () => {
+  test('rows include images_status, wordpress_post_id, and deterministic published_to', async () => {
     repos.OrgRepo.findById.mockResolvedValueOnce(org);
     repos.ArticleRepo.listByOrg.mockResolvedValueOnce({
-      articles: [{ ...article, wordpress_post_id: 77 }, article],
-      total: 2,
+      articles: [
+        { ...article, wordpress_post_id: 77 },
+        {
+          ...article,
+          wordpress_post_id: undefined,
+          publications: [
+            {
+              provider: 'static-site' as const,
+              ref: 'sha',
+              slug: article.slug,
+              published_at: new Date('2026-07-11T00:00:00.000Z'),
+              updated_at: null,
+              remote_url: 'https://github.com/acme/site/commit/sha',
+            },
+            {
+              provider: 'wordpress' as const,
+              ref: '88',
+              slug: article.slug,
+              published_at: new Date('2026-07-11T00:00:00.000Z'),
+              updated_at: null,
+              remote_url: 'https://example.com/crm-guide',
+            },
+          ],
+        },
+        article,
+      ],
+      total: 3,
     });
 
     const res = await client.admin.v0.orgs[':org_id'].articles.$get(
@@ -147,8 +172,16 @@ describe('GET /admin/v0/orgs/{org_id}/articles', () => {
     );
     if (res.status !== 200) throw new Error('expected 200');
     const json = await res.json();
-    expect(json.articles[0]).toMatchObject({ images_status: 'complete', wordpress_post_id: 77 });
-    expect(json.articles[1]?.wordpress_post_id).toBeNull();
+    expect(json.articles[0]).toMatchObject({
+      images_status: 'complete',
+      wordpress_post_id: 77,
+      published_to: ['wordpress'],
+    });
+    expect(json.articles[1]).toMatchObject({
+      wordpress_post_id: null,
+      published_to: ['wordpress', 'static-site'],
+    });
+    expect(json.articles[2]?.published_to).toEqual([]);
     expect(repos.ArticleRepo.listByOrg).toHaveBeenCalledWith(org.id, {
       status: undefined,
       limit: 20,

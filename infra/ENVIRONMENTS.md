@@ -391,7 +391,12 @@ AWS_PROFILE=seo-staging CDK_DEFAULT_ACCOUNT=977476318001 CDK_DEFAULT_REGION=us-e
 For prod, swap the profile/account (`seo-prod` / `672093561569`) and the stack
 name. **Deploy from `master`, not a feature branch** — `cdk deploy` ships
 whatever is checked out, with no relationship to what staging validated. The
-Release flow below exists precisely to make that impossible.
+Release flow below exists precisely to make that impossible, and the CDK app
+enforces it locally: it refuses to synthesize unless HEAD is a commit on
+`origin/master` with a clean working tree (`infra/lib/git-guard.ts`; a local
+deploy from a feature branch rolled staging back on 2026-09-08). For a
+`cdk synth` / `cdk diff` on a branch pass `-c allow-off-master=1` — never for
+a deploy. CI skips the guard (`GITHUB_ACTIONS`); the workflows pin the ref.
 
 ## Deploying prod
 

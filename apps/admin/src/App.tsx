@@ -7,6 +7,7 @@ import {
 } from 'react-router';
 import { AuthedLayout } from './components/AuthedLayout';
 import { StageBanner } from './components/StageBanner';
+import { LOCAL_ADMIN_SESSION } from './lib/env';
 import { ArticlePage } from './pages/ArticlePage';
 import { CreateArticlePage } from './pages/CreateArticlePage';
 import { LoginPage } from './pages/LoginPage';
@@ -25,7 +26,10 @@ import { SearchPage } from './pages/SearchPage';
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
-      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/login"
+        element={LOCAL_ADMIN_SESSION ? <Navigate to="/" replace /> : <LoginPage />}
+      />
       <Route element={<AuthedLayout />}>
         <Route path="/" element={<SearchPage />} />
         {/* Tabs are nested routes, so every tab is a deep-linkable URL. */}

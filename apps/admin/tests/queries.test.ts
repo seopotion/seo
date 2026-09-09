@@ -46,6 +46,8 @@ const {
   fetchArticles,
   fetchAudit,
   fetchOrg,
+  fetchPublishingTargets,
+  publishToStaticSite,
   publishToWordPress,
   rerunScan,
   resetGeneration,
@@ -500,6 +502,52 @@ describe('WordPress publish/update', () => {
 
     await expect(publishToWordPress('art1')).rejects.toMatchObject({
       code: 'images_not_complete',
+      status: 409,
+    });
+  });
+});
+
+describe('publishing targets and static-site publish', () => {
+  test('loads targets by article id without an org query parameter', async () => {
+    reply = {
+      status: 200,
+      body: {
+        destinations: [
+          {
+            provider: 'static-site',
+            target: 'customer/repository@main',
+            connected_at: '2026-09-01T00:00:00.000Z',
+            last_error: null,
+          },
+        ],
+      },
+    };
+
+    await expect(fetchPublishingTargets('art1')).resolves.toEqual(reply.body);
+    expect(calls[0]?.method).toBe('GET');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1/publishing-targets');
+  });
+
+  test('publishes to the static-site article route', async () => {
+    reply = {
+      status: 200,
+      body: {
+        commit_sha: 'abc123',
+        commit_url: 'https://github.com/customer/repository/commit/abc123',
+        path: 'seopotion/articles/guide.md',
+      },
+    };
+
+    await expect(publishToStaticSite('art1')).resolves.toEqual(reply.body);
+    expect(calls[0]?.method).toBe('POST');
+    expect(calls[0]?.url).toBe('http://localhost:8788/admin/v0/articles/art1/static-site');
+  });
+
+  test('surfaces a static-site refusal as its error code', async () => {
+    reply = { status: 409, body: { error: 'slug_conflict' } };
+
+    await expect(publishToStaticSite('art1')).rejects.toMatchObject({
+      code: 'slug_conflict',
       status: 409,
     });
   });

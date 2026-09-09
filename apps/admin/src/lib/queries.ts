@@ -357,9 +357,29 @@ export async function updateWordPressPost(articleId: string) {
   );
 }
 
+export async function fetchPublishingTargets(articleId: string) {
+  return unwrap(
+    await adminApi.admin.v0.articles[':article_id']['publishing-targets'].$get({
+      param: { article_id: articleId },
+    }),
+  );
+}
+
+export type PublishingTarget = Awaited<
+  ReturnType<typeof fetchPublishingTargets>
+>['destinations'][number];
+
+export async function publishToStaticSite(articleId: string) {
+  return unwrap(
+    await adminApi.admin.v0.articles[':article_id']['static-site'].$post({
+      param: { article_id: articleId },
+    }),
+  );
+}
+
 /**
  * Re-enqueues the image task — the lever for `images_status: 'failed'`, which
- * blocks WordPress publish. The worker's set-if-absent slots make replay
+ * blocks publishing. The worker's set-if-absent slots make replay
  * idempotent, so there is no guard to trip and no 409 to handle.
  */
 export async function retryImages(articleId: string) {
