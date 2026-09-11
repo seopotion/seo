@@ -2,7 +2,12 @@ import { createRoute, OpenAPIHono } from '@hono/zod-openapi';
 import { ArticleRepo, OrgRepo } from '@shared/db';
 import { audit } from '../audit';
 import { toAdminArticleDetail } from '../dto';
-import { finalizeImageUpload, ImageUploadError, prepareImageUpload } from '../image-uploads';
+import {
+  finalizeImageUpload,
+  ImageUploadError,
+  prepareImageUpload,
+  removeArticleImage,
+} from '../image-uploads';
 import type { AdminEnv } from '../middleware';
 import * as schemas from '../schemas';
 
@@ -32,7 +37,15 @@ const errors = {
 
 const articleImages = new OpenAPIHono<AdminEnv>({
   defaultHook: (result, c) => {
-    if (!result.success) return c.json({ error: 'invalid_upload_metadata' }, 400);
+    if (!result.success)
+      return c.json(
+        {
+          error: c.req.path.endsWith('/images/remove')
+            ? 'invalid_image_removal'
+            : 'invalid_upload_metadata',
+        },
+        400,
+      );
   },
 })
   .openapi(
@@ -114,6 +127,52 @@ const articleImages = new OpenAPIHono<AdminEnv>({
             org_id: article.org_id,
             entity: { type: 'article', id: article.id },
             payload: { images: updated.images },
+            before: { images: article.images },
+          });
+        return c.json(toAdminArticleDetail(updated), 200);
+      } catch (error) {
+        if (error instanceof ImageUploadError) return c.json({ error: error.code }, error.status);
+        throw error;
+      }
+    },
+  )
+  .openapi(
+    createRoute({
+      method: 'post',
+      path: '/articles/{article_id}/images/remove',
+      tags: ['admin'],
+      security: [{ Bearer: [] }],
+      request: {
+        params: schemas.AdminArticleParams,
+        body: {
+          required: true,
+          content: { 'application/json': { schema: schemas.AdminImageRemoveBody } },
+        },
+      },
+      responses: {
+        ...errors,
+        200: {
+          description: 'Updated article',
+          content: { 'application/json': { schema: schemas.ArticleDetailResponse } },
+        },
+      },
+    }),
+    async (c) => {
+      if (c.var.adminAuth.role !== 'operator') return c.json({ error: 'operator_required' }, 403);
+      const article = await ArticleRepo.findById(c.req.valid('param').article_id);
+      if (!article || article.status === 'deleted' || !(await OrgRepo.findById(article.org_id))) {
+        return c.json({ error: 'not_found' }, 404);
+      }
+      if (article.keyword_id !== null) return c.json({ error: 'manual_images_only' }, 409);
+      const { url } = c.req.valid('json');
+      try {
+        const updated = await removeArticleImage(article, url);
+        if (updated !== article)
+          await audit(c, {
+            action: 'article.image_remove',
+            org_id: article.org_id,
+            entity: { type: 'article', id: article.id },
+            payload: { url, images: updated.images },
             before: { images: article.images },
           });
         return c.json(toAdminArticleDetail(updated), 200);

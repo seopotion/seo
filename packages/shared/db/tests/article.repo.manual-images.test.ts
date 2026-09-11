@@ -80,6 +80,33 @@ test('returns a conflict without a fallback write when the article snapshot chan
   expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
 });
 
+test('atomically removes the last image and keeps the article ready for publishing', async () => {
+  const before = { ...article, images: [cover], featured_image_url: cover.url };
+  const { id, ...document } = article;
+  findOneAndUpdate.mockResolvedValue({ ...document, _id: new ObjectId(id) });
+  const result = await ArticleRepo.saveManualImage(before, [], article.content, '');
+  expect(result?.images).toEqual([]);
+  expect(result?.featured_image_url).toBe('');
+  expect(result?.images_status).toBe('complete');
+  expect(findOneAndUpdate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      images: [cover],
+      content: before.content,
+      updated_at: before.updated_at,
+    }),
+    {
+      $set: {
+        images: [],
+        content: article.content,
+        featured_image_url: '',
+        images_status: 'complete',
+        updated_at: expect.any(Date),
+      },
+    },
+    { returnDocument: 'after' },
+  );
+});
+
 test('refuses generated articles and image arrays exceeding the slot limits', async () => {
   expect(
     await ArticleRepo.saveManualImage(

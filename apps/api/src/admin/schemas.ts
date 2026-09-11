@@ -6,6 +6,7 @@ import {
   ArticleImageSchema,
   CANDIDATE_STATUSES,
   IMAGES_STATUSES,
+  MAX_MANUAL_IMAGE_BYTES,
   ONBOARDING_INTEGRATIONS,
   PROMO_DURATIONS,
   PROMO_REDEMPTION_STATUSES,
@@ -39,7 +40,7 @@ export function imageHeadings(content: string): string[] {
   return headings.filter((heading) => headings.filter((other) => other === heading).length === 1);
 }
 
-export const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_UPLOAD_IMAGE_BYTES = MAX_MANUAL_IMAGE_BYTES;
 export const AdminImageUploadBody = z
   .object({
     role: z.enum(['cover', 'inline']),
@@ -70,6 +71,11 @@ export const AdminImageFinalizeBody = z
   })
   .strict()
   .openapi('AdminImageFinalizeBody');
+export const AdminImageRemoveBody = z
+  .object({ url: z.url().max(2048) })
+  .strict()
+  .openapi('AdminImageRemoveBody');
+export type AdminImageRemoveBody = z.infer<typeof AdminImageRemoveBody>;
 export { ScheduleBody } from '../schemas/keywords';
 
 export const AdminErrorResponse = z.object({ error: z.string() }).openapi('AdminError');

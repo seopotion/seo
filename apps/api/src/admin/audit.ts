@@ -34,6 +34,7 @@ export type AdminActionName =
   | 'article.static_site_update'
   | 'article.images_replay'
   | 'article.image_upload'
+  | 'article.image_remove'
   | 'promo_code.create'
   | 'promo_code.deactivate';
 

@@ -272,10 +272,10 @@ function ArticleEditor({
 
       {blocker.state === 'blocked' && (
         <ConfirmDialog
-          title={imageUploadBusy ? 'Leave during image upload?' : 'Discard unsaved changes?'}
+          title={imageUploadBusy ? 'Leave during image changes?' : 'Discard unsaved changes?'}
           body={
             imageUploadBusy
-              ? 'The image upload is still running. Stay here until it finishes.'
+              ? 'An image change is still running. Stay here until it finishes.'
               : 'This article has edits that were never saved. Leaving throws them away.'
           }
           confirmLabel="Discard and leave"

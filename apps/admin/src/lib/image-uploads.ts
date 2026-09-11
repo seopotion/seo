@@ -1,3 +1,4 @@
+import { MAX_MANUAL_IMAGE_BYTES } from '@shared/schemas';
 import type { InferRequestType } from 'hono/client';
 import { ApiError, adminApi, unwrap } from './api';
 
@@ -23,12 +24,24 @@ export async function finalizeImageUpload(articleId: string, token: string) {
   );
 }
 
+export async function removeArticleImage(articleId: string, url: string) {
+  return unwrap(
+    await adminApi.admin.v0.articles[':article_id'].images.remove.$post({
+      param: { article_id: articleId },
+      json: { url },
+    }),
+  );
+}
+
 export function uploadImageFile(
   url: string,
   headers: Record<string, string>,
   file: File,
   onProgress: (percent: number) => void,
 ): Promise<void> {
+  if (file.size === 0 || file.size > MAX_MANUAL_IMAGE_BYTES) {
+    return Promise.reject(new ApiError('image_compression_limit', 0));
+  }
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);

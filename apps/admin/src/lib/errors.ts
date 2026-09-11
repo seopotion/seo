@@ -32,26 +32,35 @@ const MESSAGES: Record<string, string> = {
     'The images worker is still writing this article — it would overwrite the save. ' +
     'Wait for images to finish, then reload.',
   images_not_supported: 'Standalone articles do not support image generation.',
-  invalid_upload_metadata: 'Choose a WebP, JPEG, or PNG up to 5 MiB, with descriptive alt text.',
+  invalid_upload_metadata: 'The optimized image must be at most 100 KB, with descriptive alt text.',
+  invalid_image_source: 'Choose a WebP, JPEG, or PNG file up to 5 MiB.',
+  image_decode_failed:
+    'The image could not be read, or exceeds 40 megapixels. Choose another image.',
+  image_optimization_failed: 'The image could not be optimized. Try again or choose another image.',
+  image_webp_unsupported: 'This browser cannot create WebP images. Try another browser.',
+  image_compression_limit:
+    'The image could not be reduced to 100 KB. Choose a simpler or smaller image.',
   invalid_image_placement:
     'The H2 section is missing or ambiguous. Reload and choose a unique section.',
   manual_image_limit:
     'This article already has eight images. Choose an existing placement to replace one.',
   image_slot_changed: 'This placement changed during the upload. Reload before trying again.',
-  article_changed: 'The article changed during the upload. Reload and retry finalization.',
+  article_changed: 'The article changed. Reload and try again.',
+  invalid_image_removal: 'The image could not be identified. Reload and try again.',
   invalid_upload_token:
     'This upload expired or belongs to another session. Select the file again to restart.',
   upload_not_found: 'The file has not reached storage. Select the file again and retry the upload.',
   uploaded_file_mismatch:
     'The uploaded file does not match its declared type or size. Select the file again.',
-  invalid_image_file: 'The file is not a valid supported image, or exceeds 40 megapixels.',
+  invalid_image_file:
+    'The uploaded image must be valid, at most 100 KB, and at most 1200 px per edge.',
   image_storage_unavailable: 'Image storage is not configured for this environment.',
   image_upload_failed: 'Image storage rejected the upload. Please try again.',
   image_upload_network_error:
     'The browser could not upload to image storage. Check your connection and whether storage CORS allows this admin app address.',
   image_upload_cancelled: 'The image upload was cancelled. Please try again.',
   image_upload_timeout: 'The upload timed out. Check your connection and try again.',
-  manual_images_only: 'Manual uploads are available only for manually created articles.',
+  manual_images_only: 'Image uploads and removal are available only for manually created articles.',
 
   // Publishing.
   wordpress_not_connected: 'This org has no WordPress connection — connect the plugin first.',
