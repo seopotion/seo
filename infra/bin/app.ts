@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 import { App } from 'aws-cdk-lib';
 import { ApiStack } from '../lib/api-stack';
+import { enforceHeadOnMaster } from '../lib/git-guard';
 import { openNextBuildExists, WebStack } from '../lib/web-stack';
 
 const app = new App();
+
+// A human `cdk deploy` must come from a clean checkout of origin/master —
+// see git-guard.ts for the incident behind this.
+enforceHeadOnMaster({
+  allowOffMaster: app.node.tryGetContext('allow-off-master') !== undefined,
+  ci: process.env.GITHUB_ACTIONS === 'true',
+});
 
 // Account/region come from the standard CDK env vars when deploying; synth is
 // region-agnostic so this is safe to leave undefined.

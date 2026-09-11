@@ -10,6 +10,7 @@ import {
   parseVideoPick,
   SEMANTIC_RESPONSE_SCHEMA,
   sanitizeLinks,
+  stripLeadingH1,
   VIDEO_PICK_RESPONSE_SCHEMA,
   validateArticle,
 } from '@shared/generation';
@@ -61,7 +62,13 @@ export async function stageFinalize(
 
   // Fail closed (#186): unwrap anything invented or over-placed before
   // validation, which then asserts the invariant as a backstop.
-  let content = sanitizeLinks(chosenContent, outline.internal_links, ctx.maxInternalLinks);
+  // The draft stage already stripped its own H1, but humanize is a second LLM
+  // pass that restores a `# Title` often enough to burn a day's article.
+  let content = sanitizeLinks(
+    stripLeadingH1(chosenContent),
+    outline.internal_links,
+    ctx.maxInternalLinks,
+  );
 
   const failures = validateArticle(
     {

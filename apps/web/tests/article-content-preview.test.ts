@@ -3,8 +3,18 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { ArticleContentPreview } from '../components/article/ArticleContentPreview';
 
-const render = (content: string) =>
-  renderToStaticMarkup(createElement(ArticleContentPreview, { content }));
+const render = (content: string, title = 'Untitled') =>
+  renderToStaticMarkup(createElement(ArticleContentPreview, { title, content }));
+
+describe('ArticleContentPreview title', () => {
+  test('renders the title as the only H1, above the body, since the body carries none', () => {
+    const html = render('Intro paragraph.\n\n## First section', 'Widget Guide');
+
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(html).toMatch(/<h1[^>]*>Widget Guide<\/h1>/);
+    expect(html.indexOf('Widget Guide')).toBeLessThan(html.indexOf('Intro paragraph.'));
+  });
+});
 
 describe('ArticleContentPreview code', () => {
   test('renders a fenced block as one <pre> without the fences or info string', () => {
@@ -24,7 +34,7 @@ describe('ArticleContentPreview code', () => {
     );
 
     expect(html.match(/<pre/g)).toHaveLength(1);
-    expect(html).not.toContain('<h1');
+    expect(html).not.toMatch(/<h1[^>]*>#? ?post-receive/);
     expect(html).toContain('# post-receive hook\n\ngit pull origin main');
   });
 

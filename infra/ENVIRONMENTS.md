@@ -172,6 +172,75 @@ comes from the account boundary, not the path.
    Both deploy jobs declare `environment:`, so every job resolving these secrets
    gets its own stage's values.
 
+## Transactional email (SES, #336)
+
+The API sends one courtesy email today: "you've been added to a workspace"
+(`POST /core/members`). CDK creates an SES **domain identity** per stage
+(`staging.seopotion.co` / `seopotion.co`, Easy DKIM) and grants send to the
+API Lambda only. Sends fail — logged, never blocking the add — until the three
+manual steps below are done.
+
+1. **Confirm no existing identity.** Before merging `dev` → `master`
+   (staging) and before publishing a prod release, confirm neither account
+   already holds the domain identity — `AWS::SES::EmailIdentity` creation
+   fails with `AlreadyExistsException` if it does, and CloudFormation rolls
+   back the whole `SeoApiStack-*` deploy:
+
+   ```sh
+   aws sesv2 list-email-identities --profile seo-staging   # staging.seopotion.co must be absent
+   aws sesv2 list-email-identities --profile seo-prod      # seopotion.co must be absent
+   ```
+
+   If one exists, delete it in the console (or
+   `aws sesv2 delete-email-identity --email-identity <domain>`) before
+   deploying, so CDK can own it.
+2. **DKIM CNAMEs in Cloudflare** (after the first deploy that includes the
+   identity). Read the three name/value pairs from the stack outputs and add
+   each as a CNAME, **DNS only** (grey cloud, not proxied):
+
+   ```sh
+   aws cloudformation describe-stacks --stack-name SeoApiStack-staging --profile seo-staging \
+     --query "Stacks[0].Outputs[?starts_with(OutputKey,'MailDkim')].[OutputKey,OutputValue]" --output table
+   ```
+
+   SES flips the identity to *Verified* within minutes of the records
+   resolving: `aws sesv2 get-email-identity --email-identity staging.seopotion.co --profile seo-staging`
+   → `VerifiedForSendingStatus: true`.
+3. **Sandbox.** New accounts can only deliver to verified recipients.
+   - *Staging* stays in the sandbox. Verify each team test inbox once (a
+     confirmation link is emailed to it):
+     ```sh
+     aws sesv2 create-email-identity --email-identity you@example.com --profile seo-staging
+     ```
+   - *Prod* needs production access once (form in the SES console →
+     *Account dashboard* → *Request production access*, or
+     `aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL --website-url https://www.seopotion.co --use-case-description '...' --profile seo-prod`).
+     Approval takes up to 24h.
+
+**If the test email doesn't arrive**, read the API Lambda's CloudWatch logs
+for `member-added email failed`:
+- `MODULE_NOT_FOUND` for `@aws-sdk/client-sesv2` — CDK's `NodejsFunction`
+  bundling externalizes `@aws-sdk/*` (the Lambda runtime's own SDK is used),
+  and the runtime SDK doesn't carry this client. Set `bundleAwsSDK: true` on
+  `apiFn` in `infra/lib/api-stack.ts`.
+- `MessageRejected` — the sending identity isn't verified, or (in the
+  sandbox) the recipient isn't verified.
+- `AccessDenied` on `identity/<recipient address>` — SES checks the send
+  against every verified identity in the request, recipients included, so
+  the grant must cover `identity/*` (pinned to the sender with
+  `ses:FromAddress`), not just the domain identity. That is what the stack
+  does; a denial here means the policy regressed.
+- `AccessDenied` on `identity/<domain>` — the Lambda's send grant is missing.
+
+**Reputation.** SES suspends sending once the bounce rate crosses roughly 5%.
+Watch **SES → Reputation metrics** in each account. Bounce/complaint handling
+(an SNS topic) is a follow-up, not covered here.
+
+No custom MAIL FROM domain: the envelope sender stays on `amazonses.com`, so
+the Zoho SPF record is untouched and DKIM alignment on the From domain
+satisfies DMARC. The team's Zoho Mail is deliberately **not** used for app
+mail — its free-tier send cap is reserved for customer outreach.
+
 ## Google OAuth clients
 
 Login is the Google Identity Services **ID-token** flow (`google.accounts.id` →
@@ -322,7 +391,12 @@ AWS_PROFILE=seo-staging CDK_DEFAULT_ACCOUNT=977476318001 CDK_DEFAULT_REGION=us-e
 For prod, swap the profile/account (`seo-prod` / `672093561569`) and the stack
 name. **Deploy from `master`, not a feature branch** — `cdk deploy` ships
 whatever is checked out, with no relationship to what staging validated. The
-Release flow below exists precisely to make that impossible.
+Release flow below exists precisely to make that impossible, and the CDK app
+enforces it locally: it refuses to synthesize unless HEAD is a commit on
+`origin/master` with a clean working tree (`infra/lib/git-guard.ts`; a local
+deploy from a feature branch rolled staging back on 2026-09-08). For a
+`cdk synth` / `cdk diff` on a branch pass `-c allow-off-master=1` — never for
+a deploy. CI skips the guard (`GITHUB_ACTIONS`); the workflows pin the ref.
 
 ## Deploying prod
 

@@ -17,8 +17,13 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
   const system = [
     'You are an expert long-form SEO writer.',
     'Write a complete, publish-ready blog article in GitHub-flavored Markdown.',
-    'Start with a single H1 (# ...), then H2 (## ...) sections following the outline.',
-    'Include an engaging introduction before the first H2 and a concluding section.',
+    // The page renders the title as its H1 (frontmatter / post title), so an
+    // H1 in the body ships as a duplicate on the customer's site.
+    'Do not write an H1 and do not repeat the title: the page renders it above the body.',
+    // Without the H1 anchor the model tends to open with `## Introduction`,
+    // which the validator reads as an empty intro (staging, 2026-09-08).
+    'Begin with an engaging introduction as plain paragraphs under no heading at all (not even "## Introduction").',
+    'The first heading in the article is the first H2 (## ...) section from the outline; end with a concluding section.',
     'Use the target keyword naturally; never keyword-stuff.',
     'Do not invent unverifiable facts about the business. Never promote competitors.',
     ctx.includeCta
@@ -48,7 +53,7 @@ export function buildArticlePrompt(ctx: GenerationContext, outline: Outline): Ll
     topic
       ? `Assigned content focus (the intended scope of this article): ${topic.topic_content_focus}`
       : '',
-    `H1: ${outline.h1}`,
+    `Title (rendered by the page; do not repeat it): ${outline.h1}`,
     `Sections: ${outline.sections.map((s) => s.heading).join(' | ')}`,
     outline.faqs.length ? `FAQs to answer: ${outline.faqs.map((f) => f.question).join(' | ')}` : '',
     linkLines.length ? `Internal links you may use (title — URL):\n${linkLines.join('\n')}` : '',

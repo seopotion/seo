@@ -26,6 +26,10 @@ export const config = {
   GSC_TOKEN_KEY: process.env.GSC_TOKEN_KEY ?? '',
   /** Web app origin — builds the GSC OAuth redirect URI (<origin>/dashboard/gsc/callback). */
   WEB_ORIGIN: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+  /** Verified SES sender address for transactional mail (#336), e.g.
+   * `no-reply@seopotion.co`. Empty locally and in tests: `clients/ses.ts` then
+   * logs the would-be message instead of sending. */
+  MAIL_FROM: process.env.MAIL_FROM ?? '',
   /** GitHub App slug (public, per-env) — builds the install URL. One App per
    * environment, because the Setup URL is a single field on the registration.
    * See design/github-app.md. */

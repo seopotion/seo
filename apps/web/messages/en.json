@@ -343,6 +343,8 @@
     },
     "description": "Plan one article per day, month by month.",
     "modal": {
+      "failureReason": "Failure reason",
+      "generationFailed": "The last generation attempt failed.",
       "keyword": "Keyword",
       "notGenerated": "This article has not been generated yet.",
       "scheduledDate": "Scheduled date",
@@ -412,6 +414,7 @@
     },
     "scheduledCount": "{count} scheduled",
     "statuses": {
+      "failed": "Failed",
       "generated": "Generated",
       "planned": "Planned"
     },
@@ -919,7 +922,7 @@
       "add": "Add",
       "adding": "Adding...",
       "alreadyMember": "That email is already on the team.",
-      "description": "Teammates you add here can use everything in this workspace except billing and this team list. They sign in with Google using the email you enter.",
+      "description": "Teammates you add here can use everything in this workspace except billing and this team list. They get an email and sign in with Google using the address you enter.",
       "emailLabel": "Teammate email",
       "emailPlaceholder": "name@company.com",
       "error": "Something went wrong. Please try again.",

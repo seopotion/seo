@@ -793,6 +793,14 @@ function PlannerStatusBadge({
     return <Badge variant="info">{t('targetKeywords.statuses.scheduled')}</Badge>;
   }
 
+  if (article.generationStatus === 'generating') {
+    return <Badge variant="warning">{t('targetKeywords.statuses.generating')}</Badge>;
+  }
+
+  if (article.generationStatus === 'failed') {
+    return <Badge variant="error">{t('targetKeywords.statuses.failed')}</Badge>;
+  }
+
   return null;
 }
 

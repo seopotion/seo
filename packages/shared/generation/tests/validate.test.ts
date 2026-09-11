@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { GenerationContext } from '../src/types';
-import { countWords, validateArticle } from '../src/validate';
+import { countWords, stripLeadingH1, validateArticle } from '../src/validate';
 import { buildVideoEmbed } from '../src/video';
 
 const ctx = {
@@ -17,7 +17,8 @@ const linkCandidate = (title: string, url: string) => ({
 });
 
 // Fixture must clear WORD_COUNT_FLOOR (800): 140 intro + 2 x 360 section words = ~868.
-const goodBody = `# Best Widgets For Makers\n\n${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(60)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(60)}\n`;
+// No H1: the title is rendered by the page, so the body starts with the intro.
+const goodBody = `${'An intro paragraph with plenty of words. '.repeat(20)}\n\n## Section One\n\n${'Unique body content number one here. '.repeat(60)}\n\n## Section Two\n\n${'Distinct body content number two here. '.repeat(60)}\n`;
 
 const goodArticle = {
   title: 'Best Widgets For Makers',
@@ -44,7 +45,7 @@ describe('validateArticle', () => {
 
   test('short article fails word_count', () => {
     const codes = validateArticle(
-      { ...goodArticle, content: '# Title\n\nintro\n\n## A\n\nshort\n\n## B\n\nalso' },
+      { ...goodArticle, content: 'intro\n\n## A\n\nshort\n\n## B\n\nalso' },
       ctx,
     ).map((f) => f.code);
     expect(codes).toContain('word_count');
@@ -62,12 +63,23 @@ describe('validateArticle', () => {
     ).map((f) => f.code);
     expect(codes).toContain('meta_title_length');
     expect(codes).toContain('meta_description_length');
-    expect(codes).toContain('h1_count');
+    expect(codes).not.toContain('h1_count');
     expect(codes).toContain('h2_count');
   });
 
+  test('an H1 in the body fails: the page renders the title, so a body H1 duplicates it', () => {
+    const failures = validateArticle(
+      { ...goodArticle, content: `# Best Widgets For Makers\n\n${goodBody}` },
+      ctx,
+    );
+    expect(failures).toContainEqual({
+      code: 'h1_count',
+      message: 'expected no H1 (the page renders the title), found 1',
+    });
+  });
+
   test('empty and duplicate sections fail', () => {
-    const dup = `# T\n\n${'intro '.repeat(20)}\n\n## A\n\nsame body text repeated exactly here now\n\n## B\n\nsame body text repeated exactly here now\n`;
+    const dup = `${'intro '.repeat(20)}\n\n## A\n\nsame body text repeated exactly here now\n\n## B\n\nsame body text repeated exactly here now\n`;
     const codes = validateArticle({ ...goodArticle, content: dup }, ctx).map((f) => f.code);
     expect(codes).toContain('duplicate_section');
   });
@@ -80,17 +92,22 @@ describe('validateArticle', () => {
 
   test('a heading-shaped line inside a fenced code block does not split sections', () => {
     const sample = '```md\n## Heading syntax\nUse one H1 per page.\n```';
-    const content = `# T\n\n${'intro words here. '.repeat(40)}\n\n## First\n\n${'Body words for the first section. '.repeat(80)}\n\n${sample}\n\n## Second\n\n${'Body words for the second section. '.repeat(80)}\n\n${sample}\n`;
+    const content = `${'intro words here. '.repeat(40)}\n\n## First\n\n${'Body words for the first section. '.repeat(80)}\n\n${sample}\n\n## Second\n\n${'Body words for the second section. '.repeat(80)}\n\n${sample}\n`;
     const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
     expect(codes).toEqual([]);
   });
 
   test('up to 3 leading spaces still opens a heading, 4+ is indented code', () => {
-    // 3 spaces is a real heading per CommonMark, so this is the article's ONE H1
-    const threeSpace = `   # T\n\n${'intro words here. '.repeat(40)}\n\n   ## First\n\n${'Body words for the first section. '.repeat(80)}\n\n   ## Second\n\n${'Distinct body words for the second section. '.repeat(80)}\n`;
+    const threeSpace = `${'intro words here. '.repeat(40)}\n\n   ## First\n\n${'Body words for the first section. '.repeat(80)}\n\n   ## Second\n\n${'Distinct body words for the second section. '.repeat(80)}\n`;
     expect(
       validateArticle({ ...goodArticle, content: threeSpace }, ctx).map((f) => f.code),
     ).toEqual([]);
+    // 3 spaces is a real heading per CommonMark, so this one IS an H1 and fails.
+    expect(
+      validateArticle({ ...goodArticle, content: `   # T\n\n${threeSpace}` }, ctx).map(
+        (f) => f.code,
+      ),
+    ).toContain('h1_count');
   });
 
   test('a 4-space indented heading is code, so it is not counted', () => {
@@ -100,13 +117,36 @@ describe('validateArticle', () => {
   });
 
   test('a section whose body is only a code block is not an empty section', () => {
-    const content = `# T\n\n${'intro words here. '.repeat(40)}\n\n## Install\n\n\`\`\`bash\nnpm install piper\n\`\`\`\n\n## Notes\n\n${'Distinct trailing body words. '.repeat(150)}\n`;
+    const content = `${'intro words here. '.repeat(40)}\n\n## Install\n\n\`\`\`bash\nnpm install piper\n\`\`\`\n\n## Notes\n\n${'Distinct trailing body words. '.repeat(150)}\n`;
     const codes = validateArticle({ ...goodArticle, content }, ctx).map((f) => f.code);
     expect(codes).not.toContain('empty_section');
   });
 
   test('countWords ignores markdown punctuation', () => {
     expect(countWords('# Hello **world**')).toBe(2);
+  });
+});
+
+describe('stripLeadingH1', () => {
+  test('drops an H1 that opens the body, and the blank lines after it', () => {
+    expect(stripLeadingH1('# Title\n\nIntro.\n\n## A\n\nBody.\n')).toBe(
+      'Intro.\n\n## A\n\nBody.\n',
+    );
+  });
+
+  test('tolerates leading blank lines and up to 3 spaces of indentation', () => {
+    expect(stripLeadingH1('\n\n   # Title\nIntro.')).toBe('Intro.');
+  });
+
+  test('leaves a body with no leading H1 untouched', () => {
+    const body = 'Intro.\n\n## A\n\n# Not leading\n';
+    expect(stripLeadingH1(body)).toBe(body);
+    expect(stripLeadingH1('## Only H2\n\nBody.')).toBe('## Only H2\n\nBody.');
+  });
+
+  test('does not treat a shell comment in an opening code fence as an H1', () => {
+    const body = '```bash\n# comment\n```\n\nIntro.';
+    expect(stripLeadingH1(body)).toBe(body);
   });
 
   test('an unapproved link fails illegal_link (#186)', () => {

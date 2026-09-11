@@ -101,7 +101,7 @@ actionable error instead of waiting on the worker.
 
 ## Repairing existing articles
 
-Three `db` commands fix articles in place. All read/write whatever `MONGO_URI`
+Four `db` commands fix articles in place. All read/write whatever `MONGO_URI`
 targets; the two destructive ones are **dry run by default — add `--apply`**.
 None of them republish: after `--apply`, re-push every published article they
 touched (see "Republishing" above), or the customer's site keeps the old content.
@@ -110,6 +110,7 @@ touched (see "Republishing" above), or the customer's site keeps the old content
 | --- | --- | --- |
 | `db set-post-base --org <id> --base <https://site/blog>` | Sets `post_url_base` on the org's static-site integration (#228); a post lives at `<base>/<slug>`. Trailing slash stripped; `INVALID_BASE` for non-http(s)/query/fragment; `NO_STATIC_SITE` if none | Run **before** `clean-links` — it derives the allowed static-site URLs from this |
 | `db clean-links --org <id> [--apply]` | Unwraps every internal link that isn't a verified (HTTP-checked from your machine), published page of the org (#186), using the pipeline's own sanitizer. Scans all articles, any status. Result lists `publishedChanged` | Republish each `publishedChanged` article |
+| `db strip-h1 --org <id> [--apply]` | Drops the leading `# Title` line from bodies generated before the no-H1 contract; the page renders `title`, so that line shipped as a duplicate H1 on every customer site. Scans all articles, any status. Result lists `publishedChanged` | Republish each `publishedChanged` article |
 | `db reset-images --host <dead-cdn-host> --org <id>\|--article <id> [--apply] [--enqueue]` | For image slots whose URL is on that host: blanks the slot (+ inline markdown + `featured_image_url`), rewinds `images_status` so regeneration refills them. `--enqueue` (needs `--apply`, else `ENQUEUE_NEEDS_APPLY`) launches an **image-repair run** per reset article via `launchImageRepair` — a normal run with the earlier stages pre-completed, dropping straight into the image stages | Wait until `articles show` reports `images_status: complete` (regeneration bills fal and produces **different** images), then republish |
 
 Order for a multi-part repair: `set-post-base` → `reset-images --apply --enqueue`

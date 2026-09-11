@@ -277,15 +277,25 @@ describe('calendar construction', () => {
     expect(calendar().getByText('Scheduled')).toBeTruthy();
   });
 
-  test('a planned article that is not queued yet gets no badge at all', async () => {
+  test('badges a failed generation and one in progress', async () => {
     plannerGet.mockResolvedValue(
       apiResponse(
         200,
         plannerBody([
           plannerKeyword({
             article_id: null,
+            generation_error: 'validation: semantic: competitor_promotion',
             generation_status: 'failed',
+            id: 'p1',
+            keyword: 'broken',
             scheduled_date: '2026-09-20',
+          }),
+          plannerKeyword({
+            article_id: null,
+            generation_status: 'generating',
+            id: 'p2',
+            keyword: 'in flight',
+            scheduled_date: '2026-09-21',
           }),
         ]),
       ),
@@ -293,9 +303,9 @@ describe('calendar construction', () => {
     renderPage();
     await waitForCalendar();
 
-    expect(calendar().getByText('content marketing')).toBeTruthy();
+    expect(calendar().getByText('Failed')).toBeTruthy();
+    expect(calendar().getByText('Generating')).toBeTruthy();
     expect(calendar().queryByText('Scheduled')).toBeNull();
-    expect(calendar().queryByText('Generated')).toBeNull();
   });
 
   test('renders the seven weekday headings', async () => {
@@ -344,6 +354,33 @@ describe('calendar construction', () => {
 
     expect(await screen.findByRole('dialog')).toBeTruthy();
     expect(screen.getByText('This article has not been generated yet.')).toBeTruthy();
+  });
+
+  test('opening a failed article shows why generation failed', async () => {
+    plannerGet.mockResolvedValue(
+      apiResponse(
+        200,
+        plannerBody([
+          plannerKeyword({
+            generation_error: 'validation: semantic: competitor_promotion: mentions Heroku',
+            generation_status: 'failed',
+            scheduled_date: '2026-09-20',
+          }),
+        ]),
+      ),
+    );
+    const { user } = renderPage();
+    await waitForCalendar();
+
+    await user.click(calendar().getByRole('button', { name: /Open .* details/ }));
+
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('The last generation attempt failed.')).toBeTruthy();
+    expect(
+      dialog.getByText('validation: semantic: competitor_promotion: mentions Heroku'),
+    ).toBeTruthy();
+    expect(dialog.getByText('Failed')).toBeTruthy();
+    expect(dialog.queryByText('This article has not been generated yet.')).toBeNull();
   });
 });
 
