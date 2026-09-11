@@ -8,7 +8,13 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ArticleRepo } from '@shared/db';
 import { injectImageAfterHeading } from '@shared/generation';
-import { type Article, type ArticleImage, MAX_MANUAL_ARTICLE_IMAGES } from '@shared/schemas';
+import {
+  type Article,
+  type ArticleImage,
+  MAX_MANUAL_ARTICLE_IMAGES,
+  MAX_MANUAL_IMAGE_BYTES,
+  MAX_MANUAL_IMAGE_EDGE,
+} from '@shared/schemas';
 import { sign, verify } from 'hono/jwt';
 import { imageSize } from 'image-size';
 import { z } from 'zod';
@@ -127,6 +133,23 @@ export function escapeImageAlt(alt: string) {
   return alt.replace(/[\\`*_[\]<>]/g, '\\$&');
 }
 
+export async function removeArticleImage(article: Article, url: string) {
+  if (!article.images.some((image) => image.url === url)) return article;
+  const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const content = article.content.replace(
+    new RegExp(`!\\[(?:\\\\.|[^\\[\\]\\\\\\r\\n])*\\]\\(${escapedUrl}\\)`, 'g'),
+    '',
+  );
+  const updated = await ArticleRepo.saveManualImage(
+    article,
+    article.images.filter((image) => image.url !== url),
+    content,
+    article.featured_image_url === url ? '' : article.featured_image_url,
+  );
+  if (!updated) throw new ImageUploadError('article_changed', 409);
+  return updated;
+}
+
 export async function finalizeImageUpload(article: Article, operator: string, token: string) {
   let claims: z.infer<typeof UploadClaims>;
   try {
@@ -163,6 +186,7 @@ export async function finalizeImageUpload(article: Article, operator: string, to
   }
   if (
     object.ContentLength !== claims.size ||
+    object.ContentLength > MAX_MANUAL_IMAGE_BYTES ||
     object.ContentType !== claims.content_type ||
     !object.Body
   ) {
@@ -178,10 +202,11 @@ export async function finalizeImageUpload(article: Article, operator: string, to
   }
   if (
     bytes.length !== claims.size ||
+    bytes.length > MAX_MANUAL_IMAGE_BYTES ||
     dimensions.type !== extensions[claims.content_type] ||
     !dimensions.width ||
     !dimensions.height ||
-    dimensions.width * dimensions.height > 40_000_000
+    Math.max(dimensions.width, dimensions.height) > MAX_MANUAL_IMAGE_EDGE
   ) {
     throw new ImageUploadError('invalid_image_file');
   }

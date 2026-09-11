@@ -104,7 +104,7 @@ beforeEach(() => {
 });
 
 describe('manual article image uploads', () => {
-  test.each(['upload', 'finalize'])('%s requires an admin operator', async (action) => {
+  test.each(['upload', 'finalize', 'remove'])('%s requires an admin operator', async (action) => {
     for (const auth of [
       'invalid',
       await signToken({ sub: 'user', email: 'user@example.com' }),
@@ -121,8 +121,14 @@ describe('manual article image uploads', () => {
   test.each([
     'upload',
     'finalize',
+    'remove',
   ])('%s rejects missing, deleted, generated articles and missing orgs', async (action) => {
-    const body = action === 'upload' ? metadata : { upload_token: 'invalid' };
+    const body =
+      action === 'upload'
+        ? metadata
+        : action === 'remove'
+          ? { url: 'https://cdn.example.com/image.png' }
+          : { upload_token: 'invalid' };
     expect((await request(action, body, undefined, 'missing')).status).toBe(404);
     article.status = 'deleted';
     expect((await request(action, body)).status).toBe(404);
@@ -140,6 +146,7 @@ describe('manual article image uploads', () => {
     { content_type: 'text/html' },
     { size: 0 },
     { size: 5 * 1024 * 1024 + 1 },
+    { size: 100_001 },
     { size: 1.5 },
     { alt: '  ' },
     { alt: 'x\ny' },
@@ -169,6 +176,56 @@ describe('manual article image uploads', () => {
     expect(first.upload_url).not.toBe(second.upload_url);
     expect(article.images_status).toBe('complete');
     expect(repos.ArticleRepo.saveManualImage).not.toHaveBeenCalled();
+  });
+
+  test('accepts exactly 100,000 stored bytes and records measured dimensions', async () => {
+    const bytes = Buffer.concat([png, Buffer.alloc(100_000 - png.length)]);
+    send.mockResolvedValueOnce({
+      ContentLength: bytes.length,
+      ContentType: 'image/png',
+      Body: { transformToByteArray: async () => bytes },
+    });
+    const { result } = await finish({ size: bytes.length });
+    expect(result.images[0]).toMatchObject({ width: 1, height: 1 });
+  });
+
+  test.each([
+    'header',
+    'body',
+  ])('rejects oversized S3 %s without saving the article', async (kind) => {
+    const { upload_token } = await prepare();
+    const bytes = Buffer.concat([png, Buffer.alloc(100_001 - png.length)]);
+    const body = { transformToByteArray: vi.fn(async () => bytes), destroy: vi.fn() };
+    send.mockResolvedValueOnce({
+      ContentLength: kind === 'header' ? bytes.length : png.length,
+      ContentType: 'image/png',
+      Body: body,
+    });
+    expect((await request('finalize', { upload_token })).status).toBe(400);
+    expect(repos.ArticleRepo.saveManualImage).not.toHaveBeenCalled();
+    if (kind === 'header') {
+      expect(body.transformToByteArray).not.toHaveBeenCalled();
+      expect(body.destroy).toHaveBeenCalled();
+    }
+  });
+
+  test.each([
+    [1200, 800, 200],
+    [1201, 800, 400],
+    [800, 1201, 400],
+  ])('enforces stored dimensions %i × %i', async (width, height, status) => {
+    const bytes = Buffer.from(png);
+    bytes.writeUInt32BE(width, 16);
+    bytes.writeUInt32BE(height, 20);
+    const { upload_token } = await prepare();
+    send.mockResolvedValueOnce({
+      ContentLength: bytes.length,
+      ContentType: 'image/png',
+      Body: { transformToByteArray: async () => bytes },
+    });
+    expect((await request('finalize', { upload_token })).status).toBe(status);
+    if (status === 200) expect(article.images[0]).toMatchObject({ width, height });
+    else expect(repos.ArticleRepo.saveManualImage).not.toHaveBeenCalled();
   });
 
   test('finalizes a cover with truthful structured metadata, without changing Markdown', async () => {
@@ -362,5 +419,130 @@ describe('manual article image uploads', () => {
     } finally {
       fetch.mockRestore();
     }
+  });
+});
+
+describe('manual article image removal', () => {
+  test('removes legacy high resolution uploads from an older CDN without validating their bytes', async () => {
+    await finish();
+    const url = 'https://old-cdn.example.com/articles/legacy.png';
+    article.images[0] = { ...article.images[0]!, url, width: 1800, height: 1200 };
+    article.featured_image_url = url;
+    vi.clearAllMocks();
+    expect((await request('remove', { url })).status).toBe(200);
+    expect(article.images).toEqual([]);
+    expect(article.featured_image_url).toBe('');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('removes previously uploaded images one by one, including the last cover, without publishing or S3 access', async () => {
+    await finish();
+    for (const section_heading of ['First', 'Second', 'Third']) {
+      await finish({ role: 'inline', section_heading });
+    }
+    const urls = article.images.map((image) => image.url).reverse();
+    vi.clearAllMocks();
+    vi.stubEnv('IMAGES_BUCKET', '');
+    vi.stubEnv('IMAGES_CDN_DOMAIN', '');
+    for (const [index, url] of urls.entries()) {
+      const response = await request('remove', { url });
+      expect(response.status).toBe(200);
+      const result = ArticleDetailResponse.parse(await response.json());
+      expect(result.images).toHaveLength(3 - index);
+      expect(result.images.some((image) => image.url === url)).toBe(false);
+      expect(result.content).not.toContain(url);
+      expect(result.featured_image_url).not.toBe(url);
+      expect(result.images_status).toBe('complete');
+      expect(result.status).toBe('generated');
+      expect(result.published_at).toBeNull();
+    }
+    expect(article.featured_image_url).toBe('');
+    expect(send).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).toHaveBeenCalledTimes(4);
+    expect(repos.AdminActionRepo.insert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        action: 'article.image_remove',
+        payload: { url: urls[3], images: [] },
+      }),
+    );
+    const entry = { article, slug: article.slug, published_at: new Date(), updated_at: null };
+    for (const url of urls) {
+      expect(renderArticle(entry)).not.toContain(url);
+      expect(JSON.stringify(manifestEntry(entry, 'blog'))).not.toContain(url);
+    }
+  });
+
+  test('removes an inline image with escaped or edited alt text while preserving the cover and other content', async () => {
+    await finish();
+    const cover = article.featured_image_url;
+    await finish({ role: 'inline', section_heading: 'First', alt: 'Lake [view] <sun>' });
+    const url = article.images[1]!.url;
+    await finish({ role: 'inline', section_heading: 'Second' });
+    const other = article.images[2]!;
+    article.content += `\n\n![Unfinished example\n\nKeep this paragraph.\n\n![Edited description](${url})\n\n[Download](${url})`;
+    const response = await request('remove', { url });
+    expect(response.status).toBe(200);
+    expect(article.images).toHaveLength(2);
+    expect(article.images[1]).toEqual(other);
+    expect(article.featured_image_url).toBe(cover);
+    expect(article.content).not.toContain('![Lake');
+    expect(article.content).not.toContain('![Edited description]');
+    expect(article.content).toContain(`[Download](${url})`);
+    expect(article.content).toContain('![Unfinished example\n\nKeep this paragraph.');
+    expect(article.content).toContain(`![${other.alt}](${other.url})`);
+    expect(article.content).toContain('## First');
+    expect(article.content).toContain('Text');
+  });
+
+  test('allows removal after the inline heading or image Markdown has been edited away', async () => {
+    await finish({ role: 'inline', section_heading: 'First' });
+    const url = article.images[0]!.url;
+    article.content = '## Renamed\n\nEdited body';
+    expect((await request('remove', { url })).status).toBe(200);
+    expect(article.content).toBe('## Renamed\n\nEdited body');
+    expect(article.images).toEqual([]);
+  });
+
+  test('retries are idempotent and stale removal cannot delete a replacement', async () => {
+    const first = await finish();
+    const url = first.result.featured_image_url;
+    expect((await request('remove', { url })).status).toBe(200);
+    await finish();
+    const replacement = article.featured_image_url;
+    vi.clearAllMocks();
+    expect((await request('remove', { url })).status).toBe(200);
+    expect((await request('remove', { url: 'https://other.example.com/foreign.png' })).status).toBe(
+      200,
+    );
+    expect(article.featured_image_url).toBe(replacement);
+    expect(article.images).toHaveLength(1);
+    expect(repos.ArticleRepo.saveManualImage).not.toHaveBeenCalled();
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+  });
+
+  test('refuses a concurrent edit and leaves the image intact for retry', async () => {
+    await finish();
+    const url = article.featured_image_url;
+    vi.clearAllMocks();
+    repos.ArticleRepo.saveManualImage.mockResolvedValueOnce(null);
+    const response = await request('remove', { url });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'article_changed' });
+    expect(article.featured_image_url).toBe(url);
+    expect(repos.AdminActionRepo.insert).not.toHaveBeenCalled();
+    expect((await request('remove', { url })).status).toBe(200);
+    expect(article.images).toEqual([]);
+  });
+
+  test.each([
+    {},
+    { url: '' },
+    { url: 'invalid' },
+    { url: 'https://cdn.example.com/image.png', key: 'other' },
+  ])('rejects invalid removal metadata %j', async (body) => {
+    const response = await request('remove', body);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_image_removal' });
+    expect(repos.ArticleRepo.saveManualImage).not.toHaveBeenCalled();
   });
 });

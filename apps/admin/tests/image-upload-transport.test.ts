@@ -41,6 +41,17 @@ test('sends file bytes with only the prescribed S3 headers and reports progress'
   await expect(promise).resolves.toBeUndefined();
 });
 
+test.each([0, 100_001])('does not send an invalid %i-byte file to S3', async (size) => {
+  await expect(
+    uploadImageFile(
+      'https://bucket.example.com/key',
+      {},
+      new File([new Uint8Array(size)], 'image.webp', { type: 'image/webp' }),
+      vi.fn(),
+    ),
+  ).rejects.toMatchObject({ code: 'image_compression_limit' });
+});
+
 test.each([
   ['http', 'image_upload_failed'],
   ['network', 'image_upload_network_error'],
