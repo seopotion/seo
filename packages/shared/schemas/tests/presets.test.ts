@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
+  CONTENT_COMPLEXITIES,
+  CONTENT_COMPLEXITY_DEFAULT,
   ContentSeoPatchSchema,
   EngagementPrefsPatchSchema,
   IMAGE_MEDIA,
@@ -226,5 +228,58 @@ describe('ContentSeoPatchSchema', () => {
     expect(ContentSeoPatchSchema.parse({ readability_grade_max: 12 })).toEqual({
       readability_grade_max: 12,
     });
+  });
+});
+
+describe('SetupPresetsSchema content_seo.content_complexity', () => {
+  const withAudience = { ...base, audience: { target: ['a'], competitors: [] } };
+
+  test('the enum is general | professional | technical, in that order', () => {
+    expect(CONTENT_COMPLEXITIES).toEqual(['general', 'professional', 'technical']);
+  });
+
+  // Pre-existing org docs and article_runs snapshots have no such field; the
+  // default is what keeps them parsing and routes them exactly as before.
+  test('defaults to general when absent', () => {
+    expect(CONTENT_COMPLEXITY_DEFAULT).toBe('general');
+    const p = SetupPresetsSchema.parse(withAudience);
+    expect(p.article_preferences.content_seo.content_complexity).toBe('general');
+  });
+
+  test('keeps an explicit value', () => {
+    const p = SetupPresetsSchema.parse({
+      ...withAudience,
+      article_preferences: {
+        ...withAudience.article_preferences,
+        content_seo: {
+          ...withAudience.article_preferences.content_seo,
+          content_complexity: 'technical',
+        },
+      },
+    });
+    expect(p.article_preferences.content_seo.content_complexity).toBe('technical');
+  });
+
+  test('rejects a value outside the enum', () => {
+    expect(() =>
+      SetupPresetsSchema.parse({
+        ...withAudience,
+        article_preferences: {
+          ...withAudience.article_preferences,
+          content_seo: {
+            ...withAudience.article_preferences.content_seo,
+            content_complexity: 'expert',
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
+  test('the patch schema keeps an explicit value and injects no default', () => {
+    expect(ContentSeoPatchSchema.parse({ content_complexity: 'professional' })).toEqual({
+      content_complexity: 'professional',
+    });
+    expect(ContentSeoPatchSchema.parse({ article_style: 'x' })).toEqual({ article_style: 'x' });
+    expect(() => ContentSeoPatchSchema.parse({ content_complexity: 'expert' })).toThrow();
   });
 });

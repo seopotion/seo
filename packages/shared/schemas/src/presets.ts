@@ -62,6 +62,17 @@ function migrateLegacyImageStyle(value: unknown): unknown {
   return { ...rest, image_direction: { medium: 'photograph', palette: '', notes: image_style } };
 }
 
+/**
+ * How expert the articles must read. Decided once per org by the scanner and
+ * user-editable; it selects the LLM ladder every article stage runs on
+ * (design/ai-model-routing.md). `general` is today's behaviour.
+ */
+export const CONTENT_COMPLEXITIES = ['general', 'professional', 'technical'] as const;
+export type ContentComplexity = (typeof CONTENT_COMPLEXITIES)[number];
+
+/** Complexity for orgs scanned before the field existed: routes them as before. */
+export const CONTENT_COMPLEXITY_DEFAULT: ContentComplexity = 'general';
+
 const ContentSeoFields = {
   article_style: z.string(),
   // 0–3 internal links per article (frontend dropdown). Replaces the
@@ -72,6 +83,7 @@ const ContentSeoFields = {
   // audience (8 general public / 10 professional / 12 technical), user-
   // editable.
   readability_grade_max: z.number().int().min(6).max(14),
+  content_complexity: z.enum(CONTENT_COMPLEXITIES),
   llm_instructions: z.string(),
 };
 
@@ -123,6 +135,8 @@ export const SetupPresetsSchema = z.object({
       readability_grade_max: ContentSeoFields.readability_grade_max.default(
         READABILITY_GRADE_MAX_DEFAULT,
       ),
+      // Same reason as readability: pre-existing docs and run snapshots keep parsing.
+      content_complexity: ContentSeoFields.content_complexity.default(CONTENT_COMPLEXITY_DEFAULT),
     }),
     engagement: z.preprocess(
       migrateLegacyImageStyle,
