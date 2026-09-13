@@ -13,6 +13,7 @@ export const presets = {
       internal_links_count: 0,
       table_of_contents: true,
       readability_grade_max: 8,
+      content_complexity: 'general' as const,
       llm_instructions: '',
     },
     engagement: {
