@@ -2,6 +2,7 @@ import { parseJsonObject } from '@shared/generation';
 import type { LlmClient, LlmMessage } from '@shared/providers';
 import {
   AUDIENCE_TARGET_MAX,
+  CONTENT_COMPLEXITIES,
   ImageDirectionSchema,
   type SetupPresets,
   SetupPresetsSchema,
@@ -29,6 +30,7 @@ const ScanOutputSchema = z.object({
       llm_instructions: z.string(),
       // Three reviewable tiers (#313); the preset itself allows 6–14 for edits.
       readability_grade_max: z.literal([8, 10, 12]),
+      content_complexity: z.enum(CONTENT_COMPLEXITIES),
     }),
     engagement: z.object({ image_direction: ImageDirectionSchema }),
   }),
@@ -72,6 +74,10 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'readability_grade_max is the highest acceptable Flesch-Kincaid grade for articles: 8 for general-public',
     'or consumer audiences, 10 for business and professional audiences, 12 for developers, engineers,',
     'scientists and other specialists.',
+    'content_complexity is how expert the articles must read: general for consumer, lifestyle',
+    'and local-service sites; professional for B2B, finance, legal and agency audiences;',
+    'technical for developer tools, infrastructure, engineering and scientific products whose',
+    'readers expect precise, expert-level content.',
   ].join('\n');
 
   const user = pageText
