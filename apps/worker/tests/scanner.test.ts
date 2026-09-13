@@ -219,4 +219,18 @@ describe('scanWebsite', () => {
       scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(off)) }),
     ).rejects.toThrow();
   });
+
+  test('describes when diagram is the medium and keeps screenshots out', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    await scanWebsite('https://clewas.com', { llm });
+
+    const system = String(llm.complete.mock.calls[0]![0].messages[0]!.content);
+    expect(system).toContain('diagram for developer tools');
+    expect(system).toContain('Screenshots and real interfaces are never a medium');
+    expect(system).not.toContain('Screenshots, diagrams and interfaces are never a medium');
+    const schema = JSON.stringify(llm.complete.mock.calls[0]![0].responseSchema?.schema);
+    expect(schema).toContain('"diagram"');
+  });
 });
