@@ -8,16 +8,13 @@ import {
   parseImagePlan,
   withNoTextDirective,
 } from '@shared/generation';
-import { type ImageResult, type LlmClient, routeLlm } from '@shared/providers';
+import { type ImageResult, type LlmClient, routeImage, routeLlm } from '@shared/providers';
 import type { ArticleImage, ArticleRun } from '@shared/schemas';
 import type { ArticleStageClients } from '../clients';
 import { ArticleFatalError, ArticleRetryableError } from '../errors';
 import { logLlmUsage } from '../llm-usage';
 import { storeImage } from '../storage';
 import type { StageOutcome } from './types';
-
-/** Recorded on each slot; passed explicitly to generate so metadata stays truthful. */
-const IMAGE_MODEL = 'fal-ai/flux-2';
 
 /**
  * Exact pixels per role. The cover is the OG large-card size; inline is the same
@@ -166,6 +163,8 @@ export async function stageImagesRender(
   if (article.images.length === 0) throw new ArticleRetryableError('image plan missing');
 
   const articleId = article.id;
+  const medium = run.input.presets.article_preferences.engagement.image_direction.medium;
+  const route = routeImage(medium);
   let content = article.content;
   for (const [i, slot] of article.images.entries()) {
     if (slot.url !== '') continue;
@@ -173,9 +172,11 @@ export async function stageImagesRender(
       // The planner is told to avoid lettering, but flux-2 still renders
       // garbled words on any surface that implies them — so the ban is
       // restated here, which also covers slots planned before that rule.
-      prompt: withNoTextDirective(slot.prompt),
-      model: IMAGE_MODEL,
-      size: SLOT_SIZE[slot.role],
+      // A diagram is made of its labels, so the ban is skipped for that medium.
+      prompt: medium === 'diagram' ? slot.prompt : withNoTextDirective(slot.prompt),
+      model: route.model,
+      // flux-2 takes exact pixels; nano-banana takes a ratio (both slots are ~16:9).
+      ...(route.sizing === 'pixels' ? { size: SLOT_SIZE[slot.role] } : { aspectRatio: '16:9' }),
       // fal encodes WebP itself, so no PNG is ever downloaded, stored or
       // published. Measured 63KB-555KB depending on subject detail, against
       // ~2MB as PNG; fal has no quality knob, so the spread is not ours to
@@ -219,7 +220,7 @@ export async function stageImagesRender(
       i,
       {
         url,
-        model: IMAGE_MODEL,
+        model: route.model,
         seed: res.seed,
         generated_at: new Date(),
         width: generated.width,
