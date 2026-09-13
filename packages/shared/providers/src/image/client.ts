@@ -1,8 +1,8 @@
 import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
+import { DEFAULT_IMAGE_MODEL } from './routing';
 import type { ImageClient, ImageConfig, ImageGenerateParams, ImageResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://fal.run';
-const DEFAULT_MODEL = 'fal-ai/flux-2';
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 500;
@@ -15,7 +15,7 @@ function numOrNull(raw: unknown): number | null {
 
 export function createFalClient(config: ImageConfig): ImageClient {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-  const defaultModel = config.defaultModel ?? DEFAULT_MODEL;
+  const defaultModel = config.defaultModel ?? DEFAULT_IMAGE_MODEL;
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = config.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
@@ -67,6 +67,7 @@ export function createFalClient(config: ImageConfig): ImageClient {
       const model = params.model ?? defaultModel;
       const body: Record<string, unknown> = { prompt: params.prompt };
       if (params.size) body.image_size = params.size;
+      if (params.aspectRatio) body.aspect_ratio = params.aspectRatio;
       if (params.seed !== undefined) body.seed = params.seed;
       if (params.outputFormat) body.output_format = params.outputFormat;
 
