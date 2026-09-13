@@ -25,6 +25,7 @@ const PRESETS: SetupPresets = {
       internal_links_count: 1,
       table_of_contents: true,
       readability_grade_max: 8,
+      content_complexity: 'general',
       llm_instructions: 'Keep it dry.',
     },
     engagement: {
