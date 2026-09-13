@@ -54,6 +54,9 @@ const ImageSlotSchema = z.object({
   composition: z.enum(IMAGE_COMPOSITIONS),
   lighting: z.enum(IMAGE_LIGHTING),
   objects: z.array(z.string()),
+  // The words a diagram is made of; every other medium ignores them (#358).
+  // Defaulted so plans stored before the field existed still parse.
+  labels: z.array(z.string()).default([]),
   alt: z.string().min(1),
 });
 export type ImageSlot = z.infer<typeof ImageSlotSchema>;
@@ -158,6 +161,27 @@ export function usableObjects(objects: string[]): string[] {
     .slice(0, 4);
 }
 
+/** Most labels a diagram may carry; more than this stops being legible at 1200px. */
+export const MAX_DIAGRAM_LABELS = 5;
+
+/**
+ * The only text a diagram may carry: the planner's labels, tidied, de-duplicated
+ * (case-insensitively) and capped. Never filtered by `findTextRisk` — words are
+ * the point here.
+ */
+export function diagramLabels(labels: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of labels) {
+    const label = raw.trim().replace(/\s+/g, ' ');
+    const key = label.toLowerCase();
+    if (label === '' || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out.slice(0, MAX_DIAGRAM_LABELS);
+}
+
 const MEDIUM_CLAUSE: Record<ImageMedium, string> = {
   photograph: 'A photograph',
   flat_illustration: 'A flat vector illustration',
@@ -225,6 +249,27 @@ function scene(
 }
 
 /**
+ * The diagram medium's prompt. Composition, lighting and objects are photographic
+ * ideas and are ignored; the subject says what the diagram explains and the
+ * labels are the only text the model may render, spelled out verbatim. The
+ * no-text ban is deliberately absent — the render stage skips it too.
+ */
+function diagramPrompt(direction: ImageDirection, slot: Omit<ImageSlot, 'alt'>): string {
+  const labels = diagramLabels(slot.labels);
+  const palette = direction.palette.trim();
+  return [
+    `${MEDIUM_CLAUSE.diagram} explaining ${slot.subject}: simple labelled boxes connected by arrows on a plain background, in the style of technical documentation.`,
+    labels.length > 0
+      ? `The only text in the image is exactly these ${labels.length} labels, each rendered once in a clean sans-serif typeface and spelled exactly: ${labels.map((l) => `"${l}"`).join(', ')}.`
+      : 'No text anywhere in the image.',
+    palette !== '' && findTextRisk(palette) === null ? `Palette: ${palette}.` : '',
+    'No other words, captions, titles, logos or watermarks.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
  * The prompt sent to the image model, assembled from the org's image direction
  * and the planner's structured answer. This is the only way a prompt is built —
  * the model never writes the string, so it cannot ask for a diagram however it
@@ -239,6 +284,7 @@ function scene(
  * (measured, #286).
  */
 export function imagePrompt(direction: ImageDirection, slot: Omit<ImageSlot, 'alt'>): string {
+  if (direction.medium === 'diagram') return diagramPrompt(direction, slot);
   const objects = usableObjects(slot.objects);
   const composition =
     objects.length === 0 && NEEDS_OBJECTS.has(slot.composition) ? 'abstract' : slot.composition;
@@ -256,8 +302,8 @@ export function imagePrompt(direction: ImageDirection, slot: Omit<ImageSlot, 'al
     .join(' ');
 }
 
-export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
-  const system = [
+function picturePlanSystem(language: string): string {
+  return [
     'You are an art director deciding what each image of one blog article shows.',
     `Return a cover entry and exactly ${INLINE_IMAGE_COUNT} inline entries; each`,
     'section_heading MUST be copied EXACTLY from the provided section list, each from a',
@@ -280,10 +326,40 @@ export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
     '  books, packaging, bottles or boxes. Never name a brand or a branded product: say',
     '  "single-board computer", not "Raspberry Pi". Prefer bare surfaces: hardware, tools,',
     '  materials, components, natural objects.',
-    `- alt: a meaningful description of the image for screen readers, written in ${input.language}.`,
+    `- alt: a meaningful description of the image for screen readers, written in ${language}.`,
+    '- labels: return an empty list; these images carry no text.',
     'You are NOT writing the image prompt. Nothing you return is passed to the image model',
     'verbatim, so do not describe a scene, a composition, a style or a diagram.',
   ].join('\n');
+}
+
+function diagramPlanSystem(language: string): string {
+  return [
+    'You are a technical illustrator deciding what each diagram of one blog article shows.',
+    `Return a cover entry and exactly ${INLINE_IMAGE_COUNT} inline entries; each`,
+    'section_heading MUST be copied EXACTLY from the provided section list, each from a',
+    'DIFFERENT section.',
+    'Every image is a labelled schematic diagram — boxes and arrows in the style of technical',
+    'documentation. For every entry:',
+    '- subject: what the diagram explains — a process, an architecture, a data flow or a',
+    '  comparison — as a short phrase. Use a DIFFERENT subject for each of the three images.',
+    `- labels: 3 to ${MAX_DIAGRAM_LABELS} short labels naming the boxes or steps, at most 3 words each,`,
+    `  written in ${language}. These are the ONLY words that will appear in the image.`,
+    '  Never name a brand or a branded product.',
+    `- composition: ${IMAGE_COMPOSITIONS.join(' | ')} and lighting: ${IMAGE_LIGHTING.join(' | ')}`,
+    '  are not used for diagrams; return any value.',
+    '- objects: return an empty list.',
+    `- alt: a meaningful description of the diagram for screen readers, written in ${language}.`,
+    'You are NOT writing the image prompt. Nothing you return is passed to the image model',
+    'verbatim except the labels.',
+  ].join('\n');
+}
+
+export function buildImagePlanPrompt(input: ImagePlanInput): LlmMessage[] {
+  const system =
+    input.imageDirection.medium === 'diagram'
+      ? diagramPlanSystem(input.language)
+      : picturePlanSystem(input.language);
 
   const notes = input.imageDirection.notes.trim();
   const user = [
