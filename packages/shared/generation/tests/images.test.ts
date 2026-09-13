@@ -380,7 +380,8 @@ describe('imagePrompt', () => {
     expect(imagePrompt(direction({ medium: 'line_art' }), slot({}))).toContain(
       'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
     );
-    for (const medium of IMAGE_MEDIA) {
+    // `diagram` is the one medium that carries text; it has its own prompt branch.
+    for (const medium of IMAGE_MEDIA.filter((m) => m !== 'diagram')) {
       const prompt = imagePrompt(direction({ medium }), slot({}));
       expect(prompt).toContain('No text, lettering, signage or logos anywhere in the frame.');
       expect(findTextRisk(prompt)).toBeNull();

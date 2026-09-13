@@ -15,6 +15,9 @@ export const PublishingPrefsSchema = z.object({ auto_publish: z.boolean().defaul
  * The kind of picture every article image is. Decided once per org by the
  * scanner and inherited by every article's image prompts (#312); the planner
  * used to guess it per article from a free-text phrase.
+ *
+ * `diagram` (design/ai-model-routing.md) is the one medium that carries text:
+ * labelled schematics for technical sites, routed to a text-capable image model.
  */
 export const IMAGE_MEDIA = [
   'photograph',
@@ -23,6 +26,7 @@ export const IMAGE_MEDIA = [
   'watercolor',
   'line_art',
   'isometric',
+  'diagram',
 ] as const;
 export type ImageMedium = (typeof IMAGE_MEDIA)[number];
 

@@ -167,7 +167,7 @@ describe('SetupPresetsSchema engagement.image_direction', () => {
     expect(() => withEngagement({ include_cta: true })).toThrow();
   });
 
-  test('the enum is the fixed six media', () => {
+  test('the enum is the six media plus diagram, appended last', () => {
     expect(IMAGE_MEDIA).toEqual([
       'photograph',
       'flat_illustration',
@@ -175,6 +175,7 @@ describe('SetupPresetsSchema engagement.image_direction', () => {
       'watercolor',
       'line_art',
       'isometric',
+      'diagram',
     ]);
   });
 });

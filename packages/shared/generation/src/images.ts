@@ -165,6 +165,7 @@ const MEDIUM_CLAUSE: Record<ImageMedium, string> = {
   watercolor: 'A watercolor painting',
   line_art: 'A minimal line-art illustration',
   isometric: 'An isometric illustration',
+  diagram: 'A clean, flat schematic diagram',
 };
 
 /** How the planner is told what kind of picture it is planning for. */
@@ -175,6 +176,7 @@ const MEDIUM_NOUN: Record<ImageMedium, string> = {
   watercolor: 'watercolor paintings',
   line_art: 'minimal line-art illustrations',
   isometric: 'isometric illustrations',
+  diagram: 'labelled schematic diagrams',
 };
 
 const LIGHTING_CLAUSE: Record<ImageLighting, string> = {
