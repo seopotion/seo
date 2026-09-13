@@ -1,8 +1,9 @@
 import { buildHumanizePrompt, fleschKincaidGrade, HUMANIZE } from '@shared/generation';
-import type { LlmClient } from '@shared/providers';
+import { type LlmClient, routeLlm } from '@shared/providers';
 import type { ArticleRun, HumanizeAttempt } from '@shared/schemas';
 import { contextFromRun } from '../context';
 import { ArticleFatalError } from '../errors';
+import { logLlmUsage } from '../llm-usage';
 import type { StageOutcome } from './types';
 
 /** Initial humanize pass + up to 2 readability retries (2026-08-28 spec). */
@@ -54,7 +55,11 @@ export async function stageHumanize(run: ArticleRun, llm: LlmClient): Promise<St
       }
     : undefined;
 
-  const res = await llm.complete({ messages: buildHumanizePrompt(ctx, input, feedback) });
+  const res = await llm.complete({
+    messages: buildHumanizePrompt(ctx, input, feedback),
+    ...routeLlm(ctx.contentComplexity, 'humanize'),
+  });
+  logLlmUsage('humanize', res);
   const grade = ctx.language === 'English' ? fleschKincaidGrade(res.text) : null;
   const attempt: HumanizeAttempt = { attempt: prior.length + 1, grade, content: res.text };
   const attempts = [...prior, attempt];

@@ -2,6 +2,7 @@ import { parseJsonObject } from '@shared/generation';
 import type { LlmClient, LlmMessage } from '@shared/providers';
 import {
   AUDIENCE_TARGET_MAX,
+  CONTENT_COMPLEXITIES,
   ImageDirectionSchema,
   type SetupPresets,
   SetupPresetsSchema,
@@ -29,6 +30,7 @@ const ScanOutputSchema = z.object({
       llm_instructions: z.string(),
       // Three reviewable tiers (#313); the preset itself allows 6–14 for edits.
       readability_grade_max: z.literal([8, 10, 12]),
+      content_complexity: z.enum(CONTENT_COMPLEXITIES),
     }),
     engagement: z.object({ image_direction: ImageDirectionSchema }),
   }),
@@ -63,8 +65,10 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     "- medium: the kind of picture that matches the site's visual character — photograph for",
     '  product, hardware or photo-led sites; flat_illustration or isometric for software and',
     '  services with flat brand graphics; three_d_render, watercolor or line_art only when the',
-    '  site itself looks that way. Screenshots, diagrams and interfaces are never a medium; when',
-    '  the site suggests those, choose photograph.',
+    '  site itself looks that way; diagram for developer tools, infrastructure and engineering',
+    '  products whose readers are better served by a labelled schematic than by a picture.',
+    '  Screenshots and real interfaces are never a medium; when the site suggests those, choose',
+    '  photograph.',
     '- palette: the site\'s brand colours as at most 6 words (e.g. "deep navy and warm white"),',
     '  or "" when none are evident.',
     '- notes: one short phrase of subject matter the images should favour (e.g. "workshop',
@@ -72,6 +76,10 @@ function buildScanPrompt(url: string, pageText: string | null): LlmMessage[] {
     'readability_grade_max is the highest acceptable Flesch-Kincaid grade for articles: 8 for general-public',
     'or consumer audiences, 10 for business and professional audiences, 12 for developers, engineers,',
     'scientists and other specialists.',
+    'content_complexity is how expert the articles must read: general for consumer, lifestyle',
+    'and local-service sites; professional for B2B, finance, legal and agency audiences;',
+    'technical for developer tools, infrastructure, engineering and scientific products whose',
+    'readers expect precise, expert-level content.',
   ].join('\n');
 
   const user = pageText

@@ -309,6 +309,29 @@ describe('stageHumanize', () => {
     });
   });
 
+  test('routes the humanize model by content_complexity', async () => {
+    const llm = llmReplying('Acme rewrite-pass');
+    const technical = makeRun({
+      working: { draft: 'Acme draft' },
+      presets: {
+        ...presets,
+        article_preferences: {
+          ...presets.article_preferences,
+          content_seo: {
+            ...presets.article_preferences.content_seo,
+            content_complexity: 'technical',
+          },
+        },
+      },
+    });
+
+    await stageHumanize(technical, llm);
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-sonnet-5', timeoutMs: 120_000 }),
+    );
+  });
+
   test('retry feedback quotes the org target, not a global one (#313)', async () => {
     const technical = {
       ...presets,

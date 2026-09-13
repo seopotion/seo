@@ -25,6 +25,7 @@ export function buildContext(
     linkCandidates,
     llmInstructions: p.article_preferences.content_seo.llm_instructions,
     readabilityGradeMax: p.article_preferences.content_seo.readability_grade_max,
+    contentComplexity: p.article_preferences.content_seo.content_complexity,
     keyword: keyword.keyword,
     topic_cluster_id: keyword.topic_cluster_id,
     topic_cluster_label: keyword.topic_cluster_label,

@@ -119,13 +119,39 @@ describe('stageOutline', () => {
     const result = await stageOutline(makeRun(), llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ responseSchema: OUTLINE_RESPONSE_SCHEMA }),
+      expect.objectContaining({
+        responseSchema: OUTLINE_RESPONSE_SCHEMA,
+        model: 'anthropic/claude-haiku-4.5',
+        timeoutMs: 60_000,
+      }),
     );
     expect(result.completed).toBe(true);
     expect(result.working.outline).toMatchObject({
       h1: 'Best Widgets For Makers',
       slug: 'best-widgets',
     });
+  });
+
+  test('routes the outline model by the run snapshot content_complexity', async () => {
+    const llm = llmReplying(outlineJson);
+    const technical = makeRun({
+      presets: {
+        ...presets,
+        article_preferences: {
+          ...presets.article_preferences,
+          content_seo: {
+            ...presets.article_preferences.content_seo,
+            content_complexity: 'technical',
+          },
+        },
+      },
+    });
+
+    await stageOutline(technical, llm);
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-sonnet-5', timeoutMs: 120_000 }),
+    );
   });
 });
 
@@ -163,5 +189,28 @@ describe('stageDraft', () => {
     const result = await stageDraft(run, llm);
 
     expect(result.working).toEqual({ draft: 'Intro.\n\n## One\n\nBody.' });
+  });
+
+  test('routes the draft model by the run snapshot content_complexity', async () => {
+    const llm = llmReplying('## One\n\nbody');
+    const technical = makeRun({
+      working: { outline },
+      presets: {
+        ...presets,
+        article_preferences: {
+          ...presets.article_preferences,
+          content_seo: {
+            ...presets.article_preferences.content_seo,
+            content_complexity: 'technical',
+          },
+        },
+      },
+    });
+
+    await stageDraft(technical, llm);
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-opus-5', timeoutMs: 240_000 }),
+    );
   });
 });

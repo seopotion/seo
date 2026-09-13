@@ -4,12 +4,15 @@ import { INLINE_IMAGE_COUNT } from '../src/config';
 import type { ImageSlot } from '../src/images';
 import {
   buildImagePlanPrompt,
+  diagramLabels,
   extractH2s,
   findTextRisk,
   IMAGE_COMPOSITIONS,
   IMAGE_LIGHTING,
+  IMAGE_PLAN_RESPONSE_SCHEMA,
   imagePrompt,
   injectImageAfterHeading,
+  MAX_DIAGRAM_LABELS,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
   usableObjects,
@@ -153,9 +156,15 @@ describe('withNoTextDirective', () => {
 
 describe('parseImagePlan', () => {
   test('accepts a valid plan (with an optional code fence)', () => {
-    expect(parseImagePlan(JSON.stringify(validPlan), headings)).toEqual(validPlan);
+    // The input JSON carries no `labels` (a pre-existing plan shape); the schema
+    // default fills it in as an empty list — see 'parseImagePlan labels' below.
+    const expected = {
+      cover: { ...validPlan.cover, labels: [] },
+      inline: validPlan.inline.map((slot) => ({ ...slot, labels: [] })),
+    };
+    expect(parseImagePlan(JSON.stringify(validPlan), headings)).toEqual(expected);
     expect(parseImagePlan(`\`\`\`json\n${JSON.stringify(validPlan)}\n\`\`\``, headings)).toEqual(
-      validPlan,
+      expected,
     );
   });
 
@@ -287,6 +296,7 @@ describe('imagePrompt', () => {
     composition: 'still_life',
     lighting: 'natural_daylight',
     objects: ['server rack', 'coiled cable'],
+    labels: [],
     ...patch,
   });
 
@@ -380,7 +390,8 @@ describe('imagePrompt', () => {
     expect(imagePrompt(direction({ medium: 'line_art' }), slot({}))).toContain(
       'A single illustrated scene, not a document, page, poster, slide, chart or screen.',
     );
-    for (const medium of IMAGE_MEDIA) {
+    // `diagram` is the one medium that carries text; it has its own prompt branch.
+    for (const medium of IMAGE_MEDIA.filter((m) => m !== 'diagram')) {
       const prompt = imagePrompt(direction({ medium }), slot({}));
       expect(prompt).toContain('No text, lettering, signage or logos anywhere in the frame.');
       expect(findTextRisk(prompt)).toBeNull();
@@ -410,5 +421,103 @@ describe('usableObjects', () => {
   test('caps the list and tolerates an empty answer', () => {
     expect(usableObjects(['a', 'b', 'c', 'd', 'e'])).toHaveLength(4);
     expect(usableObjects([])).toEqual([]);
+  });
+});
+
+describe('diagramLabels', () => {
+  test('trims, collapses whitespace, drops blanks and case-insensitive duplicates, caps at 5', () => {
+    expect(
+      diagramLabels([' API  Gateway ', '', 'api gateway', 'Queue', 'Worker', 'DB', 'Cache', 'CDN']),
+    ).toEqual(['API Gateway', 'Queue', 'Worker', 'DB', 'Cache']);
+    expect(MAX_DIAGRAM_LABELS).toBe(5);
+  });
+
+  test('strips double quotes, dropping a label left empty', () => {
+    expect(diagramLabels(['"API"', 'a "quoted" word', '"'])).toEqual(['API', 'a quoted word']);
+  });
+});
+
+describe('imagePrompt for the diagram medium', () => {
+  const diagram = direction({ medium: 'diagram', palette: 'deep navy and white' });
+  const slot = {
+    subject: 'how a scan task moves from the API to the worker',
+    composition: 'still_life' as const,
+    lighting: 'natural_daylight' as const,
+    objects: ['server rack'],
+    labels: ['API', 'SQS queue', 'Worker', 'MongoDB'],
+  };
+
+  test('asks for a labelled schematic with exactly the planned labels and no other text', () => {
+    const prompt = imagePrompt(diagram, slot);
+    expect(prompt).toContain(
+      'A clean, flat schematic diagram explaining how a scan task moves from the API to the worker',
+    );
+    expect(prompt).toContain('exactly these 4 labels');
+    expect(prompt).toContain('"API", "SQS queue", "Worker", "MongoDB"');
+    expect(prompt).toContain('Palette: deep navy and white.');
+    expect(prompt).toContain('No other words, captions, titles, logos or watermarks.');
+    // The no-text ban and the photographic clauses do not apply to diagrams.
+    expect(prompt).not.toContain('No text, lettering, signage or logos anywhere in the frame.');
+    expect(prompt).not.toContain('server rack');
+    expect(prompt).not.toContain('daylight');
+  });
+
+  test('with no usable labels it asks for a wordless diagram', () => {
+    const prompt = imagePrompt(diagram, { ...slot, labels: ['', '  '] });
+    expect(prompt).toContain('No text anywhere in the image.');
+    expect(prompt).not.toContain('exactly these');
+  });
+
+  test('every non-diagram medium ignores labels', () => {
+    for (const medium of IMAGE_MEDIA.filter((m) => m !== 'diagram')) {
+      const prompt = imagePrompt(direction({ medium }), slot);
+      expect(prompt).not.toContain('SQS queue');
+      expect(prompt).toContain('No text, lettering, signage or logos anywhere in the frame.');
+    }
+  });
+});
+
+describe('buildImagePlanPrompt for the diagram medium', () => {
+  const input = {
+    businessName: 'Piper',
+    businessDescription: 'infra tooling',
+    language: 'English',
+    imageDirection: direction({ medium: 'diagram' }),
+    articleTitle: 'T',
+    metaDescription: 'M',
+    headings,
+  };
+
+  test('asks for labels and says they are the only words rendered', () => {
+    const [system, user] = buildImagePlanPrompt(input).map((m) => String(m.content));
+    expect(user).toContain('Images are labelled schematic diagrams.');
+    expect(system).toContain('labels: 3 to 5 short labels');
+    expect(system).toContain('at most 3 words each');
+    expect(system).toContain('ONLY words that will appear in the image');
+    expect(system).toContain('written in English');
+    expect(system).toContain(`exactly ${INLINE_IMAGE_COUNT}`);
+    expect(system).not.toContain('Never a screen, diagram');
+  });
+
+  test('non-diagram media are told to return no labels', () => {
+    const [system] = buildImagePlanPrompt({ ...input, imageDirection: photo }).map((m) =>
+      String(m.content),
+    );
+    expect(system).toContain('labels: return an empty list');
+  });
+});
+
+describe('parseImagePlan labels', () => {
+  test('a plan without labels parses to empty label lists', () => {
+    const plan = parseImagePlan(JSON.stringify(validPlan), headings);
+    expect(plan.cover.labels).toEqual([]);
+    expect(plan.inline[0]!.labels).toEqual([]);
+  });
+
+  test('labels are required on the wire schema', () => {
+    const cover = (
+      IMAGE_PLAN_RESPONSE_SCHEMA.schema.properties as Record<string, { required: string[] }>
+    ).cover!;
+    expect(cover.required).toContain('labels');
   });
 });

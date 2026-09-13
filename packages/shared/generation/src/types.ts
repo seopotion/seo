@@ -1,4 +1,4 @@
-import type { SerpCompetitor } from '@shared/schemas';
+import type { ContentComplexity, SerpCompetitor } from '@shared/schemas';
 import type { LinkCandidate } from './links';
 import type { TopicBriefFields } from './topic';
 
@@ -22,6 +22,9 @@ export interface GenerationContext extends TopicBriefFields {
   // Highest acceptable Flesch–Kincaid grade for English articles (#313). Comes
   // from presets.article_preferences.content_seo.readability_grade_max.
   readabilityGradeMax: number;
+  // Selects the LLM ladder each stage runs on (design/ai-model-routing.md).
+  // Comes from presets.article_preferences.content_seo.content_complexity.
+  contentComplexity: ContentComplexity;
   keyword: string;
   articleType: string | null;
   intent: string | null;

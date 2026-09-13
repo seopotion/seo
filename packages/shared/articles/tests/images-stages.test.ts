@@ -192,6 +192,20 @@ const directedRun = makeRun({
   },
 });
 
+const diagramRun = makeRun({
+  working: { article_id: 'a1' },
+  presets: {
+    ...presets,
+    article_preferences: {
+      ...presets.article_preferences,
+      engagement: {
+        ...presets.article_preferences.engagement,
+        image_direction: { medium: 'diagram', palette: 'navy and white', notes: '' },
+      },
+    },
+  },
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   findArticleById.mockReset();
@@ -328,6 +342,17 @@ describe('stageImagesPlan', () => {
     expect(slots[0]!.prompt).not.toContain('badge');
   });
 
+  test('plans on the image_plan route (Haiku at every complexity)', async () => {
+    findArticleById.mockResolvedValue({ ...article, images: [] });
+    llmComplete.mockResolvedValue({ text: planJson, model: 'm', usage: usageStub });
+
+    await stageImagesPlan(run, { complete: llmComplete });
+
+    expect(llmComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+    );
+  });
+
   test('invalid plan marks images failed and rethrows', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({
@@ -347,6 +372,22 @@ describe('stageImagesPlan', () => {
 
     await expect(stageImagesPlan(run, { complete: llmComplete })).rejects.toThrow(/exactly/);
     expect(failImages).toHaveBeenCalledWith('a1');
+  });
+
+  test('a diagram org gets label-bearing prompts', async () => {
+    findArticleById.mockResolvedValue({ ...article, images: [] });
+    const plan = JSON.parse(planJson);
+    plan.cover.labels = ['API', 'Queue', 'Worker'];
+    llmComplete.mockResolvedValue({ text: JSON.stringify(plan), model: 'm', usage: usageStub });
+
+    await stageImagesPlan(diagramRun, { complete: llmComplete });
+
+    const messages = llmComplete.mock.calls[0]![0].messages as { content: string }[];
+    expect(messages[0]!.content).toContain('technical illustrator');
+    const slots = setImagePlan.mock.calls[0]![1] as ArticleImage[];
+    expect(slots[0]!.prompt).toContain('"API", "Queue", "Worker"');
+    expect(slots[0]!.prompt).toContain('Palette: navy and white.');
+    expect(slots[1]!.prompt).toContain('No text anywhere in the image.');
   });
 });
 
@@ -374,6 +415,42 @@ describe('stageImagesRender', () => {
     for (const call of imageGenerate.mock.calls) {
       expect((call[0] as { prompt: string }).prompt).toContain(NO_TEXT_DIRECTIVE);
     }
+  });
+
+  test('non-diagram media render on flux-2 with exact pixels and record that model', async () => {
+    findArticleById
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+      .mockResolvedValue({ ...article, images: filledSlots() });
+
+    await stageImagesRender(run, { generate: imageGenerate });
+
+    const first = imageGenerate.mock.calls[0]![0] as Record<string, unknown>;
+    expect(first.model).toBe('fal-ai/flux-2');
+    expect(first.size).toEqual({ width: 1200, height: 630 });
+    expect(first.aspectRatio).toBeUndefined();
+    expect((fillImageSlot.mock.calls[0]![2] as { model: string }).model).toBe('fal-ai/flux-2');
+  });
+
+  // Diagrams are the one medium made of text: the no-text ban would fight the
+  // labels, and flux-2 cannot render them, so the medium picks the model.
+  test('the diagram medium renders on nano-banana-pro at 16:9 without the no-text directive', async () => {
+    findArticleById
+      .mockResolvedValueOnce({ ...article, images: plannedSlots() })
+      .mockResolvedValue({ ...article, images: filledSlots() });
+
+    await stageImagesRender(diagramRun, { generate: imageGenerate });
+
+    for (const call of imageGenerate.mock.calls) {
+      const params = call[0] as Record<string, unknown>;
+      expect(params.model).toBe('fal-ai/nano-banana-pro');
+      expect(params.aspectRatio).toBe('16:9');
+      expect(params.size).toBeUndefined();
+      expect(params.outputFormat).toBe('webp');
+      expect(params.prompt as string).not.toContain(NO_TEXT_DIRECTIVE);
+    }
+    expect((fillImageSlot.mock.calls[0]![2] as { model: string }).model).toBe(
+      'fal-ai/nano-banana-pro',
+    );
   });
 
   test('short-circuits when images_status is already complete', async () => {

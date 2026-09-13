@@ -9,11 +9,16 @@ export type ImageSize =
 /** Encoding the provider emits. fal's `output_format`; unset = the model's default (png). */
 export type ImageOutputFormat = 'jpeg' | 'png' | 'webp';
 
+/** fal `aspect_ratio` values shared by the nano-banana models. */
+export type ImageAspectRatio = '21:9' | '16:9' | '4:3' | '1:1';
+
 export interface ImageGenerateParams {
   prompt: string;
   /** Defaults to config.defaultModel. */
   model?: string;
   size?: ImageSize;
+  /** For models sized by ratio rather than pixels (nano-banana). */
+  aspectRatio?: ImageAspectRatio;
   seed?: number;
   outputFormat?: ImageOutputFormat;
 }
