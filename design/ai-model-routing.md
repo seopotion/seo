@@ -2,7 +2,7 @@
 
 Design written 2026-09-13. Follows [`llm-image-providers.md`](llm-image-providers.md)
 (one model everywhere) and [`article-image-direction.md`](article-image-direction.md)
-(#312, org-level medium). Issue: to be filed on implementation.
+(#312, org-level medium). Issue: [#358](https://github.com/seopotion/seo/issues/358).
 
 ## Problem
 
@@ -92,9 +92,16 @@ image planning are mechanical regardless of audience.
 **Timeouts.** The LLM client defaults to 60s per request. An Opus draft of
 ~5k output tokens will exceed that, so the route carries its own timeout:
 Haiku 60s, Sonnet 120s, Opus 240s. `LlmCompleteParams` gains an optional
-`timeoutMs` that overrides the client default for that call. The draft
-stage's Step Functions task timeout is 5 minutes, so no infra change. Retries
-(2, backoff) are unchanged.
+`timeoutMs` that overrides the client default for that call. Retries (2,
+backoff) are unchanged, and a `timeout` error is retryable, so the worst case
+is three attempts: Sonnet 6 min, Opus 12 min, against a 5-minute Step
+Functions draft task timeout and a 10-minute Lambda. On that slow path Step
+Functions abandons the first Lambda and starts another while the first may
+still be retrying Opus, so one article can bill more than one Opus draft.
+Accepted for now: Step Functions is the recovery, the duplicate is bounded,
+and the staging check reads the `llm usage` lines to see whether it ever
+happens. If it does, the options are a longer draft task timeout or a client
+retry budget that stops retrying a timeout when another attempt cannot fit.
 
 **Call sites.** Each article stage reads
 `run.input.presets.article_preferences.content_seo.content_complexity` and
@@ -110,10 +117,11 @@ passes `{ model, timeoutMs }` from `routeLlm`:
 
 The keyword/strategy pipeline is untouched; it keeps its own pinned model.
 
-**Observability.** `LlmResult.model` and `usage.costUsd` already exist; the
-stages already log the result. No new fields — the model actually served
-shows up in the existing per-stage log line, which is what the staging check
-reads.
+**Observability.** `LlmResult.model` and `usage.costUsd` already exist. The
+stages did not log them, so `@shared/articles` gains a one-line
+`logLlmUsage(stage, result)` helper that every routed call site invokes; the
+served model shows up in that `llm usage` log line, which is what the staging
+check reads.
 
 ## 3. Image routing
 

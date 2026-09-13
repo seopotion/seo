@@ -1,14 +1,8 @@
 import type { ContentComplexity } from '@shared/schemas';
 
 /** The article stages that call the LLM. The keyword pipeline pins its own models. */
-export type LlmTask = 'outline' | 'draft' | 'humanize' | 'finalize' | 'image_plan';
-export const LLM_TASKS: readonly LlmTask[] = [
-  'outline',
-  'draft',
-  'humanize',
-  'finalize',
-  'image_plan',
-];
+export const LLM_TASKS = ['outline', 'draft', 'humanize', 'finalize', 'image_plan'] as const;
+export type LlmTask = (typeof LLM_TASKS)[number];
 
 export interface LlmRoute {
   /** OpenRouter model id. */

@@ -25,6 +25,7 @@ const MEDIUM_LABEL: Record<ImageMedium, string> = {
 };
 
 /** Option labels for `CONTENT_COMPLEXITIES` — picks the LLM ladder every stage runs on. */
+// Model names mirror the ladder in packages/shared/providers/src/llm/routing.ts; keep in sync.
 const COMPLEXITY_LABEL: Record<ContentComplexity, string> = {
   general: "General (Haiku everywhere — today's default)",
   professional: 'Professional (Sonnet outline + draft)',

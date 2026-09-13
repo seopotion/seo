@@ -90,7 +90,7 @@ export async function stageFinalize(
     responseSchema: SEMANTIC_RESPONSE_SCHEMA,
     ...finalizeRoute,
   });
-  logLlmUsage('finalize', semRes);
+  logLlmUsage('finalize_semantic', semRes);
   const semantic = parseSemanticResult(semRes.text, ctx);
   if (!semantic.pass)
     failures.push({
@@ -129,7 +129,7 @@ export async function stageFinalize(
           responseSchema: VIDEO_PICK_RESPONSE_SCHEMA,
           ...finalizeRoute,
         });
-        logLlmUsage('finalize', res);
+        logLlmUsage('finalize_video', res);
         const pick = parseVideoPick(res.text, candidates.length, headings);
         if (pick) {
           const chosen = candidates[pick.video_index]!;

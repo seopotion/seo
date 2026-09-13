@@ -167,13 +167,17 @@ export const MAX_DIAGRAM_LABELS = 5;
 /**
  * The only text a diagram may carry: the planner's labels, tidied, de-duplicated
  * (case-insensitively) and capped. Never filtered by `findTextRisk` — words are
- * the point here.
+ * the point here. Every `"` is stripped first — the diagram prompt wraps each
+ * label in double quotes, and a quote inside the label would break that
+ * quoting — so a label made only of quote characters is dropped as empty. The
+ * "at most 3 words" rule from the planner instructions is prompt guidance
+ * only; it is not enforced here.
  */
 export function diagramLabels(labels: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of labels) {
-    const label = raw.trim().replace(/\s+/g, ' ');
+    const label = raw.replaceAll('"', '').trim().replace(/\s+/g, ' ');
     const key = label.toLowerCase();
     if (label === '' || seen.has(key)) continue;
     seen.add(key);

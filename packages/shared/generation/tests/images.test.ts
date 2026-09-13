@@ -431,6 +431,10 @@ describe('diagramLabels', () => {
     ).toEqual(['API Gateway', 'Queue', 'Worker', 'DB', 'Cache']);
     expect(MAX_DIAGRAM_LABELS).toBe(5);
   });
+
+  test('strips double quotes, dropping a label left empty', () => {
+    expect(diagramLabels(['"API"', 'a "quoted" word', '"'])).toEqual(['API', 'a quoted word']);
+  });
 });
 
 describe('imagePrompt for the diagram medium', () => {
