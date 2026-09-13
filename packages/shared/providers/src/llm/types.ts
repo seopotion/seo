@@ -12,6 +12,8 @@ export interface LlmCompleteParams {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  /** Overrides the client's configured timeout for this call (routed per model). */
+  timeoutMs?: number;
   /**
    * Constrain the response to a JSON Schema (OpenRouter structured outputs).
    * Omit for free-form text. There is deliberately no plain "JSON mode" option:

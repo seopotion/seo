@@ -7,6 +7,7 @@ export * from './errors';
 export * from './image/client';
 export type * from './image/types';
 export * from './llm/client';
+export * from './llm/routing';
 export type * from './llm/types';
 export * from './secrets';
 export * from './youtube/client';

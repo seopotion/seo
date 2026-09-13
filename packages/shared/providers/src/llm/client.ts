@@ -1,9 +1,8 @@
 import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
+import { DEFAULT_LLM_MODEL, DEFAULT_LLM_TIMEOUT_MS } from './routing';
 import type { LlmClient, LlmCompleteParams, LlmConfig, LlmResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
-const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5';
-const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 200;
 
@@ -15,8 +14,8 @@ function num(raw: unknown): number {
 
 export function createOpenRouterClient(config: LlmConfig): LlmClient {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-  const defaultModel = config.defaultModel ?? DEFAULT_MODEL;
-  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const defaultModel = config.defaultModel ?? DEFAULT_LLM_MODEL;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = config.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
 
@@ -28,9 +27,9 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
   if (config.appTitle) headers['X-Title'] = config.appTitle;
 
   /** One POST to /chat/completions. Handles timeout + maps failures to ProviderError. */
-  async function once(body: Record<string, unknown>): Promise<LlmResult> {
+  async function once(body: Record<string, unknown>, timeout: number): Promise<LlmResult> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeout);
     let res: Response;
     try {
       res = await fetch(`${baseUrl}/chat/completions`, {
@@ -74,12 +73,12 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
   }
 
   /** `once`, plus retries on transient transport failures. */
-  async function send(body: Record<string, unknown>): Promise<LlmResult> {
+  async function send(body: Record<string, unknown>, timeout: number): Promise<LlmResult> {
     let attempt = 0;
     // Loop: initial try + up to maxRetries retries on retryable categories.
     for (;;) {
       try {
-        return await once(body);
+        return await once(body, timeout);
       } catch (err) {
         const retryable = err instanceof ProviderError && isRetryableProviderError(err.category);
         if (!retryable || attempt >= maxRetries) throw err;
@@ -114,7 +113,8 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
         body.provider = { require_parameters: true };
       }
 
-      const result = await send(body);
+      const timeout = params.timeoutMs ?? timeoutMs;
+      const result = await send(body, timeout);
       // An empty body is a 200 OK that says nothing: every caller parses JSON out
       // of `text`, so there is no reading under which "" is an answer. Measured
       // on the previous default (GLM-5.2), a reasoning model that spent its
@@ -127,7 +127,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       // nothing. If it repeats, return the empty result and let those paths run
       // unchanged.
       if (result.text.trim().length > 0) return result;
-      return send(body);
+      return send(body, timeout);
     },
   };
 }
