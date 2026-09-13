@@ -16,6 +16,7 @@ const ctx: GenerationContext = {
   linkCandidates: [],
   llmInstructions: 'be concise',
   readabilityGradeMax: 8,
+  contentComplexity: 'general',
   keyword: 'best widgets',
   topic_cluster_id: null,
   topic_cluster_label: null,

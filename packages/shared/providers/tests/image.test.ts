@@ -112,4 +112,18 @@ describe('generate', () => {
     await client().generate({ prompt: 'x' });
     expect(JSON.parse(fetchMock.mock.calls[1]![1].body as string)).toEqual({ prompt: 'x' });
   });
+
+  // nano-banana-pro takes aspect_ratio, not image_size (fal OpenAPI, 2026-09-13).
+  test('sends aspectRatio as fal aspect_ratio', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(imageResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().generate({
+      prompt: 'a diagram',
+      model: 'fal-ai/nano-banana-pro',
+      aspectRatio: '16:9',
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('https://fal.run/fal-ai/nano-banana-pro');
+    expect(JSON.parse(init.body as string)).toEqual({ prompt: 'a diagram', aspect_ratio: '16:9' });
+  });
 });

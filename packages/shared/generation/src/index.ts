@@ -17,6 +17,7 @@ export type {
 } from './images';
 export {
   buildImagePlanPrompt,
+  diagramLabels,
   extractH2s,
   findTextRisk,
   IMAGE_COMPOSITIONS,
@@ -26,6 +27,7 @@ export {
   imagePrompt,
   injectBlockAfterHeading,
   injectImageAfterHeading,
+  MAX_DIAGRAM_LABELS,
   NO_TEXT_DIRECTIVE,
   parseImagePlan,
   usableObjects,

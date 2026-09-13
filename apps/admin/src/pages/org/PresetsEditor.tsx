@@ -1,4 +1,9 @@
-import { IMAGE_MEDIA, type ImageMedium } from '@shared/schemas';
+import {
+  CONTENT_COMPLEXITIES,
+  type ContentComplexity,
+  IMAGE_MEDIA,
+  type ImageMedium,
+} from '@shared/schemas';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useMemo, useState } from 'react';
 import { errorText } from '../../lib/errors';
@@ -16,6 +21,15 @@ const MEDIUM_LABEL: Record<ImageMedium, string> = {
   watercolor: 'Watercolor',
   line_art: 'Line art',
   isometric: 'Isometric',
+  diagram: 'Diagram (labelled schematic)',
+};
+
+/** Option labels for `CONTENT_COMPLEXITIES` — picks the LLM ladder every stage runs on. */
+// Model names mirror the ladder in packages/shared/providers/src/llm/routing.ts; keep in sync.
+const COMPLEXITY_LABEL: Record<ContentComplexity, string> = {
+  general: "General (Haiku everywhere — today's default)",
+  professional: 'Professional (Sonnet outline + draft)',
+  technical: 'Technical (Sonnet outline + humanize, Opus draft)',
 };
 
 const INPUT =
@@ -210,6 +224,25 @@ function PresetsForm({ orgId, presets }: { orgId: string; presets: Presets }) {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="block">
+            <span className={LABEL}>Content complexity</span>
+            <select
+              className={`${INPUT} mt-1`}
+              value={contentSeo.content_complexity}
+              onChange={(event) =>
+                setContentSeo({ content_complexity: event.target.value as ContentComplexity })
+              }
+            >
+              {CONTENT_COMPLEXITIES.map((complexity) => (
+                <option key={complexity} value={complexity}>
+                  {COMPLEXITY_LABEL[complexity]}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-neutral-500">
+              How expert the articles must read; selects the models each stage runs on.
+            </span>
           </label>
           <label className="block">
             <span className={LABEL}>Image medium</span>

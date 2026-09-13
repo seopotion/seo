@@ -16,6 +16,7 @@ const ctx: GenerationContext = {
   linkCandidates: [],
   llmInstructions: '',
   readabilityGradeMax: 8,
+  contentComplexity: 'general',
   keyword: 'mejores widgets',
   topic_cluster_id: null,
   topic_cluster_label: null,

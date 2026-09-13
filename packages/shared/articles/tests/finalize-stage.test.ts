@@ -279,6 +279,53 @@ describe('stageFinalize', () => {
     });
   });
 
+  test('routes the semantic check and the video pick to the finalize task (Haiku at every complexity)', async () => {
+    // Default fixture presets have youtube_videos: true; one candidate makes
+    // the stage also issue the video-pick call (#358 covers its route too).
+    const llm = llmReplying(
+      semanticPass,
+      JSON.stringify({ video_index: 0, section_heading: 'One' }),
+    );
+    const youtube: YouTubeClient = {
+      searchVideos: vi.fn(async () => [
+        { video_id: 'v1', title: 'Vid title', description: 'd', channel: 'c' },
+      ]),
+    };
+    const runOverrides = {
+      working: {
+        outline,
+        content,
+        readability_grade: 6,
+        humanize_attempts: [{ attempt: 1, grade: 6, content }],
+      },
+      presets: presetsNoVideo,
+    };
+    const technical = makeRun({
+      ...runOverrides,
+      presets: {
+        ...presets,
+        article_preferences: {
+          ...presets.article_preferences,
+          content_seo: {
+            ...presets.article_preferences.content_seo,
+            content_complexity: 'technical',
+          },
+        },
+      },
+    });
+
+    await stageFinalize(technical, { llm, youtube });
+
+    expect(llm.complete).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+    );
+    expect(llm.complete).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+    );
+  });
+
   test('stores the org readability target on the article (#313)', async () => {
     const llm = llmReplying(semanticPass);
     const youtube = youtubeThat();

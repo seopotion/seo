@@ -208,4 +208,39 @@ describe('complete', () => {
     expect(headers['HTTP-Referer']).toBe('https://example.com');
     expect(headers['X-Title']).toBe('SeoPotion');
   });
+
+  test('a per-call timeoutMs overrides the configured timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      // Never resolves on its own; only an abort can end it.
+      const fetchMock = vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const c = createOpenRouterClient({ apiKey: 'sk-test', timeoutMs: 1_000, maxRetries: 0 });
+
+      let settled = false;
+      const failed = c
+        .complete({ messages: [{ role: 'user', content: 'x' }], timeoutMs: 5_000 })
+        .then(
+          () => 'resolved',
+          (err: unknown) => (err as Error).message,
+        )
+        .finally(() => {
+          settled = true;
+        });
+      await vi.advanceTimersByTimeAsync(1_500);
+      expect(settled).toBe(false); // the 1s config timeout did not fire
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(settled).toBe(true); // the 5s per-call timeout did
+      expect(await failed).toMatch(/timed out/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

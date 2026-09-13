@@ -22,6 +22,7 @@ const LLM_JSON = JSON.stringify({
     content_seo: {
       article_style: 'Practical',
       readability_grade_max: 10,
+      content_complexity: 'professional',
       llm_instructions: 'Be clear.',
     },
     engagement: {
@@ -190,5 +191,46 @@ describe('scanWebsite', () => {
     await expect(
       scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(off)) }),
     ).rejects.toThrow();
+  });
+
+  test('asks for a content complexity and lands it in presets', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    const presets = await scanWebsite('https://clewas.com', { llm });
+
+    const system = String(llm.complete.mock.calls[0]![0].messages[0]!.content);
+    expect(system).toContain('content_complexity');
+    expect(system).toContain('general for consumer');
+    expect(system).toContain('technical for developer tools');
+    expect(presets.article_preferences.content_seo.content_complexity).toBe('professional');
+
+    const schema = JSON.stringify(llm.complete.mock.calls[0]![0].responseSchema?.schema);
+    expect(schema).toContain('"content_complexity"');
+    expect(schema).toContain('"technical"');
+  });
+
+  test('rejects a content complexity outside the enum', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const off = JSON.parse(LLM_JSON);
+    off.article_preferences.content_seo.content_complexity = 'expert';
+
+    await expect(
+      scanWebsite('https://clewas.com', { llm: llmReturning(JSON.stringify(off)) }),
+    ).rejects.toThrow();
+  });
+
+  test('describes when diagram is the medium and keeps screenshots out', async () => {
+    fetchSite.mockResolvedValue({ text: 'x', links: [] });
+    const llm = llmReturning(LLM_JSON);
+
+    await scanWebsite('https://clewas.com', { llm });
+
+    const system = String(llm.complete.mock.calls[0]![0].messages[0]!.content);
+    expect(system).toContain('diagram for developer tools');
+    expect(system).toContain('Screenshots and real interfaces are never a medium');
+    expect(system).not.toContain('Screenshots, diagrams and interfaces are never a medium');
+    const schema = JSON.stringify(llm.complete.mock.calls[0]![0].responseSchema?.schema);
+    expect(schema).toContain('"diagram"');
   });
 });
