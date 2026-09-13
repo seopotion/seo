@@ -8,10 +8,11 @@ import {
   parseImagePlan,
   withNoTextDirective,
 } from '@shared/generation';
-import type { ImageResult, LlmClient } from '@shared/providers';
+import { type ImageResult, type LlmClient, routeLlm } from '@shared/providers';
 import type { ArticleImage, ArticleRun } from '@shared/schemas';
 import type { ArticleStageClients } from '../clients';
 import { ArticleFatalError, ArticleRetryableError } from '../errors';
+import { logLlmUsage } from '../llm-usage';
 import { storeImage } from '../storage';
 import type { StageOutcome } from './types';
 
@@ -106,7 +107,9 @@ export async function stageImagesPlan(run: ArticleRun, llm: LlmClient): Promise<
       headings,
     }),
     responseSchema: IMAGE_PLAN_RESPONSE_SCHEMA,
+    ...routeLlm(presets.article_preferences.content_seo.content_complexity, 'image_plan'),
   });
+  logLlmUsage('image_plan', res);
   let plan: ReturnType<typeof parseImagePlan>;
   try {
     plan = parseImagePlan(res.text, headings);

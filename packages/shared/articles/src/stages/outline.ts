@@ -1,7 +1,8 @@
 import { buildOutlinePrompt, OUTLINE_RESPONSE_SCHEMA, parseOutline } from '@shared/generation';
-import type { LlmClient } from '@shared/providers';
+import { type LlmClient, routeLlm } from '@shared/providers';
 import type { ArticleRun } from '@shared/schemas';
 import { contextFromRun } from '../context';
+import { logLlmUsage } from '../llm-usage';
 import type { StageOutcome } from './types';
 
 export async function stageOutline(run: ArticleRun, llm: LlmClient): Promise<StageOutcome> {
@@ -9,7 +10,9 @@ export async function stageOutline(run: ArticleRun, llm: LlmClient): Promise<Sta
   const res = await llm.complete({
     messages: buildOutlinePrompt(ctx),
     responseSchema: OUTLINE_RESPONSE_SCHEMA,
+    ...routeLlm(ctx.contentComplexity, 'outline'),
   });
+  logLlmUsage('outline', res);
   const outline = parseOutline(res.text, ctx);
   return { completed: true, working: { outline } };
 }

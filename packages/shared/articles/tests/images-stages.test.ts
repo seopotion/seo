@@ -328,6 +328,17 @@ describe('stageImagesPlan', () => {
     expect(slots[0]!.prompt).not.toContain('badge');
   });
 
+  test('plans on the image_plan route (Haiku at every complexity)', async () => {
+    findArticleById.mockResolvedValue({ ...article, images: [] });
+    llmComplete.mockResolvedValue({ text: planJson, model: 'm', usage: usageStub });
+
+    await stageImagesPlan(run, { complete: llmComplete });
+
+    expect(llmComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+    );
+  });
+
   test('invalid plan marks images failed and rethrows', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({

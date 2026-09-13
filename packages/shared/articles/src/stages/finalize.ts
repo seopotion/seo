@@ -14,10 +14,12 @@ import {
   VIDEO_PICK_RESPONSE_SCHEMA,
   validateArticle,
 } from '@shared/generation';
+import { routeLlm } from '@shared/providers';
 import type { ArticleRun, ArticleVideo } from '@shared/schemas';
 import type { ArticleStageClients } from '../clients';
 import { contextFromRun } from '../context';
 import { ArticleFatalError } from '../errors';
+import { logLlmUsage } from '../llm-usage';
 import type { StageOutcome } from './types';
 
 /**
@@ -82,10 +84,13 @@ export async function stageFinalize(
     outline.internal_links,
   );
 
+  const finalizeRoute = routeLlm(ctx.contentComplexity, 'finalize');
   const semRes = await llm.complete({
     messages: buildSemanticCheckPrompt(ctx, content),
     responseSchema: SEMANTIC_RESPONSE_SCHEMA,
+    ...finalizeRoute,
   });
+  logLlmUsage('finalize', semRes);
   const semantic = parseSemanticResult(semRes.text, ctx);
   if (!semantic.pass)
     failures.push({
@@ -122,7 +127,9 @@ export async function stageFinalize(
             candidates,
           }),
           responseSchema: VIDEO_PICK_RESPONSE_SCHEMA,
+          ...finalizeRoute,
         });
+        logLlmUsage('finalize', res);
         const pick = parseVideoPick(res.text, candidates.length, headings);
         if (pick) {
           const chosen = candidates[pick.video_index]!;

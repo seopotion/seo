@@ -279,6 +279,39 @@ describe('stageFinalize', () => {
     });
   });
 
+  test('routes the semantic check to the finalize task (Haiku at every complexity)', async () => {
+    const llm = llmReplying(semanticPass);
+    const youtube = youtubeThat();
+    const runOverrides = {
+      working: {
+        outline,
+        content,
+        readability_grade: 6,
+        humanize_attempts: [{ attempt: 1, grade: 6, content }],
+      },
+      presets: presetsNoVideo,
+    };
+    const technical = makeRun({
+      ...runOverrides,
+      presets: {
+        ...presets,
+        article_preferences: {
+          ...presets.article_preferences,
+          content_seo: {
+            ...presets.article_preferences.content_seo,
+            content_complexity: 'technical',
+          },
+        },
+      },
+    });
+
+    await stageFinalize(technical, { llm, youtube });
+
+    expect(llm.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+    );
+  });
+
   test('stores the org readability target on the article (#313)', async () => {
     const llm = llmReplying(semanticPass);
     const youtube = youtubeThat();
