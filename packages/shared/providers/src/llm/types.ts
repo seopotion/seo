@@ -10,6 +10,8 @@ export interface LlmCompleteParams {
   messages: LlmMessage[];
   /** Defaults to config.defaultModel. */
   model?: string;
+  /** OpenRouter provider slug to pin the call to (no fallbacks). Defaults to config.defaultProvider. */
+  provider?: string;
   maxTokens?: number;
   temperature?: number;
   /** Overrides the client's configured timeout for this call (routed per model). */
@@ -34,13 +36,17 @@ export interface LlmUsage {
 export interface LlmResult {
   text: string;
   model: string;
+  /** OpenRouter provider that served the call, when reported; null otherwise. */
+  provider?: string | null;
   usage: LlmUsage;
 }
 
 export interface LlmConfig {
   apiKey: string;
-  /** Defaults to 'anthropic/claude-haiku-4.5'. */
+  /** Defaults to DEFAULT_LLM_MODEL. */
   defaultModel?: string;
+  /** Provider slug every call is pinned to unless the call names one. Defaults to DEFAULT_LLM_PROVIDER. */
+  defaultProvider?: string;
   /** Defaults to 'https://openrouter.ai/api/v1'. */
   baseUrl?: string;
   /** Per-request timeout. Default 60000ms. */

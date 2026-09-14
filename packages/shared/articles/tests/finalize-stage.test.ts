@@ -279,7 +279,7 @@ describe('stageFinalize', () => {
     });
   });
 
-  test('routes the semantic check and the video pick to the finalize task (Haiku at every complexity)', async () => {
+  test('routes the semantic check and the video pick to the finalize task (the small model at every complexity)', async () => {
     // Default fixture presets have youtube_videos: true; one candidate makes
     // the stage also issue the video-pick call (#358 covers its route too).
     const llm = llmReplying(
@@ -318,11 +318,11 @@ describe('stageFinalize', () => {
 
     expect(llm.complete).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+      expect.objectContaining({ model: 'google/gemini-2.5-flash', timeoutMs: 60_000 }),
     );
     expect(llm.complete).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+      expect.objectContaining({ model: 'google/gemini-2.5-flash', timeoutMs: 60_000 }),
     );
   });
 

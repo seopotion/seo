@@ -121,7 +121,7 @@ describe('stageOutline', () => {
     expect(llm.complete).toHaveBeenCalledWith(
       expect.objectContaining({
         responseSchema: OUTLINE_RESPONSE_SCHEMA,
-        model: 'anthropic/claude-haiku-4.5',
+        model: 'google/gemini-2.5-flash',
         timeoutMs: 60_000,
       }),
     );
@@ -150,7 +150,7 @@ describe('stageOutline', () => {
     await stageOutline(technical, llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'anthropic/claude-sonnet-5', timeoutMs: 120_000 }),
+      expect.objectContaining({ model: 'deepseek/deepseek-v4-pro-0813', timeoutMs: 120_000 }),
     );
   });
 });
@@ -210,7 +210,7 @@ describe('stageDraft', () => {
     await stageDraft(technical, llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'anthropic/claude-opus-5', timeoutMs: 240_000 }),
+      expect.objectContaining({ model: 'qwen/qwen3.8-max-0902', timeoutMs: 240_000 }),
     );
   });
 });

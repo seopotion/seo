@@ -1,5 +1,5 @@
 import { isRetryableProviderError, ProviderError, providerHttpError } from '../errors';
-import { DEFAULT_LLM_MODEL, DEFAULT_LLM_TIMEOUT_MS } from './routing';
+import { DEFAULT_LLM_MODEL, DEFAULT_LLM_PROVIDER, DEFAULT_LLM_TIMEOUT_MS } from './routing';
 import type { LlmClient, LlmCompleteParams, LlmConfig, LlmResult } from './types';
 
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -15,6 +15,7 @@ function num(raw: unknown): number {
 export function createOpenRouterClient(config: LlmConfig): LlmClient {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
   const defaultModel = config.defaultModel ?? DEFAULT_LLM_MODEL;
+  const defaultProvider = config.defaultProvider ?? DEFAULT_LLM_PROVIDER;
   const timeoutMs = config.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
   const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES;
   const retryDelayMs = config.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
@@ -51,6 +52,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
 
     const json = (await res.json()) as {
       model?: string;
+      provider?: string;
       choices?: Array<{ message?: { content?: string } }>;
       usage?: {
         prompt_tokens?: number;
@@ -63,6 +65,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
     return {
       text: json.choices?.[0]?.message?.content ?? '',
       model: json.model ?? defaultModel,
+      provider: json.provider ?? null,
       usage: {
         promptTokens: num(usage.prompt_tokens),
         completionTokens: num(usage.completion_tokens),
@@ -105,13 +108,18 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
             schema: params.responseSchema.schema,
           },
         };
-        // OpenRouter silently DROPS parameters an endpoint does not support, and
-        // the same model is served by several. Without this the call would look
-        // identical and quietly fall back to unconstrained output — the failure
-        // we are removing. Fail the request instead of pretending it was
-        // constrained.
-        body.provider = { require_parameters: true };
       }
+      // Every call is pinned to one provider with fallbacks off: the routing
+      // table picks models for their price on a specific host, and OpenRouter
+      // would otherwise reroute a busy provider to a pricier host of the same
+      // model without a trace. With a schema, require_parameters also refuses
+      // an endpoint that would silently DROP response_format and fall back to
+      // unconstrained output — the failure structured outputs were added to fix.
+      body.provider = {
+        only: [params.provider ?? defaultProvider],
+        allow_fallbacks: false,
+        ...(params.responseSchema ? { require_parameters: true } : {}),
+      };
 
       const timeout = params.timeoutMs ?? timeoutMs;
       const result = await send(body, timeout);
