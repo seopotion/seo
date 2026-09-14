@@ -7,32 +7,47 @@ export type LlmTask = (typeof LLM_TASKS)[number];
 export interface LlmRoute {
   /** OpenRouter model id. */
   model: string;
+  /**
+   * OpenRouter provider slug the call is pinned to, with fallbacks disabled:
+   * the price is the reason these models were chosen, and OpenRouter would
+   * otherwise silently reroute to a pricier host of the same model.
+   */
+  provider: string;
   /** Per-request timeout for this model; bigger models need longer. */
   timeoutMs: number;
 }
 
-/** The client default: what every call got before routing existed. */
-export const DEFAULT_LLM_MODEL = 'anthropic/claude-haiku-4.5';
+/** The client default: what every unrouted call (scanner, strategy) gets. */
+export const DEFAULT_LLM_MODEL = 'google/gemini-2.5-flash';
+export const DEFAULT_LLM_PROVIDER = 'google-vertex/global';
 export const DEFAULT_LLM_TIMEOUT_MS = 60_000;
 
-const HAIKU: LlmRoute = { model: DEFAULT_LLM_MODEL, timeoutMs: DEFAULT_LLM_TIMEOUT_MS };
-const SONNET: LlmRoute = { model: 'anthropic/claude-sonnet-5', timeoutMs: 120_000 };
-const OPUS: LlmRoute = { model: 'anthropic/claude-opus-5', timeoutMs: 240_000 };
+const SMALL: LlmRoute = {
+  model: DEFAULT_LLM_MODEL,
+  provider: DEFAULT_LLM_PROVIDER,
+  timeoutMs: DEFAULT_LLM_TIMEOUT_MS,
+};
+const MEDIUM: LlmRoute = {
+  model: 'deepseek/deepseek-v4-pro-0813',
+  provider: 'alibaba',
+  timeoutMs: 120_000,
+};
+const LARGE: LlmRoute = { model: 'qwen/qwen3.8-max-0902', provider: 'alibaba', timeoutMs: 240_000 };
 
 /**
  * Per-stage ladder by the org's content_complexity (design/ai-model-routing.md).
  * The draft is where technical accuracy lives, so it gets the largest jump;
  * humanize on a technical draft risks dumbing it down, so it gets a stronger
- * model at the top tier but never Opus; meta, semantic markup and image
+ * model at the top tier but never the largest; meta, semantic markup and image
  * planning are mechanical regardless of audience. `general` is the client
- * default everywhere, so unrouted orgs are byte-identical to before.
+ * default everywhere, so unrouted orgs behave exactly like a general org.
  */
 const LADDER: Record<LlmTask, Record<ContentComplexity, LlmRoute>> = {
-  outline: { general: HAIKU, professional: SONNET, technical: SONNET },
-  draft: { general: HAIKU, professional: SONNET, technical: OPUS },
-  humanize: { general: HAIKU, professional: HAIKU, technical: SONNET },
-  finalize: { general: HAIKU, professional: HAIKU, technical: HAIKU },
-  image_plan: { general: HAIKU, professional: HAIKU, technical: HAIKU },
+  outline: { general: SMALL, professional: MEDIUM, technical: MEDIUM },
+  draft: { general: SMALL, professional: MEDIUM, technical: LARGE },
+  humanize: { general: SMALL, professional: SMALL, technical: MEDIUM },
+  finalize: { general: SMALL, professional: SMALL, technical: SMALL },
+  image_plan: { general: SMALL, professional: SMALL, technical: SMALL },
 };
 
 export function routeLlm(complexity: ContentComplexity, task: LlmTask): LlmRoute {

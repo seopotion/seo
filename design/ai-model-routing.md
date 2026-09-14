@@ -67,37 +67,58 @@ package index:
 
 ```ts
 export type LlmTask = 'outline' | 'draft' | 'humanize' | 'finalize' | 'image_plan';
-export type LlmRoute = { model: string; timeoutMs: number };
+export type LlmRoute = { model: string; provider: string; timeoutMs: number };
 
 export function routeLlm(complexity: ContentComplexity, task: LlmTask): LlmRoute;
 ```
 
-Backed by this table (OpenRouter model ids; the Sonnet and Opus ids are
-**verified against OpenRouter's model list at implementation time**, never
-guessed):
+Backed by this table. Three sizes, each an OpenRouter model id pinned to one
+provider (ids and provider tags **verified against OpenRouter's endpoints API
+at implementation time**, never guessed; 2026-09-14 prices per MTok in/out):
+
+| Size | Model | Provider pin | $ in / out |
+| --- | --- | --- | --- |
+| small | `google/gemini-2.5-flash` | `google-vertex/global` | 0.30 / 2.50 |
+| medium | `deepseek/deepseek-v4-pro-0813` | `alibaba` | 0.58 / 1.74 |
+| large | `qwen/qwen3.8-max-0902` | `alibaba` | 2.00 / 6.00 |
 
 | Task | general | professional | technical |
 | --- | --- | --- | --- |
-| outline | Haiku 4.5 | Sonnet | Sonnet |
-| draft | Haiku 4.5 | Sonnet | Opus |
-| humanize | Haiku 4.5 | Haiku 4.5 | Sonnet |
-| finalize (semantic + meta) | Haiku 4.5 | Haiku 4.5 | Haiku 4.5 |
-| image_plan | Haiku 4.5 | Haiku 4.5 | Haiku 4.5 |
+| outline | small | medium | medium |
+| draft | small | medium | large |
+| humanize | small | small | medium |
+| finalize (semantic + meta) | small | small | small |
+| image_plan | small | small | small |
 
 Rationale: the draft is where technical accuracy lives, so it gets the
 largest jump. Humanize on a technical draft risks dumbing it down, so it gets
-a stronger model at the top tier but never Opus. Meta, semantic markup and
-image planning are mechanical regardless of audience.
+a stronger model at the top tier but never the largest. Meta, semantic markup
+and image planning are mechanical regardless of audience.
 
-**Timeouts.** The LLM client defaults to 60s per request. An Opus draft of
-~5k output tokens will exceed that, so the route carries its own timeout:
-Haiku 60s, Sonnet 120s, Opus 240s. `LlmCompleteParams` gains an optional
+**Provider pinning.** Every call, routed or not, sends
+`provider: { only: [<pin>], allow_fallbacks: false }` (plus
+`require_parameters: true` when a response schema is set). The models were
+chosen for their price on a specific host; with fallbacks on, OpenRouter would
+reroute a busy provider to a pricier host of the same model without a trace.
+The cost of strictness is availability: an Alibaba outage fails the medium and
+large stages until Step Functions retries them. The `llm usage` line records
+the provider OpenRouter reports as served. The small size is also the client
+default, so the website scanner and the strategy job share its model and pin;
+the keyword pipeline keeps its own pinned models.
+
+History: the ladder shipped 2026-09-13 as Claude Haiku 4.5 / Sonnet 5 / Opus 5
+(v0.8.0) and moved to the table above the next day for cost, keeping the
+same shape.
+
+**Timeouts.** The LLM client defaults to 60s per request. A large-model draft
+of ~5k output tokens will exceed that, so the route carries its own timeout:
+small 60s, medium 120s, large 240s. `LlmCompleteParams` gains an optional
 `timeoutMs` that overrides the client default for that call. Retries (2,
 backoff) are unchanged, and a `timeout` error is retryable, so the worst case
-is three attempts: Sonnet 6 min, Opus 12 min, against a 5-minute Step
+is three attempts: medium 6 min, large 12 min, against a 5-minute Step
 Functions draft task timeout and a 10-minute Lambda. On that slow path Step
 Functions abandons the first Lambda and starts another while the first may
-still be retrying Opus, so one article can bill more than one Opus draft.
+still be retrying the large model, so one article can bill more than one draft.
 Accepted for now: Step Functions is the recovery, the duplicate is bounded,
 and the staging check reads the `llm usage` lines to see whether it ever
 happens. If it does, the options are a longer draft task timeout or a client
@@ -178,10 +199,10 @@ No migration. The schema default covers every existing org and run snapshot.
 2. From the admin editor set piperbox to `content_complexity: technical` and
    `image_direction.medium: diagram`.
 3. Trigger one piperbox article (`articles generate-next`, per the
-   article-pipeline skill). Verify the stage logs show Sonnet for outline
-   and humanize and Opus for draft, and that the three images are diagrams
+   article-pipeline skill). Verify the stage logs show the medium model for outline
+   and humanize and the large model for draft, and that the three images are diagrams
    with legible labels.
-4. Confirm an unmarble article still routes to Haiku and flux-2 (no change).
+4. Confirm an unmarble article still routes to the small model and flux-2.
 5. Release to prod; repeat step 2 for prod piperbox.
 
 ## 5. Testing
