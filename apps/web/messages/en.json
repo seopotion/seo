@@ -1036,6 +1036,10 @@
       "description": "Add your website, review the business profile Seopotion extracts and turn relevant topics into a publishing plan.",
       "title": "Start with your website"
     },
+    "featuredOn": {
+      "badgeAlt": "Featured on ScrollLaunch",
+      "title": "Featured on"
+    },
     "hero": {
       "cta": "Get started",
       "subtitle": "Seopotion is a self-service software platform that analyzes your website, finds relevant content opportunities, generates articles with internal links and lets you review, edit and publish them directly to WordPress.",
