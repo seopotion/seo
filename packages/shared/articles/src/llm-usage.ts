@@ -9,6 +9,7 @@ export function logLlmUsage(stage: string, result: LlmResult): void {
   console.info('llm usage', {
     stage,
     model: result.model,
+    provider: result.provider,
     prompt_tokens: result.usage.promptTokens,
     completion_tokens: result.usage.completionTokens,
     cost_usd: result.usage.costUsd,
