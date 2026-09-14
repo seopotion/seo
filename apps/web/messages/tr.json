@@ -1036,6 +1036,9 @@
       "description": "Web sitenizi ekleyin, Seopotion'ın çıkardığı işletme profilini inceleyin ve ilgili konuları bir yayın planına dönüştürün.",
       "title": "Web sitenizle başlayın"
     },
+    "featuredOn": {
+      "title": "Öne çıktığımız yerler"
+    },
     "hero": {
       "cta": "Başlayın",
       "subtitle": "Seopotion; web sitenizi analiz eden, ilgili içerik fırsatlarını bulan, iç bağlantılı makaleler üreten ve bunları WordPress'e göndermeden önce inceleyip düzenlemenizi sağlayan self servis bir yazılım platformudur.",
