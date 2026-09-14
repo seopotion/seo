@@ -507,21 +507,38 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
         <section className="border-border border-y bg-muted/50 px-6 py-12">
           <div className="mx-auto max-w-7xl text-center">
             <p className="mb-6 text-muted-foreground">{t('featuredOn.title')}</p>
-            <a
-              href="https://www.scrolllaunch.com/products/seopotion?ref=badge"
-              target="_blank"
-              rel="noopener"
-              className="inline-flex"
-            >
-              {/* biome-ignore lint/performance/noImgElement: third-party badge served dynamically by ScrollLaunch, not our origin */}
-              <img
-                src="https://www.scrolllaunch.com/api/badge/seopotion"
-                alt="Featured on ScrollLaunch"
-                width={220}
-                height={48}
-                loading="lazy"
-              />
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <a
+                href="https://www.scrolllaunch.com/products/seopotion?ref=badge"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served dynamically by ScrollLaunch, not our origin */}
+                <img
+                  src="https://www.scrolllaunch.com/api/badge/seopotion"
+                  alt="Featured on ScrollLaunch"
+                  width={220}
+                  height={48}
+                  loading="lazy"
+                />
+              </a>
+              <a
+                href="https://nicklaunches.com/products/seopotion/?utm_source=seopotion.co&utm_medium=badge&utm_campaign=featured"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by Nick Launches, not our origin */}
+                <img
+                  src="https://nicklaunches.com/badges/featured.png"
+                  alt="SeoPotion on Nick Launches"
+                  width={244}
+                  height={56}
+                  loading="lazy"
+                />
+              </a>
+            </div>
           </div>
         </section>
       </main>
