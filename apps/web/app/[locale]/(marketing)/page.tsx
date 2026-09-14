@@ -516,7 +516,7 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
               {/* biome-ignore lint/performance/noImgElement: third-party badge served dynamically by ScrollLaunch, not our origin */}
               <img
                 src="https://www.scrolllaunch.com/api/badge/seopotion"
-                alt={t('featuredOn.badgeAlt')}
+                alt="Featured on ScrollLaunch"
                 width={220}
                 height={48}
                 loading="lazy"
