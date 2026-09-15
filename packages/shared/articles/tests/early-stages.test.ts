@@ -150,7 +150,11 @@ describe('stageOutline', () => {
     await stageOutline(technical, llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'deepseek/deepseek-v4-pro-0813', timeoutMs: 120_000 }),
+      expect.objectContaining({
+        model: 'deepseek/deepseek-v4-pro-0813',
+        timeoutMs: 180_000,
+        reasoningEffort: 'low',
+      }),
     );
   });
 });
@@ -210,7 +214,11 @@ describe('stageDraft', () => {
     await stageDraft(technical, llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'qwen/qwen3.8-max-0902', timeoutMs: 240_000 }),
+      expect.objectContaining({
+        model: 'qwen/qwen3.8-max-0902',
+        timeoutMs: 300_000,
+        reasoningEffort: 'low',
+      }),
     );
   });
 });

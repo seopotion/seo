@@ -138,6 +138,19 @@ describe('complete', () => {
     expect(body.provider).toEqual({ only: ['alibaba'], allow_fallbacks: false });
   });
 
+  test('sends reasoning.effort only when the call sets it', async () => {
+    const fetchMock = vi.fn((_url: string, _init: RequestInit) =>
+      Promise.resolve(chatResponse('ok')),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await client().complete({ messages: [{ role: 'user', content: 'x' }], reasoningEffort: 'low' });
+    await client().complete({ messages: [{ role: 'user', content: 'x' }] });
+    const withEffort = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    const without = JSON.parse(fetchMock.mock.calls[1]![1].body as string);
+    expect(withEffort.reasoning).toEqual({ effort: 'low' });
+    expect(without.reasoning).toBeUndefined();
+  });
+
   test('honors an explicit model override', async () => {
     const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
     vi.stubGlobal('fetch', fetchMock);
@@ -213,6 +226,41 @@ describe('complete', () => {
       client().complete({ messages: [{ role: 'user', content: 'x' }] }),
     ).rejects.toMatchObject({ category: 'network' });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  // A request that just spent its whole timeout is not a good candidate for
+  // an in-process second try: the stage's outer retry (Step Functions / SQS)
+  // restarts it in a fresh Lambda instead, so one invocation is bounded by a
+  // single route timeout and no two Lambdas bill the same draft.
+  test('a timeout is thrown after one attempt but stays retryable for the caller', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const c = createOpenRouterClient({
+        apiKey: 'sk-test',
+        timeoutMs: 1_000,
+        maxRetries: 2,
+        retryDelayMs: 0,
+      });
+      const failed = c.complete({ messages: [{ role: 'user', content: 'x' }] }).then(
+        () => null,
+        (err: unknown) => err as { category: string; retryable: boolean },
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      const err = await failed;
+      expect(err).toMatchObject({ category: 'timeout', retryable: true });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('sends attribution headers when configured', async () => {
