@@ -42,7 +42,7 @@ export interface LlmRoute {
   provider: string;
   timeoutMs: number;
   /** OpenRouter `reasoning.effort`; omitted = the model's default. */
-  reasoningEffort?: 'low';
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
 }
 ```
 
@@ -95,7 +95,9 @@ line (model, provider, tokens, cost) as today.
   `{ effort: 'low' }` when the param is set and is absent otherwise; a request that times
   out is thrown after one attempt (fetch called once) with category `timeout` and
   `retryable: true`; a 5xx still retries as before.
-- Article stage tests that snapshot the spread route (if any) updated for the new field.
+- `packages/shared/articles/tests/early-stages.test.ts` and `humanize-stage.test.ts` pin the
+  spread route with `objectContaining({ model, timeoutMs })`; update those timeouts and add
+  `reasoningEffort: 'low'` to the medium/large expectations.
 - Infra has no unit tests; the `infra-synth` CI job covers the task timeout change.
 - Staging check after merge: one piperbox article. Read the `llm usage` lines for
   `model`, `provider` and `completion_tokens` (expect outline well under 1k, draft near
