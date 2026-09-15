@@ -21,7 +21,7 @@ on both `LlmClient` and `ImageClient`, nobody passes it. What is missing is a
 | Concern | Choice |
 | --- | --- |
 | Text routing signal | New preset `content_seo.content_complexity`: `general \| professional \| technical`. Scan-assigned, admin-editable, default `general`. |
-| Text routing | A const table `(complexity, task) → { model, timeoutMs }` in `@shared/providers`. Article stages pass the result per call. |
+| Text routing | A const table `(complexity, task) → { model, provider, timeoutMs, reasoningEffort? }` in `@shared/providers`. Article stages pass the result per call. |
 | Image routing signal | `image_direction.medium` gains `diagram`. Complexity never touches images. |
 | Image routing | `diagram` → a text-capable fal model; every other medium → `flux-2` as today. |
 | Billing cap | None. Complexity alone decides; article generation already requires a paid plan. |
@@ -110,19 +110,19 @@ History: the ladder shipped 2026-09-13 as Claude Haiku 4.5 / Sonnet 5 / Opus 5
 (v0.8.0) and moved to the table above the next day for cost, keeping the
 same shape.
 
-**Timeouts.** The LLM client defaults to 60s per request. A large-model draft
-of ~5k output tokens will exceed that, so the route carries its own timeout:
-small 60s, medium 120s, large 240s. `LlmCompleteParams` gains an optional
-`timeoutMs` that overrides the client default for that call. Retries (2,
-backoff) are unchanged, and a `timeout` error is retryable, so the worst case
-is three attempts: medium 6 min, large 12 min, against a 5-minute Step
-Functions draft task timeout and a 10-minute Lambda. On that slow path Step
-Functions abandons the first Lambda and starts another while the first may
-still be retrying the large model, so one article can bill more than one draft.
-Accepted for now: Step Functions is the recovery, the duplicate is bounded,
-and the staging check reads the `llm usage` lines to see whether it ever
-happens. If it does, the options are a longer draft task timeout or a client
-retry budget that stops retrying a timeout when another attempt cannot fit.
+**Timeouts and reasoning effort.** The LLM client defaults to 60s per request. A
+large-model draft of ~5k output tokens will exceed that, so the route carries its own
+timeout: small 60s, medium 180s, large 300s. `LlmCompleteParams` gains an optional
+`timeoutMs` that overrides the client default for that call. The route also carries
+`reasoningEffort: 'low'` on medium and large (sent as OpenRouter `reasoning.effort`;
+small leaves the model default): DeepSeek reasons at `high` and Qwen at `xhigh` by
+default, and the first staging run (2026-09-15) spent 5.7k hidden tokens on a
+350-token outline, running the call to its then-120s limit. Retries (2, backoff) stay
+for rate-limit, provider and network errors, but a `timeout` is thrown after one
+attempt: it stays `retryable`, so Step Functions restarts the stage in a fresh Lambda
+instead of one Lambda retrying past its task while another bills the same draft. The
+draft task timeout is 7 minutes so one full large timeout fits inside a single
+attempt. Design: `docs/superpowers/specs/2026-09-15-llm-reasoning-effort-and-timeouts-design.md`.
 
 **Call sites.** Each article stage reads
 `run.input.presets.article_preferences.content_seo.content_complexity` and

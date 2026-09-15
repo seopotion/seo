@@ -1,4 +1,5 @@
 import type { LlmResponseSchema } from '@shared/schemas';
+import type { LlmReasoningEffort } from './routing';
 
 export type LlmRole = 'system' | 'user' | 'assistant';
 export interface LlmMessage {
@@ -16,6 +17,8 @@ export interface LlmCompleteParams {
   temperature?: number;
   /** Overrides the client's configured timeout for this call (routed per model). */
   timeoutMs?: number;
+  /** OpenRouter `reasoning.effort`; omitted = the model's default (routed per model). */
+  reasoningEffort?: LlmReasoningEffort;
   /**
    * Constrain the response to a JSON Schema (OpenRouter structured outputs).
    * Omit for free-form text. There is deliberately no plain "JSON mode" option:

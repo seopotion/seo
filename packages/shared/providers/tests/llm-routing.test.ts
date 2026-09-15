@@ -57,9 +57,22 @@ describe('routeLlm', () => {
     expect(pick('technical', 'image_plan')).toEqual(small);
   });
 
-  // The client default is 60s; a long technical draft runs past it.
+  // The client default is 60s; a long technical draft runs past it. Measured
+  // 2026-09-15 on staging at default reasoning effort: outline 120 s, draft
+  // 201 s — so the limits carry headroom over the low-effort durations.
   test('bigger models get longer timeouts', () => {
-    expect(routeLlm('professional', 'draft').timeoutMs).toBe(120_000);
-    expect(routeLlm('technical', 'draft').timeoutMs).toBe(240_000);
+    expect(routeLlm('professional', 'draft').timeoutMs).toBe(180_000);
+    expect(routeLlm('technical', 'draft').timeoutMs).toBe(300_000);
+  });
+
+  // DeepSeek defaults to effort `high` and Qwen to `xhigh` (mandatory): a
+  // 350-token outline cost 5.7k completion tokens of hidden reasoning.
+  test('medium and large routes cap reasoning effort at low; small leaves the default', () => {
+    expect(routeLlm('technical', 'outline').reasoningEffort).toBe('low');
+    expect(routeLlm('technical', 'draft').reasoningEffort).toBe('low');
+    expect(routeLlm('technical', 'humanize').reasoningEffort).toBe('low');
+    for (const task of LLM_TASKS) {
+      expect(routeLlm('general', task).reasoningEffort).toBeUndefined();
+    }
   });
 });

@@ -15,7 +15,15 @@ export interface LlmRoute {
   provider: string;
   /** Per-request timeout for this model; bigger models need longer. */
   timeoutMs: number;
+  /**
+   * OpenRouter `reasoning.effort`; omitted = the model's own default. DeepSeek
+   * defaults to `high` and Qwen to `xhigh` (mandatory), which on staging spent
+   * 5.7k hidden tokens on a 350-token outline and ran the call to its timeout.
+   */
+  reasoningEffort?: LlmReasoningEffort;
 }
+
+export type LlmReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 
 /** The client default: what every unrouted call (scanner, strategy) gets. */
 export const DEFAULT_LLM_MODEL = 'google/gemini-2.5-flash';
@@ -30,9 +38,15 @@ const SMALL: LlmRoute = {
 const MEDIUM: LlmRoute = {
   model: 'deepseek/deepseek-v4-pro-0813',
   provider: 'alibaba',
-  timeoutMs: 120_000,
+  timeoutMs: 180_000,
+  reasoningEffort: 'low',
 };
-const LARGE: LlmRoute = { model: 'qwen/qwen3.8-max-0902', provider: 'alibaba', timeoutMs: 240_000 };
+const LARGE: LlmRoute = {
+  model: 'qwen/qwen3.8-max-0902',
+  provider: 'alibaba',
+  timeoutMs: 300_000,
+  reasoningEffort: 'low',
+};
 
 /**
  * Per-stage ladder by the org's content_complexity (design/ai-model-routing.md).
