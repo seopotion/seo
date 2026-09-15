@@ -506,7 +506,6 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
 
         <section className="border-border border-y bg-muted/50 px-6 py-12">
           <div className="mx-auto max-w-7xl text-center">
-            <p className="mb-6 text-muted-foreground">{t('featuredOn.title')}</p>
             <div className="flex flex-wrap items-center justify-center gap-6">
               <a
                 href="https://www.scrolllaunch.com/products/seopotion?ref=badge"
@@ -536,6 +535,55 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
                   width={244}
                   height={56}
                   loading="lazy"
+                />
+              </a>
+              <a
+                href="https://thesaasdir.com/product/seopotion?ref=badge"
+                rel="dofollow"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by TheSaaSDir, not our origin */}
+                <img
+                  src="https://thesaasdir.com/badge/seopotion.svg"
+                  alt="Featured on TheSaaSDir"
+                  width={160}
+                  height={44}
+                />
+              </a>
+              <a href="https://saascity.io" target="_blank" rel="noopener" className="inline-flex">
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by SaaSCity, not our origin */}
+                <img
+                  src="https://saascity.io/badges/featured-light.svg"
+                  alt="Featured on SaaSCity"
+                  width={150}
+                  height={54}
+                />
+              </a>
+              <a
+                href="https://fazier.com/launches/seopotion.co"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by Fazier, not our origin */}
+                <img
+                  src="https://fazier.com/api/v1//public/badges/launch_badges.svg?badge_type=featured&theme=neutral"
+                  width={250}
+                  alt="Fazier badge"
+                />
+              </a>
+              <a
+                href="https://startupfa.me/s/seopotion?utm_source=seopotion.co"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by Startup Fame, not our origin */}
+                <img
+                  src="https://startupfa.me/badges/featured-badge.webp"
+                  alt="Seopotion - Featured on Startup Fame"
+                  width={171}
+                  height={54}
                 />
               </a>
             </div>
