@@ -4,7 +4,8 @@ import { createOpenRouterClient } from '../src';
 function chatResponse(content: string) {
   return new Response(
     JSON.stringify({
-      model: 'anthropic/claude-haiku-4.5',
+      model: 'google/gemini-2.5-flash',
+      provider: 'Google',
       choices: [{ message: { role: 'assistant', content } }],
       usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14, cost: 0.00014 },
     }),
@@ -32,17 +33,19 @@ describe('complete', () => {
 
     expect(out).toEqual({
       text: 'Hello there!',
-      model: 'anthropic/claude-haiku-4.5',
+      model: 'google/gemini-2.5-flash',
+      provider: 'Google',
       usage: { promptTokens: 10, completionTokens: 4, totalTokens: 14, costUsd: 0.00014 },
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-test');
     expect(JSON.parse(init.body as string)).toEqual({
-      model: 'anthropic/claude-haiku-4.5',
+      model: 'google/gemini-2.5-flash',
       messages: [{ role: 'user', content: 'Hi' }],
       max_tokens: 100,
       temperature: 0.7,
+      provider: { only: ['google-vertex/global'], allow_fallbacks: false },
     });
   });
 
@@ -104,16 +107,35 @@ describe('complete', () => {
       responseSchema: { name: 'thing', schema: { type: 'object' } },
     });
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
-    expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.provider).toEqual({
+      only: ['google-vertex/global'],
+      allow_fallbacks: false,
+      require_parameters: true,
+    });
   });
 
-  test('omits response_format and provider pinning without a responseSchema', async () => {
+  // The pin is unconditional: the routing table chose each model for its price
+  // on one host, and a fallback would silently move the call to a pricier one.
+  test('pins the default provider with fallbacks off even without a responseSchema', async () => {
     const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
     vi.stubGlobal('fetch', fetchMock);
     await client().complete({ messages: [{ role: 'user', content: 'x' }] });
     const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
     expect(body.response_format).toBeUndefined();
-    expect(body.provider).toBeUndefined();
+    expect(body.provider).toEqual({ only: ['google-vertex/global'], allow_fallbacks: false });
+  });
+
+  test('honors an explicit provider override', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatResponse('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    await client().complete({
+      messages: [{ role: 'user', content: 'x' }],
+      model: 'qwen/qwen3.8-max-0902',
+      provider: 'alibaba',
+    });
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+    expect(body.model).toBe('qwen/qwen3.8-max-0902');
+    expect(body.provider).toEqual({ only: ['alibaba'], allow_fallbacks: false });
   });
 
   test('honors an explicit model override', async () => {

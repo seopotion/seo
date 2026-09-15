@@ -342,14 +342,14 @@ describe('stageImagesPlan', () => {
     expect(slots[0]!.prompt).not.toContain('badge');
   });
 
-  test('plans on the image_plan route (Haiku at every complexity)', async () => {
+  test('plans on the image_plan route (the small model at every complexity)', async () => {
     findArticleById.mockResolvedValue({ ...article, images: [] });
     llmComplete.mockResolvedValue({ text: planJson, model: 'm', usage: usageStub });
 
     await stageImagesPlan(run, { complete: llmComplete });
 
     expect(llmComplete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'anthropic/claude-haiku-4.5', timeoutMs: 60_000 }),
+      expect.objectContaining({ model: 'google/gemini-2.5-flash', timeoutMs: 60_000 }),
     );
   });
 
