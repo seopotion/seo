@@ -215,7 +215,7 @@ export default function HomePage() {
                         href={article.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="truncate text-foreground hover:text-foreground hover:underline"
+                        className="min-w-0 truncate text-foreground hover:text-foreground hover:underline"
                       >
                         {article.title ?? pathLabel(article.url)}
                       </a>
