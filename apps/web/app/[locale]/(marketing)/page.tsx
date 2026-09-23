@@ -586,6 +586,36 @@ export default function LandingPage({ params }: { params: Promise<{ locale: stri
                   height={54}
                 />
               </a>
+              <a
+                href="https://smollaunch.com"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by Smol Launch, not our origin */}
+                <img
+                  src="https://smollaunch.com/badges/featured.svg"
+                  alt="Seopotion — Featured on Smol Launch"
+                  loading="lazy"
+                  width={250}
+                  height={60}
+                />
+              </a>
+              <a
+                href="https://launchaf.com/"
+                target="_blank"
+                rel="noopener"
+                data-launchaf-badge="true"
+                className="inline-flex"
+              >
+                {/* biome-ignore lint/performance/noImgElement: third-party badge served by LaunchAF, not our origin */}
+                <img
+                  src="https://launchaf.com/api/badge/light?v=launchaf-blue-2026-2"
+                  alt="Featured on LaunchAF"
+                  width={200}
+                  height={56}
+                />
+              </a>
             </div>
           </div>
         </section>
