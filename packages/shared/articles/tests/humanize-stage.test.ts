@@ -328,7 +328,11 @@ describe('stageHumanize', () => {
     await stageHumanize(technical, llm);
 
     expect(llm.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'deepseek/deepseek-v4-pro-0813', timeoutMs: 120_000 }),
+      expect.objectContaining({
+        model: 'deepseek/deepseek-v4-pro-0813',
+        timeoutMs: 180_000,
+        reasoningEffort: 'low',
+      }),
     );
   });
 

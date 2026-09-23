@@ -75,7 +75,13 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
     };
   }
 
-  /** `once`, plus retries on transient transport failures. */
+  /**
+   * `once`, plus retries on transient transport failures. A timeout is the
+   * exception: the request just spent its whole budget, so a second in-process
+   * try would only push one Lambda past its Step Functions task while a fresh
+   * one starts and bills the same stage again. The error stays `retryable` so
+   * the caller's outer retry (Step Functions, SQS) restarts the stage instead.
+   */
   async function send(body: Record<string, unknown>, timeout: number): Promise<LlmResult> {
     let attempt = 0;
     // Loop: initial try + up to maxRetries retries on retryable categories.
@@ -83,7 +89,10 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       try {
         return await once(body, timeout);
       } catch (err) {
-        const retryable = err instanceof ProviderError && isRetryableProviderError(err.category);
+        const retryable =
+          err instanceof ProviderError &&
+          err.category !== 'timeout' &&
+          isRetryableProviderError(err.category);
         if (!retryable || attempt >= maxRetries) throw err;
         await sleep(retryDelayMs * 2 ** attempt);
         attempt += 1;
@@ -99,6 +108,7 @@ export function createOpenRouterClient(config: LlmConfig): LlmClient {
       };
       if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens;
       if (params.temperature !== undefined) body.temperature = params.temperature;
+      if (params.reasoningEffort) body.reasoning = { effort: params.reasoningEffort };
       if (params.responseSchema) {
         body.response_format = {
           type: 'json_schema',

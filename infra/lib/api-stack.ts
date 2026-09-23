@@ -588,7 +588,8 @@ export class ApiStack extends Stack {
 
     const articleDefinition = articleStage('prepare', Duration.minutes(3))
       .next(articleStage('outline', Duration.minutes(5)))
-      .next(articleStage('draft', Duration.minutes(5)))
+      // One full large-route LLM timeout (300 s) + checkpoint I/O + cold start.
+      .next(articleStage('draft', Duration.minutes(7)))
       .next(humanizeTask.next(readabilityGate));
 
     const articleStateMachine = new StateMachine(this, 'ArticleStateMachine', {
